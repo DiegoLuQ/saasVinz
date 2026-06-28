@@ -1,0 +1,99 @@
+# =============================================================================
+#  SaaSCrematorio V2 — Despliegue en VPS
+#  - Reverse proxy: jwilder/nginx-proxy + letsencrypt-companion (YA existen en
+#    el VPS). Se integra por variables VIRTUAL_HOST / LETSENCRYPT_HOST.
+#  - PostgreSQL: se reusa el contenedor compartido (evolution_postgres). No se
+#    levanta una BD propia.
+#  - Red: web_private_red_webapps (externa, la misma del reverse-proxy).
+#  Todos los valores provienen del .env de la raíz.
+# =============================================================================
+
+services:
+  # --- BACKEND (FastAPI) ---
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vincer_backend
+    restart: unless-stopped
+    expose:
+      - "8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      # Conexión a la BD compartida con el usuario de la app (RLS APLICA).
+      - SQLALCHEMY_DATABASE_URL=postgresql://${APP_USER}:${APP_USER_PASSWORD}@${POSTGRES_HOST}:5432/${POSTGRES_DB}
+      # Credenciales admin para los respaldos (superusuario, ignora RLS).
+      - DB_ADMIN_USER=${POSTGRES_USER}
+      - DB_ADMIN_PASS=${POSTGRES_PASSWORD}
+      # URLs públicas (sobrescriben los valores de desarrollo de backend/.env).
+      - BASE_URL=https://${DOMAIN_APP}
+      - FRONTEND_URL=https://${DOMAIN_MAIN}
+      # pg_dump corre dentro del backend (postgresql-client) vía TCP; no se usa
+      # la rama docker-exec, por eso se deja vacío.
+      - BACKUP_PG_CONTAINER=
+      # Integración con nginx-proxy + Let's Encrypt:
+      - VIRTUAL_HOST=${DOMAIN_API}
+      - VIRTUAL_PORT=8000
+      - LETSENCRYPT_HOST=${DOMAIN_API}
+      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
+    networks:
+      - web
+
+  # --- FRONTEND (Next.js) ---
+  frontend:
+    build:
+      context: ./frontend-saas
+      dockerfile: Dockerfile
+      args:
+        # Variables públicas: se hornean en build desde el .env raíz.
+        NEXT_PUBLIC_API_URL: https://${DOMAIN_API}
+        NEXT_PUBLIC_ROOT_DOMAIN: ${DOMAIN_MAIN}
+        NEXT_PUBLIC_MEMORIAL_DOMAIN: ${DOMAIN_MEMORIALS}
+    container_name: vincer_frontend
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      # El front sirve el landing (raíz) y los subdominios app/admin/pm.
+      - VIRTUAL_HOST=${DOMAIN_MAIN},www.${DOMAIN_MAIN},${DOMAIN_APP},${DOMAIN_ADMIN},${DOMAIN_MEMORIALS}
+      - VIRTUAL_PORT=3000
+      - LETSENCRYPT_HOST=${DOMAIN_MAIN},www.${DOMAIN_MAIN},${DOMAIN_APP},${DOMAIN_ADMIN},${DOMAIN_MEMORIALS}
+      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
+    networks:
+      - web
+
+  # --- PGADMIN (UI de la BD) ---
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: vincer_pgadmin
+    restart: unless-stopped
+    expose:
+      - "80"
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+      - PGADMIN_CONFIG_SERVER_MODE=False
+      # Necesario detrás de un reverse proxy con TLS para evitar redirecciones a http:
+      - PGADMIN_CONFIG_PROXY_X_FOR_COUNT=1
+      - PGADMIN_CONFIG_PROXY_X_PROTO_COUNT=1
+      - PGADMIN_CONFIG_PROXY_X_HOST_COUNT=1
+      - PGADMIN_CONFIG_PROXY_X_PORT_COUNT=1
+      # Integración con nginx-proxy + Let's Encrypt:
+      - VIRTUAL_HOST=${DOMAIN_PGADMIN}
+      - VIRTUAL_PORT=80
+      - LETSENCRYPT_HOST=${DOMAIN_PGADMIN}
+      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - web
+
+volumes:
+  pgadmin_data:
+
+# La red la administra el reverse-proxy existente; aquí se referencia como externa.
+networks:
+  web:
+    external: true
+    name: ${EXTERNAL_NETWORK}

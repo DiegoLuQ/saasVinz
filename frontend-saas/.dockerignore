@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+.gitignore
+Dockerfile
+.dockerignore
+npm-debug.log
+# Las NEXT_PUBLIC_* llegan por build args, no desde .env local:
+.env
+.env.*
+!.env.example

@@ -1,0 +1,27 @@
+export const formatRut = (rut: string): string => {
+    if (!rut) return '';
+
+    // Clean all non-alphanumeric characters
+    let value = rut.replace(/[^0-9kK]/g, '');
+
+    if (value.length === 0) return '';
+    if (value.length > 9) value = value.slice(0, 9); // Max length check
+
+    // Separate body and dv
+    const body = value.slice(0, -1);
+    const dv = value.slice(-1).toUpperCase();
+
+    if (value.length === 1) return value.toUpperCase();
+
+    // Format body with dots
+    let formattedBody = '';
+    for (let i = body.length - 1, j = 0; i >= 0; i--, j++) {
+        formattedBody = body.charAt(i) + formattedBody;
+        if (j === 2 && i !== 0) {
+            formattedBody = '.' + formattedBody;
+            j = -1;
+        }
+    }
+
+    return `${formattedBody}-${dv}`;
+};

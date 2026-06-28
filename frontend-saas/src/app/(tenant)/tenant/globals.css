@@ -1,0 +1,205 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+
+  /* Colores base por defecto (Esmeralda) */
+  --color-primary: var(--primary-color);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-background: var(--background-color);
+  --color-foreground: var(--foreground-color);
+  --color-muted: var(--muted-color);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent-color);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-card: var(--card-color);
+  --color-card-border: var(--card-border-color);
+}
+
+@layer base {
+  :root {
+    /* Tema Esmeralda (Default) */
+    --primary-color: #10b981;
+    --primary-foreground: #ffffff;
+    --background-color: #0f172a;
+    --foreground-color: #f8fafc;
+    --muted-color: #1e293b;
+    --muted-foreground: #94a3b8;
+    --accent-color: #059669;
+    --accent-foreground: #ffffff;
+    --card-color: #1e293b;
+    --card-border-color: #334155;
+  }
+
+  [data-theme='oceano'] {
+    --primary-color: #0ea5e9;
+    --primary-foreground: #ffffff;
+    --background-color: #082f49;
+    --foreground-color: #f0f9ff;
+    --muted-color: #0c4a6e;
+    --muted-foreground: #7dd3fc;
+    --accent-color: #0284c7;
+    --accent-foreground: #ffffff;
+    --card-color: #0c4a6e;
+    --card-border-color: #075985;
+  }
+
+  [data-theme='atardecer'] {
+    --primary-color: #fb923c;
+    --primary-foreground: #ffffff;
+    --background-color: #2e1065;
+    --foreground-color: #faf5ff;
+    --muted-color: #4c1d95;
+    --muted-foreground: #c084fc;
+    --accent-color: #f97316;
+    --accent-foreground: #ffffff;
+    --card-color: #4c1d95;
+    --card-border-color: #5b21b6;
+  }
+
+  [data-theme='oro'] {
+    --primary-color: #eab308;
+    --primary-foreground: #0c0a09;
+    --background-color: #0c0a09;
+    --foreground-color: #f5f5f4;
+    --muted-color: #1c1917;
+    --muted-foreground: #a8a29e;
+    --accent-color: #ca8a04;
+    --accent-foreground: #0c0a09;
+    --card-color: #141210;
+    --card-border-color: #2e2a24;
+  }
+
+  [data-theme='monocromo'] {
+    --primary-color: #ffffff;
+    --primary-foreground: #000000;
+    --background-color: #000000;
+    --foreground-color: #ffffff;
+    --muted-color: #1a1a1a;
+    --muted-foreground: #a3a3a3;
+    --accent-color: #404040;
+    --accent-foreground: #ffffff;
+    --card-color: #121212;
+    --card-border-color: #262626;
+  }
+
+  [data-theme='turquesa'] {
+    --primary-color: #14b8a6;
+    --primary-foreground: #ffffff;
+    --background-color: #06101e;
+    --foreground-color: #f0f9ff;
+    --muted-color: #0d1e36;
+    --muted-foreground: #8fa4c3;
+    --accent-color: #0d9488;
+    --accent-foreground: #ffffff;
+    --card-color: #0b1a2f;
+    --card-border-color: #182c47;
+  }
+
+  [data-theme='light'] {
+    --primary-color: #10b981;
+    --primary-foreground: #ffffff;
+    --background-color: #f8fafc;
+    --foreground-color: #0f172a;
+    --muted-color: #f1f5f9;
+    --muted-foreground: #64748b;
+    --accent-color: #059669;
+    --accent-foreground: #ffffff;
+    --card-color: #ffffff;
+    --card-border-color: #e2e8f0;
+  }
+
+  * {
+    border-color: var(--card-border-color);
+  }
+
+  body {
+    background-color: var(--background-color);
+    color: var(--foreground-color);
+    font-family: var(--font-sans);
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .glass-card {
+    background: var(--card-color);
+    border: 1px solid var(--card-border-color);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  }
+
+  /* Global Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    opacity: 0.8;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+   Paleta "Light": correcciones de contraste.
+   El panel se construyó "dark-first" con colores hardcodeados (text-white,
+   grises claros y algunos fondos oscuros fijos) que en fondo claro pierden
+   contraste. Aquí se reescriben a tonos legibles. Va SIN @layer y con
+   !important para ganarle a las utilidades de Tailwind (incl. variantes de
+   opacidad). Todo scopeado a [data-theme='light'] para no afectar otras paletas.
+   ========================================================================== */
+
+/* Gris muteado más oscuro (afecta text-muted-foreground y sus variantes) */
+[data-theme='light'] {
+  --muted-foreground: #475569; /* slate-600 */
+}
+
+/* Texto blanco hardcodeado -> texto oscuro (incluye text-white/NN) */
+[data-theme='light'] [class*="text-white"] {
+  color: #1e293b !important; /* slate-800 */
+}
+
+/* Grises claros hardcodeados (100-500) -> gris oscuro legible */
+[data-theme='light'] [class*="text-slate-1"],
+[data-theme='light'] [class*="text-slate-2"],
+[data-theme='light'] [class*="text-slate-3"],
+[data-theme='light'] [class*="text-slate-4"],
+[data-theme='light'] [class*="text-slate-5"],
+[data-theme='light'] [class*="text-gray-1"],
+[data-theme='light'] [class*="text-gray-2"],
+[data-theme='light'] [class*="text-gray-3"],
+[data-theme='light'] [class*="text-gray-4"],
+[data-theme='light'] [class*="text-gray-5"] {
+  color: #475569 !important; /* slate-600 */
+}
+
+/* Fondos oscuros hardcodeados frecuentes (tarjetas / kanban) -> claros */
+[data-theme='light'] [class*="bg-[#0f172a]"],
+[data-theme='light'] [class*="bg-[#1e293b]"],
+[data-theme='light'] [class*="bg-[#0a192f]"],
+[data-theme='light'] [class*="bg-[#0b1a2f]"] {
+  background-color: #ffffff !important;
+}

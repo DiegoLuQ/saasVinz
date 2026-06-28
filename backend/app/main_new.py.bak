@@ -1,0 +1,158 @@
+"""
+Backend FastAPI - SaaS Crematorio
+Arquitectura modular v1
+"""
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from app.middleware.audit_middleware import AuditMiddleware
+import logging
+
+# Logger configuration
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+app = FastAPI(
+    title="SaaS Crematorio API",
+    version="1.0.0",
+    description="API para gestión de crematorios"
+)
+
+# Audit Middleware
+app.add_middleware(AuditMiddleware)
+
+# ===== Global Error Handling =====
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    logger.error(f"HTTP Error on {request.url.path}: {exc.detail}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail, "type": "http_error"}
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.error(f"Validation Error on {request.url.path}: {exc.errors()}")
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": exc.errors(), "type": "validation_error"}
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled Error on {request.url.path}: {str(exc)}", exc_info=True)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "detail": "Ha ocurrido un error interno inesperado. El administrador ha sido notificado.",
+            "type": "internal_server_error"
+        }
+    )
+
+# CORS Configuration (Must be outermost to handle all responses)
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+    "http://127.0.0.1:3002",
+    "http://localhost:3002",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"]
+)
+
+# Static Files
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+# ===== API v1 - SHARED Endpoints =====
+from app.api.v1.shared.auth.router import router as auth_router
+from app.api.v1.shared.notifications.router import router as notifications_router
+from app.api.v1.shared.upload.router import router as uploads_router
+from app.api.v1.shared.theme.router import router as theme_router
+from app.api.v1.shared.dashboard.router import router as shared_dashboard_router
+from app.api.v1.shared.health.router import router as health_router
+from app.api.v1.shared.announcements.router import router as common_announcements_router
+
+app.include_router(auth_router, prefix="/api/v1/shared/auth", tags=["Shared - Autenticación"])
+app.include_router(notifications_router, prefix="/api/v1/shared/notifications", tags=["Shared - Notificaciones"])
+app.include_router(uploads_router, prefix="/api/v1/shared/upload", tags=["Shared - Uploads"])
+app.include_router(theme_router, prefix="/api/v1/shared/theme", tags=["Shared - Tema"])
+app.include_router(shared_dashboard_router, prefix="/api/v1/shared/dashboard", tags=["Shared - Dashboard"])
+app.include_router(health_router, prefix="/api/v1/shared/health", tags=["Shared - Salud"])
+app.include_router(common_announcements_router, prefix="/api/v1/shared/announcements", tags=["Shared - Anuncios"])
+
+# ===== API v1 - ADMIN Endpoints =====
+from app.api.v1.admin.tenants.router import router as tenants_router
+from app.api.v1.admin.rbac.router import router as rbac_router
+from app.api.v1.admin.audit.router import router as audit_router
+from app.api.v1.admin.maintenance.router import router as maintenance_router
+from app.api.v1.admin.announcements.router import router as admin_announcements_router
+from app.api.v1.admin.crm.customers.router import router as customers_router
+from app.api.v1.admin.crm.pets.router import router as pets_router
+from app.api.v1.admin.operations.cremations.router import router as cremations_router
+from app.api.v1.admin.operations.documents.router import router as documents_router
+from app.api.v1.admin.operations.operations.router import router as operations_router
+from app.api.v1.admin.catalog.services.router import router as services_router
+from app.api.v1.admin.catalog.plans.router import router as plans_router
+from app.api.v1.admin.catalog.products.router import router as products_router
+
+app.include_router(tenants_router, prefix="/api/v1/admin/tenants", tags=["Admin - Tenants"])
+app.include_router(rbac_router, prefix="/api/v1/admin/rbac", tags=["Admin - RBAC"])
+app.include_router(audit_router, prefix="/api/v1/admin/audit-logs", tags=["Admin - Auditoría"])
+app.include_router(maintenance_router, prefix="/api/v1/admin/maintenance", tags=["Admin - Mantenimiento"])
+app.include_router(admin_announcements_router, prefix="/api/v1/admin/announcements", tags=["Admin - Alertas"])
+app.include_router(customers_router, prefix="/api/v1/admin/customers", tags=["Admin - CRM Clientes"])
+app.include_router(pets_router, prefix="/api/v1/admin/pets", tags=["Admin - CRM Mascotas"])
+app.include_router(cremations_router, prefix="/api/v1/admin/cremations", tags=["Admin - Operaciones Cremaciones"])
+app.include_router(documents_router, prefix="/api/v1/admin/documents", tags=["Admin - Operaciones Documentos"])
+app.include_router(operations_router, prefix="/api/v1/admin/operations", tags=["Admin - Operaciones"])
+app.include_router(services_router, prefix="/api/v1/admin/services", tags=["Admin - Catálogo Servicios"])
+app.include_router(plans_router, prefix="/api/v1/admin/plans", tags=["Admin - Catálogo Planes"])
+app.include_router(products_router, prefix="/api/v1/admin/products", tags=["Admin - Catálogo Productos"])
+
+# ===== API v1 - CREATOR Endpoints =====
+from app.api.v1.creator.dashboard.router import router as creator_dashboard_router
+from app.api.v1.creator.announcements.router import router as creator_announcements_router
+from app.api.v1.creator.plans.router import router as creator_plans_router
+
+app.include_router(creator_dashboard_router, prefix="/api/v1/creator", tags=["Creator - Dashboard"])
+app.include_router(creator_announcements_router, prefix="/api/v1/creator/announcements", tags=["Creator - Anuncios"])
+app.include_router(creator_plans_router, prefix="/api/v1/creator/subscription-plans", tags=["Creator - Planes"])
+
+# ===== API v1 - PUBLIC Endpoints =====
+from app.api.v1.public.forms.router import router as public_forms_router
+from app.api.v1.public.tenants.router import router as public_tenants_router
+from app.api.v1.public.qr.router import router as qr_router
+from app.api.v1.public.landing.router import router as public_landing_router
+from app.api.v1.public.submissions.router import router as public_internal_submissions_router
+from app.api.v1.public.onboarding.router import router as public_onboarding_router
+from app.api.v1.public.farewell.router import router as public_farewell_router
+from app.api.v1.public.form_tokens.router import router as public_form_tokens_router
+
+app.include_router(public_forms_router, prefix="/api/v1/public", tags=["Public - Formularios"])
+app.include_router(public_tenants_router, prefix="/api/v1/public", tags=["Public - Tenants"])
+app.include_router(qr_router, prefix="/api/v1/public", tags=["Public - QR"])
+app.include_router(public_landing_router, prefix="/api/v1/public/landing", tags=["Public - Landing"])
+app.include_router(public_internal_submissions_router, prefix="/api/v1/public/submissions", tags=["Public - Submissions"])
+app.include_router(public_onboarding_router, prefix="/api/v1/public/onboarding", tags=["Public - Onboarding"])
+app.include_router(public_farewell_router, prefix="/api/v1/public/farewell-templates", tags=["Public - Plantillas Despedida"])
+app.include_router(public_form_tokens_router, prefix="/api/v1/public/form-tokens", tags=["Public - Form Tokens"])
+
+@app.get("/")
+def read_root():
+    return {"message": "SaaS Crematorio API v1.0 - Arquitectura Modular"}
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "version": "1.0.0"}

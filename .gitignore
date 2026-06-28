@@ -1,0 +1,57 @@
+# Node
+node_modules/
+.next/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+.env.*
+!.env.example
+
+# Distribution / Packaging
+dist/
+build/
+*.egg-info/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Logs (artefactos de runtime, no versionar)
+*.log
+
+# Project Specific
+backend/static/storage/
+backend/app/static/storage/
+backend/temp_uploads/
+backend/scratch/
+mercadoPago/
+coverage/
+htmlcov/
+.pytest_cache/
+backups/
+*.sqlite
+*.db
+
+# Notas internas / docs que NO van a GitHub
+MarkDowns/
+.agent/
+traefik.yml
+BITACORA.md
+inicio.txt
+plan_mejora_vincer.md

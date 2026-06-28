@@ -1,0 +1,120 @@
+"""
+Backend FastAPI - SaaS Crematorio
+Arquitectura modular v1
+"""
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from app.middleware.audit_middleware import AuditMiddleware
+
+app = FastAPI(
+    title="SaaS Crematorio API",
+    version="1.0.0",
+    description="API para gestión de crematorios"
+)
+
+# CORS Configuration
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+    "http://127.0.0.1:3002",
+    "http://localhost:3002",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"]
+)
+
+# Audit Middleware
+app.add_middleware(AuditMiddleware)
+
+# Static Files
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+# ===== API v1 - Internal Endpoints =====
+
+# Auth Module
+from app.api.v1.internal.auth.router import router as auth_router
+app.include_router(auth_router, prefix="/api/internal/auth", tags=["Autenticación"])
+
+# CRM Module
+from app.api.v1.internal.crm.customers.router import router as customers_router
+from app.api.v1.internal.crm.pets.router import router as pets_router
+app.include_router(customers_router, prefix="/api/internal/customers", tags=["CRM - Clientes"])
+app.include_router(pets_router, prefix="/api/internal/pets", tags=["CRM - Mascotas"])
+
+# Operations Module
+from app.api.v1.internal.operations.cremations.router import router as cremations_router
+from app.api.v1.internal.operations.documents.router import router as documents_router
+from app.api.v1.internal.operations.operations.router import router as operations_router
+app.include_router(cremations_router, prefix="/api/internal/cremations", tags=["Operaciones - Cremaciones"])
+app.include_router(documents_router, prefix="/api/internal/documents", tags=["Operaciones - Documentos"])
+app.include_router(operations_router, prefix="/api/internal/operations", tags=["Operaciones"])
+
+# Catalog Module
+from app.api.v1.internal.catalog.services.router import router as services_router
+from app.api.v1.internal.catalog.plans.router import router as plans_router
+from app.api.v1.internal.catalog.products.router import router as products_router
+app.include_router(services_router, prefix="/api/internal/services", tags=["Catálogo - Servicios"])
+app.include_router(plans_router, prefix="/api/internal/plans", tags=["Catálogo - Planes"])
+app.include_router(products_router, prefix="/api/internal/products", tags=["Catálogo - Productos"])
+
+# Admin Module
+from app.api.v1.internal.admin.tenants.router import router as tenants_router
+from app.api.v1.internal.admin.rbac.router import router as rbac_router
+from app.api.v1.internal.admin.audit.router import router as audit_router
+from app.api.v1.internal.admin.maintenance.router import router as maintenance_router
+app.include_router(tenants_router, prefix="/api/internal/tenants", tags=["Admin - Tenants"])
+app.include_router(rbac_router, prefix="/api/internal/rbac", tags=["Admin - RBAC"])
+app.include_router(audit_router, prefix="/api/internal/audit-logs", tags=["Admin - Auditoría"])
+app.include_router(maintenance_router, prefix="/api/internal/maintenance", tags=["Admin - Mantenimiento"])
+
+# Creator Module (SuperAdmin)
+from app.api.v1.internal.creator.dashboard.router import router as creator_dashboard_router
+app.include_router(creator_dashboard_router, prefix="/api/internal/creator", tags=["Creator - Dashboard"])
+
+# Common Module
+from app.api.v1.internal.common.notifications.router import router as notifications_router
+from app.api.v1.internal.common.uploads.router import router as uploads_router
+from app.api.v1.internal.common.theme.router import router as theme_router
+from app.api.v1.internal.common.dashboard.router import router as dashboard_router
+from app.api.v1.internal.common.submissions.router import router as internal_submissions_router
+from app.api.v1.internal.common.onboarding.router import router as onboarding_router
+from app.api.v1.internal.common.limits.router import router as limits_router
+from app.api.v1.internal.common.landing.router import router as landing_router
+from app.api.v1.internal.common.farewell.router import router as farewell_router
+from app.api.v1.internal.common.form_tokens.router import router as form_tokens_router
+app.include_router(notifications_router, prefix="/api/internal/notifications", tags=["Notificaciones"])
+app.include_router(uploads_router, prefix="/api/internal/upload", tags=["Uploads"])
+app.include_router(theme_router, prefix="/api/internal/theme", tags=["Tema"])
+app.include_router(dashboard_router, prefix="/api/internal/dashboard", tags=["Dashboard"])
+app.include_router(internal_submissions_router, prefix="/api/internal/submissions", tags=["Formularios Internos"])
+app.include_router(onboarding_router, prefix="/api/internal/onboarding", tags=["Onboarding"])
+app.include_router(limits_router, prefix="/api/internal/limits", tags=["Límites"])
+app.include_router(landing_router, prefix="/api/internal/landing", tags=["Landing Config"])
+app.include_router(farewell_router, prefix="/api/internal/farewell-templates", tags=["Plantillas Despedida"])
+app.include_router(form_tokens_router, prefix="/api/internal/form-tokens", tags=["Form Tokens"])
+
+# ===== API v1 - Public Endpoints =====
+
+from app.api.v1.public.forms.router import router as public_forms_router
+from app.api.v1.public.tenants.router import router as public_tenants_router
+from app.api.v1.public.qr.router import router as qr_router
+app.include_router(public_forms_router, prefix="/api/public", tags=["Público - Formularios"])
+app.include_router(public_tenants_router, prefix="/api/public", tags=["Público - Tenants"])
+app.include_router(qr_router, prefix="/api/public", tags=["Público - QR"])
+
+@app.get("/")
+def read_root():
+    return {"message": "SaaS Crematorio API v1.0 - Arquitectura Modular"}
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "version": "1.0.0"}

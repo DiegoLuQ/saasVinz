@@ -1,0 +1,103 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&family=Cormorant+Garamond:wght@300;400;600&display=swap');
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-mode="dark"], [data-mode="dark"] *));
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  font-size: 80%;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: 'Inter', sans-serif;
+  --font-heading: 'Outfit', sans-serif;
+}
+
+:root[data-mode="dark"] {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+html, body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', sans-serif;
+}
+
+/* Custom Scrollbar for Notifications */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 185, 129, 0.3);
+}
+
+/* Efecto Ken Burns para fondo del altar */
+@keyframes kenBurns {
+  0%   { background-position: 50% 50%; background-size: 110%; }
+  33%  { background-position: 55% 45%; background-size: 115%; }
+  66%  { background-position: 45% 55%; background-size: 112%; }
+  100% { background-position: 50% 60%; background-size: 118%; }
+}
+
+/* Force CSS reload to apply custom-variant */
+
+/* Fluid glow animation for Vincer navbar CTA button */
+@keyframes fluidGlow {
+  0% {
+    background-position: -200% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+@keyframes navEntrance {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-15px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+.nav-capsule-entrance {
+  animation: navEntrance 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
+}
+
+.btn-fluid-glow {
+  background: linear-gradient(
+    90deg,
+    #10b981 0%,
+    #10b981 30%,
+    #34d399 50%,
+    #10b981 70%,
+    #10b981 100%
+  );
+  background-size: 300% 100%;
+  animation: fluidGlow 4s ease-in-out infinite;
+}
+
+.btn-fluid-glow:hover {
+  box-shadow: 0 0 25px rgba(16, 185, 129, 0.6), inset 0 0 15px rgba(255, 255, 255, 0.15);
+}
