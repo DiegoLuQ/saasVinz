@@ -53,7 +53,7 @@ export function VincerJourney() {
                     <span className="text-[10px] font-black text-[#E0B84D] uppercase tracking-widest">Confianza Total para las Familias</span>
                 </div>
                 <h2 className="text-3xl md:text-5xl font-black text-[#FFFFFF]">
-                    La Trazabilidad QR que redefine la gestión funeraria.
+                    Trazabilidad QR inviolable para la administración y control funerario
                 </h2>
                 <p className="text-[#C0C0C0] font-medium">
                     El miedo de las familias es real: ¿Son estas las cenizas de mi mascota? Vincer responde a esta inquietud con tecnología inviolable de punta a punta.

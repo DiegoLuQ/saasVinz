@@ -22,7 +22,8 @@ import {
     BookOpen,
     Heart,
     ImageIcon,
-    Receipt
+    Receipt,
+    Code2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAdminVets, useAdminMetadata, useAdminSaasConfig } from '@/hooks/useAdminBootstrap';
@@ -48,6 +49,7 @@ export default function Sidebar({ onLogout, isCollapsed, setIsCollapsed }: Sideb
             items: [
                 { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
                 { href: '/dashboard/tenants', icon: Building2, label: 'Tenants (Empresas)' },
+                { href: '/dashboard/widgets', icon: Code2, label: 'Widgets Web' },
                 {
                     href: '/dashboard/memorials',
                     icon: BookOpen,

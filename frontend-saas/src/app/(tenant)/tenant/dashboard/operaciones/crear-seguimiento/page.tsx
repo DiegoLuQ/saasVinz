@@ -13,6 +13,7 @@ import SearchableSelect from '@/components/tenant/SearchableSelect';
 import Modal from '@/components/tenant/Modal';
 import { useCurrentTenant } from '@/hooks/useSessionBootstrap';
 import { copyToClipboard } from '@/lib/clipboard';
+import { buildTrackingUrl } from '@/lib/publicUrls';
 import { regions } from '@/lib/tenant/chile-data';
 import { useOrderForm } from '@/hooks/tenant/useOrderForm';
 
@@ -65,6 +66,9 @@ export default function CrearSeguimientoPage() {
         setCustomers,
         services,
         plans,
+        refreshServices,
+        refreshingServices,
+        servicesUpdatedAt,
         petOptions,
         selectedPet,
         relatedCustomer,
@@ -82,6 +86,10 @@ export default function CrearSeguimientoPage() {
     } = useOrderForm({
         mode: 'express',
         cremationTypeOverride: 'seguimiento',
+        // Persistir el formulario en localStorage y restaurarlo automáticamente
+        // al volver, para no perder los datos al cambiar de página.
+        enableDraft: true,
+        autoRestoreDraft: true,
         onSaveSuccess: handleSaved,
     });
 
@@ -225,10 +233,7 @@ export default function CrearSeguimientoPage() {
 
         let trackingUrl = '';
         if (typeof window !== 'undefined') {
-            const host = window.location.host; // e.g. "app.lvh.me:3000"
-            const rootDomain = host.replace(/^app\./, ''); // e.g. "lvh.me:3000"
-            const protocol = window.location.protocol; // "http:" or "https:"
-            trackingUrl = `${protocol}//pm.${rootDomain}/${tenantSlug}/track/${encodeURIComponent(petName)}/${createdCode}`;
+            trackingUrl = buildTrackingUrl(tenantSlug, petName, createdCode);
         }
 
         const handleCopyLink = async () => {
@@ -431,9 +436,28 @@ export default function CrearSeguimientoPage() {
                             transition={{ delay: 0.1 }}
                             className="glass-card rounded-3xl p-6 border border-white/10 overflow-hidden"
                         >
-                            <div className="flex items-center gap-2.5 mb-4">
-                                <Sparkles size={18} className="text-primary" />
-                                <h3 className="font-bold text-sm">Servicio de Seguimiento</h3>
+                            <div className="flex items-center justify-between gap-2 mb-4">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                    <Sparkles size={18} className="text-primary shrink-0" />
+                                    <h3 className="font-bold text-sm">Servicio de Seguimiento</h3>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    {servicesUpdatedAt && (
+                                        <span className="text-[10px] text-muted-foreground/60 hidden sm:inline">
+                                            Actualizado {new Date(servicesUpdatedAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => refreshServices()}
+                                        disabled={refreshingServices}
+                                        title="Actualizar servicios y planes sin recargar la página"
+                                        className="text-xs px-2.5 py-1.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors font-medium flex items-center gap-1.5 disabled:opacity-50"
+                                    >
+                                        <RefreshCw size={12} className={refreshingServices ? 'animate-spin' : ''} />
+                                        {refreshingServices ? 'Actualizando...' : 'Actualizar'}
+                                    </button>
+                                </div>
                             </div>
                             {itemOptions.length > 0 ? (
                                 <SearchableSelect

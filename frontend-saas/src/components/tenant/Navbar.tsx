@@ -487,7 +487,7 @@ export default function Navbar() {
                                                 className="flex items-center w-full p-3 rounded-xl hover:bg-foreground/5 text-sm font-medium transition-all"
                                             >
                                                 <Palette size={16} className="mr-3 text-muted-foreground" />
-                                                Preferencias
+                                                Configuración
                                             </button>
                                         )}
                                         <div className="h-px bg-foreground/5 my-2" />

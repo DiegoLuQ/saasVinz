@@ -18,24 +18,12 @@ const faqs = [
         a: "El sistema genera certificados PDF automáticos con los datos de la mascota, el dueño, el tipo de servicio, firma digital, marca de agua del crematorio y numeración secuencial por cuenta. Las plantillas son editables (secciones, colores, orden, tipografías). Disponible desde el plan PRO."
     },
     {
-        q: "¿Cómo son los memoriales digitales?",
-        a: "Cada servicio puede generar un memorial público interactivo, temas configurables (fondos, partículas, colores), galería de imágenes colaborativa, dedicatorias y velas virtuales. Las dedicatorias requieren aprobación del crematorio antes de publicarse y los memoriales privados pueden protegerse con un PIN de 6 dígitos."
-    },
-    {
         q: "¿Qué roles y permisos puedo asignar al equipo?",
-        a: "El sistema cuenta con roles para admin, recepción, operador de cremación, contabilidad, marketing, auditor y conductor. Cada rol tiene permisos granulares por módulo y acción (ver, crear, editar, eliminar). El admin del crematorio puede activar o desactivar módulos según necesidad."
+        a: "El sistema cuenta con roles para administrador, recepción y operador. Cada rol tiene permisos granulares por módulo y acción (ver, crear, editar, eliminar)."
     },
     {
-        q: "¿El software es multi-sede y aísla los datos de cada crematorio?",
+        q: "¿El software permite gestionar múltiples sedes de manera segura e independiente?",
         a: "Sí. Vincer está construido sobre una arquitectura multi-tenant nativa con aislamiento estricto: cada crematorio opera dentro de su propio espacio y no puede ver datos de otros. Los administradores globales tienen un panel separado para gestionar cuentas y planes."
-    },
-    {
-        q: "¿Qué módulos incluye cada plan?",
-        a: "FREE: dashboard, CRM (clientes/mascotas), catálogo (servicios/productos), órdenes e inventario. TRACK: foco en operaciones + órdenes + inventario (sin certificados ni configuración). NORMAL: añade certificados y operaciones. PRO: lo mismo que NORMAL más exportación de datos. ULTRA: todo lo anterior con mayores cupos de mascotas y usuarios."
-    },
-    {
-        q: "¿En qué se diferencia el plan Track del Normal?",
-        a: "Track ($29.900/mes) es un plan especializado en operaciones y trazabilidad para crematorios que ya tienen su CRM/facturación externa. Incluye operaciones, órdenes, cobros online e inventario, pero no certificados ni el módulo de configuración. Normal ($39.900/mes) es la versión completa con certificados y mayor flexibilidad operativa."
     }
 ];
 

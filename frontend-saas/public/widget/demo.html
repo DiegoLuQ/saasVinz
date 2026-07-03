@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vincer Widget · Demo</title>
+    <style>
+        body { margin: 0; background: #f6f8fb; padding: 40px 20px; }
+        .demo-shell { max-width: 1160px; margin: 0 auto; }
+        .demo-bar { font-family: system-ui, sans-serif; font-size: 13px; color: #475569; background: #fff;
+            border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 16px; margin-bottom: 28px; }
+        .demo-bar code { background: #eef2f7; padding: 1px 6px; border-radius: 5px; }
+        .demo-warn { color: #b45309; }
+    </style>
+</head>
+<body>
+    <div class="demo-shell">
+        <div class="demo-bar" id="demo-bar">Cargando demo…</div>
+
+        <!-- El widget se inyecta aquí -->
+        <div id="vincer-widget-root"></div>
+    </div>
+
+    <script>
+        (function () {
+            var params = new URLSearchParams(window.location.search);
+            var key = params.get('key') || '';
+            var api = params.get('api') || window.location.origin; // mismo origen por defecto
+
+            var root = document.getElementById('vincer-widget-root');
+            root.setAttribute('data-vincer-key', key);
+            root.setAttribute('data-vincer-api', api.replace(/\/$/, ''));
+
+            var bar = document.getElementById('demo-bar');
+            if (!key) {
+                bar.innerHTML = '<span class="demo-warn">⚠ Falta la API key. Abre esta página con <code>?key=pk_vincer_live_...</code></span>';
+                return;
+            }
+            bar.innerHTML = 'Origen de esta página: <code>' + window.location.host +
+                '</code> · API: <code>' + api + '</code> · key: <code>' + key.slice(0, 18) + '…</code>';
+
+            // Cargar el script del widget
+            var s = document.createElement('script');
+            s.src = (api.replace(/\/$/, '')) + '/widget/v1.js';
+            s.defer = true;
+            document.body.appendChild(s);
+        })();
+    </script>
+</body>
+</html>

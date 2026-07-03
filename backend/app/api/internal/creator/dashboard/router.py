@@ -509,7 +509,22 @@ async def create_tenant(
     existing = db.query(Tenant).filter(Tenant.slug == tenant_data.slug).first()
     if existing:
         raise HTTPException(status_code=400, detail="Slug already exists")
-    
+
+    # Check if RUT already exists (unique constraint ix_sys_tenants_rut)
+    if tenant_data.rut:
+        existing_rut = db.query(Tenant).filter(Tenant.rut == tenant_data.rut).first()
+        if existing_rut:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Ya existe un crematorio registrado con el RUT {tenant_data.rut}."
+            )
+
+    # Check if the admin email is already taken before creating anything
+    if tenant_data.email:
+        existing_user = db.query(models.User).filter(models.User.email == tenant_data.email).first()
+        if existing_user:
+            raise HTTPException(status_code=400, detail="El correo electrónico ya está registrado en el sistema.")
+
     # Create tenant
     new_tenant = Tenant(
         name=tenant_data.name,
@@ -532,14 +547,8 @@ async def create_tenant(
     db.commit()
     db.refresh(new_tenant)
 
-    # Create Initial Admin User
+    # Create Initial Admin User (email uniqueness already validated above)
     if tenant_data.email:
-        # Check if email is already taken
-        existing_user = db.query(models.User).filter(models.User.email == tenant_data.email).first()
-        if existing_user:
-             # If it belongs to another tenant, we can't use it
-             raise HTTPException(status_code=400, detail="El correo electrónico ya está registrado en el sistema.")
-        
         admin_password = tenant_data.admin_password or "admin123"
         hashed_password = get_password_hash(admin_password)
         
@@ -618,15 +627,15 @@ async def create_tenant(
         pending_reason=new_tenant.pending_reason,
         created_at=new_tenant.created_at.isoformat() if new_tenant.created_at else "",
         
-        # Billing
-        billing_cycle=billing_info.billing_cycle,
-        billing_status=billing_info.billing_status,
-        billing_end_date=billing_info.billing_end_date,
-        last_payment_date=billing_info.last_payment_date,
-        last_payment_method=billing_info.last_payment_method,
-        billing_notify_days=billing_info.billing_notify_days,
-        billing_notify_channels=billing_info.billing_notify_channels,
-        billing_discount=billing_info.billing_discount,
+        # Billing (these columns live on the Tenant model, not TenantBillingInfo)
+        billing_cycle=new_tenant.billing_cycle,
+        billing_status=new_tenant.billing_status,
+        billing_end_date=new_tenant.billing_end_date,
+        last_payment_date=new_tenant.last_payment_date,
+        last_payment_method=new_tenant.last_payment_method,
+        billing_notify_days=new_tenant.billing_notify_days,
+        billing_notify_channels=new_tenant.billing_notify_channels,
+        billing_discount=new_tenant.billing_discount,
         monthly_price=billing_info.monthly_price,
         resources={} # New tenant has no resources
     )

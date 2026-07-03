@@ -7,7 +7,6 @@ import {
     LayoutDashboard,
     Users,
     Dog,
-    Settings,
     FileText,
     Flame,
     Palette,
@@ -106,7 +105,7 @@ const navItems: NavItem[] = [
         ]
     },
     { name: 'Roles y Módulos', href: '/dashboard/roles-modulos', icon: ShieldCheck, moduleKey: 'configuracion', featureKey: 'configuracion:roles' }, // Nuevo
-    { name: 'Configuración', href: '/dashboard/configuracion', icon: Settings, moduleKey: 'configuracion', featureKey: 'configuracion:avanzada' },
+    // 'Configuración' se removió del sidebar: ahora está en el menú de usuario del Navbar.
 ];
 
 export default function Sidebar() {

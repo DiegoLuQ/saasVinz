@@ -6,7 +6,6 @@ import {
     Building2,
     ArrowLeft,
     CheckCircle,
-    AlertCircle,
     Loader2,
     Globe,
     Mail,
@@ -16,7 +15,9 @@ import {
     ShieldCheck,
     Phone,
     MapPin,
-    Image
+    Image,
+    X,
+    AlertTriangle
 } from 'lucide-react';
 import { apiRequest } from '@/lib/admin/api';
 import { SOUTH_AMERICA_COUNTRIES, SOUTH_AMERICA_CITIES, CHILE_REGIONS_COMUNAS } from '@/lib/geo-data';
@@ -27,6 +28,7 @@ export default function NewTenantPage() {
     const [loading, setLoading] = useState(false);
     const [fetchingPlans, setFetchingPlans] = useState(true);
     const [error, setError] = useState('');
+    const [showErrorModal, setShowErrorModal] = useState(false);
     const [success, setSuccess] = useState(false);
     const [hasDraft, setHasDraft] = useState(false);
 
@@ -133,6 +135,7 @@ export default function NewTenantPage() {
             }, 2000);
         } catch (err: any) {
             setError(err.message || 'Error al crear la empresa');
+            setShowErrorModal(true);
             setLoading(false);
         }
     };
@@ -452,13 +455,6 @@ export default function NewTenantPage() {
                     )}
                 </section>
 
-                {error && (
-                    <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 animate-shake">
-                        <AlertCircle size={20} />
-                        <span className="text-sm font-bold uppercase tracking-tight">{error}</span>
-                    </div>
-                )}
-
                 {success && (
                     <div className="flex items-center gap-3 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400">
                         <CheckCircle size={20} />
@@ -484,6 +480,48 @@ export default function NewTenantPage() {
                     </button>
                 </div>
             </form>
+
+            {/* Modal de Error */}
+            {showErrorModal && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm animate-in fade-in"
+                    onClick={() => setShowErrorModal(false)}
+                >
+                    <div
+                        className="glass-card relative w-full max-w-md rounded-[2rem] border border-red-500/20 bg-[#0a0f18] p-8 space-y-6 shadow-2xl animate-in zoom-in-95"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            type="button"
+                            onClick={() => setShowErrorModal(false)}
+                            className="absolute right-5 top-5 text-white/30 hover:text-white transition-colors"
+                            aria-label="Cerrar"
+                        >
+                            <X size={20} />
+                        </button>
+
+                        <div className="flex flex-col items-center text-center gap-4">
+                            <div className="p-4 bg-red-500/10 rounded-full text-red-400 border border-red-500/20">
+                                <AlertTriangle size={36} />
+                            </div>
+                            <div className="space-y-2">
+                                <h3 className="text-xl font-black text-white tracking-tight">No se pudo crear la empresa</h3>
+                                <p className="text-sm text-white/60 font-medium leading-relaxed">
+                                    {error || 'Ocurrió un error inesperado. Inténtalo nuevamente.'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => setShowErrorModal(false)}
+                            className="w-full px-8 py-4 bg-red-500/90 hover:bg-red-500 text-white font-black rounded-2xl transition-all uppercase tracking-widest text-xs active:scale-95"
+                        >
+                            Entendido
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

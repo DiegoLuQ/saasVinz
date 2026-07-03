@@ -18,16 +18,7 @@ import {
 import { Loader2, Search, Edit, Calendar, Sparkles, Smartphone, Monitor } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-
-function getMemorialBaseUrl(): string {
-    if (typeof window === 'undefined') return '';
-    const host = window.location.host;
-    const port = window.location.port || '3000';
-    if (host.includes('lvh.me')) return `http://pm.lvh.me:${port}`;
-    if (host.includes('localhost')) return `http://localhost:${port}`;
-    const domain = process.env.NEXT_PUBLIC_MEMORIAL_DOMAIN;
-    return domain ? `https://${domain}` : `https://${window.location.host}`;
-}
+import { getMemorialBaseUrl } from '@/lib/publicUrls';
 
 interface Memorial {
     id: number;

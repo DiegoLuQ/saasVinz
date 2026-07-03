@@ -16,35 +16,33 @@ export async function generateMetadata(): Promise<Metadata> {
         const seo = data.config?.seo || {};
 
         return {
-            title: seo.title || "Vincer | Software para Crematorios de Mascotas y Funerarias",
-            description: seo.description || "La plataforma SaaS líder que digitaliza tu crematorio de mascotas. Trazabilidad QR del proceso en tiempo real, plan de tracking público para familias y memoriales digitales interactivos.",
+            metadataBase: new URL('https://vincer.app'),
+            title: seo.title || "Software para Crematorios de Mascotas y Funerarias | Vincer",
+            description: seo.description || "Optimiza la gestión de tu crematorio de mascotas con Vincer. Controla la trazabilidad QR, evidencias fotográficas y clientes en un solo sistema. Pruébalo gratis.",
             keywords: seo.keywords || [
-                'software para crematorio de mascotas',
-                'sistema de gestion funeraria de mascotas',
-                'trazabilidad qr mascotas',
-                'tracking de cremación en tiempo real',
-                'plan de tracking familias mascotas',
-                'software funerario mascotas',
-                'plataforma memoriales mascotas',
-                'memoriales interactivos mascotas',
-                'vincer saas',
-                'gestion crematorio mascotas'
+                'software para crematorios de mascotas',
+                'gestión funeraria mascotas',
+                'trazabilidad qr cremaciones',
+                'vincer software chile',
+                'sistema de gestion de cementerios de mascotas',
             ],
             robots: seo.robots || "index, follow",
             openGraph: {
-                title: seo.ogTitle || seo.title || "Vincer | Software para Crematorios de Mascotas y Funerarias",
-                description: seo.ogDescription || seo.description || "Plataforma SaaS para crematorios: trazabilidad QR, plan de tracking en tiempo real para familias y memoriales digitales interactivos.",
-                images: seo.ogImage ? [{ url: seo.ogImage }] : [],
+                title: seo.ogTitle || "Software de Gestión y Trazabilidad para Crematorios de Mascotas | Vincer",
+                description: seo.ogDescription || "Vincer te ayuda a profesionalizar tu crematorio o cementerio de mascotas con tecnología QR e informes transparentes.",
+                images: seo.ogImage
+                    ? [{ url: seo.ogImage }]
+                    : [{ url: '/images/og-image-vincer.jpg', width: 1200, height: 630, alt: 'Panel de gestión de Vincer' }],
                 url: 'https://vincer.app',
                 siteName: 'Vincer',
-                locale: 'es_ES',
+                locale: 'es_CL',
                 type: 'website',
             },
             twitter: {
                 card: 'summary_large_image',
-                title: seo.ogTitle || seo.title || "Vincer | Software para Crematorios de Mascotas",
-                description: seo.ogDescription || seo.description || "Trazabilidad QR, tracking en tiempo real para familias y memoriales digitales interactivos.",
-                images: seo.ogImage ? [seo.ogImage] : [],
+                title: seo.ogTitle || "Software de Gestión y Trazabilidad para Crematorios de Mascotas | Vincer",
+                description: seo.ogDescription || "Vincer te ayuda a profesionalizar tu crematorio o cementerio de mascotas con tecnología QR e informes transparentes.",
+                images: seo.ogImage ? [seo.ogImage] : ['/images/og-image-vincer.jpg'],
             },
             alternates: {
                 canonical: seo.canonical || 'https://vincer.app',
@@ -53,8 +51,9 @@ export async function generateMetadata(): Promise<Metadata> {
     } catch (error) {
         console.error('SEO metadata fetch error on root domain:', error);
         return {
-            title: "Vincer | Software para Crematorios de Mascotas y Funerarias",
-            description: "La plataforma SaaS líder que digitaliza tu crematorio de mascotas. Trazabilidad QR del proceso en tiempo real, plan de tracking público para familias y memoriales digitales interactivos.",
+            metadataBase: new URL('https://vincer.app'),
+            title: "Software para Crematorios de Mascotas y Funerarias | Vincer",
+            description: "Optimiza la gestión de tu crematorio de mascotas con Vincer. Controla la trazabilidad QR, evidencias fotográficas y clientes en un solo sistema. Pruébalo gratis.",
         };
     }
 }
@@ -103,7 +102,7 @@ function VincerLandingPageSchema() {
         'aggregateRating': {
             '@type': 'AggregateRating',
             'ratingValue': '4.9',
-            'ratingCount': '24'
+            'reviewCount': '12'
         }
     };
 

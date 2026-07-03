@@ -21,10 +21,13 @@ interface UseAutoDraftOptions {
     selectedServices: SelectedService[];
     selectedPlans: SelectedPlan[];
     selectedProducts: SelectedProduct[];
+    /** Namespace para separar borradores de formularios distintos (ej. 'express'). */
+    keyNamespace?: string;
 }
 
-function getDraftKey(editId: string | null): string {
-    return editId ? `${DRAFT_KEY_PREFIX}_edit_${editId}` : `${DRAFT_KEY_PREFIX}_new`;
+function getDraftKey(editId: string | null, namespace?: string): string {
+    const base = namespace ? `${DRAFT_KEY_PREFIX}_${namespace}` : DRAFT_KEY_PREFIX;
+    return editId ? `${base}_edit_${editId}` : `${base}_new`;
 }
 
 /**
@@ -38,8 +41,9 @@ export function useAutoDraft({
     selectedServices,
     selectedPlans,
     selectedProducts,
+    keyNamespace,
 }: UseAutoDraftOptions) {
-    const draftKey = getDraftKey(editId);
+    const draftKey = getDraftKey(editId, keyNamespace);
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     // Check for existing draft on mount
@@ -105,6 +109,19 @@ export function useAutoDraft({
         window.addEventListener('pagehide', handler);
         return () => window.removeEventListener('pagehide', handler);
     }, [isDirty, saveDraft]);
+
+    // Save on unmount (navegación SPA con Next router). `pagehide` no se dispara
+    // en cambios de ruta del lado del cliente, así que guardamos en el cleanup
+    // usando refs para capturar siempre el estado más reciente.
+    const saveDraftRef = useRef(saveDraft);
+    saveDraftRef.current = saveDraft;
+    const isDirtyRef = useRef(isDirty);
+    isDirtyRef.current = isDirty;
+    useEffect(() => {
+        return () => {
+            if (isDirtyRef.current) saveDraftRef.current();
+        };
+    }, []);
 
     return {
         getExistingDraft,

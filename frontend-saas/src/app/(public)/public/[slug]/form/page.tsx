@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 import { apiRequest, API_BASE_URL } from '@/lib/api';
+import { buildTrackingUrl } from '@/lib/publicUrls';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, AlertCircle, ChevronRight, ChevronLeft, Send, CheckCircle2, Sun, Moon, Copy, Check, ExternalLink } from 'lucide-react';
 import Image from 'next/image';
@@ -462,21 +463,11 @@ export default function TenantFormPage() {
                             
                             <div className="flex items-center gap-2 bg-white/90 dark:bg-slate-950/90 p-2.5 rounded-2xl border border-slate-200/60 dark:border-slate-800">
                                 <span className="text-xs font-mono truncate text-slate-600 dark:text-slate-400 select-all text-left flex-1 pl-2">
-                                    {(() => {
-                                        const rootDomain = typeof window !== 'undefined' 
-                                            ? (window.location.host.includes('localhost') ? 'localhost:3000' : window.location.host.replace('app.', '').replace('www.', ''))
-                                            : 'localhost:3000';
-                                        const baseUrl = process.env.NEXT_PUBLIC_TRACKING_BASE_URL || `http://pm.${rootDomain}`;
-                                        return `${baseUrl}/${tenant.slug}/track/${encodeURIComponent(petData.name || 'mascota')}/${submissionCode}`;
-                                    })()}
+                                    {buildTrackingUrl(tenant.slug, petData.name, submissionCode)}
                                 </span>
                                 <button
                                     onClick={() => {
-                                        const rootDomain = typeof window !== 'undefined' 
-                                            ? (window.location.host.includes('localhost') ? 'localhost:3000' : window.location.host.replace('app.', '').replace('www.', ''))
-                                            : 'localhost:3000';
-                                        const baseUrl = process.env.NEXT_PUBLIC_TRACKING_BASE_URL || `http://pm.${rootDomain}`;
-                                        const url = `${baseUrl}/${tenant.slug}/track/${encodeURIComponent(petData.name || 'mascota')}/${submissionCode}`;
+                                        const url = buildTrackingUrl(tenant.slug, petData.name, submissionCode);
                                         navigator.clipboard.writeText(url);
                                         setCopiedTrackLink(true);
                                         setTimeout(() => setCopiedTrackLink(false), 2000);
@@ -488,13 +479,7 @@ export default function TenantFormPage() {
                                     {copiedTrackLink ? <Check size={14} /> : <Copy size={14} />}
                                 </button>
                                 <a
-                                    href={(() => {
-                                        const rootDomain = typeof window !== 'undefined' 
-                                            ? (window.location.host.includes('localhost') ? 'localhost:3000' : window.location.host.replace('app.', '').replace('www.', ''))
-                                            : 'localhost:3000';
-                                        const baseUrl = process.env.NEXT_PUBLIC_TRACKING_BASE_URL || `http://pm.${rootDomain}`;
-                                        return `${baseUrl}/${tenant.slug}/track/${encodeURIComponent(petData.name || 'mascota')}/${submissionCode}`;
-                                    })()}
+                                    href={buildTrackingUrl(tenant.slug, petData.name, submissionCode)}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl transition-all flex items-center justify-center shrink-0 cursor-pointer"

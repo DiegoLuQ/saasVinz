@@ -17,6 +17,7 @@ import Modal from '@/components/tenant/Modal';
 import { apiRequest } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { copyToClipboard } from '@/lib/clipboard';
+import { buildMemorialUrl } from '@/lib/publicUrls';
 
 interface MemorialSetupModalProps {
     isOpen: boolean;
@@ -115,13 +116,6 @@ export default function MemorialSetupModal({ isOpen, onClose, pet, tenantName }:
 
     const getPublicUrl = () => {
         if (!memorial) return '';
-        let host = window.location.host;
-
-        // Strip subdomain if exists (e.g. tenant.lvh.me:3000 -> lvh.me:3000)
-        const parts = host.split('.');
-        if (parts.length > 2) {
-            host = parts.slice(1).join('.');
-        }
 
         const family_slug = (tenantName || 'memorial')
             .toLowerCase()
@@ -129,13 +123,8 @@ export default function MemorialSetupModal({ isOpen, onClose, pet, tenantName }:
             .replace(/\s+/g, '-')
             .replace(/[^\w-]/g, '');
 
-        const pet_slug = pet.name
-            .toLowerCase()
-            .trim()
-            .replace(/\s+/g, '-')
-            .replace(/[^\w-]/g, '');
-
-        return `${window.location.protocol}//${host}/memorials/v/${family_slug}/${pet_slug}/${memorial.id_recuerdo}`;
+        // Enlace público en el subdominio de memoriales (memorial.) configurado por env.
+        return buildMemorialUrl(family_slug, pet.name, memorial.id_recuerdo);
     };
 
     const handleCopyLink = async () => {

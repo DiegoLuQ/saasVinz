@@ -68,19 +68,16 @@ export default function SearchableSelect({
             const margin = 16;
             const spaceBelow = window.innerHeight - rect.bottom - margin;
             const spaceAbove = rect.top - margin;
-            // Abrir hacia abajo si hay espacio suficiente o si abajo hay más que
-            // arriba; si no, voltear hacia arriba. Forzamos un mínimo de 160px para
-            // que la lista de opciones siempre sea visible y scrolleable (antes,
-            // con el campo bajo en un modal, el panel se aplastaba a unos pocos px).
-            const preferBottom = spaceBelow >= 200 || spaceBelow >= spaceAbove;
+            // Abrimos siempre hacia el lado con MÁS espacio y limitamos la altura
+            // del panel completo (header + lista) al espacio realmente disponible,
+            // sin forzar un mínimo que lo haga desbordar la pantalla. Así la lista
+            // siempre cabe en el viewport y scrollea internamente (antes, dentro de
+            // un modal el panel se salía por abajo y se cortaban opciones y scroll).
+            const preferBottom = spaceBelow >= spaceAbove;
+            const available = preferBottom ? spaceBelow : spaceAbove;
 
-            if (preferBottom) {
-                setPlacement('bottom');
-                setDynamicMaxHeight(Math.max(160, Math.min(280, spaceBelow)));
-            } else {
-                setPlacement('top');
-                setDynamicMaxHeight(Math.max(160, Math.min(280, spaceAbove)));
-            }
+            setPlacement(preferBottom ? 'bottom' : 'top');
+            setDynamicMaxHeight(Math.min(340, Math.max(0, available)));
         }
     };
 
@@ -161,7 +158,7 @@ export default function SearchableSelect({
                         left: dropdownRect.left,
                         width: dropdownRect.width,
                         zIndex: 9999,
-                        maxHeight: dynamicMaxHeight + 60, // Account for search header
+                        maxHeight: dynamicMaxHeight, // Panel completo (header + lista), acotado al viewport
                     }}
                     className="searchable-select-dropdown bg-white border-2 border-primary rounded-xl shadow-2xl flex flex-col overflow-hidden"
                     onMouseDown={(e) => e.stopPropagation()}
@@ -182,7 +179,7 @@ export default function SearchableSelect({
                     </div>
 
                     {/* List */}
-                    <div className="overflow-y-auto flex-1 min-h-0 max-h-[280px] p-2 bg-white">
+                    <div className="overflow-y-auto flex-1 min-h-0 p-2 bg-white">
                         {filteredOptions.length > 0 ? (
                             <div className="space-y-1">
                                 {filteredOptions.map((option) => {

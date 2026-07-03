@@ -26,7 +26,7 @@ const tabData = {
         title: "Panel Operativo del Crematorio",
         subtitle: "Todo el ciclo del servicio en una sola plataforma.",
         features: [
-            "CRM completo de clientes y mascotas (RUT, contacto, historial, fotos).",
+            "CRM completo de clientes y mascotas (Documento de identidad, contacto, historial, fotos).",
             "Catálogo gestionable: productos, servicios, planes y categorías.",
             "Cola de pedidos con vistas Kanban y Lista, filtros por fecha y estado.",
             "Flujo de trabajo personalizable por crematorio: pasos secuenciales con evidencia fotográfica y notas en cada fase.",
@@ -65,7 +65,7 @@ export function VincerFeatures() {
                             <span className="text-[10px] font-black text-[#19B5FE] uppercase tracking-widest">Módulos del Sistema</span>
                         </div>
                         <h2 className="text-3xl md:text-5xl font-black text-[#FFFFFF]">
-                            Una plataforma única para tres necesidades críticas.
+                            Un solo software para la gestión comercial, operativa y memorial de tu negocio
                         </h2>
                         <p className="text-[#C0C0C0] font-medium">
                             Olvídate de contratar múltiples herramientas inconexas. Vincer unifica tus operaciones comerciales, B2B y familiares.
@@ -199,10 +199,10 @@ export function VincerFeatures() {
             <section id="comparativa" className="py-32 px-6 max-w-7xl mx-auto relative z-10">
                 <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
                     <h2 className="text-3xl md:text-5xl font-black text-[#FFFFFF]">
-                        ¿Por qué los mejores crematorios migran a Vincer?
+                        ¿Por qué los crematorios y cementerios de mascotas eligen Vincer?
                     </h2>
                     <p className="text-[#C0C0C0] font-medium">
-                        El contraste entre trabajar con métodos tradicionales y centralizar tus operaciones con nuestro software es abismal.
+                        Descubre la diferencia entre operar con métodos tradicionales y centralizar tu negocio con una plataforma moderna y automatizada.
                     </p>
                 </div>
 
@@ -273,7 +273,7 @@ export function VincerFeatures() {
                             <span className="text-[10px] font-black text-[#19B5FE] uppercase tracking-widest">Capacidades del Sistema</span>
                         </div>
                         <h2 className="text-3xl md:text-5xl font-black text-[#FFFFFF]">
-                            Todo lo que Vincer hace por tu crematorio.
+                            Módulos y funcionalidades clave de nuestro software para crematorios
                         </h2>
                         <p className="text-[#C0C0C0] font-medium">
                             Módulos reales del sistema, mapeados al flujo de trabajo de un crematorio profesional.
@@ -343,7 +343,9 @@ export function VincerFeatures() {
                             <div className="w-11 h-11 rounded-xl bg-purple-400/10 border border-purple-400/30 text-purple-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                                 <Heart size={20} />
                             </div>
-                            <h3 className="text-sm font-black text-[#FFFFFF] uppercase tracking-wider mb-2">Memoriales Digitales</h3>
+                            <h3 className="text-sm font-black text-[#FFFFFF] uppercase tracking-wider mb-2">Memoriales Digitales
+                                <span className="ml-2 text-[8px] bg-[#E0B84D]/10 text-[#E0B84D] border border-[#E0B84D]/30 px-1.5 py-0.5 rounded-full">ULTRA</span>
+                            </h3>
                             <p className="text-xs text-[#C0C0C0] leading-relaxed">
                                 Memorial interactivo, dedicatorias moderadas, velas virtuales y galería colaborativa.
                             </p>
@@ -398,7 +400,7 @@ export function VincerFeatures() {
                             <div className="w-11 h-11 rounded-xl bg-indigo-400/10 border border-indigo-400/30 text-indigo-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                                 <LayoutDashboard size={20} />
                             </div>
-                            <h3 className="text-sm font-black text-[#FFFFFF] uppercase tracking-wider mb-2">Multi-Tenant Aislado</h3>
+                            <h3 className="text-sm font-black text-[#FFFFFF] uppercase tracking-wider mb-2">Privacidad y seguridad de datos</h3>
                             <p className="text-xs text-[#C0C0C0] leading-relaxed">
                                 Cada crematorio opera en su propio espacio seguro con aislamiento estricto de datos.
                             </p>

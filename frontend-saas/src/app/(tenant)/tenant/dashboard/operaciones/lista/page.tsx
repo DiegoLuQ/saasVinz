@@ -46,6 +46,7 @@ import CameraModal from '@/components/tenant/CameraModal';
 import EditDateModal from '@/components/tenant/EditDateModal';
 import EditWeightModal from '@/components/tenant/EditWeightModal';
 import { copyToClipboard } from '@/lib/clipboard';
+import { buildTrackingUrl } from '@/lib/publicUrls';
 import { Scale } from 'lucide-react';
 
 export default function OperationsPanelPage() {
@@ -460,9 +461,8 @@ export default function OperationsPanelPage() {
                                     </button>
                                 )}
                                 <button onClick={async () => {
-                                    const baseUrl = process.env.NEXT_PUBLIC_TRACKING_BASE_URL || `http://pm.${process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000'}`;
                                     const token = selectedOrder.verification_code || selectedOrder.tracking_token;
-                                    const url = `${baseUrl}/${selectedOrder.tenant_slug}/track/${encodeURIComponent(selectedOrder.pet_name)}/${token}`;
+                                    const url = buildTrackingUrl(selectedOrder.tenant_slug, selectedOrder.pet_name, token);
                                     if(await copyToClipboard(url)) showToast('Enlace copiado', 'success');
                                 }} className="flex items-center gap-2 px-3 py-1.5 bg-white/5 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-white/10 whitespace-nowrap">
                                     <LinkIcon size={14} /> Tracking

@@ -47,3 +47,8 @@ from app.api.internal.common.models import (
 from app.api.internal.memorials.models import (
     Memorial, Dedication, MemorialStatus, DedicationStatus, MemorialPlan
 )
+
+# 8. Integrations (Widget embebible / API keys públicas)
+from app.api.internal.integrations.models import (
+    TenantApiKey
+)

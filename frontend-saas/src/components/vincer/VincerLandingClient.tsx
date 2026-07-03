@@ -15,7 +15,6 @@ import {
     X,
     Eye,
     Menu,
-    QrCode,
     Layers,
     CreditCard,
     HelpCircle,
@@ -27,7 +26,9 @@ import { VincerLogo } from './VincerLogo';
 import { VincerJourney } from './VincerJourney';
 import { VincerFeatures } from './VincerFeatures';
 import { VincerPricing } from './VincerPricing';
+import { VincerWebService } from './VincerWebService';
 import { VincerFaqs } from './VincerFaqs';
+import TrackingSearch from '@/components/public/TrackingSearch';
 
 export default function VincerLandingClient(props: any) {
     const { scrollYProgress } = useScroll();
@@ -62,7 +63,7 @@ export default function VincerLandingClient(props: any) {
         }
 
         const handleScroll = () => {
-            const sections = ['inicio', 'trazabilidad', 'vision', 'modulos', 'precios', 'faqs'];
+            const sections = ['inicio', 'trazabilidad', 'vision', 'modulos', 'precios', 'faqs', 'sitio-web'];
             const scrollPosition = window.scrollY + 250; // offset
 
             for (const section of sections) {
@@ -130,6 +131,7 @@ export default function VincerLandingClient(props: any) {
                             { href: '#modulos', label: 'Módulos' },
                             { href: '#precios', label: 'Precios' },
                             { href: '#faqs', label: 'FAQs' },
+                            { href: '#sitio-web', label: 'Sitio Web' },
                         ].map((link) => {
                             const sectionId = link.href.replace('#', '');
                             const active = activeSection === sectionId;
@@ -141,11 +143,11 @@ export default function VincerLandingClient(props: any) {
                                     whileHover={{ scale: 1.05 }}
                                     whileTap={{ scale: 0.95 }}
                                     className={`relative text-[11px] font-bold tracking-widest uppercase transition-all duration-300 focus:outline-none py-1
-                                        ${active 
-                                            ? 'text-[#19B5FE]' 
+                                        ${active
+                                            ? 'text-[#19B5FE]'
                                             : 'text-[#C0C0C0] hover:text-[#FFFFFF]'
                                         }`}
-                                  >
+                                >
                                     {link.label}
                                     {active && (
                                         <motion.div
@@ -162,13 +164,22 @@ export default function VincerLandingClient(props: any) {
                     {/* Lado Derecho: Acciones Desktop */}
                     <div className="hidden md:flex items-center gap-4 shrink-0">
                         <a
-                            href="https://wa.me/56912345678"
+                            href="https://wa.me/56982395940?text=Hola%2C%20quiero%20obtener%20una%20cuenta%20GRATIS%20en%20Vincer"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center justify-center gap-2 bg-[#19B5FE] hover:bg-[#0e9ce0] text-[#020210] font-black text-xs tracking-wider px-6 py-2.5 rounded-full transition-all duration-300 shadow-[0_4px_14px_rgba(25,181,254,0.3)] hover:shadow-[0_4px_20px_rgba(25,181,254,0.5)] hover:scale-103 active:scale-97"
                         >
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.588 1.485 5.407 1.486 5.49.003 9.953-4.461 9.957-9.96.002-2.664-1.036-5.168-2.925-7.06-1.889-1.89-4.394-2.93-7.061-2.931-5.495 0-9.96 4.46-9.965 9.961-.001 1.832.482 3.62 1.398 5.184l-.995 3.634 3.731-.978zm11.233-5.263c-.3-.149-1.772-.875-2.046-.975-.276-.101-.476-.149-.675.15-.199.299-.772.976-.946 1.175-.173.199-.347.224-.648.075-3-.15-5.061-1.208-6.804-4.226-.227-.393-.227-.676-.075-.826.138-.135.3-.35.45-.525.152-.175.202-.299.302-.499.1-.2.05-.375-.025-.525-.075-.15-.675-1.625-.925-2.225-.244-.589-.491-.51-.675-.519-.174-.009-.373-.01-.572-.01-.199 0-.523.075-.797.374-.275.3-.1.776-.1 1.9s.823 2.225.936 2.375c.113.15 1.624 2.479 3.934 3.477.55.238 1.012.38 1.36.49.553.176 1.055.151 1.453.093.443-.066 1.772-.724 2.022-1.424.249-.699.249-1.299.174-1.424-.075-.125-.275-.199-.575-.349z" />
+                            <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="w-5 h-5 shrink-0"
+                                aria-hidden="true"
+                            >
+                                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
                             </svg>
                             Contáctanos
                         </a>
@@ -186,7 +197,7 @@ export default function VincerLandingClient(props: any) {
             </header>
 
             {/* Hero Section */}
-            <section id="inicio" className="relative pt-36 md:pt-48 pb-20 px-6 z-10">
+            <section id="inicio" className="relative pt-36 md:pt-44 pb-20 px-6 z-10">
                 {/* Background Image */}
                 <div className="absolute inset-0 z-0">
                     <img
@@ -204,12 +215,12 @@ export default function VincerLandingClient(props: any) {
                         {/* Tag Badge */}
                         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-[#19B5FE]/10 border border-[#19B5FE]/30 rounded-full">
                             <Zap size={14} className="text-[#19B5FE]" />
-                            <span className="text-[10px] font-black text-[#19B5FE] uppercase tracking-widest">SaaS B2B para Crematorios y Funerarias</span>
+                            <span className="text-[10px] font-black text-[#19B5FE] uppercase tracking-widest">Planes y Precios en CLP · Software para Crematorios</span>
                         </div>
 
                         {/* Título Principal H1 (SEO) */}
                         <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight leading-[1.05] text-[#FFFFFF]">
-                            Dignidad y <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#19B5FE] via-[#19B5FE] to-[#E0B84D]">Trazabilidad QR</span> para Crematorios de Mascotas.
+                            Software de Gestión y <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#19B5FE] via-[#19B5FE] to-[#E0B84D]">Trazabilidad QR</span> para Crematorios de Mascotas.
                         </h1>
 
                         {/* Subtítulo descriptivo */}
@@ -219,19 +230,66 @@ export default function VincerLandingClient(props: any) {
 
                         {/* Botones de acción */}
                         <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
+                            {/* Botón Principal (WhatsApp) */}
                             <a
-                                href="#precios"
-                                className="w-full sm:w-auto text-center bg-[#19B5FE] text-[#020210] px-8 py-4.5 rounded-2xl font-black uppercase tracking-wider text-xs hover:bg-[#19B5FE]/90 transition-all shadow-xl shadow-[#19B5FE]/15 flex items-center justify-center gap-2"
+                                href="https://wa.me/56982395940?text=Hola%2C%20quiero%20obtener%20una%20cuenta%20GRATIS%20en%20Vincer"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="group w-full sm:w-auto text-center bg-[#25D366] text-[#020210] px-8 py-4 rounded-3xl font-bold uppercase tracking-wider text-xs hover:bg-[#20ba5a] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 shadow-xl shadow-[#25D366]/10 flex items-center justify-center gap-3"
                                 id="hero-primary-cta"
                             >
-                                Obtén tu cuenta Free <ArrowRight size={16} />
+                                {/* Icono de WhatsApp con estilo Outline */}
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="w-5 h-5 shrink-0"
+                                    aria-hidden="true"
+                                >
+                                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                                </svg>
+
+                                <span className="font-extrabold">Obtén tu cuenta GRATIS</span>
+
+                                {/* Flecha con animación al hacer hover (gracias a la clase group-hover) */}
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="w-4 h-4 shrink-0 transition-transform duration-200 group-hover:translate-x-1"
+                                >
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    <polyline points="12 5 19 12 12 19"></polyline>
+                                </svg>
                             </a>
+
+                            {/* Botón Secundario */}
                             <button
                                 onClick={() => setIsVideoOpen(true)}
-                                className="w-full sm:w-auto text-center border border-[#E0B84D]/30 bg-[#E0B84D]/5 px-8 py-4.5 rounded-2xl font-black uppercase tracking-wider text-xs hover:bg-[#E0B84D]/10 transition-all text-[#E0B84D] flex items-center justify-center gap-2"
+                                className="group w-full sm:w-auto text-center border border-[#E0B84D]/30 bg-[#E0B84D]/5 px-8 py-4 rounded-3xl font-bold uppercase tracking-wider text-xs hover:bg-[#E0B84D]/10 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 text-[#E0B84D] flex items-center justify-center gap-3"
                                 id="hero-secondary-cta"
                             >
-                                Ver cómo funciona <Eye size={16} />
+                                <span className="font-extrabold">Ver cómo funciona</span>
+
+                                {/* Icono de Ojo con animación sutil */}
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="w-4 h-4 shrink-0 transition-transform duration-200 group-hover:scale-110"
+                                >
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
                             </button>
                         </div>
 
@@ -261,7 +319,7 @@ export default function VincerLandingClient(props: any) {
                                     <div className="w-3 h-3 rounded-full bg-green-500/80" />
                                 </div>
                                 <div className="text-[10px] text-slate-500 font-mono tracking-wider bg-white/5 px-3 py-1 rounded-full">
-                                    vincer-panel.app
+                                    track.vincer.cl
                                 </div>
                                 <div className="w-4" /> {/* Spacer */}
                             </div>
@@ -326,29 +384,12 @@ export default function VincerLandingClient(props: any) {
                                 </div>
                             </div>
 
-                            {/* Tarjeta de Memorial Previsualización */}
-                            <div className="mt-6 border-t border-white/5 pt-6 flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-[#E0B84D]/10 border border-[#E0B84D]/20 flex items-center justify-center text-[#E0B84D]">
-                                        <Heart size={18} fill="#E0B84D" />
-                                    </div>
-                                    <div>
-                                        <h5 className="text-xs font-bold text-[#FFFFFF]">Memorial Digital</h5>
-                                        <p className="text-[10px] text-slate-400">Velas y dedicatorias incluidas</p>
-                                    </div>
-                                </div>
-                                <div className="w-10 h-10 bg-white p-1 rounded-lg">
-                                    {/* Código QR falso */}
-                                    <svg viewBox="0 0 100 100" fill="black" className="w-full h-full">
-                                        <rect width="25" height="25" />
-                                        <rect x="75" width="25" height="25" />
-                                        <rect y="75" width="25" height="25" />
-                                        <rect x="25" y="25" width="10" height="10" />
-                                        <rect x="50" y="50" width="15" height="15" />
-                                        <rect x="35" y="70" width="15" height="10" />
-                                        <rect x="75" y="75" width="25" height="25" fill="none" stroke="black" strokeWidth="5" />
-                                    </svg>
-                                </div>
+                            {/* Campo de seguimiento por código (funcional) */}
+                            <div className="mt-6 border-t border-white/5 pt-5">
+                                <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-3 text-center">
+                                    ¿Eres familia? Sigue el servicio con tu código
+                                </p>
+                                <TrackingSearch theme="dark" buttonLabel="Buscar" placeholder="Ej: SMROE2STJ4" />
                             </div>
                         </div>
                     </div>
@@ -366,8 +407,8 @@ export default function VincerLandingClient(props: any) {
                                 <span className="text-[10px] font-black text-[#E0B84D] uppercase tracking-widest">Nuestra Visión</span>
                             </div>
                             <h2 className="text-3xl md:text-5xl font-black text-[#FFFFFF] leading-tight">
-                                Vínculo cercano entre las familias <br className="hidden md:block" />
-                                y el último viaje de su mascota.
+                                Tecnología empática para la gestión funeraria <br className="hidden md:block" />
+                                y cremación de mascotas
                             </h2>
                             <p className="text-[#C0C0C0] font-medium leading-relaxed max-w-3xl">
                                 Vincer nace con el propósito de transformar la industria funeraria de mascotas en Latinoamérica: convertir un proceso opaco y burocrático en una experiencia transparente, dignificada y digital, donde ninguna familia tenga que dudar del cuidado y la identidad de su compañero.
@@ -448,7 +489,7 @@ export default function VincerLandingClient(props: any) {
                 <div className="max-w-7xl mx-auto px-6">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
                         <div className="space-y-1">
-                            <div className="text-3xl md:text-4xl font-black text-[#19B5FE]">10 chars</div>
+                            <div className="text-3xl md:text-4xl font-black text-[#19B5FE]">10 caracteres</div>
                             <div className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Código de Verificación Único</div>
                         </div>
                         <div className="space-y-1">
@@ -475,6 +516,8 @@ export default function VincerLandingClient(props: any) {
 
             <VincerFaqs />
 
+            <VincerWebService />
+
             {/* CTA Final */}
             <section className="py-28 px-6 relative overflow-hidden z-10 max-w-7xl mx-auto">
                 <div className="relative bg-gradient-to-tr from-[#0b0a24] to-[#020210] border border-white/10 rounded-[3rem] p-10 md:p-16 text-center space-y-8 overflow-hidden shadow-2xl">
@@ -484,26 +527,25 @@ export default function VincerLandingClient(props: any) {
 
                     <div className="max-w-3xl mx-auto space-y-6">
                         <h2 className="text-3xl md:text-6xl font-black text-[#FFFFFF] leading-tight">
-                            ¿Preparado para transformar la reputación de tu crematorio?
+                            ¿Listo para digitalizar y automatizar tu crematorio de mascotas?
                         </h2>
                         <p className="text-base md:text-lg text-[#C0C0C0] font-medium">
                             Únete a la red nacional de crematorios digitales que priorizan la trazabilidad, la eficiencia y el cuidado emocional de las familias.
                         </p>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+                    <div className="flex items-center justify-center pt-4">
                         <a
-                            href="#precios"
-                            className="w-full sm:w-auto bg-[#19B5FE] hover:bg-[#19B5FE]/90 text-[#020210] px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-[#19B5FE]/15"
+                            href="https://wa.me/56982395940?text=Hola%2C%20quiero%20obtener%20una%20cuenta%20GRATIS%20en%20Vincer"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full sm:w-auto inline-flex items-center justify-center gap-3 bg-[#25D366] hover:bg-[#25D366]/90 text-[#020210] px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-[#25D366]/20"
                             id="cta-final-btn"
                         >
-                            Obtén tu cuenta Free
-                        </a>
-                        <a
-                            href="mailto:soporte@vincer.app"
-                            className="w-full sm:w-auto border border-[#E0B84D]/30 bg-[#E0B84D]/5 hover:bg-[#E0B84D]/10 text-[#E0B84D] px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-xs transition-all"
-                        >
-                            Hablar con un Asesor
+                            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5" aria-hidden="true">
+                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.71.306 1.263.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.247-.694.247-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                            </svg>
+                            Obtén tu cuenta GRATIS por WhatsApp
                         </a>
                     </div>
                 </div>
@@ -636,7 +678,8 @@ export default function VincerLandingClient(props: any) {
                                 </p>
                             </div>
 
-                            <nav className="flex flex-col gap-6 items-center text-center">
+                            <nav className="flex flex-col gap-6 items-center text-center w-full max-w-xs mx-auto">
+                                {/* Secciones de Navegación */}
                                 {[
                                     { href: '#inicio', label: 'Inicio' },
                                     { href: '#vision', label: 'Visión' },
@@ -644,49 +687,88 @@ export default function VincerLandingClient(props: any) {
                                     { href: '#modulos', label: 'Módulos' },
                                     { href: '#precios', label: 'Precios' },
                                     { href: '#faqs', label: 'FAQs' },
+                                    { href: '#sitio-web', label: 'Sitio Web' },
                                 ].map((link, index) => {
                                     const sectionId = link.href.replace('#', '');
                                     const active = activeSection === sectionId;
+
                                     return (
-                                        <div key={link.href + '-' + link.label} className="w-full">
+                                        <div key={link.href} className="w-full">
                                             <motion.a
                                                 href={link.href}
                                                 onClick={(e) => {
                                                     setIsMobileMenuOpen(false);
                                                     handleNavLinkClick(e, link.href);
                                                 }}
-                                                whileTap={{ scale: 0.95 }}
-                                                className="group block py-1.5 relative cursor-pointer"
+                                                whileHover={{ scale: 1.03 }}
+                                                whileTap={{ scale: 0.97 }}
+                                                transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                                                className="group block py-2 relative cursor-pointer select-none"
                                             >
-                                                <span className="text-[#19B5FE]/50 text-xs font-mono mr-2">0{index + 1}.</span>
-                                                <span className={`text-2xl font-sans tracking-wide font-bold transition-all duration-300 ${active ? 'text-[#19B5FE]' : 'text-[#FFFFFF]/90 hover:text-[#19B5FE]'}`}>
+                                                {/* Número de sección (Ej. 01.) */}
+                                                <span className={`text-xs font-mono mr-2 transition-colors duration-300 ${active ? 'text-[#19B5FE]' : 'text-[#19B5FE]/40 group-hover:text-[#19B5FE]/75'
+                                                    }`}>
+                                                    0{index + 1}.
+                                                </span>
+
+                                                {/* Texto del enlace */}
+                                                <span className={`text-2xl font-sans tracking-wide font-bold transition-colors duration-300 ${active ? 'text-[#19B5FE]' : 'text-white/80 group-hover:text-white'
+                                                    }`}>
                                                     {link.label}
                                                 </span>
+
+                                                {/* Indicador Activo Animado con Deslizamiento Fluido */}
                                                 {active && (
-                                                    <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-[2px] bg-[#19B5FE] rounded-full shadow-[0_0_6px_rgba(25,181,254,0.8)]" />
+                                                    <motion.span
+                                                        layoutId="activeMobileIndicator"
+                                                        transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                                                        className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-10 h-[2.5px] bg-[#19B5FE] rounded-full shadow-[0_0_10px_rgba(25,181,254,0.9)]"
+                                                    />
                                                 )}
                                             </motion.a>
                                         </div>
                                     );
                                 })}
 
-                                <div className="h-px w-20 bg-white/10 my-2" />
+                                {/* Divisor estético con gradiente desvanecido */}
+                                <div className="h-[1px] w-28 bg-gradient-to-r from-transparent via-white/15 to-transparent my-4" />
 
                                 {/* Botones de Acción */}
-                                <div className="flex flex-col gap-3.5 w-full max-w-xs mt-4">
-                                    {/* Contáctanos */}
-                                    <a
-                                        href="https://wa.me/56912345678"
+                                <div className="flex flex-col gap-3.5 w-full mt-2">
+                                    {/* Contáctanos - Diseño Premium Interactivo */}
+                                    <motion.a
+                                        href="https://wa.me/56982395940?text=Hola%2C%20quiero%20obtener%20una%20cuenta%20GRATIS%20en%20Vincer"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         onClick={() => setIsMobileMenuOpen(false)}
-                                        className="px-8 py-3 bg-[#25d366] text-[#020210] rounded-full text-xs font-black uppercase tracking-widest shadow-lg shadow-[#25d366]/20 hover:bg-[#20ba5a] transition-all text-center flex items-center justify-center gap-1.5"
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        className="group relative w-full py-4 px-8 rounded-full overflow-hidden flex items-center justify-center border border-[#25d366]/30 bg-[#25d366]/5 text-[#25d366] hover:text-[#020210] font-black uppercase tracking-widest text-xs transition-colors duration-300 shadow-[0_0_15px_rgba(37,211,102,0.03)] hover:shadow-[0_0_25px_rgba(37,211,102,0.2)]"
                                     >
-                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                            <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.588 1.485 5.407 1.486 5.49.003 9.953-4.461 9.957-9.96.002-2.664-1.036-5.168-2.925-7.06-1.889-1.89-4.394-2.93-7.061-2.931-5.495 0-9.96 4.46-9.965 9.961-.001 1.832.482 3.62 1.398 5.184l-.995 3.634 3.731-.978zm11.233-5.263c-.3-.149-1.772-.875-2.046-.975-.276-.101-.476-.149-.675.15-.199.299-.772.976-.946 1.175-.173.199-.347.224-.648.075-3-.15-5.061-1.208-6.804-4.226-.227-.393-.227-.676-.075-.826.138-.135.3-.35.45-.525.152-.175.202-.299.302-.499.1-.2.05-.375-.025-.525-.075-.15-.675-1.625-.925-2.225-.244-.589-.491-.51-.675-.519-.174-.009-.373-.01-.572-.01-.199 0-.523.075-.797.374-.275.3-.1.776-.1 1.9s.823 2.225.936 2.375c.113.15 1.624 2.479 3.934 3.477.55.238 1.012.38 1.36.49.553.176 1.055.151 1.453.093.443-.066 1.772-.724 2.022-1.424.249-.699.249-1.299.174-1.424-.075-.125-.275-.199-.575-.349z" />
-                                        </svg>
-                                        Contáctanos
-                                    </a>
+                                        {/* Fondo deslizante (Efecto Slide-Fill) */}
+                                        <span className="absolute inset-0 w-full h-full bg-[#25d366] transform scale-x-0 origin-left transition-transform duration-300 ease-out group-hover:scale-x-100 z-0" />
+
+                                        {/* Contenido superior (Icono y Texto) */}
+                                        <span className="relative z-10 flex items-center justify-center gap-2.5">
+                                            {/* Nuevo Ícono: Avión de papel / Enviar mensaje */}
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                strokeWidth={2}
+                                                stroke="currentColor"
+                                                className="w-4 h-4 shrink-0 transition-all duration-300 group-hover:scale-110 group-hover:rotate-12"
+                                                aria-hidden="true"
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379L10.3 21.18c-.305.21-.69-.114-.51-.448l1.41-2.61a48.59 48.59 0 01-6.19-2.006c-1.584-.233-2.707-1.626-2.707-3.228V6.741c0-1.602 1.123-2.995 2.707-3.228A48.394 48.394 0 0112 3c2.78 0 5.44.347 8.003 1.013 1.584.233 2.707 1.626 2.707 3.228v4.032c0 1.602-1.123 2.995-2.707 3.228a48.394 48.394 0 01-1.343.185"
+                                                />
+                                            </svg>
+                                            <span>Contáctanos</span>
+                                        </span>
+                                    </motion.a>
                                 </div>
                             </nav>
 

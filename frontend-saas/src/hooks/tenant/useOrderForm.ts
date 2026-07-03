@@ -4,8 +4,10 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiRequest } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
+import { useCurrentTenant } from '@/hooks/useSessionBootstrap';
 import { regions } from '@/lib/tenant/chile-data';
 import { useAutoDraft } from '@/hooks/tenant/useAutoDraft';
+import { readCatalogCache, writeCatalogCache } from '@/lib/tenant/orders/catalogCache';
 import type { OrderTemplate } from '@/lib/tenant/orders/templates';
 import {
     calculateWeightPrice,
@@ -46,6 +48,8 @@ export interface UseOrderFormOptions {
     redirectAfterSave?: boolean;
     /** Si es false, desactiva autoguardado de borrador y aviso al salir. Por defecto solo activo en modo full. */
     enableDraft?: boolean;
+    /** Si es true, restaura el borrador automáticamente al volver (sin preguntar). Útil en modo express. */
+    autoRestoreDraft?: boolean;
     /** Callback tras un guardado exitoso, recibe la orden creada/actualizada (incluye verification_code). */
     onSaveSuccess?: (result: any) => void;
 }
@@ -57,6 +61,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
         cremationTypeOverride,
         redirectAfterSave = mode !== 'express',
         enableDraft = mode !== 'express',
+        autoRestoreDraft = false,
         onSaveSuccess,
     } = options;
 
@@ -64,6 +69,8 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const editId = searchParams.get('id');
+    const currentTenant = useCurrentTenant();
+    const tenantId = currentTenant?.id ?? null;
 
     // ==========================================
     // Catalog data (loaded once)
@@ -81,6 +88,11 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
     // ==========================================
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    // Refresco aislado del catálogo de servicios/planes (botón "Actualizar")
+    const [refreshingServices, setRefreshingServices] = useState(false);
+    const [servicesUpdatedAt, setServicesUpdatedAt] = useState<number | null>(null);
+    // Tras un guardado exitoso suprimimos el borrador para no re-crearlo al salir.
+    const [justSaved, setJustSaved] = useState(false);
     const [currentCremation, setCurrentCremation] = useState<Partial<Cremation>>({
         pet_id: 0,
         status: mode === 'express' ? 'received' : 'pendiente',
@@ -232,13 +244,41 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
     // ==========================================
     // Auto-Draft (localStorage persistence)
     // ==========================================
+    // ¿Hay contenido que valga la pena persistir? (mascota, servicios, planes,
+    // productos o notas). En modo express los handlers no siempre marcan isDirty,
+    // así que usamos esto para decidir si guardar el borrador.
+    const hasDraftableContent = useMemo(() => {
+        return (
+            (!!currentCremation.pet_id && currentCremation.pet_id > 0) ||
+            selectedServices.length > 0 ||
+            selectedPlans.length > 0 ||
+            selectedProducts.length > 0 ||
+            (currentCremation.notes?.trim().length ?? 0) > 0
+        );
+    }, [
+        currentCremation.pet_id, currentCremation.notes,
+        selectedServices.length, selectedPlans.length, selectedProducts.length,
+    ]);
+
+    // El formulario completo persiste por isDirty; el express (autoRestoreDraft)
+    // persiste en cuanto hay contenido, aunque no se haya marcado dirty.
+    const draftActive = enableDraft && !justSaved && (isDirty || (autoRestoreDraft && hasDraftableContent));
+
+    // Al quedar el formulario vacío (p. ej. tras "Nuevo Seguimiento"), reactivamos
+    // la persistencia para el próximo registro.
+    useEffect(() => {
+        if (!hasDraftableContent && justSaved) setJustSaved(false);
+    }, [hasDraftableContent, justSaved]);
+
     const { getExistingDraft, saveDraft, clearDraft } = useAutoDraft({
         editId,
-        isDirty: enableDraft && isDirty,
+        isDirty: draftActive,
         currentCremation,
         selectedServices,
         selectedPlans,
         selectedProducts,
+        // Separa el borrador del formulario express del completo para no mezclarlos.
+        keyNamespace: mode === 'express' ? 'express' : undefined,
     });
 
     // ==========================================
@@ -261,6 +301,16 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
     // ==========================================
     const fetchData = useCallback(async () => {
         setLoading(true);
+        // Stale-while-revalidate: si hay catálogo en caché, lo mostramos al
+        // instante mientras pedimos la versión fresca a la API en segundo plano.
+        if (!editId) {
+            const cached = readCatalogCache(tenantId);
+            if (cached) {
+                setServices(cached.services);
+                setPlans(cached.plans);
+                setServicesUpdatedAt(cached.savedAt);
+            }
+        }
         try {
             // allSettled: si un recurso no-crítico no está disponible para el plan
             // (ej. 'inventario'/'partners' sin permiso en planes solo-operaciones),
@@ -284,13 +334,20 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
             const productsData = settled(5);
             const partnersData = settled(6);
 
+            const normalizedServices = normalizeServices(servicesData);
+            const normalizedPlans = normalizePlans(plansData);
+
             setPets(petsData);
             setPartners(partnersData);
-            setServices(normalizeServices(servicesData));
-            setPlans(normalizePlans(plansData));
+            setServices(normalizedServices);
+            setPlans(normalizedPlans);
             setCustomers(customersData);
             setWeightPricingRules(weightRules);
             setProducts(normalizeProducts(productsData));
+
+            // Refrescamos la caché local del catálogo con la versión fresca.
+            writeCatalogCache(tenantId, { services: normalizedServices, plans: normalizedPlans });
+            setServicesUpdatedAt(Date.now());
 
             // Load existing cremation if editing
             if (editId) {
@@ -331,15 +388,59 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
         } finally {
             setLoading(false);
         }
-    }, [editId]);
+    }, [editId, tenantId]);
 
+    // ==========================================
+    // Refresco aislado del catálogo (servicios + planes)
+    // Permite actualizar el selector sin recargar toda la página.
+    // ==========================================
+    const refreshServices = useCallback(async () => {
+        setRefreshingServices(true);
+        try {
+            const [servicesRes, plansRes] = await Promise.allSettled([
+                apiRequest('/api/internal/services/'),
+                apiRequest('/api/internal/plans/'),
+            ]);
+            const servicesData = servicesRes.status === 'fulfilled' ? (servicesRes.value ?? []) : [];
+            const plansData = plansRes.status === 'fulfilled' ? (plansRes.value ?? []) : [];
+
+            const normalizedServices = normalizeServices(servicesData);
+            const normalizedPlans = normalizePlans(plansData);
+
+            setServices(normalizedServices);
+            setPlans(normalizedPlans);
+            writeCatalogCache(tenantId, { services: normalizedServices, plans: normalizedPlans });
+            setServicesUpdatedAt(Date.now());
+            showToast('Servicios y planes actualizados', 'success');
+        } catch (err: any) {
+            showToast(err?.message || 'No se pudieron actualizar los servicios', 'error');
+        } finally {
+            setRefreshingServices(false);
+        }
+    }, [tenantId, showToast]);
+
+    const didCheckDraftRef = useRef(false);
     useEffect(() => {
         fetchData().then(() => {
-            // After data loads, check for existing draft
-            if (!editId && enableDraft) {
+            // After data loads, check for existing draft (solo una vez por montaje,
+            // aunque fetchData se re-ejecute al resolverse el tenant).
+            if (editId || !enableDraft || didCheckDraftRef.current) return;
+            didCheckDraftRef.current = true;
+            {
                 const draft = getExistingDraft();
                 if (draft) {
-                    setDraftPrompt({ savedAt: draft.savedAt });
+                    if (autoRestoreDraft) {
+                        // Modo express: recuperamos el formulario automáticamente
+                        // al volver, sin mostrar un diálogo de confirmación.
+                        setCurrentCremation(draft.cremation);
+                        setSelectedServices(draft.services);
+                        setSelectedPlans(draft.plans);
+                        setSelectedProducts(draft.products);
+                        setIsDirty(true);
+                        showToast('Recuperamos los datos del formulario', 'info');
+                    } else {
+                        setDraftPrompt({ savedAt: draft.savedAt });
+                    }
                 }
             }
         });
@@ -968,6 +1069,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
             showToast(`Servicio ${isEdit ? 'actualizado' : 'registrado'} con éxito`, 'success');
             if (enableDraft) clearDraft();  // Remove localStorage draft on success
             setIsDirty(false);  // Prevent beforeunload on navigation
+            setJustSaved(true);  // Evita re-crear el borrador al salir tras guardar
 
             // result puede no traer las imágenes recién subidas, pero sí id + verification_code
             onSaveSuccess?.(result);
@@ -1083,6 +1185,9 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
         partners,
         weightPricingRules,
         refreshData: fetchData,
+        refreshServices,
+        refreshingServices,
+        servicesUpdatedAt,
 
         // Memoized lookups
         selectedPet,
