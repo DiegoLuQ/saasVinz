@@ -275,12 +275,12 @@ async def delete_category(category_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Categoría no encontrada.")
 
     # No borrar si hay archivos usando la categoría: se perdería su clasificación.
-    # En ese caso se sugiere desactivarla (is_active=false) vía PUT.
+    # El admin debe reasignar esos archivos a otra categoría primero (modal Editar).
     in_use = db.query(func.count(MediaLibrary.id)).filter(MediaLibrary.category == cat.key).scalar() or 0
     if in_use > 0:
         raise HTTPException(
             status_code=409,
-            detail=f"No se puede eliminar: {in_use} archivo(s) usan esta categoría. Desactívala en su lugar.",
+            detail=f"No se puede eliminar: {in_use} archivo(s) usan esta categoría. Reasígnalos a otra categoría primero.",
         )
 
     db.delete(cat)

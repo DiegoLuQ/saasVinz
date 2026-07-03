@@ -19,9 +19,7 @@ import {
     ChevronRight,
     Inbox,
     Settings2,
-    Plus,
-    Eye,
-    EyeOff
+    Plus
 } from 'lucide-react';
 import { apiRequest, getImageUrl } from '@/lib/admin/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
@@ -311,22 +309,6 @@ export default function MediaLibraryAdmin() {
         } catch (error: any) {
             showToast(error?.message || 'No se pudo crear la categoría', 'error');
             return false;
-        }
-    };
-
-    const handleToggleCategory = async (cat: MediaCategoryItem) => {
-        try {
-            const formData = new FormData();
-            formData.append('is_active', String(!cat.is_active));
-            const res = await fetch(`${apiBase()}/api/internal/media/categories/${cat.id}`, {
-                method: 'PUT',
-                headers: { ...authHeader() },
-                body: formData,
-            });
-            if (!res.ok) throw new Error('No se pudo actualizar la categoría');
-            await fetchCategories();
-        } catch (error: any) {
-            showToast(error?.message || 'No se pudo actualizar la categoría', 'error');
         }
     };
 
@@ -832,8 +814,9 @@ export default function MediaLibraryAdmin() {
                                     {categories.map(c => (
                                         <option key={c.key} value={c.key} className="text-black">{c.label}</option>
                                     ))}
-                                    {/* Categoría actual que ya no está en la lista (técnica o desactivada):
-                                        se mantiene para no reclasificar el archivo sin querer */}
+                                    {/* Categoría actual que no está en la lista gestionable (categoría
+                                        técnica generada por el sistema): se mantiene para no reclasificar
+                                        el archivo sin querer */}
                                     {editingItem.category && !categories.some(c => c.key === editingItem.category) && (
                                         <option value={editingItem.category} className="text-black">
                                             {catLabel(editingItem.category)} (actual)
@@ -951,22 +934,13 @@ export default function MediaLibraryAdmin() {
                             {categories.map(cat => (
                                 <div
                                     key={cat.id}
-                                    className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 transition-colors ${
-                                        cat.is_active ? 'bg-white/[0.03] border-white/10' : 'bg-white/[0.01] border-white/5 opacity-60'
-                                    }`}
+                                    className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 transition-colors"
                                 >
                                     <div className="min-w-0">
                                         <p className="text-white font-medium text-sm truncate">{cat.label}</p>
                                         <p className="text-white/40 text-[11px] font-mono truncate">{cat.key}</p>
                                     </div>
                                     <div className="flex items-center gap-1 shrink-0">
-                                        <button
-                                            onClick={() => handleToggleCategory(cat)}
-                                            title={cat.is_active ? 'Desactivar (ocultar del selector)' : 'Activar'}
-                                            className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
-                                        >
-                                            {cat.is_active ? <Eye size={15} /> : <EyeOff size={15} />}
-                                        </button>
                                         <button
                                             onClick={() => setCatToDelete(cat)}
                                             title="Eliminar"
@@ -983,7 +957,7 @@ export default function MediaLibraryAdmin() {
                         {catToDelete && (
                             <div className="mt-4 pt-4 border-t border-white/10">
                                 <p className="text-sm text-white/80 mb-3">
-                                    ¿Eliminar la categoría <span className="font-bold">{catToDelete.label}</span>? Si hay archivos que la usan, deberás desactivarla en su lugar.
+                                    ¿Eliminar la categoría <span className="font-bold">{catToDelete.label}</span>? Si hay archivos que la usan, primero deberás reasignarlos a otra categoría.
                                 </p>
                                 <div className="flex justify-end gap-2">
                                     <button
