@@ -70,7 +70,7 @@ services:
     expose:
       - "3000"
     environment:
-      # El front sirve el landing (raíz) y los subdominios app/admin/pm.
+      # El front sirve el landing (raíz) y los subdominios app/admin/memorial.
       - VIRTUAL_HOST=${DOMAIN_MAIN},www.${DOMAIN_MAIN},${DOMAIN_APP},${DOMAIN_ADMIN},${DOMAIN_MEMORIALS}
       - VIRTUAL_PORT=3000
       - LETSENCRYPT_HOST=${DOMAIN_MAIN},www.${DOMAIN_MAIN},${DOMAIN_APP},${DOMAIN_ADMIN},${DOMAIN_MEMORIALS}

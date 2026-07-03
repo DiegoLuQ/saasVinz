@@ -33,7 +33,7 @@ _DEFAULT_CORS_ORIGINS = [
     "https://www.vincer.cl",
     "https://app.vincer.cl",
     "https://admin.vincer.cl",
-    "https://pm.vincer.cl",
+    "https://memorial.vincer.cl",
     "https://api-saas-keys.vincer.cl",
 ]
 
