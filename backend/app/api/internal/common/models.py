@@ -172,3 +172,19 @@ class MediaLibrary(Base):
     thumbnail_url = Column(String, nullable=True) # For video covers or optimized image previews
     theme_config = Column(JSON, nullable=True) # Per-background theme overrides (mode, colors)
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
+
+
+class MediaCategory(Base):
+    """
+    Categoría gestionable de la biblioteca de medios global (SuperAdmin).
+    Alimenta el selector de "Subir Archivo". `key` es el slug técnico que se
+    guarda en MediaLibrary.category; `label` es el nombre visible.
+    Config global (sin RLS ni tenant), igual que MediaLibrary.
+    """
+    __tablename__ = "web_media_categories"
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String(50), unique=True, nullable=False, index=True)
+    label = Column(String(120), nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), default=tz.get_now)

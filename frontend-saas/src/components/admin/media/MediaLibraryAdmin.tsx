@@ -17,7 +17,11 @@ import {
     Play,
     ChevronLeft,
     ChevronRight,
-    Inbox
+    Inbox,
+    Settings2,
+    Plus,
+    Eye,
+    EyeOff
 } from 'lucide-react';
 import { apiRequest, getImageUrl } from '@/lib/admin/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
@@ -50,6 +54,14 @@ interface MediaFacets {
     global_count: number;
     tenants: { id: number; name: string; count: number }[];
     categories: { value: string; count: number }[];
+}
+
+interface MediaCategoryItem {
+    id: number;
+    key: string;
+    label: string;
+    sort_order: number;
+    is_active: boolean;
 }
 
 export default function MediaLibraryAdmin() {
@@ -85,16 +97,33 @@ export default function MediaLibraryAdmin() {
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<MediaItem | null>(null);
 
+    // Categorías (gestionables desde la tabla web_media_categories)
+    const [categories, setCategories] = useState<MediaCategoryItem[]>([]);
+    const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+    const [newCatLabel, setNewCatLabel] = useState('');
+    const [creatingCat, setCreatingCat] = useState(false);
+    const [catToDelete, setCatToDelete] = useState<MediaCategoryItem | null>(null);
+
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const apiBase = () => (typeof window === 'undefined' ? (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') : '');
 
-    // Carga inicial: facets (para los filtros) + primera página
+    // Carga inicial: facets (para los filtros) + categorías + primera página
     useEffect(() => {
         fetchFacets();
+        fetchCategories();
         fetchMedia(1);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    const fetchCategories = async () => {
+        try {
+            const res = await fetch(`${apiBase()}/api/internal/media/categories`, { headers: { ...authHeader() } });
+            if (res.ok) setCategories(await res.json());
+        } catch (error) {
+            console.error(error);
+        }
+    };
 
     // Al cambiar un filtro, volver a la página 1 y recargar desde el servidor
     useEffect(() => {
@@ -261,6 +290,63 @@ export default function MediaLibraryAdmin() {
         }
     };
 
+    const handleCreateCategory = async (label: string): Promise<boolean> => {
+        const clean = label.trim();
+        if (!clean) return false;
+        try {
+            const formData = new FormData();
+            formData.append('label', clean);
+            const res = await fetch(`${apiBase()}/api/internal/media/categories`, {
+                method: 'POST',
+                headers: { ...authHeader() },
+                body: formData,
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body?.detail || 'No se pudo crear la categoría');
+            }
+            await fetchCategories();
+            showToast('Categoría creada', 'success');
+            return true;
+        } catch (error: any) {
+            showToast(error?.message || 'No se pudo crear la categoría', 'error');
+            return false;
+        }
+    };
+
+    const handleToggleCategory = async (cat: MediaCategoryItem) => {
+        try {
+            const formData = new FormData();
+            formData.append('is_active', String(!cat.is_active));
+            const res = await fetch(`${apiBase()}/api/internal/media/categories/${cat.id}`, {
+                method: 'PUT',
+                headers: { ...authHeader() },
+                body: formData,
+            });
+            if (!res.ok) throw new Error('No se pudo actualizar la categoría');
+            await fetchCategories();
+        } catch (error: any) {
+            showToast(error?.message || 'No se pudo actualizar la categoría', 'error');
+        }
+    };
+
+    const handleDeleteCategory = async (cat: MediaCategoryItem) => {
+        try {
+            const res = await fetch(`${apiBase()}/api/internal/media/categories/${cat.id}`, {
+                method: 'DELETE',
+                headers: { ...authHeader() },
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body?.detail || 'No se pudo eliminar la categoría');
+            }
+            await fetchCategories();
+            showToast('Categoría eliminada', 'success');
+        } catch (error: any) {
+            showToast(error?.message || 'No se pudo eliminar la categoría', 'error');
+        }
+    };
+
     const copyToClipboard = async (text: string) => {
         try {
             if (navigator.clipboard && window.isSecureContext) {
@@ -309,7 +395,12 @@ export default function MediaLibraryAdmin() {
         submissions: 'Formularios', template_assets: 'Plantillas', backgrounds: 'Fondos',
         saas: 'SaaS (global)', disenos: 'Diseños', gallery: 'Galería', receipts: 'Recibos',
     };
-    const catLabel = (c: string) => CATEGORY_LABELS[c] || c;
+    // Las categorías gestionables (tabla) tienen prioridad sobre el mapa estático,
+    // así los nombres personalizados también se ven en los filtros.
+    const catLabel = (c: string) => {
+        const managed = categories.find(cat => cat.key === c);
+        return managed?.label || CATEGORY_LABELS[c] || c;
+    };
 
     // Opciones de los dropdowns: vienen de /facets (toda la biblioteca, no la página)
     const tenantSelectOptions = useMemo<FilterOption[]>(() => {
@@ -337,11 +428,18 @@ export default function MediaLibraryAdmin() {
                 </div>
                 <div className="flex gap-2">
                     <button
+                        onClick={() => setCategoryModalOpen(true)}
+                        className="border border-white/10 hover:border-white/30 bg-white/5 hover:bg-white/10 text-white/80 font-bold py-2 px-4 rounded-xl flex items-center gap-2 transition-all"
+                    >
+                        <Settings2 size={18} />
+                        Categorías
+                    </button>
+                    <button
                         onClick={() => fileInputRef.current?.click()}
-                        className="bg-primary text-black font-bold py-2 px-4 rounded-xl flex items-center gap-2 
+                        className="bg-primary text-black font-bold py-2 px-4 rounded-xl flex items-center gap-2
                transition-all duration-200
-               hover:brightness-110 
-               active:brightness-90 
+               hover:brightness-110
+               active:brightness-90
                active:text-black/70"
                     >
                         <Upload size={18} />
@@ -603,21 +701,24 @@ export default function MediaLibraryAdmin() {
 
                             <div className="space-y-4 flex-1">
                                 <div>
-                                    <label className="block text-xs font-bold text-white/60 uppercase mb-2">Categoría</label>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="block text-xs font-bold text-white/60 uppercase">Categoría</label>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCategoryModalOpen(true)}
+                                            className="flex items-center gap-1 text-[11px] font-bold text-primary/80 hover:text-primary transition-colors"
+                                        >
+                                            <Settings2 size={12} /> Gestionar
+                                        </button>
+                                    </div>
                                     <select
                                         value={uploadForm.category}
                                         onChange={(e) => setUploadForm({ ...uploadForm, category: e.target.value })}
                                         className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary/50"
                                     >
-                                        <option value="gallery" className="text-black">Galería General</option>
-                                        <option value="altars" className="text-black">Fondos de Altar</option>
-                                        <option value="logos" className="text-black">Logos/Marcas</option>
-                                        <option value="objects" className="text-black">Objetos (3D/2D)</option>
-                                        <option value="memories" className="text-black">Recuerdos/Fotos</option>
-                                        <option value="music" className="text-black">Música/Audio</option>
-                                        <option value="videos" className="text-black">Videos</option>
-                                        <option value="ui" className="text-black">Interfaz (UI)</option>
-                                        <option value="backgrounds" className="text-black">Fondos Web</option>
+                                        {categories.map(c => (
+                                            <option key={c.key} value={c.key} className="text-black">{c.label}</option>
+                                        ))}
                                     </select>
                                 </div>
 
@@ -728,15 +829,16 @@ export default function MediaLibraryAdmin() {
                                     onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
                                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary/50"
                                 >
-                                    <option value="gallery" className="text-black">Galería General</option>
-                                    <option value="altars" className="text-black">Fondos de Altar</option>
-                                    <option value="logos" className="text-black">Logos/Marcas</option>
-                                    <option value="objects" className="text-black">Objetos (3D/2D)</option>
-                                    <option value="memories" className="text-black">Recuerdos/Fotos</option>
-                                    <option value="music" className="text-black">Música/Audio</option>
-                                    <option value="videos" className="text-black">Videos</option>
-                                    <option value="ui" className="text-black">Interfaz (UI)</option>
-                                    <option value="backgrounds" className="text-black">Fondos Web</option>
+                                    {categories.map(c => (
+                                        <option key={c.key} value={c.key} className="text-black">{c.label}</option>
+                                    ))}
+                                    {/* Categoría actual que ya no está en la lista (técnica o desactivada):
+                                        se mantiene para no reclasificar el archivo sin querer */}
+                                    {editingItem.category && !categories.some(c => c.key === editingItem.category) && (
+                                        <option value={editingItem.category} className="text-black">
+                                            {catLabel(editingItem.category)} (actual)
+                                        </option>
+                                    )}
                                 </select>
                             </div>
                             <div>
@@ -798,6 +900,107 @@ export default function MediaLibraryAdmin() {
                                 Eliminar
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Gestión de Categorías */}
+            {categoryModalOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <div className="bg-[#0f172a] border border-white/10 rounded-2xl w-full max-w-lg p-6 shadow-2xl flex flex-col max-h-[85vh]">
+                        <div className="flex justify-between items-center mb-1">
+                            <h3 className="text-xl font-bold text-white">Categorías de medios</h3>
+                            <button onClick={() => setCategoryModalOpen(false)} className="text-white/40 hover:text-white">
+                                <X size={24} />
+                            </button>
+                        </div>
+                        <p className="text-white/50 text-sm mb-5">Estas categorías llenan el selector al subir archivos.</p>
+
+                        {/* Crear nueva */}
+                        <form
+                            onSubmit={async (e) => {
+                                e.preventDefault();
+                                setCreatingCat(true);
+                                const ok = await handleCreateCategory(newCatLabel);
+                                setCreatingCat(false);
+                                if (ok) setNewCatLabel('');
+                            }}
+                            className="flex gap-2 mb-5"
+                        >
+                            <input
+                                type="text"
+                                value={newCatLabel}
+                                onChange={(e) => setNewCatLabel(e.target.value)}
+                                placeholder="Nueva categoría (ej: Ilustraciones)"
+                                className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-primary/50"
+                            />
+                            <button
+                                type="submit"
+                                disabled={creatingCat || !newCatLabel.trim()}
+                                className="bg-primary text-black font-bold px-4 py-2.5 rounded-xl flex items-center gap-1.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all"
+                            >
+                                <Plus size={16} /> Añadir
+                            </button>
+                        </form>
+
+                        {/* Lista */}
+                        <div className="flex-1 overflow-y-auto -mx-1 px-1 space-y-2">
+                            {categories.length === 0 && (
+                                <p className="text-white/40 text-sm text-center py-6">Aún no hay categorías.</p>
+                            )}
+                            {categories.map(cat => (
+                                <div
+                                    key={cat.id}
+                                    className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 transition-colors ${
+                                        cat.is_active ? 'bg-white/[0.03] border-white/10' : 'bg-white/[0.01] border-white/5 opacity-60'
+                                    }`}
+                                >
+                                    <div className="min-w-0">
+                                        <p className="text-white font-medium text-sm truncate">{cat.label}</p>
+                                        <p className="text-white/40 text-[11px] font-mono truncate">{cat.key}</p>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <button
+                                            onClick={() => handleToggleCategory(cat)}
+                                            title={cat.is_active ? 'Desactivar (ocultar del selector)' : 'Activar'}
+                                            className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                                        >
+                                            {cat.is_active ? <Eye size={15} /> : <EyeOff size={15} />}
+                                        </button>
+                                        <button
+                                            onClick={() => setCatToDelete(cat)}
+                                            title="Eliminar"
+                                            className="p-2 rounded-lg text-white/50 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                        >
+                                            <Trash2 size={15} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Confirmación de borrado de categoría (anidada) */}
+                        {catToDelete && (
+                            <div className="mt-4 pt-4 border-t border-white/10">
+                                <p className="text-sm text-white/80 mb-3">
+                                    ¿Eliminar la categoría <span className="font-bold">{catToDelete.label}</span>? Si hay archivos que la usan, deberás desactivarla en su lugar.
+                                </p>
+                                <div className="flex justify-end gap-2">
+                                    <button
+                                        onClick={() => setCatToDelete(null)}
+                                        className="px-4 py-2 rounded-lg hover:bg-white/5 text-white/60 text-sm font-medium transition-colors"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={async () => { await handleDeleteCategory(catToDelete); setCatToDelete(null); }}
+                                        className="bg-red-500 hover:bg-red-600 text-white font-bold px-5 py-2 rounded-lg text-sm transition-all"
+                                    >
+                                        Eliminar
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

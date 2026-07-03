@@ -1,12 +1,22 @@
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Body
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.api.internal.common.media_service import MediaService
-from app.api.internal.common.models import MediaLibrary
+from app.api.internal.common.models import MediaLibrary, MediaCategory
 import os
+import re
 import uuid
 
 router = APIRouter(prefix="/media", tags=["Media Library"])
+
+
+def _slugify_category_key(text: str) -> str:
+    """Convierte un label en un slug técnico ASCII para usar como `key`."""
+    import unicodedata
+    normalized = unicodedata.normalize("NFKD", text or "").encode("ascii", "ignore").decode()
+    slug = re.sub(r"[^a-z0-9]+", "_", normalized.lower()).strip("_")
+    return slug[:50]
 
 @router.post("/upload")
 async def upload_media(
@@ -182,6 +192,101 @@ async def media_facets(db: Session = Depends(get_db)):
         "tenants": tenants,
         "categories": categories,
     }
+
+# ===== Categorías de la biblioteca (gestión SuperAdmin) =====
+
+def _serialize_category(c: MediaCategory) -> dict:
+    return {
+        "id": c.id,
+        "key": c.key,
+        "label": c.label,
+        "sort_order": c.sort_order,
+        "is_active": c.is_active,
+    }
+
+
+@router.get("/categories")
+async def list_categories(include_inactive: bool = False, db: Session = Depends(get_db)):
+    """Categorías del selector de subida. Por defecto solo las activas."""
+    query = db.query(MediaCategory)
+    if not include_inactive:
+        query = query.filter(MediaCategory.is_active.is_(True))
+    cats = query.order_by(MediaCategory.sort_order, MediaCategory.label).all()
+    return [_serialize_category(c) for c in cats]
+
+
+@router.post("/categories")
+async def create_category(
+    label: str = Form(...),
+    key: str = Form(None),
+    sort_order: int = Form(None),
+    db: Session = Depends(get_db),
+):
+    label = (label or "").strip()
+    if not label:
+        raise HTTPException(status_code=400, detail="El nombre de la categoría es obligatorio.")
+
+    final_key = _slugify_category_key(key) if key else _slugify_category_key(label)
+    if not final_key:
+        raise HTTPException(status_code=400, detail="No se pudo generar una clave válida para la categoría.")
+
+    if db.query(MediaCategory).filter(MediaCategory.key == final_key).first():
+        raise HTTPException(status_code=409, detail=f"Ya existe una categoría con la clave '{final_key}'.")
+
+    if sort_order is None:
+        max_order = db.query(func.max(MediaCategory.sort_order)).scalar() or 0
+        sort_order = max_order + 10
+
+    cat = MediaCategory(key=final_key, label=label[:120], sort_order=sort_order, is_active=True)
+    db.add(cat)
+    db.commit()
+    db.refresh(cat)
+    return _serialize_category(cat)
+
+
+@router.put("/categories/{category_id}")
+async def update_category(
+    category_id: int,
+    label: str = Form(None),
+    sort_order: int = Form(None),
+    is_active: bool = Form(None),
+    db: Session = Depends(get_db),
+):
+    cat = db.query(MediaCategory).filter(MediaCategory.id == category_id).first()
+    if not cat:
+        raise HTTPException(status_code=404, detail="Categoría no encontrada.")
+
+    if label is not None and label.strip():
+        cat.label = label.strip()[:120]
+    if sort_order is not None:
+        cat.sort_order = sort_order
+    if is_active is not None:
+        cat.is_active = is_active
+
+    db.commit()
+    db.refresh(cat)
+    return _serialize_category(cat)
+
+
+@router.delete("/categories/{category_id}")
+async def delete_category(category_id: int, db: Session = Depends(get_db)):
+    cat = db.query(MediaCategory).filter(MediaCategory.id == category_id).first()
+    if not cat:
+        raise HTTPException(status_code=404, detail="Categoría no encontrada.")
+
+    # No borrar si hay archivos usando la categoría: se perdería su clasificación.
+    # En ese caso se sugiere desactivarla (is_active=false) vía PUT.
+    in_use = db.query(func.count(MediaLibrary.id)).filter(MediaLibrary.category == cat.key).scalar() or 0
+    if in_use > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"No se puede eliminar: {in_use} archivo(s) usan esta categoría. Desactívala en su lugar.",
+        )
+
+    db.delete(cat)
+    db.commit()
+    return {"message": "Categoría eliminada."}
+
 
 @router.delete("/{media_id}")
 async def delete_media(
