@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **SaaSCrematorio V2** is a multi-tenant SaaS platform for crematory and funeral home management. It supports subdomain-based routing per tenant, RBAC, audit logging, pet memorials, partner/veterinary portals, and payment processing via Polar.sh.
 
+`MEJORAS_SISTEMA.md` (repo root) holds the prioritized improvement plan with implementation status. Largest pending items: S-01/S-02 (httpOnly session cookie + refresh tokens) and S-09 (apply migrations 014/018 in production).
+
 ## Development Commands
 
 ### Backend (FastAPI + Python 3.11)
@@ -22,13 +24,16 @@ npm install
 npm run dev       # http://localhost:3000
 npm run build
 npm run lint
+npm run typecheck # tsc --noEmit — must stay clean
 ```
 
 ### Full Stack (Docker Compose)
 ```bash
 docker-compose up -d
 ```
-Services: Traefik reverse proxy, PostgreSQL, 3 backend replicas, frontend, pgAdmin.
+Services (VPS deployment): backend (1 instance), frontend, pgAdmin, Redis (rate limiting). The reverse proxy is **jwilder/nginx-proxy + acme-companion already running on the VPS** (integration via `VIRTUAL_HOST`/`LETSENCRYPT_HOST` env vars on the shared external network), and PostgreSQL is a **shared container** on that VPS — the compose file does not start its own proxy or database.
+
+> **Warning**: `app/core/client_ip.py` extracts the real client IP from `X-Forwarded-For` assuming the current proxy's behavior. If the reverse proxy ever changes (e.g. to Traefik/Caddy), re-validate that function — the 5/min login rate limit depends on it.
 
 ### Database Setup
 ```bash
@@ -36,7 +41,7 @@ cd backend
 python scripts/database/setup_initial_db.py
 python scripts/database/seed_plans.py   # Bootstrap only — see warning in "Subscription Plans" section
 ```
-> **Important**: `seed_plans.py` does NOT match production plans. It defines 4 plans (FREE/NORMAL/PRO/ULTRA) with stale prices/limits and omits the Track plan. The DB is the source of truth.
+> **Important**: `seed_plans.py` does NOT match production plans. It defines 4 plans (FREE/NORMAL/PRO/ULTRA) with stale prices/limits and omits the Track plan. The DB is the source of truth. The script now **aborts automatically if plans already exist** — it is only for bootstrapping an empty DB.
 
 ## Architecture
 
@@ -71,6 +76,12 @@ Public tracking endpoint: `GET /api/public/tracking/{tenant_slug}/{pet_name}/{tr
 
 `WorkflowStep` is **tenant-configurable** — each crematory defines its own sequence of phases. Advancing a step typically requires `OrderEvidence` (photo + notes + operator signature). The frontend's `OperationDetailModal` is the operator's primary UI for this flow.
 
+### Embeddable Widget (public API keys)
+Tenants on **PRO/ULTRA** plans (`WIDGET_ALLOWED_PLANS` in `app/api/internal/integrations/services.py`) can embed a catalog/tracking widget on their own websites:
+- Public API keys `pk_vincer_live_*` per tenant (table `sys_tenant_api_keys`, migration 018). Keys are public by design — security relies on the `allowed_domains` whitelist validated against the `Origin` header, plus instant revocation via `is_active`.
+- Public endpoints: `/api/public/widget/{catalog,products-services,tracking/*}` — rate-limited 60/min per API key (30/min for tracking) with ETag caching (`max-age=300`).
+- Embeddable script is versioned: `frontend-saas/public/widget/v1.js` (+ `demo.html`). Treat its JSON contract as stable — third-party sites depend on it.
+
 ### RBAC: Roles & Permissions
 8 roles defined: `admin`, `recepcion`, `operador_cremacion`, `contabilidad`, `marketing`, `auditor`, `operator`, `driver`. Plus `creator` (SuperAdmin, bypasses tenant scope).
 
@@ -78,11 +89,13 @@ Permissions are granular: `{module_key, action}` where action ∈ `{view, create
 
 ### Subdomain Routing (Frontend)
 `frontend-saas/src/middleware.ts` routes based on hostname:
-- `admin.*` → `/admin` (SuperAdmin dashboard)
-- `veterinary.*` → `/veterinary` (Partner portal)
-- `<tenant>.*` → `/tenant` (Tenant operations)
-- root or `lvh.me` → `/public` (Landing page)
-- `pawmemory.pet` → `/public/memorials` (Dedicated memorials domain)
+- `admin.*` → `/admin` (SuperAdmin dashboard; guarded by `saasc_token` cookie)
+- `app.*` → `/tenant` (tenant operations; the tenant is identified by JWT, not by a slug subdomain)
+- `veterinary.*` → `/veterinary` (partner portal; guarded by `vet_token` cookie)
+- `memorial.*` or the dedicated domain (`NEXT_PUBLIC_MEMORIAL_DOMAIN`, e.g. pawmemory.pet) → `/public`
+- `track.*` → `/track` at the root (public search-by-code page); other paths → `/public`
+- root / `www.` → `/vincer` (marketing site)
+- any other subdomain → redirect to root
 
 For local dev, use `lvh.me:3000` (resolves to 127.0.0.1) with subdomains like `admin.lvh.me:3000`.
 
@@ -95,7 +108,9 @@ module/
   schemas.py   # Pydantic request/response validation
   services.py  # Business logic
 ```
-Modules: `admin`, `auth`, `catalog`, `crm`, `operations`, `creator`, `memorials`, `payments`, `partners`, `veterinary`, `common`.
+Modules: `admin`, `auth`, `catalog`, `crm`, `operations`, `creator`, `memorials`, `payments`, `partners`, `veterinary`, `common`, `integrations`.
+
+Note: `integrations` holds the models/schemas/services for the public widget API keys; its routers live in `creator/widgets/` (SuperAdmin management) and `api/public/widget/` (public consumption).
 
 ### Authentication
 - JWT (HS256), 7-day expiry, via `Authorization: Bearer <token>` header
@@ -116,7 +131,7 @@ Modules: `admin`, `auth`, `catalog`, `crm`, `operations`, `creator`, `memorials`
 ## Environment Variables
 
 ### Backend (`backend/.env`)
-Key vars: `SECRET_KEY`, `SQLALCHEMY_DATABASE_URL`, `DB_ADMIN_USER/PASS`, `R2_*` (Cloudflare R2), `POLAR_*` (payments), `MAIL_*` (Gmail SMTP), `RECAPTCHA_SECRET_KEY`, `REDIS_URL`.
+Key vars: `SECRET_KEY`, `SQLALCHEMY_DATABASE_URL`, `DB_ADMIN_USER/PASS`, `R2_*` (Cloudflare R2), `POLAR_*` (payments), `MAIL_*` (Gmail SMTP), `RECAPTCHA_SECRET_KEY`, `REDIS_URL`, `CORS_ORIGINS` (optional, comma-separated; falls back to the defaults in `app/core/config.py` when unset).
 
 ### Frontend (`frontend-saas/.env`)
 Key vars: `NEXT_PUBLIC_ROOT_DOMAIN`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_CLOUDFLARE_R2`, `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`.
@@ -129,8 +144,8 @@ Database credentials and domain mappings consumed by Docker Compose.
 ### API Responses
 - Schemas follow naming: `CustomerCreate`, `CustomerUpdate`, `CustomerInDB`
 - 401: `"Sesión expirada o token inválido"`
-- Rate limits: 5/min on login, 100/min general (SlowAPI)
-- Errors logged to `backend/error_debug.log`
+- Rate limits (SlowAPI, Redis storage via `REDIS_URL`): 5/min on login, 100/min general; public tracking `/resolve` 10/min, tracking detail 30/min; widget 60/min per API key
+- Errors logged to `backend/error_debug.log` (rotating, 10 MB × 3)
 
 ### Frontend Route Groups
 App Router layout groups: `(admin)`, `(public)`, `(tenant)`, `(veterinary)` — these are in `frontend-saas/src/app/`.
@@ -143,7 +158,7 @@ App Router layout groups: `(admin)`, `(public)`, `(tenant)`, `(veterinary)` — 
 ### Known Incomplete Areas ("Próximamente")
 - **Veterinary B2B portal**: The data model (Veterinary, PartnerLink, commission %) and notifications exist, but the full self-service portal (clinics submitting cremations, viewing referrals, commission payouts) is incomplete. Landing page (`/vincer`) explicitly tags these features with "Próximamente".
 - **Commission liquidation**: Calculated but no payout endpoint.
-- Several files have **pre-existing TypeScript errors** (e.g. `gestion-servicios/plan/[id]/page.tsx`, `mascotas/page.tsx` null-vs-undefined mismatches). They are not blocking the build via Next.js's loose mode but `tsc --noEmit` will report them. Don't assume they're caused by your changes.
+- Type checking runs with `npm run typecheck` (`tsc --noEmit`). As of 2026-07-02 it passes clean — keep it that way.
 
 ## Infrastructure
 
@@ -152,5 +167,6 @@ App Router layout groups: `(admin)`, `(public)`, `(tenant)`, `(veterinary)` — 
 - **Email**: Gmail SMTP via fastapi-mail (`backend/app/services/email.py`)
 - **Certificates**: PDF generation in `backend/app/utils/certificates.py` (~34KB, complex)
 - **Audit**: All API requests logged via `backend/app/middleware/audit_middleware.py` to `AuditLog` table
-- **3D Memorials**: Three.js / @react-three/fiber in frontend for pet memorial visualization
+- **Backups**: automatic backups run from a background task (`backend/app/services/backup_scheduler.py`): startup asyncio loop, 5-min check interval, `pg_try_advisory_lock` for exclusion across replicas. They no longer depend on HTTP traffic.
+- **API docs**: `/docs`, `/redoc` and `/openapi.json` are disabled when `ENVIRONMENT=production`
 - **Form Tokens**: Public registration forms use temporary tokens (`form_tokens`) with a 6-digit PIN and a few-day TTL. Generated from the tenant's Navbar "share" action.
