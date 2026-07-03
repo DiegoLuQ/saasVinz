@@ -32,10 +32,23 @@ interface SidebarProps {
     onLogout: () => void;
     isCollapsed: boolean;
     setIsCollapsed: (value: boolean) => void;
+    /* En <lg el sidebar es un drawer off-canvas: estas props controlan su apertura */
+    isMobileOpen: boolean;
+    onMobileClose: () => void;
 }
 
-export default function Sidebar({ onLogout, isCollapsed, setIsCollapsed }: SidebarProps) {
+export default function Sidebar({ onLogout, isCollapsed: isCollapsedProp, setIsCollapsed, isMobileOpen, onMobileClose }: SidebarProps) {
     const pathname = usePathname();
+
+    // Con el drawer móvil abierto el sidebar se muestra siempre expandido
+    // (labels visibles), aunque la preferencia guardada de desktop sea colapsado.
+    const isCollapsed = isCollapsedProp && !isMobileOpen;
+
+    // Cerrar el drawer móvil al navegar a otra página
+    React.useEffect(() => {
+        onMobileClose();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pathname]);
 
     const vets = useAdminVets();
     const metadata = useAdminMetadata();
@@ -153,11 +166,24 @@ export default function Sidebar({ onLogout, isCollapsed, setIsCollapsed }: Sideb
     }, [pathname, allItems]);
 
     return (
+        <>
+        {/* Backdrop del drawer móvil */}
+        {isMobileOpen && (
+            <div
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-20 lg:hidden"
+                onClick={onMobileClose}
+                aria-hidden="true"
+            />
+        )}
         <motion.aside
             initial={false}
             animate={{ width: isCollapsed ? '80px' : '288px' }}
             transition={{ duration: 0.5, ease: "easeInOut" }}
-            className="bg-[#0a192f] border-r border-white/5 flex flex-col fixed h-full z-30"
+            /* max-lg: drawer off-canvas de ancho fijo (el ! pisa el width inline de
+               framer-motion); en lg+ se mantiene el comportamiento colapsable */
+            className={`bg-[#0a192f] border-r border-white/5 flex flex-col fixed h-full z-30
+                max-lg:!w-72 max-lg:transition-transform max-lg:duration-300
+                ${isMobileOpen ? 'max-lg:translate-x-0' : 'max-lg:-translate-x-full'}`}
         >
             {/* Header / Logo */}
             <div className={`p-6 border-b border-white/5 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
@@ -189,10 +215,10 @@ export default function Sidebar({ onLogout, isCollapsed, setIsCollapsed }: Sideb
                 </div>
             </div>
 
-            {/* Toggle Button */}
+            {/* Toggle Button (solo desktop: en móvil el drawer se cierra con el backdrop) */}
             <button
                 onClick={() => setIsCollapsed(!isCollapsed)}
-                className="absolute -right-3 top-20 bg-primary text-white p-1 rounded-full shadow-lg z-40 hover:scale-110 active:scale-95 transition-all"
+                className="hidden lg:block absolute -right-3 top-20 bg-primary text-white p-1 rounded-full shadow-lg z-40 hover:scale-110 active:scale-95 transition-all"
             >
                 {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
             </button>
@@ -334,5 +360,6 @@ export default function Sidebar({ onLogout, isCollapsed, setIsCollapsed }: Sideb
                 </button>
             </div>
         </motion.aside>
+        </>
     );
 }

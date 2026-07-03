@@ -421,7 +421,7 @@ export default function RolesModulosPage() {
                         </div>
                     </div>
 
-                    <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden backdrop-blur-sm">
+                    <div className="bg-white/5 border border-white/10 rounded-3xl overflow-x-auto backdrop-blur-sm">
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="border-b border-white/5 bg-white/5">

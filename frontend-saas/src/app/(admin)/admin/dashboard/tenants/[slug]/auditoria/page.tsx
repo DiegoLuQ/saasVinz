@@ -208,6 +208,7 @@ export default function TenantAuditoriaPage() {
                         <div className="text-white/40 text-sm font-medium">No hay eventos para los filtros seleccionados</div>
                     </div>
                 ) : (
+                    <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead className="bg-white/[0.02] border-b border-white/5">
                             <tr className="text-[10px] uppercase tracking-widest font-bold text-white/40">
@@ -256,6 +257,7 @@ export default function TenantAuditoriaPage() {
                             ))}
                         </tbody>
                     </table>
+                    </div>
                 )}
             </div>
 

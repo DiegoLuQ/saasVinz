@@ -123,7 +123,9 @@ export default function VincerLandingClient(props: any) {
                         </Link>
                     </div>
 
-                    <nav className="hidden md:flex items-center gap-8">
+                    {/* xl: los 7 items + CTA necesitan ~1100px; entre md y xl el nav
+                        desktop se rompía (items en dos líneas chocando con el CTA) */}
+                    <nav className="hidden xl:flex items-center gap-8">
                         {[
                             { href: '#inicio', label: 'Inicio' },
                             { href: '#vision', label: 'Visión' },
@@ -162,7 +164,7 @@ export default function VincerLandingClient(props: any) {
                     </nav>
 
                     {/* Lado Derecho: Acciones Desktop */}
-                    <div className="hidden md:flex items-center gap-4 shrink-0">
+                    <div className="hidden xl:flex items-center gap-4 shrink-0">
                         <a
                             href="https://wa.me/56982395940?text=Hola%2C%20quiero%20obtener%20una%20cuenta%20GRATIS%20en%20Vincer"
                             target="_blank"
@@ -188,7 +190,7 @@ export default function VincerLandingClient(props: any) {
                     {/* Botón Menú Móvil */}
                     <button
                         onClick={() => setIsMobileMenuOpen(true)}
-                        className="md:hidden p-2.5 text-[#C0C0C0] hover:text-[#19B5FE] transition-all duration-300 rounded-xl bg-white/5 border border-white/10 active:scale-90"
+                        className="xl:hidden p-2.5 text-[#C0C0C0] hover:text-[#19B5FE] transition-all duration-300 rounded-xl bg-white/5 border border-white/10 active:scale-90"
                         aria-label="Open menu"
                     >
                         <Menu size={18} />
@@ -648,7 +650,7 @@ export default function VincerLandingClient(props: any) {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.25 }}
-                        className="fixed inset-0 z-[100] bg-slate-950/96 backdrop-blur-2xl flex flex-col p-6 md:hidden overflow-y-auto"
+                        className="fixed inset-0 z-[100] bg-slate-950/96 backdrop-blur-2xl flex flex-col p-6 xl:hidden overflow-y-auto"
                     >
                         {/* Ambient Glows */}
                         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full bg-[#19B5FE]/10 blur-[100px] pointer-events-none" />

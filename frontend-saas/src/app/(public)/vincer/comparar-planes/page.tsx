@@ -117,13 +117,22 @@ export default function CompararPlanesPage() {
                     </p>
                 </div>
  
+                {/* Hint de scroll: en móvil la tabla (900px) excede el viewport y sin
+                    esta señal el usuario solo ve la columna FREE sin saber que hay más */}
+                <div className="xl:hidden flex items-center justify-center gap-2 mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                    Desliza para comparar los 5 planes
+                    <ArrowLeft size={12} className="rotate-180" />
+                </div>
+
                 {/* Table wrapper for responsiveness */}
                 <div className="w-full overflow-x-auto border border-white/10 rounded-3xl bg-[#0b0a24]/60 backdrop-blur-md shadow-2xl">
                     <table className="w-full min-w-[900px] border-collapse text-left">
                         {/* Table Header */}
                         <thead>
                             <tr className="border-b border-white/10 bg-[#020210]/80">
-                                <th className="p-6 text-xs font-bold uppercase tracking-wider text-slate-400 w-1/4">Característica</th>
+                                {/* sticky: la columna de etiquetas queda fija al deslizar
+                                    horizontalmente (bg opaco para tapar las celdas de abajo) */}
+                                <th className="p-6 text-xs font-bold uppercase tracking-wider text-slate-400 w-1/4 min-w-[150px] sticky left-0 z-20 bg-[#020210]">Característica</th>
                                 
                                 {/* FREE Column */}
                                 <th className="p-6 text-center w-[15%]">
@@ -195,7 +204,9 @@ export default function CompararPlanesPage() {
                                     {/* Category Heading Row */}
                                     <tr className="bg-[#020210]/40 border-b border-white/5">
                                         <td colSpan={6} className="p-4 px-6 text-xs font-black uppercase tracking-widest text-[#E0B84D] bg-white/5">
-                                            {section.category}
+                                            {/* sticky interno: el título de categoría se mantiene
+                                                visible al desplazar la tabla horizontalmente */}
+                                            <div className="sticky left-6 w-max">{section.category}</div>
                                         </td>
                                     </tr>
 
@@ -206,9 +217,11 @@ export default function CompararPlanesPage() {
                                             className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
                                         >
                                             {/* Feature Name & Description */}
-                                            <td className="p-5 px-6 align-top">
+                                            <td className="p-5 px-6 align-top sticky left-0 z-10 bg-[#0b0a24]">
                                                 <div className="font-bold text-xs text-[#FFFFFF]">{feature.name}</div>
-                                                <div className="text-[10px] text-slate-400 mt-1 leading-normal max-w-xs">{feature.description}</div>
+                                                {/* En móvil solo la etiqueta: la descripción haría
+                                                    la columna fija demasiado ancha (viewport 375px) */}
+                                                <div className="hidden md:block text-[10px] text-slate-400 mt-1 leading-normal max-w-xs">{feature.description}</div>
                                             </td>
 
                                             {/* FREE Cell */}

@@ -367,7 +367,7 @@ export default function SubmissionDetailPage() {
                         <h3 className="text-sm font-black uppercase tracking-widest text-orange-400/70 flex items-center gap-2">
                             <Package size={16} /> Servicios Seleccionados
                         </h3>
-                        <div className="border border-white/5 rounded-2xl overflow-hidden bg-white/[0.01]">
+                        <div className="border border-white/5 rounded-2xl overflow-x-auto bg-white/[0.01]">
                             <table className="w-full text-left text-xs">
                                 <thead>
                                     <tr className="border-b border-white/5 bg-white/5 text-muted-foreground">
