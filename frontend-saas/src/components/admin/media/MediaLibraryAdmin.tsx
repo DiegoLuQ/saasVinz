@@ -116,7 +116,9 @@ export default function MediaLibraryAdmin() {
 
     const fetchCategories = async () => {
         try {
-            const res = await fetch(`${apiBase()}/api/internal/media/categories`, { headers: { ...authHeader() } });
+            // include_inactive: al no existir ya un botón de "activar", ninguna
+            // categoría debe quedar oculta/atrapada. Se muestran todas.
+            const res = await fetch(`${apiBase()}/api/internal/media/categories?include_inactive=true`, { headers: { ...authHeader() } });
             if (res.ok) setCategories(await res.json());
         } catch (error) {
             console.error(error);
