@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const config = {
     matcher: [
-        '/((?!api/|_next/|_static/|static/|storage/|_vercel|[\\w-]+\\.\\w+).*)',
+        '/((?!api/|_next/|_static/|static/|storage/|widget/|_vercel|[\\w-]+\\.\\w+).*)',
     ],
 };
 
@@ -10,7 +10,9 @@ export const config = {
 //   admin.<root>     -> /admin           (panel SaaS Creator)
 //   app.<root>       -> /tenant          (panel multi-tenant, identificación por JWT)
 //   veterinary.<root>-> /veterinary      (portal veterinarias)
-//   <memorialDomain> -> /public          (URLs públicas de memoriales)
+//   memorial.<root>  -> /public          (URLs públicas de memoriales)
+//   track.<root>     -> /public          (seguimiento público de órdenes)
+//   <memorialDomain> -> /public          (dominio de marca dedicado, ej. pawmemory.pet)
 //   <root>           -> /public          (landing temporal hasta migrar a sitio externo)
 //   cualquier otro   -> redirect a <root>
 
@@ -21,7 +23,7 @@ export default async function middleware(req: NextRequest) {
     const rootDomainEnv = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000';
     const memorialDomain = process.env.NEXT_PUBLIC_MEMORIAL_DOMAIN;
 
-    let currentHost: 'admin' | 'app' | 'veterinary' | 'memorial' | 'pm' | 'invalid' | undefined;
+    let currentHost: 'admin' | 'app' | 'veterinary' | 'memorial' | 'track' | 'invalid' | undefined;
     const isLocal = hostname?.includes('lvh.me') || hostname?.includes('localhost');
     let effectiveRoot = isLocal
         ? (hostname?.includes('lvh.me') ? 'lvh.me:3000' : 'localhost:3000')
@@ -30,8 +32,10 @@ export default async function middleware(req: NextRequest) {
     if (hostname) {
         if (memorialDomain && (hostname === memorialDomain || hostname === `www.${memorialDomain}`)) {
             currentHost = 'memorial';
-        } else if (hostname.startsWith('pm.')) {
-            currentHost = 'pm';
+        } else if (hostname.startsWith('memorial.')) {
+            currentHost = 'memorial';
+        } else if (hostname.startsWith('track.')) {
+            currentHost = 'track';
         } else {
             if (hostname === effectiveRoot || hostname === `www.${effectiveRoot}`) {
                 currentHost = undefined;
@@ -47,7 +51,9 @@ export default async function middleware(req: NextRequest) {
         }
     }
 
-    console.log(`[Middleware] Host: ${hostname} | Detected: ${currentHost ?? 'root'} | Path: ${url.pathname}`);
+    if (process.env.NODE_ENV !== 'production') {
+        console.log(`[Middleware] Host: ${hostname} | Detected: ${currentHost ?? 'root'} | Path: ${url.pathname}`);
+    }
 
     // Pasar de largo: API y memoriales públicos
     if (url.pathname.startsWith('/memorials') || url.pathname.startsWith('/api')) {
@@ -96,9 +102,15 @@ export default async function middleware(req: NextRequest) {
         return NextResponse.rewrite(url);
     }
 
-    // Memorials, PM subdomain or public tenant pages (form, track) -> /public (PawMemory content)
+    // Raíz del subdominio de seguimiento -> web pública de búsqueda por código
+    if (currentHost === 'track' && (url.pathname === '/' || url.pathname === '')) {
+        url.pathname = '/track';
+        return NextResponse.rewrite(url);
+    }
+
+    // Memoriales, seguimiento o páginas públicas del tenant (form, track) -> /public
     const isPublicTenantPath = url.pathname.includes('/track/') || url.pathname.includes('/form');
-    if (currentHost === 'pm' || currentHost === 'memorial' || isPublicTenantPath) {
+    if (currentHost === 'memorial' || currentHost === 'track' || isPublicTenantPath) {
         url.pathname = `/public${url.pathname}`;
         return NextResponse.rewrite(url);
     }

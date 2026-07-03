@@ -1,16 +1,73 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from app import models
 from app import schemas
+from app.core.rate_limiter import limiter
 from datetime import datetime
 from typing import List, Optional
 
 router = APIRouter()
 
+# Mensaje único para cualquier fallo de resolución: no revelar si el código
+# existe, si el formato es válido, ni a qué tenant pertenece.
+_RESOLVE_NOT_FOUND = "No encontramos un seguimiento con ese código"
+
+
+@router.get("/resolve/{code}")
+@limiter.limit("10/minute")
+def resolve_tracking_code(request: Request, code: str, db: Session = Depends(get_db)):
+    """
+    Resuelve un código de seguimiento a (slug, pet_name) para la web pública de
+    tracking, donde la familia solo ingresa el código.
+
+    Acepta verification_code (10 chars), tracking_token (UUID) o el código de una
+    solicitud de formulario pendiente. La búsqueda es entre todos los crematorios
+    (bypass RLS) porque estos identificadores son únicos globalmente.
+    """
+    from app.core.tenant_context import apply_bypass_rls
+
+    code = (code or "").strip()
+    if not code:
+        raise HTTPException(status_code=404, detail=_RESOLVE_NOT_FOUND)
+
+    # Búsqueda cross-tenant: los códigos son únicos a nivel global.
+    apply_bypass_rls(db)
+
+    cremation = db.query(models.Cremation).outerjoin(
+        models.CremationDetails, models.Cremation.id == models.CremationDetails.cremation_id
+    ).filter(
+        or_(
+            models.Cremation.verification_code == code,
+            models.CremationDetails.tracking_token == code,
+        )
+    ).first()
+
+    if cremation:
+        tenant = db.query(models.Tenant).filter(models.Tenant.id == cremation.tenant_id).first()
+        pet = db.query(models.Pet).filter(models.Pet.id == cremation.pet_id).first()
+        if tenant and pet:
+            return {"tenant_slug": tenant.slug, "pet_name": pet.name, "code": code}
+
+    # Solicitud de formulario pendiente (aún sin orden creada)
+    submission = db.query(models.FormSubmission).filter(
+        models.FormSubmission.code == code
+    ).first()
+    if submission:
+        tenant = db.query(models.Tenant).filter(models.Tenant.id == submission.tenant_id).first()
+        pet_data = submission.pet_data or {}
+        pet_name = (pet_data.get("name") or "mascota").strip()
+        if tenant:
+            return {"tenant_slug": tenant.slug, "pet_name": pet_name, "code": code}
+
+    raise HTTPException(status_code=404, detail=_RESOLVE_NOT_FOUND)
+
+
 @router.get("/{slug}/{pet_name}/{token}", response_model=schemas.PublicTrackingResponse)
+@limiter.limit("30/minute")
 def get_tracking_info(
+    request: Request,
     slug: str,
     pet_name: str,
     token: str,

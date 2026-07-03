@@ -39,6 +39,34 @@ const nextConfig: NextConfig = {
       }
     ],
   },
+  async headers() {
+    const baseSecurityHeaders = [
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+      // HSTS: solo tiene efecto bajo HTTPS (producción detrás del proxy).
+      { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
+      { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+    ];
+    return [
+      {
+        // Anti-clickjacking en toda la app EXCEPTO /memorials: el panel admin
+        // previsualiza memoriales embebiéndolos en un iframe desde otro
+        // subdominio (admin.* → dominio de memoriales), y SAMEORIGIN los
+        // bloquearía. Los memoriales públicos son de solo lectura.
+        // El widget embebible tampoco pasa por aquí (script estático en
+        // /public/widget que corre en el sitio del cliente).
+        source: '/((?!memorials).*)',
+        headers: [
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          ...baseSecurityHeaders,
+        ],
+      },
+      {
+        source: '/memorials/:path*',
+        headers: baseSecurityHeaders,
+      },
+    ];
+  },
   async rewrites() {
     return {
       // beforeFiles: se ejecuta antes de verificar rutas del filesystem

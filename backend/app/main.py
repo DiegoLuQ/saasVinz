@@ -17,21 +17,38 @@ from app.core.rate_limiter import limiter
 import logging
 
 # Configurar logging (Fase: Estabilización de Logs)
+# RotatingFileHandler: los logs de acceso/errores no pueden crecer sin límite
+# dentro del contenedor (10 MB x 5 archivos por réplica).
+from logging.handlers import RotatingFileHandler
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("backend_access.log", encoding="utf-8")
+        RotatingFileHandler("backend_access.log", maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"),
     ]
 )
 logger = logging.getLogger("saas_crematorio")
+
+# Logger dedicado para tracebacks de errores 500 (antes: open() síncrono por error).
+error_logger = logging.getLogger("saas_crematorio.errors")
+_error_handler = RotatingFileHandler("error_debug.log", maxBytes=10 * 1024 * 1024, backupCount=3, encoding="utf-8")
+_error_handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+error_logger.addHandler(_error_handler)
+error_logger.setLevel(logging.ERROR)
+
+from app.core.config import settings as app_settings
 
 app = FastAPI(
     title="SaaS Crematorio API",
     version="1.0.0",
     description="API para gestión de crematorios",
-    redirect_slashes=False  # Prevent 307 redirects that trigger adblockers
+    redirect_slashes=False,  # Prevent 307 redirects that trigger adblockers
+    # En producción no se expone la documentación del API interno.
+    docs_url=None if app_settings.IS_PRODUCTION else "/docs",
+    redoc_url=None if app_settings.IS_PRODUCTION else "/redoc",
+    openapi_url=None if app_settings.IS_PRODUCTION else "/openapi.json",
 )
 
 # Registrar el Limiter en la app (Fase 31: Rate Limiting)
@@ -57,13 +74,11 @@ class ErrorLoggingMiddleware:
         try:
             await self.app(scope, receive, send)
         except Exception as e:
-            import traceback, uuid
+            import uuid
             correlation_id = uuid.uuid4().hex[:12]
-            traceback.print_exc()
-            with open("error_debug.log", "a", encoding="utf-8") as f:
-                f.write(f"\n[{datetime.now()}] [cid={correlation_id}] ERROR on {scope['method']} {scope['path']}\n")
-                f.write(traceback.format_exc())
-                f.write("-" * 50 + "\n")
+            error_logger.exception(
+                f"[cid={correlation_id}] ERROR on {scope['method']} {scope['path']}"
+            )
 
             response = JSONResponse(
                 status_code=500,
@@ -74,95 +89,32 @@ class ErrorLoggingMiddleware:
             )
             await response(scope, receive, send)
 
-class BackupSchedulerMiddleware:
-    def __init__(self, app):
-        self.app = app
-
-    async def __call__(self, scope, receive, send):
-        if scope["type"] != "http":
-            await self.app(scope, receive, send)
-            return
-
-        path = scope["path"]
-        if path.startswith("/api/internal/maintenance/backups/status"):
-            from app.database import SessionLocal
-            from app import models
-            from app.services.backup_service import run_db_backup
-            
-            db = SessionLocal()
-            try:
-                config = db.query(models.SaaSConfig).first()
-                if config and config.backup_enabled:
-                    now = datetime.now()
-                    current_day = now.weekday()
-                    
-                    if current_day == config.backup_day:
-                        current_time_str = now.strftime("%H:%M")
-                        if current_time_str >= config.backup_time:
-                            last_backup = config.last_backup_at
-                            is_today = last_backup and last_backup.date() == now.date()
-                            
-                            if not is_today and config.last_backup_status != "in_progress":
-                                print(f"⏰ Automating backup: {now}")
-                                import threading
-
-                                def _run_backup_with_own_session():
-                                    from app.core.tenant_context import apply_bypass_rls
-                                    thread_db = SessionLocal()
-                                    try:
-                                        apply_bypass_rls(thread_db)
-                                        run_db_backup(thread_db)
-                                    finally:
-                                        thread_db.close()
-
-                                threading.Thread(target=_run_backup_with_own_session, daemon=True).start()
-            except Exception as e:
-                print(f"Backup scheduler error: {e}")
-            finally:
-                db.close()
-                
-        await self.app(scope, receive, send)
-
 app.add_middleware(ErrorLoggingMiddleware)
-app.add_middleware(BackupSchedulerMiddleware)
+
+
+# Backups automáticos: tarea de fondo con advisory lock (una sola réplica
+# ejecuta el backup). Reemplaza al antiguo BackupSchedulerMiddleware, que
+# dependía del tráfico HTTP y tenía una race entre réplicas.
+@app.on_event("startup")
+async def _start_backup_scheduler():
+    import asyncio
+    from app.services.backup_scheduler import backup_scheduler_loop
+    asyncio.create_task(backup_scheduler_loop())
 
 # Startup tasks removed. DDL migrations are handled by deployment scripts.
 
 # CORS Configuration - DEBE IR AL FINAL para que se ejecute PRIMERO en el request
+# Orígenes configurables por entorno vía CORS_ORIGINS (separados por coma);
+# sin la variable se usan los defaults de app/core/config.py.
+from app.core.config import settings
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://lvh.me:3000",
-        "http://admin.lvh.me:3000",
-        "http://tenant.lvh.me:3000",
-        "http://partner.lvh.me:3000",
-        "http://www.lvh.me:3000",
-        "http://crematorio.lvh.me:3000",
-        "http://funeraria.lvh.me:3000",
-        "http://huellas.lvh.me:3000",
-        "http://app.lvh.me:3000",
-        # Production Domains (vincer.app - legacy)
-        "https://vincer.app",
-        "https://www.vincer.app",
-        "https://admin.vincer.app",
-        "https://tenant.vincer.app",
-        "https://veterinary.vincer.app",
-        "https://apisaasv2.vincer.app",
-        "https://pawmemory.pet",
-        # Production Domains (vincer.cl)
-        "https://vincer.cl",
-        "https://www.vincer.cl",
-        "https://app.vincer.cl",
-        "https://admin.vincer.cl",
-        "https://pm.vincer.cl",
-        "https://api-saas-keys.vincer.cl"
-    ],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"]
+    # Solo lo que el frontend realmente lee (descarga de backups).
+    expose_headers=["Content-Disposition"],
 )
 
 
@@ -195,7 +147,6 @@ from app.api.internal.operations.documents.router import router as documents_rou
 from app.api.internal.operations.operations.router import router as operations_router
 app.include_router(cremations_router, prefix="/api/internal/cremations", tags=["Operaciones - Cremaciones"])
 app.include_router(documents_router, prefix="/api/internal/ops-records", tags=["Operaciones - Documentos"])
-app.include_router(documents_router, prefix="/api/internal/documents", tags=["Operaciones - Documentos (Legacy)"])
 app.include_router(operations_router, prefix="/api/internal/operations", tags=["Operaciones"])
 
 # Catalog Module
@@ -281,7 +232,6 @@ app.include_router(onboarding_router, prefix="/api/internal/onboarding", tags=["
 
 app.include_router(landing_router, prefix="/api/internal/landing", tags=["Landing Config"])
 app.include_router(farewell_router, prefix="/api/internal/farewell-templates", tags=["Plantillas Despedida"])
-app.include_router(farewell_router, prefix="/api/internal/farewell_templates", tags=["Plantillas Despedida (Legacy)"])
 app.include_router(form_tokens_router, prefix="/api/internal/form-tokens", tags=["Form Tokens"])
 app.include_router(health_router, prefix="/api/internal", tags=["Health"])
 app.include_router(media_router, prefix="/api/internal", tags=["Biblioteca de Medios"])
@@ -293,6 +243,10 @@ app.include_router(announcements_router, prefix="/api/internal/announcements", t
 # Partners Module (Veterinarios)
 from app.api.internal.partners.router import router as partners_router
 app.include_router(partners_router)
+
+# Integrations Module (Widget embebible / API keys públicas) — gestionado por SuperAdmin
+from app.api.internal.creator.widgets.router import router as creator_widgets_router
+app.include_router(creator_widgets_router, prefix="/api/internal/creator/widgets", tags=["Creator - Widgets"])
 
 # ===== API v1 - Public Endpoints =====
 
@@ -307,6 +261,9 @@ app.include_router(qr_router, prefix="/api/public", tags=["Público - QR"])
 app.include_router(public_partners_router, prefix="/api/public", tags=["Público - Partners"])
 app.include_router(landing_router, prefix="/api/public", tags=["Público - Landing"])
 app.include_router(public_contact_router, prefix="/api/public", tags=["Público - Contacto"])
+
+from app.api.public.widget.router import router as public_widget_router
+app.include_router(public_widget_router, prefix="/api/public/widget", tags=["Público - Widget"])
 
 
 # ===== API v1 - Veterinary Portal =====

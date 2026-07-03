@@ -32,11 +32,26 @@ services:
       # pg_dump corre dentro del backend (postgresql-client) vía TCP; no se usa
       # la rama docker-exec, por eso se deja vacío.
       - BACKUP_PG_CONTAINER=
+      # Rate limiting persistente (sobrevive reinicios y réplicas adicionales).
+      - REDIS_URL=redis://redis:6379/0
       # Integración con nginx-proxy + Let's Encrypt:
       - VIRTUAL_HOST=${DOMAIN_API}
       - VIRTUAL_PORT=8000
       - LETSENCRYPT_HOST=${DOMAIN_API}
       - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
+    depends_on:
+      - redis
+    networks:
+      - web
+
+  # --- REDIS (rate limiting compartido; futuro: caché/colas) ---
+  redis:
+    image: redis:7-alpine
+    container_name: vincer_redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    expose:
+      - "6379"
     networks:
       - web
 

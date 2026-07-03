@@ -10,6 +10,20 @@ from app import models
 def seed_plans():
     db = SessionLocal()
     try:
+        # GUARD: este seed es SOLO bootstrap inicial. Sus valores (precios,
+        # límites, sin plan Track) NO reflejan producción — la DB es la fuente
+        # de verdad. Si ya hay planes, abortamos para no pisar datos reales.
+        existing = db.query(models.SubscriptionPlan).count()
+        if existing > 0:
+            print(
+                f"ABORTADO: ya existen {existing} planes en la base de datos.\n"
+                "Este seed es solo para bootstrap de una DB vacía y sus valores "
+                "están desactualizados respecto a producción (falta el plan Track, "
+                "precios/límites viejos). Edita los planes vía el panel de admin "
+                "o una migración."
+            )
+            return
+
         print("Sincronizando Planes de Suscripción...")
         
         # Módulos Base

@@ -3,6 +3,40 @@ from pydantic_settings import BaseSettings
 
 _INSECURE_SECRET_KEYS = {"", "placeholder-key-for-dev-only", "CHANGE_ME_genera_una_clave_aleatoria_de_64_bytes"}
 
+# Defaults de CORS cuando CORS_ORIGINS no está definido en el entorno.
+# Mantiene dev + producción conocidos para no romper despliegues existentes.
+_DEFAULT_CORS_ORIGINS = [
+    # Desarrollo local
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://lvh.me:3000",
+    "http://admin.lvh.me:3000",
+    "http://tenant.lvh.me:3000",
+    "http://partner.lvh.me:3000",
+    "http://www.lvh.me:3000",
+    "http://crematorio.lvh.me:3000",
+    "http://funeraria.lvh.me:3000",
+    "http://huellas.lvh.me:3000",
+    "http://app.lvh.me:3000",
+    "http://track.lvh.me:3000",
+    "http://memorial.lvh.me:3000",
+    # Producción (vincer.app - legacy)
+    "https://vincer.app",
+    "https://www.vincer.app",
+    "https://admin.vincer.app",
+    "https://tenant.vincer.app",
+    "https://veterinary.vincer.app",
+    "https://apisaasv2.vincer.app",
+    "https://pawmemory.pet",
+    # Producción (vincer.cl)
+    "https://vincer.cl",
+    "https://www.vincer.cl",
+    "https://app.vincer.cl",
+    "https://admin.vincer.cl",
+    "https://pm.vincer.cl",
+    "https://api-saas-keys.vincer.cl",
+]
+
 class Settings(BaseSettings):
     PROJECT_NAME: str = "SaaSCrematorio"
     # 'development' | 'production'. En producción algunas protecciones fallan-cerrado
@@ -38,6 +72,16 @@ class Settings(BaseSettings):
     RATE_LIMIT_API: str = "100/minute"
     # Por defecto usamos memoria para evitar errores si no hay Redis configurado
     REDIS_URL: str = "memory://"
+
+    # CORS: orígenes separados por coma. Si está vacío, se usan los defaults
+    # (dev en lvh.me + dominios de producción conocidos) para no romper
+    # despliegues existentes. En producción define CORS_ORIGINS en el .env.
+    CORS_ORIGINS: str = ""
+
+    @property
+    def cors_origins_list(self) -> list:
+        configured = [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+        return configured or _DEFAULT_CORS_ORIGINS
 
     # R2 Storage
     R2_ACCOUNT_ID: str = ""
