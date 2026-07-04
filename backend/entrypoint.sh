@@ -23,21 +23,27 @@ wait_for_postgres() {
     echo "PostgreSQL started on $DB_HOST:$DB_PORT"
 }
 
-# Wait for DB to be ready
-# Note: Using nc requires knowing the host. In docker-compose usually 'db'.
-# If you use a managed DB, this might pass immediately if the port is open.
-# We skip this if NO_DB_WAIT is set
+# Esperar a que PostgreSQL acepte conexiones (pg_isready viene en la imagen).
 if [ -z "$NO_DB_WAIT" ]; then
-    # Parse host from SQLALCHEMY_DATABASE_URL if possible, or fallback
-    # For simplicity in this script, we'll try to rely on the app's retry logic 
-    # OR the 'healthcheck' in docker-compose.
-    # But let's add a small sleep just in case.
-    echo "Giving DB a moment..."
-    sleep 2
+    DB_HOST=${POSTGRES_HOST:-db}
+    DB_PORT=${POSTGRES_PORT:-5432}
+    echo "Esperando a PostgreSQL en $DB_HOST:$DB_PORT..."
+    until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "${POSTGRES_USER:-postgres}" >/dev/null 2>&1; do
+        sleep 1
+    done
+    echo "PostgreSQL disponible."
 fi
 
-# Run Database Setup
-# We pipe "yes" to automatically confirm the setup script
+# Provisionar el rol de la app y la base de datos (idempotente).
+# Requiere que POSTGRES_USER sea superusuario (o tenga CREATEROLE + CREATEDB).
+# Desactivable con PROVISION_DB=false (si provisionas la BD manualmente).
+if [ "$PROVISION_DB" != "false" ]; then
+    echo "Provisionando rol y base de datos..."
+    bash /app/scripts/provision_db.sh
+fi
+
+# Aplicar esquema, migraciones y seeds (como superusuario). Requiere que la
+# base ya exista (la crea el paso de provisión anterior).
 if [ "$RUN_MIGRATIONS" != "false" ]; then
     echo "Running Database Setup & Migrations..."
     echo "yes" | python scripts/database/setup_initial_db.py

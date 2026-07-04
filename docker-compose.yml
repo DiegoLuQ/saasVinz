@@ -18,8 +18,10 @@ services:
     restart: unless-stopped
     expose:
       - "8000"
+    # Fuente ÚNICA de config: el .env de la raíz (secretos del backend incluidos).
+    # backend/.env solo se usa para desarrollo local sin Docker.
     env_file:
-      - ./backend/.env
+      - .env
     environment:
       # Conexión a la BD compartida con el usuario de la app (RLS APLICA).
       - SQLALCHEMY_DATABASE_URL=postgresql://${APP_USER}:${APP_USER_PASSWORD}@${POSTGRES_HOST}:5432/${POSTGRES_DB}
@@ -61,10 +63,18 @@ services:
       context: ./frontend-saas
       dockerfile: Dockerfile
       args:
-        # Variables públicas: se hornean en build desde el .env raíz.
+        # Variables públicas (NEXT_PUBLIC_*): se hornean en build desde el .env raíz.
+        # Las 3 primeras se derivan de los DOMAIN_*; el resto son explícitas.
         NEXT_PUBLIC_API_URL: https://${DOMAIN_API}
         NEXT_PUBLIC_ROOT_DOMAIN: ${DOMAIN_MAIN}
         NEXT_PUBLIC_MEMORIAL_DOMAIN: ${DOMAIN_MEMORIALS}
+        NEXT_PUBLIC_RECAPTCHA_SITE_KEY: ${NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+        NEXT_PUBLIC_CLOUDFLARE_R2: ${NEXT_PUBLIC_CLOUDFLARE_R2}
+        NEXT_PUBLIC_TRACKING_BASE_URL: ${NEXT_PUBLIC_TRACKING_BASE_URL}
+        NEXT_PUBLIC_MEMORIAL_BASE_URL: ${NEXT_PUBLIC_MEMORIAL_BASE_URL}
+        NEXT_PUBLIC_WIDGET_BASE_URL: ${NEXT_PUBLIC_WIDGET_BASE_URL}
+        NEXT_PUBLIC_VINCER_URL: ${NEXT_PUBLIC_VINCER_URL}
+        NEXT_PUBLIC_VINCER_SLOGAN: ${NEXT_PUBLIC_VINCER_SLOGAN}
     container_name: vincer_frontend
     restart: unless-stopped
     expose:

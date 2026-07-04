@@ -40,7 +40,10 @@ COPY . /app/
 
 # Copy entrypoint script and make it executable
 COPY entrypoint.sh /app/entrypoint.sh
-RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+# Normalizar saltos de línea (CRLF→LF) del entrypoint y del script de provisión
+# de la BD, por si se editaron en Windows, y darles permiso de ejecución.
+RUN sed -i 's/\r$//' /app/entrypoint.sh /app/scripts/provision_db.sh \
+    && chmod +x /app/entrypoint.sh /app/scripts/provision_db.sh
 
 # Change ownership to non-root user
 RUN chown -R appuser:appuser /app
