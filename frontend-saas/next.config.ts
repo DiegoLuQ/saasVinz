@@ -6,6 +6,22 @@ console.log('Next.js API Proxy Destination:', API_URL);
 const nextConfig: NextConfig = {
   /* config options here */
   output: 'standalone', // Required for the optimized Dockerfile
+  // Orígenes cross-domain permitidos para pedir recursos /_next/* en DEV.
+  // Solo aplica a `next dev` (con subdominios lvh.me); en producción no se usa.
+  allowedDevOrigins: [
+    'lvh.me',
+    'www.lvh.me',
+    'admin.lvh.me',
+    'app.lvh.me',
+    'tenant.lvh.me',
+    'veterinary.lvh.me',
+    'partner.lvh.me',
+    'track.lvh.me',
+    'memorial.lvh.me',
+    'crematorio.lvh.me',
+    'funeraria.lvh.me',
+    'huellas.lvh.me',
+  ],
   experimental: {
     serverActions: {
       allowedOrigins: [

@@ -10,7 +10,7 @@ import {
     ShieldCheck
 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
-import { PublicHeader } from '@/components/public/PublicHeader';
+import { VincerLogo } from '@/components/vincer/VincerLogo';
 import { HuellasFooter } from '@/components/public/HuellasFooter';
 import { getTranslations, type Locale } from '@/lib/translations';
 
@@ -82,13 +82,16 @@ export default function MemorialLoginPage() {
     };
 
     return (
-        <div className="min-h-screen bg-[#020617] flex flex-col pt-20">
-            <PublicHeader isDark={true} />
+        <div className="min-h-screen bg-[#020210] flex flex-col">
+            {/* Header mínimo Vincer (sin menú: página exclusiva de acceso al memorial) */}
+            <header className="flex justify-center pt-8 pb-2">
+                <VincerLogo size="sm" />
+            </header>
 
-            <main className="flex-grow flex items-center justify-center p-6 bg-gradient-to-b from-[#020617] to-[#0f172a] relative overflow-hidden">
-                {/* Background pattern */}
-                <div className="fixed inset-0 opacity-10 pointer-events-none">
-                    <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-from)_0%,_transparent_70%)] from-blue-500/20" />
+            <main className="flex-grow flex items-center justify-center p-6 bg-gradient-to-b from-[#020210] to-[#0a1a2f] relative overflow-hidden">
+                {/* Resplandor celeste de fondo */}
+                <div className="fixed inset-0 opacity-20 pointer-events-none">
+                    <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-from)_0%,_transparent_70%)] from-[#19B5FE]/25" />
                 </div>
 
                 <motion.div
@@ -97,7 +100,7 @@ export default function MemorialLoginPage() {
                     className="w-full max-w-md relative z-10"
                 >
                     <div className="text-center mb-10">
-                        <div className="w-20 h-20 bg-[#c5a059]/10 rounded-[2rem] flex items-center justify-center text-[#c5a059] mx-auto mb-6 shadow-2xl shadow-[#c5a059]/20 border border-[#c5a059]/20">
+                        <div className="w-20 h-20 bg-[#19B5FE]/10 rounded-[2rem] flex items-center justify-center text-[#19B5FE] mx-auto mb-6 shadow-2xl shadow-[#19B5FE]/20 border border-[#19B5FE]/20">
                             <Lock size={40} />
                         </div>
                         <h1 className="text-3xl font-serif text-white mb-2">{t.login_title}</h1>
@@ -114,7 +117,7 @@ export default function MemorialLoginPage() {
                                     onChange={e => setPin(e.target.value)}
                                     placeholder="····"
                                     maxLength={6}
-                                    className="w-full bg-black/40 border border-white/10 rounded-2xl py-5 px-4 text-center text-4xl font-mono tracking-[1em] text-white focus:border-[#c5a059] outline-none transition-all placeholder:text-white/5"
+                                    className="w-full bg-black/40 border border-white/10 rounded-2xl py-5 px-4 text-center text-4xl font-mono tracking-[1em] text-white focus:border-[#19B5FE] outline-none transition-all placeholder:text-white/5"
                                     required
                                     autoFocus
                                 />
@@ -133,7 +136,7 @@ export default function MemorialLoginPage() {
                             <button
                                 type="submit"
                                 disabled={loading || pin.length < 4}
-                                className="w-full bg-[#c5a059] text-white py-5 rounded-2xl font-bold uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-[#b08d4a] active:scale-95 transition-all shadow-xl shadow-[#c5a059]/10 disabled:opacity-50"
+                                className="w-full bg-[#19B5FE] text-[#020210] py-5 rounded-2xl font-bold uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-[#0e9ce0] active:scale-95 transition-all shadow-xl shadow-[#19B5FE]/20 disabled:opacity-50"
                             >
                                 {loading ? <Loader2 className="animate-spin" /> : <ShieldCheck size={20} />}
                                 {loading ? t.login_btn_verifying : t.login_btn_submit}
