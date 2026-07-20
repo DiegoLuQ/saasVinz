@@ -6,7 +6,7 @@ import { ChevronDown } from 'lucide-react';
 
 const faqs = [
     {
-        q: "¿Cómo garantiza Vincer la trazabilidad y evita errores en las cenizas?",
+        q: "¿Cómo garantiza Vinzer la trazabilidad y evita errores en las cenizas?",
         a: "Cada servicio genera un código de verificación único de 10 caracteres más un token de tracking público. El flujo de trabajo es configurable por crematorio y cada fase requiere evidencia fotográfica, notas y firma del operador. El sistema registra usuario, hora y cambios en cada acción crítica, dejando un historial de auditoría completo."
     },
     {
@@ -23,11 +23,11 @@ const faqs = [
     },
     {
         q: "¿El software permite gestionar múltiples sedes de manera segura e independiente?",
-        a: "Sí. Vincer está construido sobre una arquitectura multi-tenant nativa con aislamiento estricto: cada crematorio opera dentro de su propio espacio y no puede ver datos de otros. Los administradores globales tienen un panel separado para gestionar cuentas y planes."
+        a: "Sí. Vinzer está construido sobre una arquitectura multi-tenant nativa con aislamiento estricto: cada crematorio opera dentro de su propio espacio y no puede ver datos de otros. Los administradores globales tienen un panel separado para gestionar cuentas y planes."
     }
 ];
 
-export function VincerFaqs() {
+export function VinzerFaqs() {
     const [openFaq, setOpenFaq] = useState<number | null>(null);
 
     return (
@@ -37,7 +37,7 @@ export function VincerFaqs() {
                     Preguntas Frecuentes
                 </h2>
                 <p className="text-slate-400 font-medium">
-                    Todo lo que necesitas saber sobre la implementación, seguridad y funcionamiento de Vincer.
+                    Todo lo que necesitas saber sobre la implementación, seguridad y funcionamiento de Vinzer.
                 </p>
             </div>
 

@@ -13,13 +13,16 @@ router = APIRouter()
 
 @router.get("/stream")
 async def stream_creator_notifications(
-    token: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
 ):
     """
     Server-Sent Events (SSE) endpoint to stream new notifications to the SuperAdmin dashboard.
+
+    Autenticación por cookie httpOnly (EventSource same-origin la envía solo);
+    antes recibía el JWT como query param, que quedaba en los logs de acceso.
     """
-    user = get_current_user(db, token=token)
+    user = current_user
     if user.role != "creator" and user.role != models.UserRole.creator:
         raise HTTPException(
             status_code=403,

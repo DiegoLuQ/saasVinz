@@ -22,15 +22,15 @@ import {
     MessageSquare
 } from 'lucide-react';
 
-import { VincerLogo } from './VincerLogo';
-import { VincerJourney } from './VincerJourney';
-import { VincerFeatures } from './VincerFeatures';
-import { VincerPricing } from './VincerPricing';
-import { VincerWebService } from './VincerWebService';
-import { VincerFaqs } from './VincerFaqs';
+import { VinzerLogo } from './VinzerLogo';
+import { VinzerJourney } from './VinzerJourney';
+import { VinzerFeatures } from './VinzerFeatures';
+import { VinzerPricing } from './VinzerPricing';
+import { VinzerWebService } from './VinzerWebService';
+import { VinzerFaqs } from './VinzerFaqs';
 import TrackingSearch from '@/components/public/TrackingSearch';
 
-export default function VincerLandingClient(props: any) {
+export default function VinzerLandingClient(props: any) {
     const { scrollYProgress } = useScroll();
     const scaleX = useSpring(scrollYProgress, {
         stiffness: 100,
@@ -119,7 +119,7 @@ export default function VincerLandingClient(props: any) {
                     {/* Lado Izquierdo: Logo */}
                     <div className="flex items-center shrink-0">
                         <Link href="/" className="transition-transform duration-300 hover:scale-103 active:scale-95">
-                            <VincerLogo size="sm" />
+                            <VinzerLogo size="sm" />
                         </Link>
                     </div>
 
@@ -166,7 +166,7 @@ export default function VincerLandingClient(props: any) {
                     {/* Lado Derecho: Acciones Desktop */}
                     <div className="hidden xl:flex items-center gap-4 shrink-0">
                         <a
-                            href="https://wa.me/56982395940?text=Hola%2C%20quiero%20obtener%20una%20cuenta%20GRATIS%20en%20Vincer"
+                            href="https://wa.me/56982395940?text=Hola%2C%20quiero%20obtener%20una%20cuenta%20GRATIS%20en%20Vinzer"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center justify-center gap-2 bg-[#19B5FE] hover:bg-[#0e9ce0] text-[#020210] font-black text-xs tracking-wider px-6 py-2.5 rounded-full transition-all duration-300 shadow-[0_4px_14px_rgba(25,181,254,0.3)] hover:shadow-[0_4px_20px_rgba(25,181,254,0.5)] hover:scale-103 active:scale-97"
@@ -234,7 +234,7 @@ export default function VincerLandingClient(props: any) {
                         <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
                             {/* Botón Principal (WhatsApp) */}
                             <a
-                                href="https://wa.me/56982395940?text=Hola%2C%20quiero%20obtener%20una%20cuenta%20GRATIS%20en%20Vincer"
+                                href="https://wa.me/56982395940?text=Hola%2C%20quiero%20obtener%20una%20cuenta%20GRATIS%20en%20Vinzer"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="group w-full sm:w-auto text-center bg-[#25D366] text-[#020210] px-8 py-4 rounded-3xl font-bold uppercase tracking-wider text-xs hover:bg-[#20ba5a] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 shadow-xl shadow-[#25D366]/10 flex items-center justify-center gap-3"
@@ -321,7 +321,7 @@ export default function VincerLandingClient(props: any) {
                                     <div className="w-3 h-3 rounded-full bg-green-500/80" />
                                 </div>
                                 <div className="text-[10px] text-slate-500 font-mono tracking-wider bg-white/5 px-3 py-1 rounded-full">
-                                    track.vincer.cl
+                                    track.vinzer.cl
                                 </div>
                                 <div className="w-4" /> {/* Spacer */}
                             </div>
@@ -398,7 +398,7 @@ export default function VincerLandingClient(props: any) {
                 </div>
             </section>
 
-            {/* Sección: Visión Vincer */}
+            {/* Sección: Visión Vinzer */}
             <section id="vision" className="py-32 px-6 relative z-10 overflow-hidden">
                 <div className="max-w-6xl mx-auto">
                     {/* Encabezado de marca */}
@@ -413,13 +413,13 @@ export default function VincerLandingClient(props: any) {
                                 y cremación de mascotas
                             </h2>
                             <p className="text-[#C0C0C0] font-medium leading-relaxed max-w-3xl">
-                                Vincer nace con el propósito de transformar la industria funeraria de mascotas en Latinoamérica: convertir un proceso opaco y burocrático en una experiencia transparente, dignificada y digital, donde ninguna familia tenga que dudar del cuidado y la identidad de su compañero.
+                                Vinzer nace con el propósito de transformar la industria funeraria de mascotas en Latinoamérica: convertir un proceso opaco y burocrático en una experiencia transparente, dignificada y digital, donde ninguna familia tenga que dudar del cuidado y la identidad de su compañero.
                             </p>
                         </div>
                         <div className="lg:col-span-4 flex justify-center lg:justify-end">
                             <img
                                 src="https://i.postimg.cc/ZqnZQ0f5/gata-calico-transp-1.webp"
-                                alt="Gata Calico Vincer"
+                                alt="Gata Calico Vinzer"
                                 className="max-h-[300px] w-auto object-contain drop-shadow-[0_15px_30px_rgba(0,0,0,0.6)] transform hover:scale-105 transition-transform duration-500"
                             />
                         </div>
@@ -474,12 +474,12 @@ export default function VincerLandingClient(props: any) {
                     <div className="mt-16 max-w-3xl mx-auto text-center">
                         <p className="text-base sm:text-lg md:text-xl text-[#FFFFFF] font-light italic leading-relaxed">
                             <span className="text-[#E0B84D]">&ldquo;</span>
-                            Creemos que el respeto por una mascota se mide en cada detalle del proceso. Vincer existe para que cada crematorio pueda demostrarlo.
+                            Creemos que el respeto por una mascota se mide en cada detalle del proceso. Vinzer existe para que cada crematorio pueda demostrarlo.
                             <span className="text-[#E0B84D]">&rdquo;</span>
                         </p>
                         <div className="mt-6 inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
                             <div className="w-8 h-px bg-slate-700" />
-                            Equipo Vincer
+                            Equipo Vinzer
                             <div className="w-8 h-px bg-slate-700" />
                         </div>
                     </div>
@@ -510,15 +510,15 @@ export default function VincerLandingClient(props: any) {
                 </div>
             </section>
 
-            <VincerJourney />
+            <VinzerJourney />
 
-            <VincerFeatures />
+            <VinzerFeatures />
 
-            <VincerPricing loginUrl={loginUrl} />
+            <VinzerPricing loginUrl={loginUrl} />
 
-            <VincerFaqs />
+            <VinzerFaqs />
 
-            <VincerWebService />
+            <VinzerWebService />
 
             {/* CTA Final */}
             <section className="py-28 px-6 relative overflow-hidden z-10 max-w-7xl mx-auto">
@@ -538,7 +538,7 @@ export default function VincerLandingClient(props: any) {
 
                     <div className="flex items-center justify-center pt-4">
                         <a
-                            href="https://wa.me/56982395940?text=Hola%2C%20quiero%20obtener%20una%20cuenta%20GRATIS%20en%20Vincer"
+                            href="https://wa.me/56982395940?text=Hola%2C%20quiero%20obtener%20una%20cuenta%20GRATIS%20en%20Vinzer"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="w-full sm:w-auto inline-flex items-center justify-center gap-3 bg-[#25D366] hover:bg-[#25D366]/90 text-[#020210] px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-[#25D366]/20"
@@ -558,9 +558,9 @@ export default function VincerLandingClient(props: any) {
                 <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-12 mb-12">
                     {/* Izquierda: Info de Marca */}
                     <div className="md:col-span-5 space-y-6">
-                        <VincerLogo size="md" />
+                        <VinzerLogo size="md" />
                         <p className="text-xs text-slate-500 max-w-sm leading-relaxed">
-                            Vincer es un producto de software especializado para el sector funerario de mascotas. Nuestro compromiso es aportar tranquilidad a las familias a través del control y la trazabilidad digital.
+                            Vinzer es un producto de software especializado para el sector funerario de mascotas. Nuestro compromiso es aportar tranquilidad a las familias a través del control y la trazabilidad digital.
                         </p>
                     </div>
 
@@ -595,7 +595,7 @@ export default function VincerLandingClient(props: any) {
 
                 {/* Línea Inferior de Derechos */}
                 <div className="max-w-7xl mx-auto pt-8 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-600 font-medium">
-                    <p>© 2026 Vincer SaaS. Todos los derechos reservados.</p>
+                    <p>© 2026 Vinzer SaaS. Todos los derechos reservados.</p>
                     <div className="flex gap-4">
                         <span className="hover:text-[#19B5FE] cursor-pointer">LinkedIn</span>
                         <span className="hover:text-[#19B5FE] cursor-pointer">Instagram</span>
@@ -631,7 +631,7 @@ export default function VincerLandingClient(props: any) {
                             <div className="w-full h-full flex items-center justify-center">
                                 <iframe
                                     src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1"
-                                    title="Vincer - Cómo funciona"
+                                    title="Vinzer - Cómo funciona"
                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                     allowFullScreen
                                     className="w-full h-full"
@@ -659,7 +659,7 @@ export default function VincerLandingClient(props: any) {
                         {/* Header menu móvil */}
                         <div className="flex items-center justify-between mb-8 relative z-10">
                             <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3">
-                                <VincerLogo size="sm" />
+                                <VinzerLogo size="sm" />
                             </Link>
                             <button
                                 onClick={() => setIsMobileMenuOpen(false)}
@@ -739,7 +739,7 @@ export default function VincerLandingClient(props: any) {
                                 <div className="flex flex-col gap-3.5 w-full mt-2">
                                     {/* Contáctanos - Diseño Premium Interactivo */}
                                     <motion.a
-                                        href="https://wa.me/56982395940?text=Hola%2C%20quiero%20obtener%20una%20cuenta%20GRATIS%20en%20Vincer"
+                                        href="https://wa.me/56982395940?text=Hola%2C%20quiero%20obtener%20una%20cuenta%20GRATIS%20en%20Vinzer"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         onClick={() => setIsMobileMenuOpen(false)}
@@ -776,7 +776,7 @@ export default function VincerLandingClient(props: any) {
 
                             {/* Footer */}
                             <div className="text-center text-[9px] text-[#FFFFFF]/30 tracking-wider uppercase font-semibold mt-10">
-                                &copy; {new Date().getFullYear()} Vincer. Todos los derechos reservados.
+                                &copy; {new Date().getFullYear()} Vinzer. Todos los derechos reservados.
                             </div>
                         </div>
                     </motion.div>

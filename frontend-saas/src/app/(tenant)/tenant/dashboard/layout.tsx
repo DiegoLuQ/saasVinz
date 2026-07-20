@@ -10,7 +10,7 @@ import { SidebarProvider, useSidebar } from '../context/SidebarContext';
 import { SubscriptionWarningModal } from '@/components/tenant/SubscriptionWarningModal';
 import { SubscriptionAlertBanner } from '@/components/tenant/SubscriptionAlertBanner';
 import { DemoBanner } from '@/components/tenant/DemoBanner';
-import { getToken } from '@/lib/auth/token';
+import { hasSession } from '@/lib/auth/token';
 
 function DashboardContent({ children }: { children: React.ReactNode }) {
     const { collapsed } = useSidebar();
@@ -48,7 +48,7 @@ export default function DashboardLayout({
     const [authorized, setAuthorized] = React.useState(false);
 
     React.useEffect(() => {
-        if (!getToken()) {
+        if (!hasSession()) {
             router.push('/login');
         } else {
             setAuthorized(true);

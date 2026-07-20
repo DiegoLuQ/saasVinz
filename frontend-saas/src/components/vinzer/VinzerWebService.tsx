@@ -15,9 +15,9 @@ const valueProps = [
     },
     {
         icon: Plug,
-        title: 'Integración nativa con Vincer',
+        title: 'Integración nativa con Vinzer',
         description:
-            'El formulario de contacto del sitio conecta directo con el CRM de tu cuenta Vincer. Los datos de los clientes potenciales ingresan automáticamente.',
+            'El formulario de contacto del sitio conecta directo con el CRM de tu cuenta Vinzer. Los datos de los clientes potenciales ingresan automáticamente.',
     },
     {
         icon: Search,
@@ -31,14 +31,14 @@ const includes = [
     'Diseño personalizado con tu marca y colores',
     'Dominio + hosting el primer año incluidos',
     'Página de servicios con descripción y precios',
-    'Formulario integrado con tu CRM Vincer',
+    'Formulario integrado con tu CRM Vinzer',
     'SEO básico (metadatos, schema, sitemap)',
     'Responsive mobile-first',
     'Enlace directo a tracking público y memorial digital',
     'Entrega en 7–10 días hábiles',
 ];
 
-export function VincerWebService() {
+export function VinzerWebService() {
     return (
         <section
             id="sitio-web"

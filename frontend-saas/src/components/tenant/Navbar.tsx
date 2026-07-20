@@ -240,8 +240,8 @@ export default function Navbar() {
         'ULTRA': 'Ultra',
     };
 
-    const handleLogout = () => {
-        clearToken();
+    const handleLogout = async () => {
+        await clearToken();
         localStorage.removeItem('saasc_user');
         router.push('/login');
     };

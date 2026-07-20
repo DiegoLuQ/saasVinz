@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '@/lib/admin/api';
-import { getToken } from '@/lib/auth/token';
+import { authHeader } from '@/lib/auth/token';
 import { Database, Clock, Calendar, Play, CheckCircle, AlertTriangle, Loader2, Save, Download } from 'lucide-react';
 
 interface BackupConfig {
@@ -88,9 +88,8 @@ export default function BackupSettings() {
         setDownloading(true);
         setMessage(null);
         try {
-            const token = getToken();
             const res = await fetch('/api/internal/maintenance/backups/download', {
-                headers: token ? { Authorization: `Bearer ${token}` } : {},
+                headers: authHeader(),
             });
             if (!res.ok) {
                 let detail = 'Error al generar el respaldo';

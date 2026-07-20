@@ -75,7 +75,7 @@ export const translations = {
         cta_title: '¿Deseas un espacio dedicado en nuestra red?',
         cta_subtitle: 'Si perdiste a tu compañero y deseas crear un memorial único, contáctanos directamente.',
         cta_whatsapp: 'Contactar por WhatsApp',
-        cta_website: 'Visitar vincer.cl',
+        cta_website: 'Visitar vinzer.cl',
 
         // Footer
         footer_brand_name: 'Vínculo Cercano',
@@ -84,7 +84,7 @@ export const translations = {
         footer_home: 'Inicio',
         footer_memorials: 'Memoriales',
         footer_philosophy: 'Filosofía',
-        footer_vincer: 'Vincer.cl',
+        footer_vinzer: 'Vinzer.cl',
         footer_software: 'Software Funerario',
         footer_services: 'Nuestros Servicios',
         footer_planning: 'Planificación',
@@ -432,7 +432,7 @@ export const translations = {
         cta_title: 'Want a dedicated space in our network?',
         cta_subtitle: 'If you lost your companion and want to create a unique memorial, contact us directly.',
         cta_whatsapp: 'Contact via WhatsApp',
-        cta_website: 'Visit vincer.cl',
+        cta_website: 'Visit vinzer.cl',
 
         // Footer
         footer_brand_name: 'Vínculo Cercano',
@@ -441,7 +441,7 @@ export const translations = {
         footer_home: 'Home',
         footer_memorials: 'Memorials',
         footer_philosophy: 'Philosophy',
-        footer_vincer: 'Vincer.cl',
+        footer_vinzer: 'Vinzer.cl',
         footer_software: 'Funeral Software',
         footer_services: 'Our Services',
         footer_planning: 'Planning',

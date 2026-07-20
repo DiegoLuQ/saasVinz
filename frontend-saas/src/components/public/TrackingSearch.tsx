@@ -13,7 +13,7 @@ interface ResolveResponse {
 }
 
 interface TrackingSearchProps {
-    /** Paleta: 'light' (stone/amber) o 'dark' (Vincer #19B5FE). */
+    /** Paleta: 'light' (stone/amber) o 'dark' (Vinzer #19B5FE). */
     theme?: 'light' | 'dark';
     /** 'stacked' (campo arriba, botón abajo) o 'inline' (lado a lado en sm+). */
     layout?: 'stacked' | 'inline';

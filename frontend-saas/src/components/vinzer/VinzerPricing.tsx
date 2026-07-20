@@ -4,11 +4,11 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Star } from 'lucide-react';
 
-interface VincerPricingProps {
+interface VinzerPricingProps {
     loginUrl: string;
 }
 
-export function VincerPricing({ loginUrl }: VincerPricingProps) {
+export function VinzerPricing({ loginUrl }: VinzerPricingProps) {
     const [isAnnual, setIsAnnual] = useState(false);
 
     // Precios base
@@ -180,7 +180,7 @@ export function VincerPricing({ loginUrl }: VincerPricingProps) {
                             <li className="flex items-start gap-2 text-[#E0B84D]">✓ Sitio web gratis para siempre · solo pagas tu dominio</li>
                         </ul>
                         <a
-                            href="mailto:soporte@vincer.app"
+                            href="mailto:soporte@vinzer.app"
                             className="text-center min-h-[44px] py-3 bg-white/5 border border-[#E0B84D]/30 hover:bg-[#E0B84D] hover:text-[#020210] text-[#FFFFFF] rounded-xl text-[11px] font-black uppercase tracking-wider transition-all"
                         >
                             Agendar Reunión

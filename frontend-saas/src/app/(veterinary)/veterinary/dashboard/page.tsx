@@ -222,7 +222,7 @@ export default function VeterinaryDashboard() {
 
             {/* Footer */}
             <div className="pt-10 pb-20 text-center relative z-10">
-                <p className="text-[10px] text-[var(--primary-color)] font-black uppercase tracking-[0.4em] italic mb-4 opacity-50">Vincer</p>
+                <p className="text-[10px] text-[var(--primary-color)] font-black uppercase tracking-[0.4em] italic mb-4 opacity-50">Vinzer</p>
             </div>
         </div>
     );

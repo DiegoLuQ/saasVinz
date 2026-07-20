@@ -7,7 +7,7 @@ from typing import Optional
 
 oauth2_scheme = auth.oauth2_scheme
 
-def get_current_user(db: Session = Depends(get_db), token: Optional[str] = Depends(oauth2_scheme)):
+def get_current_user(db: Session = Depends(get_db), token: Optional[str] = Depends(auth.get_token_from_request)):
     """
     Proxy a auth.get_current_user para mantener compatibilidad con imports existentes.
     """

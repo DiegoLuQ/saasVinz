@@ -46,7 +46,7 @@ export function HuellasFooter({ locale, t }: HuellasFooterProps) {
         <footer className="relative z-50 py-10 bg-[#0b1120] text-slate-100 font-sans border-t border-white/10">
             <div className="max-w-7xl mx-auto px-6 text-center space-y-2">
                 <p className="text-xs text-slate-400 tracking-wider">
-                    © 2026 Vincer. {locale === 'en' ? 'All rights reserved.' : 'Todos los derechos reservados.'}
+                    © 2026 Vinzer. {locale === 'en' ? 'All rights reserved.' : 'Todos los derechos reservados.'}
                 </p>
                 <p className="text-[#19B5FE]/95 font-serif italic text-base">
                     "{locale === 'en' ? 'The value of a dignified farewell' : 'El valor de una despedida digna'}"

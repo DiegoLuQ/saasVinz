@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { getToken } from '@/lib/auth/token';
+import { hasSession } from '@/lib/auth/token';
 
 const SSE_URL = '/api/internal/creator/notifications/stream';
 const POLL_INTERVAL_MS = 10_000;
@@ -26,11 +26,11 @@ export function useAdminSSE() {
         const connect = () => {
             if (cancelled) return;
 
-            const token = getToken();
-            if (!token) return;
+            if (!hasSession()) return;
 
-            const url = `${SSE_URL}?token=${encodeURIComponent(token)}`;
-            const es = new EventSource(url);
+            // Autenticación por cookie httpOnly: EventSource same-origin la
+            // envía solo (antes el JWT viajaba como query param y quedaba en logs).
+            const es = new EventSource(SSE_URL);
             esRef.current = es;
 
             es.addEventListener('notification', (e: MessageEvent) => {

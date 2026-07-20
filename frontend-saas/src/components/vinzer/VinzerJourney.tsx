@@ -42,7 +42,7 @@ const journeyData = [
     }
 ];
 
-export function VincerJourney() {
+export function VinzerJourney() {
     const [journeyStep, setJourneyStep] = useState<number>(0);
 
     return (
@@ -56,7 +56,7 @@ export function VincerJourney() {
                     Trazabilidad QR inviolable para la administración y control funerario
                 </h2>
                 <p className="text-[#C0C0C0] font-medium">
-                    El miedo de las familias es real: ¿Son estas las cenizas de mi mascota? Vincer responde a esta inquietud con tecnología inviolable de punta a punta.
+                    El miedo de las familias es real: ¿Son estas las cenizas de mi mascota? Vinzer responde a esta inquietud con tecnología inviolable de punta a punta.
                 </p>
             </div>
 

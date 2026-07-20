@@ -60,7 +60,7 @@ body {
 
 /* Force CSS reload to apply custom-variant */
 
-/* Fluid glow animation for Vincer navbar CTA button */
+/* Fluid glow animation for Vinzer navbar CTA button */
 @keyframes fluidGlow {
   0% {
     background-position: -200% 50%;

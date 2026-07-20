@@ -11,7 +11,7 @@ import {
     MoreVertical, CheckCheck, Ban, Trash2
 } from 'lucide-react';
 import { apiRequest } from '@/lib/admin/api';
-import { getToken } from '@/lib/auth/token';
+import { authHeader } from '@/lib/auth/token';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { useAdminTenants } from '@/hooks/useAdminBootstrap';
 import Pagination from '@/components/admin/Pagination';
@@ -500,8 +500,7 @@ export default function TransaccionesPage() {
         setExporting(true);
         try {
             const p = buildParams();
-            const token = getToken();
-            const res = await fetch(`/api/internal/creator/billing/transactions/export?${p}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+            const res = await fetch(`/api/internal/creator/billing/transactions/export?${p}`, { headers: authHeader() });
             if (!res.ok) throw new Error();
             const blob = await res.blob();
             const url = URL.createObjectURL(blob);

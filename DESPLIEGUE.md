@@ -1,4 +1,4 @@
-# Guía de Despliegue — SaaSCrematorio V2 (Vincer)
+# Guía de Despliegue — SaaSCrematorio V2 (Vinzer)
 
 Paso a paso para instalar el proyecto en un servidor (VPS) con Docker.
 Escrito a partir del `docker-compose.yml`, los `Dockerfile` y los scripts de
@@ -30,12 +30,12 @@ Todos como registro **A** (o CNAME) apuntando a la IP del VPS:
 
 | Subdominio (ejemplo) | Variable en `.env` | Sirve |
 |---|---|---|
-| `vincer.cl` + `www.vincer.cl` | `DOMAIN_MAIN` | Landing (marketing) |
-| `app.vincer.cl` | `DOMAIN_APP` | Panel del tenant (operadores) |
-| `admin.vincer.cl` | `DOMAIN_ADMIN` | Panel SuperAdmin (creator) |
-| `memorial.vincer.cl` | `DOMAIN_MEMORIALS` | Memoriales públicos |
-| `api-saas-keys.vincer.cl` | `DOMAIN_API` | Backend (API) |
-| `pgadmin-saas.vincer.cl` | `DOMAIN_PGADMIN` | UI de administración de la BD |
+| `vinzer.cl` + `www.vinzer.cl` | `DOMAIN_MAIN` | Landing (marketing) |
+| `app.vinzer.cl` | `DOMAIN_APP` | Panel del tenant (operadores) |
+| `admin.vinzer.cl` | `DOMAIN_ADMIN` | Panel SuperAdmin (creator) |
+| `memorial.vinzer.cl` | `DOMAIN_MEMORIALS` | Memoriales públicos |
+| `api-saas-keys.vinzer.cl` | `DOMAIN_API` | Backend (API) |
+| `pgadmin-saas.vinzer.cl` | `DOMAIN_PGADMIN` | UI de administración de la BD |
 
 > `track.*` y `veterinary.*` existen en el código pero **no** están en el
 > `VIRTUAL_HOST` del compose todavía. Si vas a usarlos, añádelos al DNS y al
@@ -46,8 +46,8 @@ Todos como registro **A** (o CNAME) apuntando a la IP del VPS:
 ## 2. Clonar el repositorio
 
 ```bash
-git clone <URL_DEL_REPO> vincer
-cd vincer
+git clone <URL_DEL_REPO> vinzer
+cd vinzer
 ```
 
 ---
@@ -172,9 +172,9 @@ docker logs <contenedor_acme_companion> --tail 50
 ```
 
 Abre en el navegador:
-- `https://vincer.cl` → landing
-- `https://admin.vincer.cl` → login del SuperAdmin
-- `https://app.vincer.cl` → login del tenant
+- `https://vinzer.cl` → landing
+- `https://admin.vinzer.cl` → login del SuperAdmin
+- `https://app.vinzer.cl` → login del tenant
 
 ---
 

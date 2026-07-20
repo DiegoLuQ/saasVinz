@@ -199,7 +199,7 @@ export default function ReceiptTemplate({
                     <p className="text-[10px] font-bold italic text-black-40" style={{ color: 'rgba(0,0,0,0.4)' }}>"Excelencia y dignidad en cada detalle"</p>
                 </div>
                 <div className="text-right">
-                    <p className="text-[10px] font-black text-black-30" style={{ color: 'rgba(0,0,0,0.3)' }}>Generado por <span className="text-black-60" style={{ color: 'rgba(0,0,0,0.6)' }}>Vincer</span></p>
+                    <p className="text-[10px] font-black text-black-30" style={{ color: 'rgba(0,0,0,0.3)' }}>Generado por <span className="text-black-60" style={{ color: 'rgba(0,0,0,0.6)' }}>Vinzer</span></p>
                 </div>
             </div>
 

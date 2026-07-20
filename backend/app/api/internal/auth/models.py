@@ -43,6 +43,27 @@ class User(Base):
     tenant = relationship("Tenant", back_populates="users")
     permissions = relationship("UserModulePermission", back_populates="user", cascade="all, delete-orphan")
 
+class RefreshToken(Base):
+    """
+    Refresh tokens rotatorios (S-02). El token viaja opaco en cookie httpOnly
+    (saasc_refresh) y aquí solo se guarda su SHA-256. `replaced_by_id` encadena
+    las rotaciones: si llega un token ya rotado/revocado se asume robo y se
+    revocan todos los del usuario. Sin RLS, igual que sys_users (el lookup
+    ocurre antes de fijar el contexto de tenant).
+    """
+    __tablename__ = "sys_refresh_tokens"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("sys_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    replaced_by_id = Column(Integer, ForeignKey("sys_refresh_tokens.id"), nullable=True)
+    user_agent = Column(String(255), nullable=True)
+    ip = Column(String(45), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=tz.get_now)
+
+    user = relationship("User")
+
 class UserModulePermission(Base):
     __tablename__ = "auth_user_module_permissions"
     id = Column(Integer, primary_key=True, index=True)

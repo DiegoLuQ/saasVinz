@@ -129,7 +129,7 @@ export default function VeterinarySidebar() {
                     </button>
 
                     <p className="text-center text-[9px] text-[var(--muted-foreground)] mt-4 font-mono opacity-50">
-                        v2.4.0 • Vincer
+                        v2.4.0 • Vinzer
                     </p>
                 </div>
             </motion.aside>

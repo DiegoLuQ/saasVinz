@@ -307,7 +307,7 @@ export default function SubmissionDetailPage() {
                                 {submission.owner_data?.phone && (
                                     <button
                                         onClick={() => {
-                                            const defaultMsg = `Hola ${submission.owner_data.fullName}, te contactamos de ${tenant?.name || 'Vincer'}.`;
+                                            const defaultMsg = `Hola ${submission.owner_data.fullName}, te contactamos de ${tenant?.name || 'Vinzer'}.`;
                                             setWhatsAppMessage(defaultMsg);
                                             setIsWhatsAppModalOpen(true);
                                         }}

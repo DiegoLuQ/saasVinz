@@ -20,7 +20,7 @@ import {
     Zap
 } from 'lucide-react';
 import { apiRequest } from '@/lib/admin/api';
-import { getToken } from '@/lib/auth/token';
+import { authHeader } from '@/lib/auth/token';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import type { Transaction, TransactionListResponse } from '@/types/billing';
 import Pagination from '@/components/admin/Pagination';
@@ -174,10 +174,9 @@ export default function TransactionsHistoryPage() {
         setExporting(true);
         try {
             const params = buildFilterParams();
-            const token = getToken();
             const response = await fetch(
                 `/api/internal/creator/billing/transactions/export?${params.toString()}`,
-                { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+                { headers: authHeader() }
             );
             if (!response.ok) {
                 const errBody = await response.text().catch(() => '');

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Home, LogIn, ArrowRight } from 'lucide-react';
-import { getToken } from '@/lib/auth/token';
+import { hasSession } from '@/lib/auth/token';
 import "./globals.css";
 
 type HostContext = 'admin' | 'app' | 'veterinary' | 'public';
@@ -31,9 +31,9 @@ function getRedirectTarget(): string {
     const context = detectHostContext();
     switch (context) {
         case 'admin':
-            return getToken() ? '/dashboard' : '/iniciar-sesion-creador';
+            return hasSession() ? '/dashboard' : '/iniciar-sesion-creador';
         case 'app':
-            return getToken() ? '/dashboard' : '/login';
+            return hasSession() ? '/dashboard' : '/login';
         case 'veterinary':
             return getVetToken() ? '/dashboard' : '/login';
         case 'public':
@@ -56,7 +56,7 @@ export default function NotFound() {
         } else if (context === 'public') {
             setIsAuthenticated(false);
         } else {
-            setIsAuthenticated(!!getToken());
+            setIsAuthenticated(hasSession());
         }
 
         const timer = setInterval(() => {
@@ -100,7 +100,7 @@ export default function NotFound() {
                             <span className="text-emerald-400 text-xs font-bold uppercase tracking-widest">Error 404</span>
                         </div>
                         <h2 className="text-5xl font-black text-white tracking-tight mb-2">
-                            Vincer
+                            Vinzer
                         </h2>
                         <p className="text-emerald-400/60 font-medium tracking-wide">Aliado en tu negocio</p>
                     </div>

@@ -24,8 +24,8 @@ export default function BlockedStatusPage({ status, reason, tenant }: BlockedSta
         }
     };
 
-    const handleLogout = () => {
-        clearToken();
+    const handleLogout = async () => {
+        await clearToken();
         localStorage.removeItem('saasc_user');
         window.location.href = '/login';
     };

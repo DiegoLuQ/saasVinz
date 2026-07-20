@@ -92,7 +92,7 @@ async def send_contact_email(data: ContactFormData):
         <!-- Footer -->
         <div style="background: #f1f5f9; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0;">
             <p style="font-size: 11px; color: #94a3b8; margin: 0;">
-                Enviado desde el formulario de contacto de Vincer · Plan Recuerdo
+                Enviado desde el formulario de contacto de Vinzer · Plan Recuerdo
             </p>
         </div>
     </div>

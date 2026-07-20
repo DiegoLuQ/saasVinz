@@ -1,14 +1,14 @@
 """
-Clear Operational Data Script - SaaS Vincer & Creator Reset
+Clear Operational Data Script - SaaS Vinzer & Creator Reset
 ===========================================================
 This script performs a complete clean-up of the database to prepare for production:
 1. Deletes all media library entries (web_media_library).
 2. Deletes all receipts (sys_receipts) to leave receipt management empty.
 3. Deletes all customers, pets, cremations, partner links, and memorials completely.
-4. Deletes all other tenants, leaving ONLY tenant ID 1 ("SaaS Vincer").
-5. Renames the sole tenant to "SaaS Vincer" and elevates it to the "ULTRA" subscription plan.
+4. Deletes all other tenants, leaving ONLY tenant ID 1 ("SaaS Vinzer").
+5. Renames the sole tenant to "SaaS Vinzer" and elevates it to the "ULTRA" subscription plan.
 6. Keeps only the core subscription plans (sys_subscription_plans) and modules.
-7. Preserves only the main Super Creator admin account (creator@saascrematorio.cl) linked to "SaaS Vincer".
+7. Preserves only the main Super Creator admin account (creator@saascrematorio.cl) linked to "SaaS Vinzer".
 
 Usage (from backend/ directory):
     python scripts/database/clear_operational_data.py
@@ -23,12 +23,12 @@ from app.database import SessionLocal
 
 def main():
     print("==========================================================")
-    print("   SaaS Vincer - Pristine Database Production Reset")
+    print("   SaaS Vinzer - Pristine Database Production Reset")
     print("==========================================================")
     print("[WARNING] This script will permanently delete all operational")
     print("records, memorials, other tenants, receipts, and media.")
     print("Only the Creator admin account, core plans, global templates,")
-    print("and the single 'SaaS Vincer' ULTRA tenant will remain.")
+    print("and the single 'SaaS Vinzer' ULTRA tenant will remain.")
     print("==========================================================")
 
     db = SessionLocal()
@@ -119,7 +119,7 @@ def main():
             ("Purging other tenant Farewell Templates", "DELETE FROM ops_farewell_templates WHERE tenant_id != 1 AND tenant_id IS NOT NULL;"),
             ("Purging other tenant Notifications", "DELETE FROM sys_notifications WHERE tenant_id != 1 AND tenant_id IS NOT NULL;"),
 
-            # 18. Purge other tenants EXCEPT Vincer tenant (ID 1)
+            # 18. Purge other tenants EXCEPT Vinzer tenant (ID 1)
             ("Purging other Tenants", "DELETE FROM sys_tenants WHERE id != 1;"),
         ]
 
@@ -132,13 +132,13 @@ def main():
         ultra_plan_id = result[0] if result else 4 # Fallback to 4 if not found
         print(f"  -> Found ULTRA Plan ID: {ultra_plan_id}")
 
-        # Ensure Tenant ID 1 is perfectly set as "SaaS Vincer" on the "ULTRA" plan
-        print("  -> Configuring 'SaaS Vincer' Tenant (ID 1) to ULTRA plan...")
+        # Ensure Tenant ID 1 is perfectly set as "SaaS Vinzer" on the "ULTRA" plan
+        print("  -> Configuring 'SaaS Vinzer' Tenant (ID 1) to ULTRA plan...")
         db.execute(text(f"""
             UPDATE sys_tenants 
-            SET name = 'SaaS Vincer',
-                short_name = 'Vincer',
-                slug = 'vincer',
+            SET name = 'SaaS Vinzer',
+                short_name = 'Vinzer',
+                slug = 'vinzer',
                 plan = 'ULTRA',
                 subscription_plan_id = {ultra_plan_id},
                 status = 'active'
@@ -146,7 +146,7 @@ def main():
         """))
 
         # Link Creator user to Tenant ID 1
-        print("  -> Linking Super Creator Admin to 'SaaS Vincer' Tenant...")
+        print("  -> Linking Super Creator Admin to 'SaaS Vinzer' Tenant...")
         db.execute(text("""
             UPDATE sys_users 
             SET tenant_id = 1 
@@ -157,7 +157,7 @@ def main():
         db.commit()
         print("\n[SUCCESS] The database has been successfully reset to a pristine state.")
         print("          - Preserved plans and SuperAdmin Creator account.")
-        print("          - Tenant 1 elevated to 'SaaS Vincer' on the ULTRA plan.")
+        print("          - Tenant 1 elevated to 'SaaS Vinzer' on the ULTRA plan.")
         print("          - Receipts, media library, and operational data completely empty.")
         print("==========================================================")
 

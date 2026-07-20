@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Flame, Mail, Lock, LogIn, ShieldCheck } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { apiRequest } from '@/lib/tenant/api';
-import { getToken, setToken } from '@/lib/auth/token';
+import { hasSession } from '@/lib/auth/token';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
@@ -16,7 +16,7 @@ export default function LoginPage() {
     const [checking, setChecking] = useState(true);
 
     React.useEffect(() => {
-        if (getToken()) {
+        if (hasSession()) {
             router.push('/dashboard');
         } else {
             setChecking(false);
@@ -42,7 +42,7 @@ export default function LoginPage() {
                 body: formData, // Pass object directly
             });
 
-            setToken(data.access_token);
+            // La sesión queda en cookies httpOnly emitidas por el backend.
             localStorage.setItem('saasc_user', JSON.stringify(data.user));
 
             router.push('/dashboard');

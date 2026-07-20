@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ShieldCheck, Lock, Mail, ArrowRight, AlertCircle, PlusCircle } from 'lucide-react';
 import { apiRequest } from '@/lib/admin/api';
-import { setToken } from '@/lib/auth/token';
+import { clearToken } from '@/lib/auth/token';
 import { useRouter } from 'next/navigation';
 
 export default function CreatorLoginPage() {
@@ -36,10 +36,12 @@ export default function CreatorLoginPage() {
             });
 
             if (data.user.role !== 'creator') {
+                // El backend ya emitió cookies de sesión: revocarlas antes de rechazar.
+                await clearToken();
                 throw new Error('Acceso denegado: No tienes permisos de Creador.');
             }
 
-            setToken(data.access_token);
+            // La sesión queda en cookies httpOnly emitidas por el backend.
             router.push('/dashboard');
 
         } catch (err: any) {

@@ -20,21 +20,21 @@ _DEFAULT_CORS_ORIGINS = [
     "http://app.lvh.me:3000",
     "http://track.lvh.me:3000",
     "http://memorial.lvh.me:3000",
-    # Producción (vincer.app - legacy)
-    "https://vincer.app",
-    "https://www.vincer.app",
-    "https://admin.vincer.app",
-    "https://tenant.vincer.app",
-    "https://veterinary.vincer.app",
-    "https://apisaasv2.vincer.app",
+    # Producción (vinzer.app - legacy)
+    "https://vinzer.app",
+    "https://www.vinzer.app",
+    "https://admin.vinzer.app",
+    "https://tenant.vinzer.app",
+    "https://veterinary.vinzer.app",
+    "https://apisaasv2.vinzer.app",
     "https://pawmemory.pet",
-    # Producción (vincer.cl)
-    "https://vincer.cl",
-    "https://www.vincer.cl",
-    "https://app.vincer.cl",
-    "https://admin.vincer.cl",
-    "https://memorial.vincer.cl",
-    "https://api-saas-keys.vincer.cl",
+    # Producción (vinzer.cl)
+    "https://vinzer.cl",
+    "https://www.vinzer.cl",
+    "https://app.vinzer.cl",
+    "https://admin.vinzer.cl",
+    "https://memorial.vinzer.cl",
+    "https://api-saas-keys.vinzer.cl",
 ]
 
 class Settings(BaseSettings):
@@ -45,7 +45,11 @@ class Settings(BaseSettings):
     # OBLIGATORIO: debe provenir del entorno (.env). Sin valor seguro la app no arranca.
     SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7 # 1 week
+    # Sesión (S-01/S-02): access token corto en cookie httpOnly + refresh
+    # token rotatorio. El refresh vive en la cookie saasc_refresh (path
+    # /api/internal/auth) y se rota en cada uso.
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     @property
     def IS_PRODUCTION(self) -> bool:

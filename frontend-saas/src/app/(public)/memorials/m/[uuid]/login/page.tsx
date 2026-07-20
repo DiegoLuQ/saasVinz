@@ -10,7 +10,7 @@ import {
     ShieldCheck
 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
-import { VincerLogo } from '@/components/vincer/VincerLogo';
+import { VinzerLogo } from '@/components/vinzer/VinzerLogo';
 import { HuellasFooter } from '@/components/public/HuellasFooter';
 import { getTranslations, type Locale } from '@/lib/translations';
 
@@ -83,9 +83,9 @@ export default function MemorialLoginPage() {
 
     return (
         <div className="min-h-screen bg-[#020210] flex flex-col">
-            {/* Header mínimo Vincer (sin menú: página exclusiva de acceso al memorial) */}
+            {/* Header mínimo Vinzer (sin menú: página exclusiva de acceso al memorial) */}
             <header className="flex justify-center pt-8 pb-2">
-                <VincerLogo size="sm" />
+                <VinzerLogo size="sm" />
             </header>
 
             <main className="flex-grow flex items-center justify-center p-6 bg-gradient-to-b from-[#020210] to-[#0a1a2f] relative overflow-hidden">

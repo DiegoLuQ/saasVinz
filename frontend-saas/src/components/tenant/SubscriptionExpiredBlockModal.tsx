@@ -83,8 +83,8 @@ export default function SubscriptionExpiredBlockModal({ detail }: Props) {
         window.location.reload();
     };
 
-    const handleLogout = () => {
-        clearToken();
+    const handleLogout = async () => {
+        await clearToken();
         try { localStorage.removeItem('saasc_user'); } catch { /* ignore */ }
         window.location.href = '/login';
     };

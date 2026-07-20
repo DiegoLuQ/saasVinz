@@ -115,9 +115,9 @@ export default async function middleware(req: NextRequest) {
         return NextResponse.rewrite(url);
     }
 
-    // Root (Vincer) -> /vincer
+    // Root (Vinzer) -> /vinzer
     if (currentHost === undefined) {
-        url.pathname = `/vincer${url.pathname}`;
+        url.pathname = `/vinzer${url.pathname}`;
         return NextResponse.rewrite(url);
     }
 

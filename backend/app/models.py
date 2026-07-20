@@ -3,7 +3,8 @@
 
 # 1. Auth & Admin
 from app.api.internal.auth.models import (
-    User, UserRole, Module, UserModulePermission, RoleModuleBlueprint, TenantModuleConfig, Role
+    User, UserRole, Module, UserModulePermission, RoleModuleBlueprint, TenantModuleConfig, Role,
+    RefreshToken
 )
 from app.api.internal.admin.models import (
     Tenant, TenantStatus, TenantBillingInfo, SubscriptionPlan, AuditLog, TemporaryFormToken, TableConfiguration, SaaSConfig

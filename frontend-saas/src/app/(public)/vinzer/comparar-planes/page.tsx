@@ -2,11 +2,11 @@ import React from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, Check, Minus, Star, Heart, Flame, Shield, HelpCircle } from 'lucide-react';
-import { VincerLogo } from '@/components/vincer/VincerLogo';
+import { VinzerLogo } from '@/components/vinzer/VinzerLogo';
 
 export const metadata: Metadata = {
-    title: 'Comparar Planes | Vincer',
-    description: 'Compara detalladamente las características de los planes Free, Track, Normal, Pro y Ultra de Vincer. Elige la mejor opción para modernizar tu crematorio.',
+    title: 'Comparar Planes | Vinzer',
+    description: 'Compara detalladamente las características de los planes Free, Track, Normal, Pro y Ultra de Vinzer. Elige la mejor opción para modernizar tu crematorio.',
     robots: {
         index: true,
         follow: true,
@@ -91,7 +91,7 @@ export default function CompararPlanesPage() {
             {/* Header */}
             <header className="relative z-10 max-w-7xl mx-auto px-6 h-20 flex items-center justify-between border-b border-white/5">
                 <Link href="/">
-                    <VincerLogo size="md" />
+                    <VinzerLogo size="md" />
                 </Link>
                 <Link 
                     href="/"
@@ -140,7 +140,7 @@ export default function CompararPlanesPage() {
                                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Básico</span>
                                         <h3 className="text-sm font-bold text-[#FFFFFF]">FREE</h3>
                                         <p className="text-[10px] font-bold text-[#19B5FE]">$0 CLP / mes</p>
-                                        <a href="https://wa.me/56982395940?text=Hola,%20me%20gustaría%20solicitar%20el%20plan%20Free%20de%20Vincer." target="_blank" rel="noopener noreferrer" className="inline-block mt-3 px-4 py-1.5 bg-white/5 hover:bg-white/10 text-[#FFFFFF] rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all border border-white/10">
+                                        <a href="https://wa.me/56982395940?text=Hola,%20me%20gustaría%20solicitar%20el%20plan%20Free%20de%20Vinzer." target="_blank" rel="noopener noreferrer" className="inline-block mt-3 px-4 py-1.5 bg-white/5 hover:bg-white/10 text-[#FFFFFF] rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all border border-white/10">
                                             Conversemos
                                         </a>
                                     </div>
@@ -152,7 +152,7 @@ export default function CompararPlanesPage() {
                                         <span className="text-[9px] font-bold text-[#19B5FE] uppercase tracking-widest">Operaciones</span>
                                         <h3 className="text-sm font-bold text-[#FFFFFF]">TRACK</h3>
                                         <p className="text-[10px] font-bold text-[#19B5FE]">$29.900 CLP</p>
-                                        <a href="https://wa.me/56982395940?text=Hola,%20me%20gustaría%20cotizar%20el%20plan%20Track%20de%20Vincer." target="_blank" rel="noopener noreferrer" className="inline-block mt-3 px-4 py-1.5 bg-white/5 hover:bg-white/10 text-[#FFFFFF] rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all border border-[#19B5FE]/20">
+                                        <a href="https://wa.me/56982395940?text=Hola,%20me%20gustaría%20cotizar%20el%20plan%20Track%20de%20Vinzer." target="_blank" rel="noopener noreferrer" className="inline-block mt-3 px-4 py-1.5 bg-white/5 hover:bg-white/10 text-[#FFFFFF] rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all border border-[#19B5FE]/20">
                                             Conversemos
                                         </a>
                                     </div>
@@ -164,7 +164,7 @@ export default function CompararPlanesPage() {
                                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Profesional</span>
                                         <h3 className="text-sm font-bold text-[#FFFFFF]">NORMAL</h3>
                                         <p className="text-[10px] font-bold text-[#FFFFFF]">$39.900 CLP</p>
-                                        <a href="https://wa.me/56982395940?text=Hola,%20me%20gustaría%20cotizar%20el%20plan%20Normal%20de%20Vincer." target="_blank" rel="noopener noreferrer" className="inline-block mt-3 px-4 py-1.5 bg-white/5 hover:bg-white/10 text-[#FFFFFF] rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all border border-white/10">
+                                        <a href="https://wa.me/56982395940?text=Hola,%20me%20gustaría%20cotizar%20el%20plan%20Normal%20de%20Vinzer." target="_blank" rel="noopener noreferrer" className="inline-block mt-3 px-4 py-1.5 bg-white/5 hover:bg-white/10 text-[#FFFFFF] rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all border border-white/10">
                                             Conversemos
                                         </a>
                                     </div>
@@ -177,7 +177,7 @@ export default function CompararPlanesPage() {
                                         <span className="text-[9px] font-bold text-[#19B5FE] uppercase tracking-widest">Recomendado</span>
                                         <h3 className="text-sm font-bold text-[#FFFFFF]">PRO</h3>
                                         <p className="text-[10px] font-bold text-[#19B5FE]">$59.990 CLP</p>
-                                        <a href="https://wa.me/56982395940?text=Hola,%20me%20gustaría%20cotizar%20el%20plan%20Pro%20de%20Vincer." target="_blank" rel="noopener noreferrer" className="inline-block mt-3 px-4 py-1.5 bg-[#19B5FE] hover:bg-[#19B5FE]/90 text-[#020210] rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all shadow-md shadow-[#19B5FE]/20">
+                                        <a href="https://wa.me/56982395940?text=Hola,%20me%20gustaría%20cotizar%20el%20plan%20Pro%20de%20Vinzer." target="_blank" rel="noopener noreferrer" className="inline-block mt-3 px-4 py-1.5 bg-[#19B5FE] hover:bg-[#19B5FE]/90 text-[#020210] rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all shadow-md shadow-[#19B5FE]/20">
                                             Conversemos
                                         </a>
                                     </div>
@@ -189,7 +189,7 @@ export default function CompararPlanesPage() {
                                         <span className="text-[9px] font-bold text-[#E0B84D] uppercase tracking-widest">Corporativo</span>
                                         <h3 className="text-sm font-bold text-[#FFFFFF]">ULTRA</h3>
                                         <p className="text-[10px] font-bold text-[#E0B84D]">$119.000 CLP</p>
-                                        <a href="https://wa.me/56982395940?text=Hola,%20me%20gustaría%20cotizar%20el%20plan%20Ultra%20de%20Vincer." target="_blank" rel="noopener noreferrer" className="inline-block mt-3 px-4 py-1.5 bg-[#E0B84D]/10 border border-[#E0B84D]/20 hover:bg-[#E0B84D] hover:text-[#020210] text-[#E0B84D] rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all border border-[#E0B84D]/30">
+                                        <a href="https://wa.me/56982395940?text=Hola,%20me%20gustaría%20cotizar%20el%20plan%20Ultra%20de%20Vinzer." target="_blank" rel="noopener noreferrer" className="inline-block mt-3 px-4 py-1.5 bg-[#E0B84D]/10 border border-[#E0B84D]/20 hover:bg-[#E0B84D] hover:text-[#020210] text-[#E0B84D] rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all border border-[#E0B84D]/30">
                                             Conversemos
                                         </a>
                                     </div>
@@ -264,7 +264,7 @@ export default function CompararPlanesPage() {
                     </p>
                     <div className="flex justify-center gap-4 pt-2">
                         <a 
-                            href="mailto:soporte@vincer.app"
+                            href="mailto:soporte@vinzer.app"
                             className="bg-[#19B5FE] hover:bg-[#19B5FE]/90 text-[#020210] px-8 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
                         >
                             Hablar con un Asesor

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getToken, clearToken } from '@/lib/auth/token';
+import { authHeader, clearToken, tryRefreshSession } from '@/lib/auth/token';
 
 const isServer = typeof window === 'undefined';
 // v1.4 - ULTIMATE PROXY ENFORCEMENT
@@ -13,7 +13,7 @@ if (!isServer) {
     console.log('[API CONFIG v1.4] All requests will use Next.js proxy');
 }
 
-export const apiRequest = async (url: string, options: any = {}) => {
+export const apiRequest = async (url: string, options: any = {}, _isRetry = false): Promise<any> => {
 
     const fullUrl = `${API_URL}${url.startsWith('/') ? '' : '/'}${url}`;
     if (fullUrl.startsWith('http')) {
@@ -21,8 +21,6 @@ export const apiRequest = async (url: string, options: any = {}) => {
     }
 
     try {
-        const token = getToken();
-
         let tenantId: number | null = null;
         try {
             const stored = localStorage.getItem('saasc_user');
@@ -31,7 +29,9 @@ export const apiRequest = async (url: string, options: any = {}) => {
 
         const headers: any = {
             ...options.headers,
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            // Sesión por cookie httpOnly (viaja sola, same-origin). authHeader()
+            // solo emite Bearer para sesiones legacy pre-migración.
+            ...authHeader(),
             ...(tenantId ? { 'X-Tenant-ID': tenantId } : {}),
         };
 
@@ -51,11 +51,16 @@ export const apiRequest = async (url: string, options: any = {}) => {
     } catch (error: any) {
 
         if (error.response) {
-            // Handle 401 Unauthorized
+            // Handle 401 Unauthorized: intenta renovar la sesión una vez
+            // (refresh token en cookie httpOnly) y reintenta la request.
             if (error.response.status === 401) {
-                if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+                if (!_isRetry && typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+                    const refreshed = await tryRefreshSession();
+                    if (refreshed) {
+                        return apiRequest(url, options, true);
+                    }
                     console.warn('[API] Session expired or invalid. Redirecting to login.');
-                    clearToken();
+                    await clearToken();
                     localStorage.removeItem('saasc_user');
                     window.location.href = '/login';
                 }

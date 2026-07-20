@@ -387,7 +387,7 @@ function KeyCard({
                 </div>
             </div>
 
-            {/* Código embebible: script ligero o plantilla completa (marca Vincer) */}
+            {/* Código embebible: script ligero o plantilla completa (marca Vinzer) */}
             <div className="rounded-2xl p-px bg-gradient-to-br from-[#19B5FE]/40 via-white/5 to-[#E0B84D]/40">
                 <div className="rounded-2xl bg-[#070b12] p-4 sm:p-5 space-y-3 min-w-0">
                     {/* Encabezado */}
@@ -399,7 +399,7 @@ function KeyCard({
                             <div>
                                 <h4 className="text-sm font-black text-white leading-none">Código para el sitio</h4>
                                 <span className="text-[10px] font-bold uppercase tracking-widest bg-gradient-to-r from-[#19B5FE] to-[#E0B84D] bg-clip-text text-transparent">
-                                    Vincer Widget
+                                    Vinzer Widget
                                 </span>
                             </div>
                         </div>
@@ -432,7 +432,7 @@ function KeyCard({
 
                     <p className="text-[11px] text-white/40">
                         {embedTab === 'hosted'
-                            ? 'Recomendado: carga el widget desde Vincer y se actualiza automáticamente.'
+                            ? 'Recomendado: carga el widget desde Vinzer y se actualiza automáticamente.'
                             : 'Autocontenida: pega todo el bloque (productos, servicios y seguimiento) sin dependencias externas.'}
                     </p>
 
@@ -444,7 +444,7 @@ function KeyCard({
                                 <span className="w-2.5 h-2.5 rounded-full bg-[#19B5FE]/80" />
                                 <span className="w-2.5 h-2.5 rounded-full bg-white/20" />
                                 <span className="ml-2 text-[10px] font-mono text-white/40">
-                                    {embedTab === 'hosted' ? 'vincer-widget.html' : 'vincer-widget-full.html'}
+                                    {embedTab === 'hosted' ? 'vinzer-widget.html' : 'vinzer-widget-full.html'}
                                 </span>
                             </div>
                             <CopyButton value={embedCode} label="Copiar" />

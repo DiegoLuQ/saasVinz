@@ -143,7 +143,7 @@ export const PlanLimitModal = ({
                         </div>
 
                         <p className="text-[10px] text-primary mt-8 uppercase tracking-widest font-black italic drop-shadow-[0_0_10px_rgba(var(--primary-rgb),0.3)]">
-                            Vincer | Cuando el vínculo importa, todo cambia
+                            Vinzer | Cuando el vínculo importa, todo cambia
                         </p>
                     </div>
                 </motion.div>

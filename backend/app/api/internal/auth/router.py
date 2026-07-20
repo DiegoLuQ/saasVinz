@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import text, or_
 from app.database import get_db
@@ -21,7 +21,8 @@ from app.core.config import settings
 @limiter.limit(settings.RATE_LIMIT_LOGIN)
 def login_for_access_token(
     request: Request, # Request object is required for SlowAPI
-    form_data: OAuth2PasswordRequestForm = Depends(), 
+    response: Response,
+    form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
     # En OAuth2PasswordRequestForm, 'username' es el campo para el email
@@ -58,11 +59,75 @@ def login_for_access_token(
         data=token_data,
         expires_delta=access_token_expires
     )
+    # S-01/S-02: la sesión vive en cookies httpOnly (viajan por el proxy de
+    # Next). El body mantiene el token por compatibilidad (scripts, OAuth2
+    # password flow de /docs).
+    refresh_token = auth.create_refresh_token(db, user, request)
+    auth.set_auth_cookies(response, access_token, refresh_token)
     return {
-        "access_token": access_token, 
+        "access_token": access_token,
         "token_type": "bearer",
         "user": user
     }
+
+
+@router.post("/refresh", response_model=schemas.Token)
+@limiter.limit("20/minute")
+def refresh_session(
+    request: Request, # Request object is required for SlowAPI
+    response: Response,
+    db: Session = Depends(get_db)
+):
+    """
+    Rota el refresh token (cookie saasc_refresh) y emite un access token
+    nuevo. El frontend lo invoca automáticamente ante un 401.
+    """
+    raw_refresh = request.cookies.get(auth.REFRESH_COOKIE_NAME)
+    if not raw_refresh:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sesión expirada o token inválido.",
+        )
+    user, new_refresh = auth.rotate_refresh_token(db, raw_refresh, request)
+
+    access_token = auth.create_access_token(
+        data={
+            "sub": str(user.id),
+            "tenant_id": str(user.tenant_id) if user.tenant_id is not None else None,
+            "role": user.role,
+            "ver": user.token_version,
+        },
+        expires_delta=timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+    auth.set_auth_cookies(response, access_token, new_refresh)
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": user,
+    }
+
+
+@router.post("/logout")
+def logout(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db)
+):
+    """
+    Revoca el refresh token activo y limpia las cookies de sesión.
+    No exige access token válido: un logout siempre debe poder completarse.
+    """
+    raw_refresh = request.cookies.get(auth.REFRESH_COOKIE_NAME)
+    if raw_refresh:
+        db_token = db.query(models.RefreshToken).filter(
+            models.RefreshToken.token_hash == auth._hash_refresh_token(raw_refresh),
+            models.RefreshToken.revoked_at.is_(None),
+        ).first()
+        if db_token:
+            db_token.revoked_at = tz.get_now()
+            db.commit()
+    auth.clear_auth_cookies(response)
+    return {"detail": "Sesión cerrada"}
 
 class AdminCredentials(BaseModel):
     admin_name: str
@@ -623,6 +688,8 @@ class PasswordChange(BaseModel):
 @router.post("/change-password")
 def change_password(
     password_data: PasswordChange,
+    request: Request,
+    response: Response,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
@@ -634,10 +701,11 @@ def change_password(
     current_user.token_version = (current_user.token_version or 0) + 1
     db.add(current_user)
     db.commit()
+    # Revoca los refresh tokens de las demás sesiones (la actual recibe uno nuevo).
+    auth.revoke_user_refresh_tokens(db, current_user.id)
 
     # Devolvemos un token nuevo (con el ver actualizado) para que la sesión que
-    # acaba de cambiar la contraseña NO se desloguee. El frontend debe reemplazar
-    # su token con este si está presente.
+    # acaba de cambiar la contraseña NO se desloguee, y renovamos las cookies.
     new_token = auth.create_access_token(
         data={
             "sub": str(current_user.id),
@@ -647,6 +715,8 @@ def change_password(
         },
         expires_delta=timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
+    new_refresh = auth.create_refresh_token(db, current_user, request)
+    auth.set_auth_cookies(response, new_token, new_refresh)
     return {
         "detail": "Contraseña actualizada exitosamente",
         "access_token": new_token,
@@ -722,6 +792,7 @@ def update_user_info(
         user.password_hash = auth.get_password_hash(user_in.password)
         # Resetear la contraseña invalida las sesiones activas de ese usuario.
         user.token_version = (user.token_version or 0) + 1
+        auth.revoke_user_refresh_tokens(db, user.id)
 
     db.commit()
     db.refresh(user)

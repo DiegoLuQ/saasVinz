@@ -1,8 +1,8 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import VincerLandingClient from '@/components/vincer/VincerLandingClient';
+import VinzerLandingClient from '@/components/vinzer/VinzerLandingClient';
 
-// Server-Side Metadata Generation for the main Vincer landing page
+// Server-Side Metadata Generation for the main Vinzer landing page
 export async function generateMetadata(): Promise<Metadata> {
     try {
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -16,49 +16,49 @@ export async function generateMetadata(): Promise<Metadata> {
         const seo = data.config?.seo || {};
 
         return {
-            metadataBase: new URL('https://vincer.app'),
-            title: seo.title || "Software para Crematorios de Mascotas y Funerarias | Vincer",
-            description: seo.description || "Optimiza la gestión de tu crematorio de mascotas con Vincer. Controla la trazabilidad QR, evidencias fotográficas y clientes en un solo sistema. Pruébalo gratis.",
+            metadataBase: new URL('https://vinzer.app'),
+            title: seo.title || "Software para Crematorios de Mascotas y Funerarias | Vinzer",
+            description: seo.description || "Optimiza la gestión de tu crematorio de mascotas con Vinzer. Controla la trazabilidad QR, evidencias fotográficas y clientes en un solo sistema. Pruébalo gratis.",
             keywords: seo.keywords || [
                 'software para crematorios de mascotas',
                 'gestión funeraria mascotas',
                 'trazabilidad qr cremaciones',
-                'vincer software chile',
+                'vinzer software chile',
                 'sistema de gestion de cementerios de mascotas',
             ],
             robots: seo.robots || "index, follow",
             openGraph: {
-                title: seo.ogTitle || "Software de Gestión y Trazabilidad para Crematorios de Mascotas | Vincer",
-                description: seo.ogDescription || "Vincer te ayuda a profesionalizar tu crematorio o cementerio de mascotas con tecnología QR e informes transparentes.",
+                title: seo.ogTitle || "Software de Gestión y Trazabilidad para Crematorios de Mascotas | Vinzer",
+                description: seo.ogDescription || "Vinzer te ayuda a profesionalizar tu crematorio o cementerio de mascotas con tecnología QR e informes transparentes.",
                 images: seo.ogImage
                     ? [{ url: seo.ogImage }]
-                    : [{ url: '/images/og-image-vincer.jpg', width: 1200, height: 630, alt: 'Panel de gestión de Vincer' }],
-                url: 'https://vincer.app',
-                siteName: 'Vincer',
+                    : [{ url: '/images/og-image-vinzer.jpg', width: 1200, height: 630, alt: 'Panel de gestión de Vinzer' }],
+                url: 'https://vinzer.app',
+                siteName: 'Vinzer',
                 locale: 'es_CL',
                 type: 'website',
             },
             twitter: {
                 card: 'summary_large_image',
-                title: seo.ogTitle || "Software de Gestión y Trazabilidad para Crematorios de Mascotas | Vincer",
-                description: seo.ogDescription || "Vincer te ayuda a profesionalizar tu crematorio o cementerio de mascotas con tecnología QR e informes transparentes.",
-                images: seo.ogImage ? [seo.ogImage] : ['/images/og-image-vincer.jpg'],
+                title: seo.ogTitle || "Software de Gestión y Trazabilidad para Crematorios de Mascotas | Vinzer",
+                description: seo.ogDescription || "Vinzer te ayuda a profesionalizar tu crematorio o cementerio de mascotas con tecnología QR e informes transparentes.",
+                images: seo.ogImage ? [seo.ogImage] : ['/images/og-image-vinzer.jpg'],
             },
             alternates: {
-                canonical: seo.canonical || 'https://vincer.app',
+                canonical: seo.canonical || 'https://vinzer.app',
             },
         };
     } catch (error) {
         console.error('SEO metadata fetch error on root domain:', error);
         return {
-            metadataBase: new URL('https://vincer.app'),
-            title: "Software para Crematorios de Mascotas y Funerarias | Vincer",
-            description: "Optimiza la gestión de tu crematorio de mascotas con Vincer. Controla la trazabilidad QR, evidencias fotográficas y clientes en un solo sistema. Pruébalo gratis.",
+            metadataBase: new URL('https://vinzer.app'),
+            title: "Software para Crematorios de Mascotas y Funerarias | Vinzer",
+            description: "Optimiza la gestión de tu crematorio de mascotas con Vinzer. Controla la trazabilidad QR, evidencias fotográficas y clientes en un solo sistema. Pruébalo gratis.",
         };
     }
 }
 
-export default async function VincerLandingPage() {
+export default async function VinzerLandingPage() {
     let config = null;
 
     try {
@@ -78,18 +78,18 @@ export default async function VincerLandingPage() {
     return (
         <>
             {/* Structured Schema JSON-LD can be here */}
-            <VincerLandingPageSchema />
-            <VincerLandingClient initialConfig={config} />
+            <VinzerLandingPageSchema />
+            <VinzerLandingClient initialConfig={config} />
         </>
     );
 }
 
-function VincerLandingPageSchema() {
+function VinzerLandingPageSchema() {
     // Definición de Esquema JSON-LD para SoftwareApplication
     const softwareSchema = {
         '@context': 'https://schema.org',
         '@type': 'SoftwareApplication',
-        'name': 'Vincer',
+        'name': 'Vinzer',
         'operatingSystem': 'All',
         'applicationCategory': 'BusinessApplication',
         'description': 'Plataforma SaaS multi-tenant para la gestión de crematorios de mascotas y funerarias. Trazabilidad QR, plan de tracking en tiempo real para familias y memoriales digitales interactivos.',
@@ -113,7 +113,7 @@ function VincerLandingPageSchema() {
         'mainEntity': [
             {
                 '@type': 'Question',
-                'name': '¿Cómo garantiza Vincer la trazabilidad del servicio?',
+                'name': '¿Cómo garantiza Vinzer la trazabilidad del servicio?',
                 'acceptedAnswer': {
                     '@type': 'Answer',
                     'text': 'Cada servicio genera un código de verificación único de 10 caracteres más un token de tracking público. El flujo de trabajo es configurable por crematorio y cada fase requiere evidencia fotográfica, notas y firma del operador. El sistema registra usuario, hora y cambios en cada acción crítica, dejando un historial de auditoría completo.'
@@ -132,7 +132,7 @@ function VincerLandingPageSchema() {
                 'name': '¿Cómo funcionan los certificados de cremación?',
                 'acceptedAnswer': {
                     '@type': 'Answer',
-                    'text': 'Vincer genera certificados PDF automáticos con datos de la mascota, dueño, tipo de servicio, firma digital, marca de agua del crematorio y numeración secuencial. Las plantillas son editables en secciones, colores, orden y tipografías. Disponibles a partir del plan PRO.'
+                    'text': 'Vinzer genera certificados PDF automáticos con datos de la mascota, dueño, tipo de servicio, firma digital, marca de agua del crematorio y numeración secuencial. Las plantillas son editables en secciones, colores, orden y tipografías. Disponibles a partir del plan PRO.'
                 }
             },
             {

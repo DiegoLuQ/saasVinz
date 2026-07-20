@@ -24,7 +24,7 @@ def _is_creator(role) -> bool:
 async def create_checkout(
     request: schemas.CheckoutCreateRequest,
     db: Session = Depends(get_db),
-    token: Optional[str] = Depends(auth.oauth2_scheme)
+    token: Optional[str] = Depends(auth.get_token_from_request)
 ):
     """
     Inicia un flujo de pago en Polar.sh con metadata contextual.

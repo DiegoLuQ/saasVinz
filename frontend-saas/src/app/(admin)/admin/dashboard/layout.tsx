@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Menu, Shield } from 'lucide-react';
 import Sidebar from '@/components/admin/Sidebar';
-import { getToken, clearToken } from '@/lib/auth/token';
+import { hasSession, clearToken } from '@/lib/auth/token';
 import { useAdminSSE } from '@/hooks/useAdminSSE';
 
 function SSEMount() {
@@ -23,7 +23,7 @@ export default function DashboardLayout({
     const [isMobileOpen, setIsMobileOpen] = useState(false);
 
     useEffect(() => {
-        if (!getToken()) {
+        if (!hasSession()) {
             router.push('/iniciar-sesion-creador');
         } else {
             setAuthorized(true);
@@ -39,8 +39,8 @@ export default function DashboardLayout({
         localStorage.setItem('sidebar_collapsed', value.toString());
     };
 
-    const handleLogout = () => {
-        clearToken();
+    const handleLogout = async () => {
+        await clearToken();
         router.push('/iniciar-sesion-creador');
     };
 

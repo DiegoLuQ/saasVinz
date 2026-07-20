@@ -51,12 +51,12 @@ const tabData = {
     }
 };
 
-export function VincerFeatures() {
+export function VinzerFeatures() {
     const [activeTab, setActiveTab] = useState<'crematorio' | 'familia'>('crematorio');
 
     return (
         <>
-            {/* Módulos Destacados (Ecosistema Vincer con Tabs) */}
+            {/* Módulos Destacados (Ecosistema Vinzer con Tabs) */}
             <section id="modulos" className="py-32 bg-[#0b0a24]/30 border-y border-white/5 relative z-10">
                 <div className="max-w-7xl mx-auto px-6">
                     <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
@@ -68,7 +68,7 @@ export function VincerFeatures() {
                             Un solo software para la gestión comercial, operativa y memorial de tu negocio
                         </h2>
                         <p className="text-[#C0C0C0] font-medium">
-                            Olvídate de contratar múltiples herramientas inconexas. Vincer unifica tus operaciones comerciales, B2B y familiares.
+                            Olvídate de contratar múltiples herramientas inconexas. Vinzer unifica tus operaciones comerciales, B2B y familiares.
                         </p>
                     </div>
 
@@ -195,11 +195,11 @@ export function VincerFeatures() {
                 </div>
             </section>
 
-            {/* Comparativa: Tradicional vs Vincer */}
+            {/* Comparativa: Tradicional vs Vinzer */}
             <section id="comparativa" className="py-32 px-6 max-w-7xl mx-auto relative z-10">
                 <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
                     <h2 className="text-3xl md:text-5xl font-black text-[#FFFFFF]">
-                        ¿Por qué los crematorios y cementerios de mascotas eligen Vincer?
+                        ¿Por qué los crematorios y cementerios de mascotas eligen Vinzer?
                     </h2>
                     <p className="text-[#C0C0C0] font-medium">
                         Descubre la diferencia entre operar con métodos tradicionales y centralizar tu negocio con una plataforma moderna y automatizada.
@@ -232,11 +232,11 @@ export function VincerFeatures() {
                         </ul>
                     </div>
 
-                    {/* Columna Vincer */}
+                    {/* Columna Vinzer */}
                     <div className="bg-[#0b0a24] border border-[#19B5FE]/30 p-8 rounded-3xl space-y-6 relative overflow-hidden shadow-lg shadow-[#19B5FE]/5">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-[#19B5FE]/5 blur-2xl rounded-full" />
                         <h4 className="text-lg font-bold text-[#FFFFFF] flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-[#19B5FE]" /> Gestión Moderna con Vincer
+                            <span className="w-2 h-2 rounded-full bg-[#19B5FE]" /> Gestión Moderna con Vinzer
                         </h4>
                         <ul className="space-y-4">
                             <li className="flex gap-3 text-xs text-[#C0C0C0]">

@@ -12,27 +12,27 @@ from app import models
 from app.auth import get_password_hash
 from sqlalchemy import text
 
-def seed_vincer_pet():
+def seed_vinzer_pet():
     db = SessionLocal()
     try:
         apply_bypass_rls(db)
-        print("Iniciando la siembra (seeding) de datos para el tenant 'vincer-pet'...")
+        print("Iniciando la siembra (seeding) de datos para el tenant 'vinzer-pet'...")
 
         # 1. Asegurar plan de suscripción activo
         plan_pro = db.query(models.SubscriptionPlan).filter(models.SubscriptionPlan.name == "PRO").first()
         if not plan_pro:
             plan_pro = db.query(models.SubscriptionPlan).first()
 
-        # 2. Crear Tenant vincer-pet
-        tenant = db.query(models.Tenant).filter(models.Tenant.slug == "vincer-pet").first()
+        # 2. Crear Tenant vinzer-pet
+        tenant = db.query(models.Tenant).filter(models.Tenant.slug == "vinzer-pet").first()
         if not tenant:
-            print("Creando Tenant: Vincer Pet (vincer-pet)...")
+            print("Creando Tenant: Vinzer Pet (vinzer-pet)...")
             tenant = models.Tenant(
-                name="Vincer Pet Crematorio",
-                short_name="Vincer Pet",
-                slug="vincer-pet",
+                name="Vinzer Pet Crematorio",
+                short_name="Vinzer Pet",
+                slug="vinzer-pet",
                 rut="76.123.456-7",
-                email="admin@vincer.cl",
+                email="admin@vinzer.cl",
                 phone="+56998239540",
                 status=models.TenantStatus.active,
                 subscription_plan_id=plan_pro.id if plan_pro else None,
@@ -42,16 +42,16 @@ def seed_vincer_pet():
             db.commit()
             db.refresh(tenant)
         else:
-            print(f"Tenant 'vincer-pet' ya existe (ID: {tenant.id})")
+            print(f"Tenant 'vinzer-pet' ya existe (ID: {tenant.id})")
 
         # 3. Crear Admin User para el Tenant
-        admin_user = db.query(models.User).filter(models.User.email == "admin@vincer.cl", models.User.tenant_id == tenant.id).first()
+        admin_user = db.query(models.User).filter(models.User.email == "admin@vinzer.cl", models.User.tenant_id == tenant.id).first()
         if not admin_user:
-            print("Creando usuario Administrador: admin@vincer.cl...")
+            print("Creando usuario Administrador: admin@vinzer.cl...")
             admin_user = models.User(
                 tenant_id=tenant.id,
-                name="Administrador Vincer",
-                email="admin@vincer.cl",
+                name="Administrador Vinzer",
+                email="admin@vinzer.cl",
                 password_hash=get_password_hash("juan123"),
                 role=models.UserRole.admin,
                 is_active=True
@@ -158,12 +158,12 @@ def seed_vincer_pet():
             db.commit()
             db.refresh(cat_anforas)
 
-        prov_vincer = db.query(models.Provider).filter(models.Provider.tenant_id == tenant.id, models.Provider.name == "Urnas y Recuerdos Vincer").first()
-        if not prov_vincer:
-            prov_vincer = models.Provider(tenant_id=tenant.id, name="Urnas y Recuerdos Vincer", rut="77.111.222-3", phone="+56911223344", email="proveedor@vincer.cl")
-            db.add(prov_vincer)
+        prov_vinzer = db.query(models.Provider).filter(models.Provider.tenant_id == tenant.id, models.Provider.name == "Urnas y Recuerdos Vinzer").first()
+        if not prov_vinzer:
+            prov_vinzer = models.Provider(tenant_id=tenant.id, name="Urnas y Recuerdos Vinzer", rut="77.111.222-3", phone="+56911223344", email="proveedor@vinzer.cl")
+            db.add(prov_vinzer)
             db.commit()
-            db.refresh(prov_vincer)
+            db.refresh(prov_vinzer)
 
         print("Registrando productos...")
         products_data = [
@@ -184,7 +184,7 @@ def seed_vincer_pet():
                 product = models.Product(
                     tenant_id=tenant.id,
                     category_id=cat_anforas.id,
-                    provider_id=prov_vincer.id,
+                    provider_id=prov_vinzer.id,
                     code=prod_d["code"],
                     name=prod_d["name"],
                     cost_price=prod_d["cost"],
@@ -232,8 +232,8 @@ def seed_vincer_pet():
 
         print("Registrando planes...")
         plans_data = [
-            {"name": "Plan Vincer Eterno", "desc": "Plan integral con cremación individual y traslado prioritario.", "price": 190000.0, "cost": 52000.0, "srvs": ["Cremación Individual Premium", "Traslado Especial Domicilio/Clínica"]},
-            {"name": "Plan Vincer Básico", "desc": "Plan económico con cremación colectiva y traslado básico.", "price": 90000.0, "cost": 30000.0, "srvs": ["Cremación Colectiva", "Traslado Especial Domicilio/Clínica"]}
+            {"name": "Plan Vinzer Eterno", "desc": "Plan integral con cremación individual y traslado prioritario.", "price": 190000.0, "cost": 52000.0, "srvs": ["Cremación Individual Premium", "Traslado Especial Domicilio/Clínica"]},
+            {"name": "Plan Vinzer Básico", "desc": "Plan económico con cremación colectiva y traslado básico.", "price": 90000.0, "cost": 30000.0, "srvs": ["Cremación Colectiva", "Traslado Especial Domicilio/Clínica"]}
         ]
         plans = {}
         for pl_d in plans_data:
@@ -284,7 +284,7 @@ def seed_vincer_pet():
             db.refresh(c1)
 
             # Tablas asociadas
-            db.add(models.PlanOC(tenant_id=tenant.id, cremation_id=c1.id, plan_id=plans["Plan Vincer Eterno"].id, cantidad=1, precio_costo=52000.0, precio_venta=190000.0, es_principal=True))
+            db.add(models.PlanOC(tenant_id=tenant.id, cremation_id=c1.id, plan_id=plans["Plan Vinzer Eterno"].id, cantidad=1, precio_costo=52000.0, precio_venta=190000.0, es_principal=True))
             db.add(models.ProductoOC(tenant_id=tenant.id, cremation_id=c1.id, product_id=products["Urna de Roble Tallada"].id, cantidad=1, precio_costo=20000.0, precio_venta=65000.0))
             db.add(models.CremationDetails(tenant_id=tenant.id, cremation_id=c1.id, notes="Proceso finalizado. Cenizas entregadas en urna de roble."))
             db.add(models.CremationFinancial(tenant_id=tenant.id, cremation_id=c1.id, total_price=255000.0, total_cost=72000.0))
@@ -345,7 +345,7 @@ def seed_vincer_pet():
             db.refresh(c3)
 
             # Tablas asociadas
-            db.add(models.PlanOC(tenant_id=tenant.id, cremation_id=c3.id, plan_id=plans["Plan Vincer Básico"].id, cantidad=1, precio_costo=30000.0, precio_venta=90000.0, es_principal=True))
+            db.add(models.PlanOC(tenant_id=tenant.id, cremation_id=c3.id, plan_id=plans["Plan Vinzer Básico"].id, cantidad=1, precio_costo=30000.0, precio_venta=90000.0, es_principal=True))
             db.add(models.CremationDetails(tenant_id=tenant.id, cremation_id=c3.id, notes="El cliente canceló el servicio y decidió retirar el cuerpo."))
             db.add(models.CremationFinancial(tenant_id=tenant.id, cremation_id=c3.id, total_price=90000.0, total_cost=30000.0))
             db.add(models.CremationScheduling(tenant_id=tenant.id, cremation_id=c3.id, scheduled_at=datetime.utcnow() - timedelta(days=5)))
@@ -373,13 +373,13 @@ def seed_vincer_pet():
             db.refresh(c4)
 
             # Tablas asociadas
-            db.add(models.PlanOC(tenant_id=tenant.id, cremation_id=c4.id, plan_id=plans["Plan Vincer Básico"].id, cantidad=1, precio_costo=30000.0, precio_venta=90000.0, es_principal=True))
+            db.add(models.PlanOC(tenant_id=tenant.id, cremation_id=c4.id, plan_id=plans["Plan Vinzer Básico"].id, cantidad=1, precio_costo=30000.0, precio_venta=90000.0, es_principal=True))
             db.add(models.CremationDetails(tenant_id=tenant.id, cremation_id=c4.id, notes="Mascota en tránsito hacia el crematorio."))
             db.add(models.CremationFinancial(tenant_id=tenant.id, cremation_id=c4.id, total_price=90000.0, total_cost=30000.0))
             db.add(models.CremationScheduling(tenant_id=tenant.id, cremation_id=c4.id, scheduled_at=datetime.utcnow() + timedelta(days=1)))
             db.commit()
 
-        print("¡Siembra de datos para 'vincer-pet' completada exitosamente!")
+        print("¡Siembra de datos para 'vinzer-pet' completada exitosamente!")
     except Exception as e:
         db.rollback()
         print(f"Error al sembrar los datos: {e}")
@@ -387,4 +387,4 @@ def seed_vincer_pet():
         db.close()
 
 if __name__ == "__main__":
-    seed_vincer_pet()
+    seed_vinzer_pet()

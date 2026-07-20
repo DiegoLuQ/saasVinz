@@ -3,7 +3,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import type { Cremation, SelectedService, SelectedPlan, SelectedProduct } from '@/lib/tenant/orders/types';
 
-const DRAFT_KEY_PREFIX = 'vincer_order_draft';
+const DRAFT_KEY_PREFIX = 'vinzer_order_draft';
 const AUTO_SAVE_INTERVAL = 30_000; // 30 seconds
 
 interface DraftState {

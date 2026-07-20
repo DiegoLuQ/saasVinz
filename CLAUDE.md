@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **SaaSCrematorio V2** is a multi-tenant SaaS platform for crematory and funeral home management. It supports subdomain-based routing per tenant, RBAC, audit logging, pet memorials, partner/veterinary portals, and payment processing via Polar.sh.
 
-`MEJORAS_SISTEMA.md` (repo root) holds the prioritized improvement plan with implementation status. Largest pending items: S-01/S-02 (httpOnly session cookie + refresh tokens) and S-09 (apply migrations 014/018 in production).
+`MEJORAS_SISTEMA.md` (repo root) holds the prioritized improvement plan with implementation status. Largest pending item: S-09 (apply migrations 014/018/020 in production — 020 is required before deploying the refresh-token backend).
 
 ## Development Commands
 
@@ -94,7 +94,7 @@ Permissions are granular: `{module_key, action}` where action ∈ `{view, create
 - `veterinary.*` → `/veterinary` (partner portal; guarded by `vet_token` cookie)
 - `memorial.*` or the dedicated domain (`NEXT_PUBLIC_MEMORIAL_DOMAIN`, e.g. pawmemory.pet) → `/public`
 - `track.*` → `/track` at the root (public search-by-code page); other paths → `/public`
-- root / `www.` → `/vincer` (marketing site)
+- root / `www.` → `/vinzer` (marketing site)
 - any other subdomain → redirect to root
 
 For local dev, use `lvh.me:3000` (resolves to 127.0.0.1) with subdomains like `admin.lvh.me:3000`.
@@ -113,10 +113,12 @@ Modules: `admin`, `auth`, `catalog`, `crm`, `operations`, `creator`, `memorials`
 Note: `integrations` holds the models/schemas/services for the public widget API keys; its routers live in `creator/widgets/` (SuperAdmin management) and `api/public/widget/` (public consumption).
 
 ### Authentication
-- JWT (HS256), 7-day expiry, via `Authorization: Bearer <token>` header
-- Login endpoint: `POST /api/internal/auth/login` (OAuth2PasswordBearer)
-- Protected endpoints use `get_current_user()` FastAPI dependency from `backend/app/auth.py`
-- Frontend stores tokens in cookies: `saasc_token` (tenant/admin), `vet_token` (veterinary portal)
+- Access token: JWT (HS256), **60 min**, emitido en cookie **httpOnly** `saasc_token` por el backend en el login (viaja por el proxy same-origin de Next). El header `Authorization: Bearer <token>` sigue soportado y tiene precedencia (scripts/tests).
+- Refresh token: opaco, rotatorio, **7 días**, cookie httpOnly `saasc_refresh` (path `/api/internal/auth`), hasheado SHA-256 en la tabla `sys_refresh_tokens` (migración 020). Reuso de un token ya rotado revoca todos los del usuario.
+- Endpoints: `POST /api/internal/auth/login` (OAuth2PasswordRequestForm; setea cookies), `POST .../refresh` (rota; el frontend lo llama ante un 401 con single-flight en `lib/auth/token.ts`), `POST .../logout` (revoca + limpia cookies).
+- `saasc_session` es un marcador NO-httpOnly (sin token) para que el cliente sepa "hay sesión" (`hasSession()`); el JWT no es legible por JavaScript.
+- Protected endpoints usan `get_current_user()` de `backend/app/auth.py` (token desde header o cookie vía `get_token_from_request`).
+- Portal veterinario: `vet_token` (cookie/localStorage legible, flujo antiguo) — pendiente de migrar al mismo patrón.
 
 ### Frontend API Layer
 - Axios instance with auth headers: `frontend-saas/src/lib/api/`
@@ -125,7 +127,7 @@ Note: `integrations` holds the models/schemas/services for the public widget API
 
 ### Frontend Stack Notes
 - **Tailwind CSS v4** — no `tailwind.config.js`. Theme tokens live in `@theme inline { ... }` inside `src/app/globals.css` and per-route-group `globals.css` (e.g. tenant has dynamic theme variables in `(tenant)/tenant/globals.css`). Custom utilities (e.g. `.no-scrollbar`) are defined inside `@layer base`.
-- **Route groups** in `src/app/`: `(admin)` SuperAdmin panel, `(tenant)` operator dashboard, `(veterinary)` partner portal, `(public)` landings + memorials + form tokens + Vincer marketing site at `/vincer`.
+- **Route groups** in `src/app/`: `(admin)` SuperAdmin panel, `(tenant)` operator dashboard, `(veterinary)` partner portal, `(public)` landings + memorials + form tokens + Vinzer marketing site at `/vinzer`.
 - **Subdomain dev**: use `lvh.me:3000` (or `admin.lvh.me`, `app.lvh.me`, `vet.lvh.me`); middleware rewrites by host.
 
 ## Environment Variables
@@ -156,7 +158,7 @@ App Router layout groups: `(admin)`, `(public)`, `(tenant)`, `(veterinary)` — 
 - Memorial design (altar theme, particles, fonts) is stored as JSON per memorial and can be edited from the tenant's memorial setup modal.
 
 ### Known Incomplete Areas ("Próximamente")
-- **Veterinary B2B portal**: The data model (Veterinary, PartnerLink, commission %) and notifications exist, but the full self-service portal (clinics submitting cremations, viewing referrals, commission payouts) is incomplete. Landing page (`/vincer`) explicitly tags these features with "Próximamente".
+- **Veterinary B2B portal**: The data model (Veterinary, PartnerLink, commission %) and notifications exist, but the full self-service portal (clinics submitting cremations, viewing referrals, commission payouts) is incomplete. Landing page (`/vinzer`) explicitly tags these features with "Próximamente".
 - **Commission liquidation**: Calculated but no payout endpoint.
 - Type checking runs with `npm run typecheck` (`tsc --noEmit`). As of 2026-07-02 it passes clean — keep it that way.
 

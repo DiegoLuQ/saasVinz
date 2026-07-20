@@ -172,7 +172,7 @@ export default function ReceiptTemplate({
                     <p className="text-[10px] font-bold italic text-black/40">"Excelencia y dignidad en cada detalle"</p>
                 </div>
                 <div className="text-right">
-                    <p className="text-[10px] font-black text-black/30">Generado por <span className="text-black/60">Vincer</span></p>
+                    <p className="text-[10px] font-black text-black/30">Generado por <span className="text-black/60">Vinzer</span></p>
                 </div>
             </div>
 

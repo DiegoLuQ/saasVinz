@@ -665,8 +665,8 @@ export default function TrackingPage() {
                         <p className={`text-[10px] uppercase font-bold tracking-[0.25em] transition-colors duration-500 ${isDarkMode ? 'text-neutral-600' : 'text-gray-400'}`}>
                             © {new Date().getFullYear()} {data.tenant_name}
                         </p>
-                        <a href="https://vincer.cl" target="_blank" rel="noopener noreferrer" className={`text-[9px] uppercase font-semibold tracking-wider hover:text-emerald-500 transition-colors duration-300 flex items-center gap-1 ${isDarkMode ? 'text-neutral-700' : 'text-gray-300'}`}>
-                            Tecnología por <span className="font-black">Vincer.cl</span>
+                        <a href="https://vinzer.cl" target="_blank" rel="noopener noreferrer" className={`text-[9px] uppercase font-semibold tracking-wider hover:text-emerald-500 transition-colors duration-300 flex items-center gap-1 ${isDarkMode ? 'text-neutral-700' : 'text-gray-300'}`}>
+                            Tecnología por <span className="font-black">Vinzer.cl</span>
                         </a>
                     </div>
                 </div>

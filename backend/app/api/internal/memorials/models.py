@@ -162,7 +162,7 @@ class Memorial(Base):
     def branding(self):
         is_suspended = self.tenant.status in ["suspended", "inactive", "pending"] if self.tenant else False
         is_canceled = self.tenant.subscription_status == "canceled" if self.tenant else False
-        return {"vincer_logo": is_suspended or is_canceled}
+        return {"vinzer_logo": is_suspended or is_canceled}
 
 class Dedication(Base):
     __tablename__ = "rec_dedicatoria"

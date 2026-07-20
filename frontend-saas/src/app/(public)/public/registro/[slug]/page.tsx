@@ -64,7 +64,7 @@ export default function PartnerRegistroPage() {
     const [ownerErrors, setOwnerErrors] = useState<Partial<typeof ownerData>>({});
     const [petErrors, setPetErrors] = useState<Partial<typeof petData>>({});
 
-    const CACHE_KEY = `vincer_reg_cache_${partnerSlug}`;
+    const CACHE_KEY = `vinzer_reg_cache_${partnerSlug}`;
 
     // 1. Fetch Data & Cache Restore
     useEffect(() => {
@@ -391,7 +391,7 @@ export default function PartnerRegistroPage() {
                 {/* Footer Branding */}
                 <div className="mt-12 text-center text-indigo-200/20">
                     <p className="text-[9px] uppercase tracking-[0.3em] font-bold">
-                        Potenciado por <span className="text-white italic drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]">Vincer Platform</span>
+                        Potenciado por <span className="text-white italic drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]">Vinzer Platform</span>
                     </p>
                 </div>
             </div>

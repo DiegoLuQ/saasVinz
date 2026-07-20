@@ -240,7 +240,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 accentHover: 'hover:text-slate-800',
                 particle: '#64748b',
                 footerBorder: 'border-slate-200',
-                vincer: 'bg-slate-100 border-slate-200 text-slate-800',
+                vinzer: 'bg-slate-100 border-slate-200 text-slate-800',
                 input: 'border-slate-300 text-slate-900 placeholder:text-slate-400 opacity-100',
                 button: 'bg-slate-900 text-white hover:bg-slate-800'
             },
@@ -252,7 +252,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 accentHover: 'hover:text-white',
                 particle: '#ffffff',
                 footerBorder: 'border-white/5',
-                vincer: 'bg-white/5 border-white/5 text-white',
+                vinzer: 'bg-white/5 border-white/5 text-white',
                 input: 'border-white/10 text-white placeholder:text-white/30',
                 button: 'bg-[#c3b091] text-[#0a192f] hover:opacity-90'
             },
@@ -264,7 +264,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 accentHover: 'hover:text-emerald-100',
                 particle: '#a7f3d0',
                 footerBorder: 'border-white/5',
-                vincer: 'bg-white/5 border-white/5 text-emerald-50',
+                vinzer: 'bg-white/5 border-white/5 text-emerald-50',
                 input: 'border-emerald-700/30 text-white placeholder:text-emerald-100/30',
                 button: 'bg-emerald-500 text-emerald-950 hover:bg-emerald-400'
             },
@@ -276,7 +276,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 accentHover: 'hover:text-amber-100',
                 particle: '#fde68a',
                 footerBorder: 'border-white/5',
-                vincer: 'bg-white/5 border-white/5 text-amber-50',
+                vinzer: 'bg-white/5 border-white/5 text-amber-50',
                 input: 'border-amber-700/30 text-white placeholder:text-amber-100/30',
                 button: 'bg-amber-500 text-amber-950 hover:bg-amber-400'
             },
@@ -288,7 +288,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 accentHover: 'hover:text-pink-100',
                 particle: '#fbcfe8',
                 footerBorder: 'border-white/5',
-                vincer: 'bg-white/5 border-white/5 text-pink-50',
+                vinzer: 'bg-white/5 border-white/5 text-pink-50',
                 input: 'border-pink-700/30 text-white placeholder:text-pink-100/30',
                 button: 'bg-pink-500 text-pink-950 hover:bg-pink-400'
             },
@@ -300,7 +300,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 accentHover: 'hover:text-blue-100',
                 particle: '#bfdbfe',
                 footerBorder: 'border-white/5',
-                vincer: 'bg-white/5 border-white/5 text-blue-50',
+                vinzer: 'bg-white/5 border-white/5 text-blue-50',
                 input: 'border-blue-700/30 text-white placeholder:text-blue-100/30',
                 button: 'bg-blue-500 text-blue-950 hover:bg-blue-400'
             },
@@ -312,7 +312,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 accentHover: 'hover:text-orange-100',
                 particle: '#ffedd5',
                 footerBorder: 'border-white/5',
-                vincer: 'bg-white/5 border-white/5 text-orange-50',
+                vinzer: 'bg-white/5 border-white/5 text-orange-50',
                 input: 'border-orange-700/30 text-white placeholder:text-orange-100/30',
                 button: 'bg-orange-500 text-orange-950 hover:bg-orange-400'
             }
@@ -350,7 +350,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
     const { mascota, tenant_info, tenant_status, diseno, branding, lista_imagenes } = computedMemorial || {};
     const planName = computedMemorial?.plan?.toUpperCase() || tenant_info?.subscription_plan?.name?.toUpperCase() || 'FREE';
     const isUltra = planName === 'ULTRA' || planName === 'PARAISO';
-    const useBrandingVincer = branding?.vincer_logo || tenant_status !== 'active';
+    const useBrandingVinzer = branding?.vinzer_logo || tenant_status !== 'active';
 
     // Prioritize listed images from memorial, fallback to pet's general images
     // Cap at 5 images max, filter out broken/empty URLs

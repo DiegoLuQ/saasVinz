@@ -349,7 +349,7 @@ const ReceiptPDF: React.FC<ReceiptPDFProps> = ({ receipt }) => {
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                         <Text style={{ fontSize: 10, color: '#d1d5db', fontWeight: 'bold' }}>
-                            Generado por <Text style={{ color: '#6b7280' }}>Vincer</Text>
+                            Generado por <Text style={{ color: '#6b7280' }}>Vinzer</Text>
                         </Text>
                     </View>
                 </View>

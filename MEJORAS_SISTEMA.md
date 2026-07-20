@@ -3,22 +3,24 @@
 > Generado el 2026-07-02 a partir de una revisión del código actual (incluye los módulos nuevos de widgets/API keys y tracking público).
 > Prioridad: 🔴 Alta (seguridad/estabilidad) · 🟡 Media (deuda técnica con impacto) · 🟢 Baja (mejora incremental).
 >
-> **Estado (actualizado 2026-07-02)**: ✅ implementado en esta sesión · ⏳ pendiente.
+> **Estado (actualizado 2026-07-05)**: ✅ implementado · ⏳ pendiente.
 >
 > | Implementado ✅ | Pendiente ⏳ |
 > |---|---|
-> | S-03/P-01 (Redis en compose), S-04, S-05, S-06, S-07, S-08, C-01, C-03, C-04, C-06, F-02, F-03 (typecheck; errores TS ya no existen), P-06 (docs deshabilitados en prod) | S-01 (cookie httpOnly), S-02 (refresh tokens), S-09 (aplicar migraciones en prod), C-02, C-05, F-01, F-04, F-05, F-06, P-02, P-03, P-04, P-05, P-07 |
+> | S-01 (cookie httpOnly), S-02 (refresh tokens), S-03/P-01 (Redis en compose), S-04, S-05, S-06, S-07, S-08, C-01, C-03, C-04, C-06, F-02, F-03 (typecheck; errores TS ya no existen), P-06 (docs deshabilitados en prod) | S-09 (aplicar migraciones en prod, ahora incluye la 020), C-02, C-05, F-01, F-04, F-05, F-06, P-02, P-03, P-04, P-05, P-07 |
 
 ---
 
 ## 1. Seguridad
 
-### 🔴 S-01 · Token de sesión legible por JavaScript
+### 🔴 S-01 · Token de sesión legible por JavaScript ✅ HECHO
+> (2026-07-05) La sesión vive en cookies httpOnly emitidas por el backend en el login (viajan por el proxy same-origin de Next): `saasc_token` (access JWT, httpOnly) + `saasc_session` (marcador legible por JS para los guards). `token.ts` ya no escribe el JWT; `getToken()/authHeader()` quedan solo como compat con sesiones pre-migración. El SSE del creator dejó de recibir el JWT como query param (cookie). Header `Authorization: Bearer` sigue soportado con precedencia. El portal veterinario (`vet_token`) queda pendiente con el mismo patrón.
 - **Dónde**: `frontend-saas/src/lib/auth/token.ts` lee `saasc_token` vía `document.cookie`.
 - **Riesgo**: cualquier XSS (incluso en una dependencia de terceros) puede exfiltrar el JWT y suplantar al usuario durante 7 días.
 - **Mejora**: mover la sesión a cookie `httpOnly` + `Secure` + `SameSite=Lax` emitida por un route handler de Next (patrón BFF), o como mínimo acompañar con una CSP estricta. El middleware ya lee la cookie del request, así que el cambio es compatible con el enrutado actual.
 
-### 🔴 S-02 · JWT de 7 días sin refresh tokens
+### 🔴 S-02 · JWT de 7 días sin refresh tokens ✅ HECHO
+> (2026-07-05) Access token 60 min + refresh token opaco rotatorio de 7 días en cookie httpOnly `saasc_refresh` (path `/api/internal/auth`), hasheado SHA-256 en la tabla nueva `sys_refresh_tokens` (migración **020**, pendiente en prod → S-09). Endpoints nuevos `POST /auth/refresh` (rota, 20/min) y `POST /auth/logout` (revoca). Reuso de un refresh ya rotado revoca todos los del usuario. El frontend renueva ante un 401 con single-flight y reintenta. Cambio/reset de contraseña revoca los refresh tokens.
 - **Dónde**: `backend/app/auth.py` (expiración 7 días, decisión pendiente desde la auditoría de junio).
 - **Mejora**: access token corto (30–60 min) + refresh token rotatorio con revocación. Combinado con S-01, reduce drásticamente la ventana de un token robado.
 
@@ -62,7 +64,7 @@
 - **Mejora**: logging estructurado a stdout (recolectado por Docker), `RotatingFileHandler` si se mantiene archivo, y sanitizar payloads en errores.
 
 ### 🔴 S-09 · Recordatorio de despliegue
-- La migración `014_audit_logs_nullable_tenant.sql` fue aplicada en la DB local (junio 2026) pero **sigue pendiente en producción**. Requiere credenciales `DB_ADMIN_USER/PASS`. Verificar también que la `018_add_tenant_api_keys_table.sql` (nueva) entre en el mismo runbook.
+- La migración `014_audit_logs_nullable_tenant.sql` fue aplicada en la DB local (junio 2026) pero **sigue pendiente en producción**. Requiere credenciales `DB_ADMIN_USER/PASS`. Verificar también que la `018_add_tenant_api_keys_table.sql` y la `020_add_refresh_tokens_table.sql` (refresh tokens, 2026-07-05; **obligatoria antes de desplegar el backend nuevo** — sin ella el login falla) entren en el mismo runbook.
 
 ---
 
@@ -116,8 +118,8 @@
 - **Mejora**: corregir los existentes una vez y añadir `tsc --noEmit` al pipeline (o al menos como pre-push). Es la mejora que más previene regresiones futuras.
 
 ### 🟡 F-04 · SEO/rendimiento de páginas públicas
-- Las páginas públicas (tracking `/track`, memoriales, `/vincer`) son la cara visible ante familias y clientes potenciales.
-- **Mejora**: `generateMetadata` con OpenGraph por memorial/tenant, componentes servidor donde no haya interactividad, skeletons de carga consistentes, y `next/image` en las landings de Vincer.
+- Las páginas públicas (tracking `/track`, memoriales, `/vinzer`) son la cara visible ante familias y clientes potenciales.
+- **Mejora**: `generateMetadata` con OpenGraph por memorial/tenant, componentes servidor donde no haya interactividad, skeletons de carga consistentes, y `next/image` en las landings de Vinzer.
 
 ### 🟢 F-05 · Widget embebible: versionado y contrato
 - El script servido desde `public/widget/` va a correr en sitios de terceros: cualquier cambio rompe integraciones ajenas.
@@ -152,7 +154,7 @@ Desbloquea tres cosas a la vez: rate limiting compartido entre réplicas (S-03),
 - ✅ Hecho: `/docs`, `/redoc` y `/openapi.json` deshabilitados cuando `ENVIRONMENT=production`. ⏳ Pendiente: versionado `/v1`.
 
 ### 🟢 P-07 · Completar el portal veterinario (B2B)
-- Sigue "Próximamente": el modelo de datos y comisiones existen, falta el autoservicio (clínicas creando solicitudes, viendo referidos y liquidaciones). Es la línea de producto que diferencia a Vincer de un CRM genérico y ya tiene la mitad del backend construido.
+- Sigue "Próximamente": el modelo de datos y comisiones existen, falta el autoservicio (clínicas creando solicitudes, viendo referidos y liquidaciones). Es la línea de producto que diferencia a Vinzer de un CRM genérico y ya tiene la mitad del backend construido.
 
 ---
 
@@ -161,7 +163,7 @@ Desbloquea tres cosas a la vez: rate limiting compartido entre réplicas (S-03),
 | Sprint | Ítems | Tema | Estado |
 |--------|-------|------|--------|
 | 1 | S-03 + P-01, S-04, S-09 | Redis + brute force + migraciones pendientes | ✅ salvo S-09 (aplicar en prod al desplegar) |
-| 2 | S-01, S-02 | Sesión: cookie httpOnly + refresh tokens | ⏳ requiere sesión dedicada (afecta login de todos los usuarios) |
+| 2 | S-01, S-02 | Sesión: cookie httpOnly + refresh tokens | ✅ (2026-07-05; falta aplicar migración 020 en prod → S-09) |
 | 3 | C-01, S-08, S-06 | Backups con scheduler real, logging, CORS por env | ✅ |
 | 4 | F-03, F-02, F-01 | Deuda TS + limpieza frontend | ✅ salvo F-01 (consolidar libs de export) |
 | 5 | C-04, F-05, S-05, P-06 | Endurecer y versionar el motor de widgets | ✅ salvo F-05 (versionado del script) |
@@ -169,6 +171,6 @@ Desbloquea tres cosas a la vez: rate limiting compartido entre réplicas (S-03),
 
 ### Notas de despliegue de esta remediación
 1. `docker-compose up -d redis` (nuevo servicio) antes de recrear el backend; sin Redis el backend con `REDIS_URL=redis://redis:6379/0` fallará el rate limit.
-2. Aplicar en producción las migraciones pendientes: `014_audit_logs_nullable_tenant.sql` y `018_add_tenant_api_keys_table.sql` (requieren `DB_ADMIN_USER/PASS`).
+2. Aplicar en producción las migraciones pendientes: `014_audit_logs_nullable_tenant.sql`, `018_add_tenant_api_keys_table.sql` y `020_add_refresh_tokens_table.sql` (requieren `DB_ADMIN_USER/PASS`; la 020 debe aplicarse ANTES de desplegar el backend con refresh tokens y requiere GRANT de CRUD + secuencia al usuario de la app).
 3. En el `.env` de producción del backend: definir `CORS_ORIGINS` (opcional — sin definir se usan los defaults actuales) y verificar `ENVIRONMENT=production` para que `/docs` quede deshabilitado.
 4. El endpoint `/api/internal/documents/*` (legacy) fue retirado; el frontend ya usaba `/ops-records`. Si alguna integración externa lo consumía, restaurar el montaje.

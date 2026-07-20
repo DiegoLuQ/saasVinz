@@ -14,7 +14,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: vincer_backend
+    container_name: vinzer_backend
     restart: unless-stopped
     expose:
       - "8000"
@@ -49,7 +49,7 @@ services:
   # --- REDIS (rate limiting compartido; futuro: caché/colas) ---
   redis:
     image: redis:7-alpine
-    container_name: vincer_redis
+    container_name: vinzer_redis
     restart: unless-stopped
     command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
     expose:
@@ -73,9 +73,9 @@ services:
         NEXT_PUBLIC_TRACKING_BASE_URL: ${NEXT_PUBLIC_TRACKING_BASE_URL}
         NEXT_PUBLIC_MEMORIAL_BASE_URL: ${NEXT_PUBLIC_MEMORIAL_BASE_URL}
         NEXT_PUBLIC_WIDGET_BASE_URL: ${NEXT_PUBLIC_WIDGET_BASE_URL}
-        NEXT_PUBLIC_VINCER_URL: ${NEXT_PUBLIC_VINCER_URL}
-        NEXT_PUBLIC_VINCER_SLOGAN: ${NEXT_PUBLIC_VINCER_SLOGAN}
-    container_name: vincer_frontend
+        NEXT_PUBLIC_VINZER_URL: ${NEXT_PUBLIC_VINZER_URL}
+        NEXT_PUBLIC_VINZER_SLOGAN: ${NEXT_PUBLIC_VINZER_SLOGAN}
+    container_name: vinzer_frontend
     restart: unless-stopped
     expose:
       - "3000"
@@ -91,7 +91,7 @@ services:
   # --- PGADMIN (UI de la BD) ---
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: vincer_pgadmin
+    container_name: vinzer_pgadmin
     restart: unless-stopped
     expose:
       - "80"

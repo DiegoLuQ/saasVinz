@@ -1,38 +1,22 @@
-import { getToken, clearToken } from '@/lib/auth/token';
+import { authHeader, clearToken, tryRefreshSession } from '@/lib/auth/token';
 
-const isServer = typeof window === 'undefined';
 export const API_URL = typeof window !== 'undefined'
     ? ''
     : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
 
-export async function apiRequest(endpoint: string, options: Omit<RequestInit, 'body'> & { body?: any } = {}) {
-    const token = getToken();
-
+export async function apiRequest(endpoint: string, options: Omit<RequestInit, 'body'> & { body?: any } = {}, _isRetry = false): Promise<any> {
     const isFormData = options.body instanceof FormData;
     const isUrlSearchParams = options.body instanceof URLSearchParams;
 
     const headers = {
         ...((isFormData || isUrlSearchParams) ? {} : { 'Content-Type': 'application/json' }),
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        // Sesión por cookie httpOnly (viaja sola, same-origin). authHeader()
+        // solo emite Bearer para sesiones legacy pre-migración.
+        ...authHeader(),
         ...options.headers,
     } as any;
 
     const fullUrl = `${API_URL}${endpoint}`;
-
-    // DEBUG LOGS - POR FAVOR REVISA LA CONSOLA DEL NAVEGADOR
-    if (!isServer) {
-        console.group(`[API DEBUG] ${fullUrl}`);
-        console.log(`- Origin: ${window.location.origin}`);
-        console.log(`- Token exists: ${!!token}`);
-        if (token) {
-            console.log(`- Token preview: ${token.substring(0, 10)}...`);
-        }
-        if (fullUrl.startsWith('http')) {
-            console.warn(`! URL absoluta detectada: ${fullUrl}. Debería ser relativa.`);
-        }
-        console.log('- Headers being sent:', JSON.stringify(headers, null, 2));
-        console.groupEnd();
-    }
 
     const response = await fetch(fullUrl, {
         ...options,
@@ -54,11 +38,16 @@ export async function apiRequest(endpoint: string, options: Omit<RequestInit, 'b
             message = JSON.stringify(errorData.detail);
         }
 
-        // Handle 401 Unauthorized - Fix for Redirect Loop
+        // Handle 401 Unauthorized: intenta renovar la sesión una vez
+        // (refresh token en cookie httpOnly) y reintenta la request.
         if (response.status === 401) {
-            if (typeof window !== 'undefined' && !window.location.pathname.includes('iniciar-sesion')) {
+            if (!_isRetry && typeof window !== 'undefined' && !window.location.pathname.includes('iniciar-sesion')) {
+                const refreshed = await tryRefreshSession();
+                if (refreshed) {
+                    return apiRequest(endpoint, options, true);
+                }
                 console.warn('[API] Session expired or invalid. Redirecting to login.');
-                clearToken();
+                await clearToken();
                 window.location.href = '/iniciar-sesion-creador';
             }
         }

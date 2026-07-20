@@ -110,7 +110,7 @@ export default function EvidenceModal({ evidence, onClose, petName, apiUrl }: Ev
                     {/* Footer / Caption */}
                     <div className="p-6 border-t border-white/5 bg-white/[0.01] text-center">
                         <p className="text-[10px] font-black text-indigo-200/20 uppercase tracking-[0.4em] italic drop-shadow-sm">
-                            Vincer | Honrando la memoria de {petName}
+                            Vinzer | Honrando la memoria de {petName}
                         </p>
                     </div>
 
