@@ -433,6 +433,23 @@ def generate_certificate_json(
             </div>
         """
 
+    # Detalle del emisor: se precalcula FUERA del f-string porque contiene una
+    # barra invertida (.split("\\n")) y en Python 3.11 un f-string no admite '\'
+    # dentro de la parte de expresión {...} (sí se permite desde 3.12).
+    issuer_details_html = ""
+    _issuer = sc.get("issuer_details", {})
+    if "issuer_details" in sc and _issuer.get("show", True) and _issuer.get("label"):
+        _issuer_lines = "".join(
+            f"<p style='margin: 2px 0;'>{line}</p>"
+            for line in _issuer.get("label", "").split("\\n")
+        )
+        issuer_details_html = (
+            '<div style="margin-top: 15px; font-size: 10px; color: #666; '
+            'font-weight: 500; text-transform: none; letter-spacing: 0;">'
+            f"{_issuer_lines}"
+            "</div>"
+        )
+
     # Define section blocks
     blocks = {
         "header": f"""
@@ -443,11 +460,7 @@ def generate_certificate_json(
                 </div>
                 <h1 class="cert-title">{sc['header']['label']}</h1>
                 <p class="cert-subtitle">{sc['subtitle']['label']}</p>
-                {
-                    f'''<div style="margin-top: 15px; font-size: 10px; color: #666; font-weight: 500; text-transform: none; letter-spacing: 0;">
-                        {"".join([f"<p style='margin: 2px 0;'>{line}</p>" for line in sc.get("issuer_details", {}).get("label", "").split("\\n")])}
-                    </div>''' if "issuer_details" in sc and sc["issuer_details"].get("show", True) and sc["issuer_details"].get("label") else ""
-                }
+                {issuer_details_html}
             </div>
         """ if sc['header']['show'] else '',
         

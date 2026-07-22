@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
-### Backend (FastAPI + Python 3.11)
+### Backend (FastAPI + Python 3.12)
 ```bash
 cd backend
 pip install -r requirements.txt

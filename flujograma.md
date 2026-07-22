@@ -15,7 +15,7 @@ las versiones estables y el procedimiento de restauración de respaldos.
 | Componente        | Versión           | De dónde sale                         |
 |-------------------|-------------------|---------------------------------------|
 | **PostgreSQL**    | `16-alpine`       | `docker-compose.yml` (servicio `postgres`) |
-| **Python**        | `3.11-slim`       | `backend/Dockerfile`                  |
+| **Python**        | `3.12-slim`       | `backend/Dockerfile`                  |
 | **FastAPI**       | `0.128.0`         | `backend/requirements.txt`            |
 | **Uvicorn**       | `0.40.0`          | `backend/requirements.txt`            |
 | **SQLAlchemy**    | `2.0.45`          | `backend/requirements.txt`            |
@@ -24,7 +24,7 @@ las versiones estables y el procedimiento de restauración de respaldos.
 | **Node.js**       | `20-alpine`       | `frontend-saas/Dockerfile`            |
 | **Next.js**       | `16.1.4`          | `frontend-saas/package.json`          |
 | **Redis**         | `7-alpine`        | `docker-compose.yml` (servicio `redis`) |
-| **pgAdmin**       | `dpage/pgadmin4:latest` | `docker-compose.yml`            |
+| **pgAdmin**       | `dpage/pgadmin4:latest` | `docker-compose.yml`       |
 
 > **PostgreSQL 16** es obligatorio: los respaldos (`.dump`) se generan con
 > `pg_dump` v16 (formato de archivo `v1.15`). Un `pg_restore` de una versión
