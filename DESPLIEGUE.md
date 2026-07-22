@@ -35,12 +35,14 @@ Todos como registro **A** (o CNAME) apuntando a la IP del VPS:
 | `app.vinzer.cl` | `DOMAIN_APP` | Panel del tenant (operadores) |
 | `admin.vinzer.cl` | `DOMAIN_ADMIN` | Panel SuperAdmin (creator) |
 | `memorial.vinzer.cl` | `DOMAIN_MEMORIALS` | Memoriales públicos |
+| `track.vinzer.cl` | `DOMAIN_TRACK` | Seguimiento público de órdenes (búsqueda por código) |
 | `api-saas-keys.vinzer.cl` | `DOMAIN_API` | Backend (API) |
 | `pgadmin-saas.vinzer.cl` | `DOMAIN_PGADMIN` | UI de administración de la BD |
 
-> `track.*` y `veterinary.*` existen en el código pero **no** están en el
-> `VIRTUAL_HOST` del compose todavía. Si vas a usarlos, añádelos al DNS y al
-> `VIRTUAL_HOST`/`LETSENCRYPT_HOST` del servicio `frontend`.
+> `veterinary.*` existe en el código pero **no** está en el `VIRTUAL_HOST` del
+> compose todavía. Si vas a usarlo, añádelo al DNS y al
+> `VIRTUAL_HOST`/`LETSENCRYPT_HOST` del servicio `frontend` (igual que se hizo
+> con `track.*`).
 
 ---
 

@@ -113,10 +113,10 @@ services:
     expose:
       - "3000"
     environment:
-      # El front sirve el landing (raíz) y los subdominios app/admin/memorial.
-      - VIRTUAL_HOST=${DOMAIN_MAIN},www.${DOMAIN_MAIN},${DOMAIN_APP},${DOMAIN_ADMIN},${DOMAIN_MEMORIALS}
+      # El front sirve el landing (raíz) y los subdominios app/admin/memorial/track.
+      - VIRTUAL_HOST=${DOMAIN_MAIN},www.${DOMAIN_MAIN},${DOMAIN_APP},${DOMAIN_ADMIN},${DOMAIN_MEMORIALS},${DOMAIN_TRACK}
       - VIRTUAL_PORT=3000
-      - LETSENCRYPT_HOST=${DOMAIN_MAIN},www.${DOMAIN_MAIN},${DOMAIN_APP},${DOMAIN_ADMIN},${DOMAIN_MEMORIALS}
+      - LETSENCRYPT_HOST=${DOMAIN_MAIN},www.${DOMAIN_MAIN},${DOMAIN_APP},${DOMAIN_ADMIN},${DOMAIN_MEMORIALS},${DOMAIN_TRACK}
       - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
     networks:
       - web
