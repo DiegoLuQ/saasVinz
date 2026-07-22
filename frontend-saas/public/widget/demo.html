@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vincer Widget · Demo</title>
+    <title>Vinzer Widget · Demo</title>
     <style>
         body { margin: 0; background: #f6f8fb; padding: 40px 20px; }
         .demo-shell { max-width: 1160px; margin: 0 auto; }
@@ -18,7 +18,7 @@
         <div class="demo-bar" id="demo-bar">Cargando demo…</div>
 
         <!-- El widget se inyecta aquí -->
-        <div id="vincer-widget-root"></div>
+        <div id="vinzer-widget-root"></div>
     </div>
 
     <script>
@@ -27,13 +27,13 @@
             var key = params.get('key') || '';
             var api = params.get('api') || window.location.origin; // mismo origen por defecto
 
-            var root = document.getElementById('vincer-widget-root');
-            root.setAttribute('data-vincer-key', key);
-            root.setAttribute('data-vincer-api', api.replace(/\/$/, ''));
+            var root = document.getElementById('vinzer-widget-root');
+            root.setAttribute('data-vinzer-key', key);
+            root.setAttribute('data-vinzer-api', api.replace(/\/$/, ''));
 
             var bar = document.getElementById('demo-bar');
             if (!key) {
-                bar.innerHTML = '<span class="demo-warn">⚠ Falta la API key. Abre esta página con <code>?key=pk_vincer_live_...</code></span>';
+                bar.innerHTML = '<span class="demo-warn">⚠ Falta la API key. Abre esta página con <code>?key=pk_vinzer_live_...</code></span>';
                 return;
             }
             bar.innerHTML = 'Origen de esta página: <code>' + window.location.host +

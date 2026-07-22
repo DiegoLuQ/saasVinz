@@ -2,7 +2,7 @@ from sqlalchemy import create_engine, text
 from passlib.context import CryptContext
 
 # DB URL from .env
-DATABASE_URL = "postgresql://vincer_boss:vincer_boss_123@localhost:5432/v3_saas"
+DATABASE_URL = "postgresql://vinzer_boss:vinzer_boss_123@localhost:5432/v3_saas"
 
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 

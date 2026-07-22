@@ -12,7 +12,7 @@ from . import schemas
 # Planes que pueden usar el widget embebible / API keys públicas.
 WIDGET_ALLOWED_PLANS = {"PRO", "ULTRA"}
 
-KEY_PREFIX = "pk_vincer_live_"
+KEY_PREFIX = "pk_vinzer_live_"
 
 
 def tenant_can_use_widget(tenant: models.Tenant) -> bool:

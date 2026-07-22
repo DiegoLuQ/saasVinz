@@ -78,7 +78,7 @@ Public tracking endpoint: `GET /api/public/tracking/{tenant_slug}/{pet_name}/{tr
 
 ### Embeddable Widget (public API keys)
 Tenants on **PRO/ULTRA** plans (`WIDGET_ALLOWED_PLANS` in `app/api/internal/integrations/services.py`) can embed a catalog/tracking widget on their own websites:
-- Public API keys `pk_vincer_live_*` per tenant (table `sys_tenant_api_keys`, migration 018). Keys are public by design — security relies on the `allowed_domains` whitelist validated against the `Origin` header, plus instant revocation via `is_active`.
+- Public API keys `pk_vinzer_live_*` per tenant (table `sys_tenant_api_keys`, migration 018). Keys are public by design — security relies on the `allowed_domains` whitelist validated against the `Origin` header, plus instant revocation via `is_active`.
 - Public endpoints: `/api/public/widget/{catalog,products-services,tracking/*}` — rate-limited 60/min per API key (30/min for tracking) with ETag caching (`max-age=300`).
 - Embeddable script is versioned: `frontend-saas/public/widget/v1.js` (+ `demo.html`). Treat its JSON contract as stable — third-party sites depend on it.
 

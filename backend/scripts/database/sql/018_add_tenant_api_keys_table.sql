@@ -2,7 +2,7 @@
 -- Migración 018: Tabla de API Keys públicas por Tenant
 -- Fecha: 2026-06-29
 -- Descripción: Soporte para el "Motor de Widgets Embebibles".
---   Cada tenant puede generar claves públicas (pk_vincer_live_...) para
+--   Cada tenant puede generar claves públicas (pk_vinzer_live_...) para
 --   embeber un widget en sitios externos (WordPress, etc.). Las claves son
 --   públicas por diseño; la seguridad se basa en una whitelist de dominios
 --   (allowed_domains) validada contra el header Origin en cada petición.
@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS sys_tenant_api_keys (
     id              SERIAL PRIMARY KEY,
     tenant_id       INTEGER NOT NULL REFERENCES sys_tenants(id) ON DELETE CASCADE,
     name            VARCHAR(120) NOT NULL DEFAULT 'Widget Web',
-    api_key         VARCHAR(255) UNIQUE NOT NULL,         -- Ej: pk_vincer_live_xxx
+    api_key         VARCHAR(255) UNIQUE NOT NULL,         -- Ej: pk_vinzer_live_xxx
     allowed_domains JSONB NOT NULL DEFAULT '[]'::jsonb,   -- ["mi-crematorio.cl", "www.mi-crematorio.cl"]
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
     last_used_at    TIMESTAMP WITH TIME ZONE,

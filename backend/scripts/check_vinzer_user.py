@@ -23,10 +23,10 @@ if not db_url:
 try:
     engine = create_engine(db_url)
     with engine.connect() as connection:
-        result = connection.execute(text("SELECT 1 FROM pg_roles WHERE rolname = 'vincer_boss'")).scalar()
+        result = connection.execute(text("SELECT 1 FROM pg_roles WHERE rolname = 'vinzer_boss'")).scalar()
         if result:
-            print("VINCER_BOSS_EXISTS")
+            print("VINZER_BOSS_EXISTS")
         else:
-            print("VINCER_BOSS_NOT_FOUND")
+            print("VINZER_BOSS_NOT_FOUND")
 except Exception as e:
     print(f"Error: {e}")

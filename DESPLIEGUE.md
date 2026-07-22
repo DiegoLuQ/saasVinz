@@ -104,7 +104,7 @@ persistente `postgres_data` y healthcheck — el backend espera a que esté
 
 1. Espera a que PostgreSQL acepte conexiones (`pg_isready`).
 2. **Provisiona** (idempotente, `backend/scripts/provision_db.sh`): crea el rol
-   de la app `vincer_app` (sin superusuario, con RLS), crea la base `v3_saas` y
+   de la app `vinzer_app` (sin superusuario, con RLS), crea la base `v3_saas` y
    otorga los privilegios —incluidos los *default privileges*, para que las
    tablas que creen las migraciones queden accesibles al rol de la app.
 3. Aplica el esquema, **todas** las migraciones (`sql/*.sql`) y los seeds.
@@ -198,7 +198,7 @@ Checklist de seguridad mínima antes de considerar el despliegue "vivo":
 - [ ] `SECRET_KEY` real y única (no el placeholder).
 - [ ] `ENVIRONMENT=production` (oculta `/docs`, oculta detalle de errores 500).
 - [ ] Contraseña del creator cambiada.
-- [ ] `APP_USER` (`vincer_app`) **no** es superusuario (para que el aislamiento
+- [ ] `APP_USER` (`vinzer_app`) **no** es superusuario (para que el aislamiento
       multi-tenant por RLS funcione).
 - [ ] Contraseñas de PgAdmin y del rol de la app son fuertes.
 
