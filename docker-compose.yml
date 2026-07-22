@@ -2,13 +2,41 @@
 #  SaaSCrematorio V2 — Despliegue en VPS
 #  - Reverse proxy: jwilder/nginx-proxy + letsencrypt-companion (YA existen en
 #    el VPS). Se integra por variables VIRTUAL_HOST / LETSENCRYPT_HOST.
-#  - PostgreSQL: se reusa el contenedor compartido (evolution_postgres). No se
-#    levanta una BD propia.
-#  - Red: web_private_red_webapps (externa, la misma del reverse-proxy).
+#  - PostgreSQL: servicio PROPIO del compose (contenedor vinzer_postgres, con
+#    volumen persistente). El backend se auto-provisiona contra él (rol de la
+#    app + migraciones) al arrancar — ver entrypoint.sh / provision_db.sh.
+#  - Red: web_private_red_webapps (externa, la del reverse-proxy) para lo que
+#    debe ser alcanzable desde fuera; db_internal (interna, la crea el compose)
+#    para el tráfico backend/pgadmin ↔ postgres, que NO se expone al exterior.
 #  Todos los valores provienen del .env de la raíz.
 # =============================================================================
 
 services:
+  # --- POSTGRESQL (BD propia del stack) ---
+  postgres:
+    image: postgres:15-alpine
+    container_name: vinzer_postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      # Subcarpeta propia dentro del volumen: evita el problema de "lost+found"
+      # que algunos drivers de volumen crean en la raíz del punto de montaje.
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - db_internal
+
   # --- BACKEND (FastAPI) ---
   backend:
     build:
@@ -23,7 +51,8 @@ services:
     env_file:
       - .env
     environment:
-      # Conexión a la BD compartida con el usuario de la app (RLS APLICA).
+      # Conexión a la BD propia (contenedor 'postgres') con el usuario de la
+      # app (RLS APLICA).
       - SQLALCHEMY_DATABASE_URL=postgresql://${APP_USER}:${APP_USER_PASSWORD}@${POSTGRES_HOST}:5432/${POSTGRES_DB}
       # Credenciales admin para los respaldos (superusuario, ignora RLS).
       - DB_ADMIN_USER=${POSTGRES_USER}
@@ -42,9 +71,13 @@ services:
       - LETSENCRYPT_HOST=${DOMAIN_API}
       - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
     depends_on:
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - web
+      - db_internal
 
   # --- REDIS (rate limiting compartido; futuro: caché/colas) ---
   redis:
@@ -111,14 +144,22 @@ services:
       - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
     volumes:
       - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
     networks:
       - web
+      - db_internal
 
 volumes:
+  postgres_data:
   pgadmin_data:
 
-# La red la administra el reverse-proxy existente; aquí se referencia como externa.
 networks:
+  # La red la administra el reverse-proxy existente; aquí se referencia como externa.
   web:
     external: true
     name: ${EXTERNAL_NETWORK}
+  # Red privada creada por este compose: solo backend/pgadmin/postgres la
+  # comparten. No es alcanzable desde el reverse-proxy ni desde fuera del host.
+  db_internal:
+    driver: bridge

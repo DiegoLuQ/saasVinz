@@ -31,7 +31,7 @@ npm run typecheck # tsc --noEmit — must stay clean
 ```bash
 docker-compose up -d
 ```
-Services (VPS deployment): backend (1 instance), frontend, pgAdmin, Redis (rate limiting). The reverse proxy is **jwilder/nginx-proxy + acme-companion already running on the VPS** (integration via `VIRTUAL_HOST`/`LETSENCRYPT_HOST` env vars on the shared external network), and PostgreSQL is a **shared container** on that VPS — the compose file does not start its own proxy or database.
+Services (VPS deployment): backend (1 instance), frontend, pgAdmin, Redis (rate limiting), **postgres** (own container, `vinzer_postgres`, with a persistent named volume — defined in this compose file). The reverse proxy is **jwilder/nginx-proxy + acme-companion already running on the VPS** (integration via `VIRTUAL_HOST`/`LETSENCRYPT_HOST` env vars on the shared external network) — the compose file does not start its own proxy, but it does start and own its PostgreSQL. Postgres sits on an internal-only bridge network (`db_internal`), not the external reverse-proxy network — only `backend` and `pgadmin` can reach it. The backend still self-provisions (role + migrations) against it on boot via `entrypoint.sh`/`provision_db.sh`, exactly as before.
 
 > **Warning**: `app/core/client_ip.py` extracts the real client IP from `X-Forwarded-For` assuming the current proxy's behavior. If the reverse proxy ever changes (e.g. to Traefik/Caddy), re-validate that function — the 5/min login rate limit depends on it.
 

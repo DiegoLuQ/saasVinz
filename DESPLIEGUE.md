@@ -12,17 +12,18 @@ base de datos reales del repo.
 |---|---|---|
 | **Docker + Docker Compose v2** | Corre todos los servicios | `docker --version`, `docker compose version` |
 | **Reverse proxy `nginx-proxy` + `acme-companion` YA corriendo** | El compose **no** levanta proxy propio; se engancha por `VIRTUAL_HOST`/`LETSENCRYPT_HOST` | Debe existir la **red externa** de docker (ej. `web_private_red_webapps`) |
-| **PostgreSQL compartido YA corriendo** | El compose **no** levanta una base de datos; reusa un contenedor existente (ej. `evolution_postgres`) | Necesitas acceso de **superusuario** para provisionar rol + base |
+| **PostgreSQL** | El compose **levanta su propia BD** (servicio `postgres`, contenedor `vinzer_postgres`, volumen persistente `postgres_data`) | No necesitas nada preexistente; el backend se auto-provisiona (rol + BD + migraciones) contra este contenedor al arrancar |
 | **DNS de los subdominios → IP del VPS** | El proxy enruta por hostname y Let's Encrypt emite los certificados | Ver tabla de subdominios abajo |
 | **Cuenta Cloudflare R2** | Almacenamiento de archivos (S3-compatible) + backups | Necesitas **2 buckets**: uno de archivos y uno de respaldos, con sus API keys |
 | **Cuenta Polar.sh** | Procesamiento de pagos/suscripciones | Access token + webhook secret |
 | **Cuenta de correo SMTP (Gmail)** | Envío de emails transaccionales | Usar una **contraseña de aplicación**, no la del correo |
 | **reCAPTCHA v3** | Anti-bot en formularios públicos | Site key (frontend) + secret key (backend) |
 
-> Si NO tienes un nginx-proxy o un Postgres compartido en el VPS, tendrás que
-> añadirlos al compose (un servicio `postgres` con volumen y un proxy como
-> Traefik/Caddy/nginx-proxy). Esta guía asume el escenario para el que el
-> proyecto ya está configurado: proxy y BD compartidos y externos.
+> Si prefieres reusar un Postgres compartido ya existente en el VPS en lugar
+> del servicio `postgres` de este compose, quita ese servicio del
+> `docker-compose.yml`, apunta `POSTGRES_HOST` al contenedor externo y ponlo
+> en la misma red docker que el backend. Esta guía asume el escenario por
+> defecto del compose actual: Postgres propio, dentro del stack.
 
 ### Subdominios a crear en el DNS
 
@@ -93,7 +94,10 @@ python3 -c "import secrets; print(secrets.token_urlsafe(64))"
 
 ## 4. Base de datos: provisión automática
 
-**No hay pasos manuales de base de datos.** Al levantar el backend (paso 6), su
+**No hay pasos manuales de base de datos.** El compose levanta su propio
+Postgres (servicio `postgres`, contenedor `vinzer_postgres`, con volumen
+persistente `postgres_data` y healthcheck — el backend espera a que esté
+`healthy` antes de arrancar). Al levantar el backend (paso 6), su
 `entrypoint.sh` hace todo esto solo, en orden:
 
 1. Espera a que PostgreSQL acepte conexiones (`pg_isready`).
@@ -141,8 +145,8 @@ docker network create web_private_red_webapps
 
 ```bash
 docker compose build          # compila backend y frontend (hornea las NEXT_PUBLIC_*)
-docker compose up -d          # levanta backend, redis, frontend, pgadmin
-docker compose ps             # todos deben quedar "running"
+docker compose up -d          # levanta postgres, backend, redis, frontend, pgadmin
+docker compose ps             # todos deben quedar "running" (postgres además "healthy")
 ```
 
 **Qué pasa al arrancar el backend** (`entrypoint.sh`):
@@ -231,10 +235,12 @@ tablas nuevas también se otorgan solos, porque el paso de provisión configura
 | El backend no arranca, error de `SECRET_KEY` | Quedó el placeholder | Genera una clave real en `backend/.env` |
 | `permission denied for table ...` en la API | La provisión no corrió (¿`PROVISION_DB=false`?) | Reinicia el backend con `PROVISION_DB` activo, o corre `provision_db.sh` |
 | El backend no crea el rol/base | `POSTGRES_USER` no es superusuario | Dale al usuario privilegios `CREATE ROLE` + `CREATE DATABASE`, o provisiona a mano |
+| El backend no arranca / se queda esperando | El servicio `postgres` no llegó a `healthy` | `docker compose ps` y `docker compose logs postgres`; revisa que `POSTGRES_USER/PASSWORD/DB` del `.env` coincidan con el volumen ya inicializado |
 | No se emiten certificados HTTPS | DNS no propagado o `VIRTUAL_HOST` mal | Verifica DNS → IP y los dominios del compose |
 | El frontend muestra `localhost` / valores en blanco | Faltan las `NEXT_PUBLIC_*` en el `.env` raíz al hacer build | Complétalas y `docker compose build frontend` (se hornean en build) |
 | Rate limit se resetea/no comparte | `REDIS_URL` quedó en `memory://` | Debe ser `redis://redis:6379/0` (lo inyecta el compose) |
 | `network ... not found` | La red externa no existe o el nombre no coincide | Ajusta `EXTERNAL_NETWORK` o crea la red |
+| Cambié `POSTGRES_PASSWORD`/`POSTGRES_USER` en `.env` y no aplica | La imagen de Postgres solo lee esas variables la **primera vez** que inicializa el volumen (`postgres_data`) | Para cambiar credenciales del superusuario después del primer arranque, hazlo con `ALTER ROLE` dentro del contenedor, o borra el volumen (¡pierdes los datos!) y deja que reinicialice |
 
 ---
 
