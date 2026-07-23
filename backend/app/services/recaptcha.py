@@ -48,7 +48,21 @@ async def verify_recaptcha(token: str) -> bool:
             success = result.get("success", False)
             score = result.get("score", 0.0)
 
-            logger.info("reCAPTCHA result: success=%s, score=%s", success, score)
+            if not success:
+                # error-codes indica el motivo exacto del rechazo de Google:
+                #   invalid-input-response  -> token inválido/expirado, o el site key
+                #                              del frontend no corresponde a este secret
+                #   timeout-or-duplicate    -> token reusado o generado hace >2 min
+                #   invalid-input-secret    -> RECAPTCHA_SECRET_KEY mal
+                logger.warning(
+                    "reCAPTCHA rechazado: error-codes=%s hostname=%s",
+                    result.get("error-codes"), result.get("hostname"),
+                )
+            else:
+                logger.info(
+                    "reCAPTCHA result: success=%s, score=%s, hostname=%s",
+                    success, score, result.get("hostname"),
+                )
 
             return success and score >= MIN_SCORE
     except Exception as e:
