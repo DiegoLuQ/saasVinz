@@ -12,6 +12,7 @@ export function VinzerPricing({ loginUrl }: VinzerPricingProps) {
     const [isAnnual, setIsAnnual] = useState(false);
 
     // Precios base
+    const priceTrack = 29900;   // Aplica el mismo 20% de descuento anual que los demás
     const priceNormal = 39900;
     const pricePro = 59990;
     const priceUltra = 119000;
@@ -21,6 +22,11 @@ export function VinzerPricing({ loginUrl }: VinzerPricingProps) {
 
     const formatPrice = (value: number) => {
         return new Intl.NumberFormat('es-CL').format(Math.round(value));
+    };
+
+    // Total anual: redondeado HACIA ABAJO al millar más cercano (ej: 575.904 -> 575.000)
+    const formatAnnual = (value: number) => {
+        return new Intl.NumberFormat('es-CL').format(Math.floor(value / 1000) * 1000);
     };
 
     return (
@@ -59,7 +65,7 @@ export function VinzerPricing({ loginUrl }: VinzerPricingProps) {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 lg:gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 lg:gap-6">
                     {/* Plan FREE */}
                     <div className="bg-[#020210] border border-white/5 p-5 lg:p-6 rounded-3xl flex flex-col justify-between gap-5 hover:border-white/10 transition-all duration-300">
                         <div className="space-y-3">
@@ -84,6 +90,39 @@ export function VinzerPricing({ loginUrl }: VinzerPricingProps) {
                         </Link>
                     </div>
 
+                    {/* Plan TRACK — operativo (aplica descuento anual 20%) */}
+                    <div className="bg-[#020210] border border-white/5 p-5 lg:p-6 rounded-3xl flex flex-col justify-between gap-5 hover:border-white/10 transition-all duration-300">
+                        <div className="space-y-3">
+                            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Operativo</div>
+                            <h3 className="text-xl font-black text-[#FFFFFF]">Track</h3>
+                            <p className="text-[11px] text-slate-400 min-h-[2.5rem] leading-relaxed">Enfocado en operaciones y trazabilidad, para crematorios con CRM o facturación externos.</p>
+                            <div className="pt-2">
+                                <div className="text-2xl lg:text-3xl font-black text-[#FFFFFF] tabular-nums">
+                                    ${formatPrice(isAnnual ? priceTrack * discount : priceTrack)}
+                                    <span className="text-[10px] font-medium text-slate-500"> CLP / mes</span>
+                                </div>
+                                {isAnnual ? (
+                                    <div className="text-[9px] text-[#19B5FE] font-bold uppercase tracking-wider mt-1">Anual: ${formatAnnual(priceTrack * discount * 12)} CLP</div>
+                                ) : (
+                                    <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">Anual: ${formatAnnual(priceTrack * 12)} CLP</div>
+                                )}
+                            </div>
+                        </div>
+                        <ul className="space-y-2 border-t border-white/5 pt-4 text-[11px] text-[#C0C0C0]">
+                            <li className="flex items-start gap-2">✓ 25 órdenes al mes</li>
+                            <li className="flex items-start gap-2">✓ 2 usuarios</li>
+                            <li className="flex items-start gap-2">✓ Operaciones y trazabilidad</li>
+                            <li className="flex items-start gap-2">✓ Inventario + catálogo</li>
+                            <li className="flex items-start gap-2">✓ Plan de Tracking público</li>
+                        </ul>
+                        <Link
+                            href={loginUrl}
+                            className="text-center min-h-[44px] py-3 bg-white/5 border border-white/10 hover:bg-white/10 text-[#FFFFFF] rounded-xl text-[11px] font-black uppercase tracking-wider transition-all"
+                        >
+                            Comenzar Track
+                        </Link>
+                    </div>
+
                     {/* Plan NORMAL */}
                     <div className="bg-[#020210] border border-white/5 p-5 lg:p-6 rounded-3xl flex flex-col justify-between gap-5 hover:border-white/10 transition-all duration-300">
                         <div className="space-y-3">
@@ -96,9 +135,9 @@ export function VinzerPricing({ loginUrl }: VinzerPricingProps) {
                                     <span className="text-[10px] font-medium text-slate-500"> CLP / mes</span>
                                 </div>
                                 {isAnnual ? (
-                                    <div className="text-[9px] text-[#19B5FE] font-bold uppercase tracking-wider mt-1">Anual: ${formatPrice(priceNormal * discount * 12)} CLP</div>
+                                    <div className="text-[9px] text-[#19B5FE] font-bold uppercase tracking-wider mt-1">Anual: ${formatAnnual(priceNormal * discount * 12)} CLP</div>
                                 ) : (
-                                    <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">Anual: ${formatPrice(priceNormal * 12)} CLP</div>
+                                    <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">Anual: ${formatAnnual(priceNormal * 12)} CLP</div>
                                 )}
                             </div>
                         </div>
@@ -132,9 +171,9 @@ export function VinzerPricing({ loginUrl }: VinzerPricingProps) {
                                     <span className="text-[10px] font-medium text-slate-400"> CLP / mes</span>
                                 </div>
                                 {isAnnual ? (
-                                    <div className="text-[9px] text-[#19B5FE] font-bold uppercase tracking-wider mt-1">Anual: ${formatPrice(pricePro * discount * 12)} CLP</div>
+                                    <div className="text-[9px] text-[#19B5FE] font-bold uppercase tracking-wider mt-1">Anual: ${formatAnnual(pricePro * discount * 12)} CLP</div>
                                 ) : (
-                                    <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">Anual: ${formatPrice(pricePro * 12)} CLP</div>
+                                    <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">Anual: ${formatAnnual(pricePro * 12)} CLP</div>
                                 )}
                             </div>
                         </div>
@@ -165,9 +204,9 @@ export function VinzerPricing({ loginUrl }: VinzerPricingProps) {
                                     <span className="text-[10px] font-medium text-slate-500"> CLP / mes</span>
                                 </div>
                                 {isAnnual ? (
-                                    <div className="text-[9px] text-[#19B5FE] font-bold uppercase tracking-wider mt-1">Anual: ${formatPrice(priceUltra * discount * 12)} CLP</div>
+                                    <div className="text-[9px] text-[#19B5FE] font-bold uppercase tracking-wider mt-1">Anual: ${formatAnnual(priceUltra * discount * 12)} CLP</div>
                                 ) : (
-                                    <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">Anual: ${formatPrice(priceUltra * 12)} CLP</div>
+                                    <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">Anual: ${formatAnnual(priceUltra * 12)} CLP</div>
                                 )}
                             </div>
                         </div>
