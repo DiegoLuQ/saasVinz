@@ -71,6 +71,14 @@ export default async function middleware(req: NextRequest) {
         const token = req.cookies.get('saasc_token')?.value;
         const isLoginPage = url.pathname === '/iniciar-sesion-creador';
 
+        // La raíz del subdominio admin no muestra landing: redirige al login
+        // del creador (o al dashboard si ya hay sesión).
+        if (url.pathname === '/' || url.pathname === '') {
+            return NextResponse.redirect(
+                new URL(token ? '/dashboard' : '/iniciar-sesion-creador', req.url)
+            );
+        }
+
         if (!token && !isLoginPage) {
             return NextResponse.redirect(new URL('/iniciar-sesion-creador', req.url));
         }

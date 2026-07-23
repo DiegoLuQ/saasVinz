@@ -12,7 +12,7 @@ export function VinzerLogo({ size = 'md', className = '' }: { size?: 'sm' | 'md'
     return (
         <div className={`flex items-center ${className}`}>
             <img
-                src="https://i.postimg.cc/jj4m8gtJ/Logo-Vinzerv2.webp"
+                src="/logo-vinzer.webp"
                 alt="Vinzer"
                 className={`${heights} w-auto object-contain`}
             />
