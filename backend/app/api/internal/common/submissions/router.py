@@ -326,37 +326,17 @@ def create_pet_from_submission(
         
         pet_data = submission.pet_data
         
-        # Process Images - Move and Sanitize Filenames
-        image_urls = []
-        if submission.images:
-            target_dir = f"app/static/tenants/{tenant_id}/uploads/pets"
-            os.makedirs(target_dir, exist_ok=True)
-            
-            import unicodedata
-            def sanitize_filename(name):
-                # Normalizar y quitar acentos/caracteres especiales
-                n = unicodedata.normalize('NFKD', name).encode('ascii', 'ignore').decode('ascii')
-                # Quitar comas y otros problematicos
-                return "".join(c for c in n if c.isalnum() or c in ('.', '_', '-')).strip()
-
-            for img_path in submission.images:
-                try:
-                    source_file = Path("app/static/storage") / img_path
-                    if source_file.exists():
-                        filename = source_file.name
-                        # Sanitize filename to avoid accent/special char issues in URLs
-                        clean_filename = sanitize_filename(filename)
-                        new_filename = f"pet_{submission_id}_{clean_filename}"
-                        dest_file = Path(target_dir) / new_filename
-                        
-                        # Use copy2 then remove for cross-volume safety on Windows
-                        shutil.copy2(str(source_file), str(dest_file))
-                        # DO NOT remove source file here, it will be cleaned up when the submission is finalized
-                        # os.remove(str(source_file))
-                        
-                        image_urls.append(f"/static/tenants/{tenant_id}/uploads/pets/{new_filename}")
-                except Exception as e:
-                    print(f"Error processing image {img_path}: {e}")
+        # Reutilizar las imágenes ya almacenadas del formulario.
+        # submission.images contiene las URLs que devolvió MediaService.upload_media
+        # (URL pública de R2 en producción, o ruta /storage en local). NO se copian
+        # desde disco: bajo R2 no existe archivo local que copiar, y por eso antes la
+        # mascota quedaba sin fotos. Se resuelven igual que en el detalle del registro
+        # (get_public_url), garantizando que la mascota conserve las mismas fotos.
+        image_urls = [
+            MediaService.get_public_url(img)
+            for img in (submission.images or [])
+            if img
+        ]
 
         # Safer age conversion
         try:
