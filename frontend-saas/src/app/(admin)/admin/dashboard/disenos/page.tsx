@@ -107,8 +107,11 @@ export default function DocumentTemplatesPage() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
-                    <h1 className="text-4xl font-black text-white tracking-tight">Diseños de Documentos</h1>
-                    <p className="text-white/40 mt-2 font-medium">Configura las plantillas globales para certificados y recibos del sistema.</p>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-full mb-3">
+                        <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Uso en Tenant: Módulo Documentos → Emitir Certificado</span>
+                    </div>
+                    <h1 className="text-4xl font-black text-white tracking-tight">Certificados de Cremación</h1>
+                    <p className="text-white/40 mt-2 font-medium">Configura las plantillas oficiales de certificados de defunción/cremación y recibos que emitirán los crematorios.</p>
                 </div>
                 <button
                     onClick={() => setShowTypeModal(true)}

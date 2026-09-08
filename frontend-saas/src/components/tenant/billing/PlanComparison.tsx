@@ -198,7 +198,7 @@ export function PlanComparison({ plans, currentPlanId, onSelectPlan }: PlanCompa
                                                 <div className={cn("w-4 h-4 rounded-full flex items-center justify-center shrink-0", (isUltraUpsell || isUltraCurrent) ? "bg-amber-500/20" : "bg-emerald-500/20")}>
                                                     <Check className={cn("h-2.5 w-2.5", (isUltraUpsell || isUltraCurrent) ? "text-amber-500" : "text-emerald-500")} />
                                                 </div>
-                                                <span className={cn("text-[11px] font-bold", (isUltraUpsell || isUltraCurrent) ? "text-white" : "")}>Hasta {plan.max_pets} mascotas/mes</span>
+                                                <span className={cn("text-[11px] font-bold", (isUltraUpsell || isUltraCurrent) ? "text-white" : "")}>Mascotas & Clientes Ilimitados</span>
                                             </li>
                                         )}
                                         {/* Dynamic Features or fallback advantages */}
@@ -281,10 +281,10 @@ export function PlanComparison({ plans, currentPlanId, onSelectPlan }: PlanCompa
                         <tbody className="text-sm">
                             {[
                                 { label: "Inversión Mensual", key: "monthly_price", format: (v: any) => formatPrice(v) },
-                                { label: "Mascotas", key: "max_pets", format: (v: any) => v >= 999999 ? "Ilimitadas" : v },
+                                { label: "Mascotas", key: "max_pets", format: () => "Ilimitadas" },
                                 { label: "Usuarios", key: "max_users", format: (v: any) => v >= 999999 ? "Ilimitados" : v },
                                 { label: "Órdenes / Ventas", key: "max_orders", format: (v: any) => v >= 999999 ? "Ilimitadas" : v },
-                                { label: "Clientes", key: "max_customers", format: (v: any) => v >= 999999 ? "Ilimitados" : v },
+                                { label: "Clientes", key: "max_customers", format: () => "Ilimitados" },
                                 { label: "Productos", key: "max_products", format: (v: any) => v >= 999999 ? "Ilimitados" : v },
                                 { label: "Módulo Clientes", module: "clientes" },
                                 { label: "Módulo Mascotas", module: "mascotas" },

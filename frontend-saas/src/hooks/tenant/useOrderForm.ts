@@ -95,7 +95,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
     const [justSaved, setJustSaved] = useState(false);
     const [currentCremation, setCurrentCremation] = useState<Partial<Cremation>>({
         pet_id: 0,
-        status: mode === 'express' ? 'received' : 'pendiente',
+        status: 'en_proceso',
         scheduled_at: new Date().toISOString().slice(0, 16),
         notes: '',
         discount: 0,
@@ -381,10 +381,18 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
                 if (cremationData.planes && Array.isArray(cremationData.planes)) {
                     setSelectedPlans(mapCremationPlans(cremationData.planes, plansData));
                 }
+            } else {
+                const petParam = searchParams.get('pet_id');
+                if (petParam && Number(petParam)) {
+                    const targetPetId = Number(petParam);
+                    if (petsData.some((p: any) => p.id === targetPetId)) {
+                        setCurrentCremation(prev => ({ ...prev, pet_id: targetPetId }));
+                    }
+                }
             }
         } catch (err: any) {
             showToast(err.message, 'error');
-            if (editId) router.push('/dashboard/asignacion-servicios');
+            if (editId) router.push('/dashboard/recepcion-pedidos');
         } finally {
             setLoading(false);
         }
@@ -951,6 +959,18 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
         }));
     }, [weightPricingRules]);
 
+    // El recargo por peso se deriva siempre de las reglas vigentes. Las órdenes
+    // creadas por otros flujos (p. ej. el Registro Rápido) guardan weight_price = 0
+    // aunque tengan peso, y al editarlas el valor no aparecía junto al campo.
+    useEffect(() => {
+        if (weightPricingRules.length === 0) return;
+        setCurrentCremation(prev => {
+            const expected = calculateWeightPrice(prev.weight, weightPricingRules);
+            if (expected === (prev.weight_price || 0)) return prev;
+            return { ...prev, weight_price: expected };
+        });
+    }, [weightPricingRules, currentCremation.weight]);
+
     // ==========================================
     // Handler: Save
     // ==========================================
@@ -968,7 +988,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
         }
 
         if (requireImages && selectedImages.length === 0 && (!currentCremation.images || currentCremation.images.length === 0)) {
-            showToast('Debe subir al menos 1 imagen', 'error');
+            showToast('Para guardar o actualizar el registro debe subir al menos 1 imagen obligatoria de evidencia o mascota', 'error');
             return;
         }
 
@@ -1075,7 +1095,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
             onSaveSuccess?.(result);
 
             if (redirectAfterSave) {
-                router.push('/dashboard/asignacion-servicios');
+                router.push('/dashboard/recepcion-pedidos');
             }
         } catch (err: any) {
             showToast(err.message, 'error');

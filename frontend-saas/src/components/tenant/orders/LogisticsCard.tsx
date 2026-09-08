@@ -24,6 +24,8 @@ export default function LogisticsCard({
     onWeightChange,
     onSyncAddress,
 }: LogisticsCardProps) {
+    const weightPrice = currentCremation?.weight_price ?? 0;
+
     return (
         <div className="bg-white/[0.015] rounded-3xl border border-white/[0.07] transition-colors duration-300 hover:border-white/[0.12]">
             <div className="p-6 sm:p-10 lg:p-12 relative">
@@ -40,9 +42,13 @@ export default function LogisticsCard({
                 {/* Schedule + Weight Sub-Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pb-10 border-b border-white/[0.06]" role="group" aria-labelledby="section-logistics">
                     <div className="space-y-3">
-                        <label htmlFor="input-schedule" className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-[0.18em] ml-1">
-                            Programación Retiro <span className="text-red-400">*</span>
-                        </label>
+                        {/* Misma altura que la fila de Peso (que lleva el badge de
+                            recargo) para que ambos inputs queden alineados. */}
+                        <div className="flex items-center justify-between min-h-[26px]">
+                            <label htmlFor="input-schedule" className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-[0.18em] ml-1">
+                                Programación Retiro <span className="text-red-400">*</span>
+                            </label>
+                        </div>
                         <input
                             id="input-schedule"
                             type="datetime-local"
@@ -54,16 +60,16 @@ export default function LogisticsCard({
                         />
                     </div>
                     <div className="space-y-3">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between min-h-[26px]">
                             <label htmlFor="input-weight" className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-[0.18em] ml-1">
                                 Peso Estimado (kg)
                             </label>
-                            {currentCremation?.weight_price && currentCremation.weight_price > 0 && (
+                            {weightPrice > 0 && (
                                 <span
                                     className="bg-[#00C985]/10 border border-[#00C985]/20 text-[#00C985] px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter font-mono"
-                                    aria-label={`Cargo adicional por peso: ${CLP.format(currentCremation.weight_price)}`}
+                                    aria-label={`Cargo adicional por peso: ${CLP.format(weightPrice)}`}
                                 >
-                                    +{CLP.format(currentCremation.weight_price)}
+                                    +{CLP.format(weightPrice)}
                                 </span>
                             )}
                         </div>
@@ -81,8 +87,39 @@ export default function LogisticsCard({
                     </div>
                 </div>
 
-                {/* Dirección de Entrega (devolución de cenizas) */}
+                {/* Dirección de Retiro (dónde se recoge la mascota) */}
                 <div className="mt-10">
+                    <div className="flex items-center justify-between mb-4 px-1">
+                        <span className="text-[11px] font-black text-white uppercase tracking-[0.18em]">Dirección de Retiro <span className="text-muted-foreground/50 font-medium normal-case tracking-normal">· dónde se recoge la mascota</span></span>
+                        <button
+                            type="button"
+                            onClick={() => setCurrentCremation(prev => ({ ...prev, pickup_region: prev.region, pickup_city: prev.city, pickup_address: prev.address }))}
+                            className="text-[10px] font-black text-primary uppercase flex items-center gap-1.5 hover:opacity-80 transition-opacity bg-primary/10 px-3 py-1.5 rounded-lg"
+                            aria-label="Copiar la dirección de entrega como dirección de retiro"
+                        >
+                            <RefreshCw size={11} aria-hidden="true" />
+                            Igual a Entrega
+                        </button>
+                    </div>
+                    {/* Sólo dirección: la región/comuna del retiro se hereda de la
+                        dirección de entrega (botón "Igual a Entrega"). */}
+                    <div className="space-y-3">
+                        <label htmlFor="input-pickup-address" className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-[0.18em] ml-1">
+                            Dirección Exacta
+                        </label>
+                        <input
+                            id="input-pickup-address"
+                            value={currentCremation?.pickup_address || ''}
+                            onChange={(e) => setCurrentCremation(prev => ({ ...prev, pickup_address: e.target.value }))}
+                            className={inputClass}
+                            placeholder="Ej: Clínica Veterinaria Andes, Av. Las Condes 567"
+                            aria-label="Dirección de retiro"
+                        />
+                    </div>
+                </div>
+
+                {/* Dirección de Entrega (devolución de cenizas) */}
+                <div className="mt-10 pt-10 border-t border-white/[0.06]">
                     <div className="flex items-center justify-between mb-4 px-1">
                         <span className="text-[11px] font-black text-white uppercase tracking-[0.18em]">Dirección de Entrega <span className="text-muted-foreground/50 font-medium normal-case tracking-normal">· devolución de cenizas</span></span>
                         <button
@@ -137,67 +174,6 @@ export default function LogisticsCard({
                                 className={inputClass}
                                 placeholder="Calle, número, departamento..."
                                 aria-label="Dirección de entrega"
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Dirección de Retiro (dónde se recoge la mascota) */}
-                <div className="mt-10 pt-10 border-t border-white/[0.06]">
-                    <div className="flex items-center justify-between mb-4 px-1">
-                        <span className="text-[11px] font-black text-white uppercase tracking-[0.18em]">Dirección de Retiro <span className="text-muted-foreground/50 font-medium normal-case tracking-normal">· dónde se recoge la mascota</span></span>
-                        <button
-                            type="button"
-                            onClick={() => setCurrentCremation(prev => ({ ...prev, pickup_region: prev.region, pickup_city: prev.city, pickup_address: prev.address }))}
-                            className="text-[10px] font-black text-primary uppercase flex items-center gap-1.5 hover:opacity-80 transition-opacity bg-primary/10 px-3 py-1.5 rounded-lg"
-                            aria-label="Copiar la dirección de entrega como dirección de retiro"
-                        >
-                            <RefreshCw size={11} aria-hidden="true" />
-                            Igual a Entrega
-                        </button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="space-y-3">
-                            <label htmlFor="select-pickup-region" className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-[0.18em] ml-1">
-                                Región
-                            </label>
-                            <SearchableSelect
-                                options={regions.map(r => ({ value: r.label, label: r.label }))}
-                                value={currentCremation?.pickup_region || ''}
-                                onChange={(val) => {
-                                    setCurrentCremation(prev => ({
-                                        ...prev,
-                                        pickup_region: String(val),
-                                        pickup_city: '',
-                                    }));
-                                }}
-                                placeholder="Región..."
-                            />
-                        </div>
-                        <div className="space-y-3">
-                            <label htmlFor="select-pickup-city" className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-[0.18em] ml-1">
-                                Comuna / Ciudad
-                            </label>
-                            <SearchableSelect
-                                options={
-                                    regions.find(r => r.label === currentCremation?.pickup_region)?.communes.map(c => ({ value: c, label: c })) || []
-                                }
-                                value={currentCremation?.pickup_city || ''}
-                                onChange={(val) => setCurrentCremation(prev => ({ ...prev, pickup_city: String(val) }))}
-                                placeholder={currentCremation?.pickup_region ? 'Comuna...' : 'Sin selección'}
-                            />
-                        </div>
-                        <div className="space-y-3 md:col-span-2">
-                            <label htmlFor="input-pickup-address" className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-[0.18em] ml-1">
-                                Dirección Exacta
-                            </label>
-                            <input
-                                id="input-pickup-address"
-                                value={currentCremation?.pickup_address || ''}
-                                onChange={(e) => setCurrentCremation(prev => ({ ...prev, pickup_address: e.target.value }))}
-                                className={inputClass}
-                                placeholder="Ej: Clínica Veterinaria Andes, Av. Las Condes 567"
-                                aria-label="Dirección de retiro"
                             />
                         </div>
                     </div>

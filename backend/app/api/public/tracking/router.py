@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
@@ -13,6 +13,15 @@ router = APIRouter()
 # Mensaje único para cualquier fallo de resolución: no revelar si el código
 # existe, si el formato es válido, ni a qué tenant pertenece.
 _RESOLVE_NOT_FOUND = "No encontramos un seguimiento con ese código"
+
+
+def _names_match(url_name: str, db_name: str) -> bool:
+    """Comparación laxa de nombres (igual criterio que el endpoint de tracking)."""
+    a = (url_name or "").lower().strip().replace("-", " ")
+    b = (db_name or "").lower().strip()
+    if not a or not b:
+        return False
+    return a in b or b in a
 
 
 @router.get("/resolve/{code}")
@@ -86,9 +95,6 @@ def get_tracking_info(
     apply_tenant_rls(db, tenant.id)
 
     # 2. Buscar Cremación por Token (vía tabla oc_details) o por verification_code.
-    #    Los enlaces de seguimiento generados por el frontend usan el
-    #    verification_code (10 chars), mientras que el tracking_token es un UUID.
-    #    Aceptamos ambos para que cualquier enlace válido funcione.
     cremation = db.query(models.Cremation).outerjoin(
         models.CremationDetails, models.Cremation.id == models.CremationDetails.cremation_id
     ).options(
@@ -120,7 +126,7 @@ def get_tracking_info(
         normalized_db_name = pet_name_db.lower().strip()
 
         if normalized_url_name not in normalized_db_name and normalized_db_name not in normalized_url_name:
-             raise HTTPException(status_code=404, detail="No se encontró información para esta mascota")
+            raise HTTPException(status_code=404, detail="No se encontró información para esta mascota")
 
         # Construir línea de tiempo simulada usando los pasos de flujo del tenant
         steps = db.query(models.WorkflowStep).filter(
@@ -150,6 +156,25 @@ def get_tracking_info(
         owner_data = submission.owner_data or {}
         owner_name = owner_data.get("fullName") or owner_data.get("name") or None
 
+        farewell_tpl = db.query(models.FarewellTemplate).filter(
+            or_(
+                models.FarewellTemplate.tenant_id == tenant.id,
+                models.FarewellTemplate.tenant_id.is_(None)
+            ),
+            models.FarewellTemplate.name.ilike("%Plantilla Formulario%")
+        ).first() or db.query(models.FarewellTemplate).filter(
+            or_(
+                models.FarewellTemplate.tenant_id == tenant.id,
+                models.FarewellTemplate.tenant_id.is_(None)
+            ),
+            models.FarewellTemplate.is_default == True
+        ).first() or db.query(models.FarewellTemplate).filter(
+            or_(
+                models.FarewellTemplate.tenant_id == tenant.id,
+                models.FarewellTemplate.tenant_id.is_(None)
+            )
+        ).first()
+
         return schemas.PublicTrackingResponse(
             pet_name=pet_name_db,
             pet_species=pet_data.get("type") or pet_data.get("species") or "Canino",
@@ -160,28 +185,24 @@ def get_tracking_info(
             service_status="pending",
             timeline=timeline_events,
             tenant_name=tenant.name,
-            tenant_logo=tenant.logo_url
+            tenant_logo=tenant.logo_url,
+            pet_dedication=pet_data.get("dedication"),
+            farewell_template_config=farewell_tpl.config if farewell_tpl else None
         )
 
     # 3. Validar Nombre de Mascota (Seguridad Adicional + UX)
-    # Buscamos la mascota asociada
     pet = db.query(models.Pet).filter(models.Pet.id == cremation.pet_id).first()
     
     if not pet:
-         raise HTTPException(status_code=404, detail="Datos de mascota no encontrados")
+        raise HTTPException(status_code=404, detail="Datos de mascota no encontrados")
 
-    # Normalizar nombres para comparación (ignorar mayúsculas/espacios extra)
     normalized_url_name = pet_name.lower().strip().replace("-", " ")
     normalized_db_name = pet.name.lower().strip()
 
-    # Permitir coincidencia aproximada o exacta? 
-    # Por ahora exacta (con normalización simple) para evitar fishing
     if normalized_url_name not in normalized_db_name and normalized_db_name not in normalized_url_name:
-         # Si no coinciden, damos 404 para no revelar que el token es válido
-         raise HTTPException(status_code=404, detail="No se encontró información para esta mascota")
+        raise HTTPException(status_code=404, detail="No se encontró información para esta mascota")
 
-
-    # Construir Timeline (Lógica existente reutilizada)
+    # Construir Timeline
     steps = db.query(models.WorkflowStep).filter(
         models.WorkflowStep.tenant_id == tenant.id,
         models.WorkflowStep.is_active == True
@@ -199,7 +220,7 @@ def get_tracking_info(
             current_step_index = idx
             break
             
-    is_order_finished = cremation.status == "delivered" or (cremation.status == "entregado" or cremation.status == "delivered") # Handle both enum values if mixed
+    is_order_finished = cremation.status == "delivered" or (cremation.status == "entregado")
     
     for idx, step in enumerate(steps):
         event_status = "pending"
@@ -215,24 +236,21 @@ def get_tracking_info(
                 event_status = "pending"
         else:
             if step.id in evidence_map:
-                 event_status = "completed"
+                event_status = "completed"
             elif idx == 0:
-                 event_status = "current"
+                event_status = "current"
             
         ev_data = None
         if step.id in evidence_map:
             db_ev = evidence_map[step.id]
             ev_data = schemas.OrderEvidenceInDB.model_validate(db_ev) 
             
-        # Extract metadata timestamp
         tech = cremation.technical
         meta_timestamp = None
         if tech and tech.timeline:
-             step_meta = tech.timeline.get(str(step.id))
-             if step_meta and "completed_at" in step_meta:
-                 meta_timestamp = datetime.fromisoformat(step_meta["completed_at"])
-        # No timeline_metadata in main table anymore
-        pass
+            step_meta = tech.timeline.get(str(step.id))
+            if step_meta and "completed_at" in step_meta:
+                meta_timestamp = datetime.fromisoformat(step_meta["completed_at"])
 
         timeline_events.append(schemas.TrackingTimelineEvent(
             step_name=step.name,
@@ -242,6 +260,25 @@ def get_tracking_info(
         ))
     
     owner_name = pet.customer.name if pet.customer else None
+
+    farewell_tpl = db.query(models.FarewellTemplate).filter(
+        or_(
+            models.FarewellTemplate.tenant_id == tenant.id,
+            models.FarewellTemplate.tenant_id.is_(None)
+        ),
+        models.FarewellTemplate.name.ilike("%Plantilla Formulario%")
+    ).first() or db.query(models.FarewellTemplate).filter(
+        or_(
+            models.FarewellTemplate.tenant_id == tenant.id,
+            models.FarewellTemplate.tenant_id.is_(None)
+        ),
+        models.FarewellTemplate.is_default == True
+    ).first() or db.query(models.FarewellTemplate).filter(
+        or_(
+            models.FarewellTemplate.tenant_id == tenant.id,
+            models.FarewellTemplate.tenant_id.is_(None)
+        )
+    ).first()
 
     return schemas.PublicTrackingResponse(
         pet_name=pet.name,
@@ -253,5 +290,118 @@ def get_tracking_info(
         service_status=cremation.status,
         timeline=timeline_events,
         tenant_name=tenant.name,
-        tenant_logo=tenant.logo_url
+        tenant_logo=tenant.logo_url,
+        pet_dedication=getattr(pet, "dedication", None) or getattr(pet, "notes", None),
+        farewell_template_config=farewell_tpl.config if farewell_tpl else None
+    )
+
+
+# ---------------------------------------------------------------------------
+# Imagen de previsualización (Open Graph) para compartir por WhatsApp
+# ---------------------------------------------------------------------------
+_OG_W, _OG_H = 1200, 630
+
+
+def _find_tracking_pet_image(db: Session, slug: str, pet_name: str, token: str):
+    """Resuelve (url_imagen, nombre_mascota) validando slug + nombre + token."""
+    from app.core.tenant_context import apply_tenant_rls
+
+    tenant = db.query(models.Tenant).filter(models.Tenant.slug == slug).first()
+    if not tenant:
+        return None, None
+    apply_tenant_rls(db, tenant.id)
+
+    cremation = db.query(models.Cremation).outerjoin(
+        models.CremationDetails, models.Cremation.id == models.CremationDetails.cremation_id
+    ).filter(
+        models.Cremation.tenant_id == tenant.id,
+        or_(
+            models.CremationDetails.tracking_token == token,
+            models.Cremation.verification_code == token,
+        )
+    ).first()
+
+    if cremation:
+        pet = db.query(models.Pet).filter(models.Pet.id == cremation.pet_id).first()
+        if not pet or not _names_match(pet_name, pet.name):
+            return None, None
+        url = pet.image_url
+        if not url and isinstance(pet.images, list) and pet.images:
+            url = pet.images[0]
+        return url, pet.name
+
+    submission = db.query(models.FormSubmission).filter(
+        models.FormSubmission.code == token,
+        models.FormSubmission.tenant_id == tenant.id,
+    ).first()
+    if submission:
+        pet_data = submission.pet_data or {}
+        if not _names_match(pet_name, pet_data.get("name", "")):
+            return None, None
+        imgs = submission.images if isinstance(submission.images, list) else []
+        return (imgs[0] if imgs else None), pet_data.get("name")
+
+    return None, None
+
+
+def _compose_og_card(image_bytes: bytes) -> bytes:
+    """Foto de la mascota -> tarjeta 1200x630 JPEG (fondo difuminado + foto centrada)."""
+    import io
+    from PIL import Image, ImageDraw, ImageFilter, ImageOps
+
+    src = Image.open(io.BytesIO(image_bytes))
+    try:
+        src = ImageOps.exif_transpose(src)
+    except Exception:
+        pass
+    src = src.convert("RGB")
+
+    bg = ImageOps.fit(src, (_OG_W, _OG_H), Image.Resampling.LANCZOS, centering=(0.5, 0.5))
+    bg = bg.filter(ImageFilter.GaussianBlur(28))
+    bg = Image.blend(bg, Image.new("RGB", (_OG_W, _OG_H), (16, 16, 20)), 0.45)
+
+    side = 460
+    fg = ImageOps.fit(src, (side, side), Image.Resampling.LANCZOS, centering=(0.5, 0.4))
+    mask = Image.new("L", (side, side), 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, side - 1, side - 1], radius=36, fill=255)
+    bg.paste(fg, ((_OG_W - side) // 2, (_OG_H - side) // 2), mask)
+
+    out = io.BytesIO()
+    bg.save(out, format="JPEG", quality=85, optimize=True)
+    return out.getvalue()
+
+
+@router.get("/{slug}/{pet_name}/{token}/og-image.jpg")
+@limiter.limit("60/minute")
+def get_tracking_og_image(
+    request: Request,
+    slug: str,
+    pet_name: str,
+    token: str,
+    db: Session = Depends(get_db),
+):
+    """Tarjeta JPEG con la foto de la mascota para el preview de WhatsApp."""
+    image_url, _ = _find_tracking_pet_image(db, slug, pet_name, token)
+    if not image_url:
+        raise HTTPException(status_code=404, detail="Sin imagen disponible")
+
+    if not str(image_url).lower().startswith(("http://", "https://")):
+        raise HTTPException(status_code=404, detail="Sin imagen disponible")
+
+    try:
+        import requests
+        resp = requests.get(image_url, timeout=8)
+        if resp.status_code != 200 or not resp.content:
+            raise HTTPException(status_code=404, detail="Sin imagen disponible")
+        jpeg = _compose_og_card(resp.content)
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error generando og-image de tracking: {e}")
+        raise HTTPException(status_code=404, detail="Sin imagen disponible")
+
+    return Response(
+        content=jpeg,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "public, max-age=3600"},
     )

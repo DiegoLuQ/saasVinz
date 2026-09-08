@@ -110,9 +110,16 @@ export default function Sidebar({ onLogout, isCollapsed: isCollapsedProp, setIsC
         {
             title: 'Contenido',
             items: [
-                { href: '/dashboard/disenos', icon: Palette, label: 'Diseños de Documentos' },
-                { href: '/dashboard/despedidas', icon: Heart, label: 'Plantillas de Despedida' },
-                { href: '/dashboard/plantillas-imagen', icon: ImageIcon, label: 'Plantillas de Imagen' },
+                {
+                    href: '/dashboard/disenos',
+                    icon: Palette,
+                    label: 'Plantillas y Diseños',
+                    subItems: [
+                        { href: '/dashboard/disenos', label: 'Certificados de Cremación' },
+                        { href: '/dashboard/despedidas', label: 'Tarjetas de Homenaje' },
+                        { href: '/dashboard/plantillas-imagen', label: 'Diseños Gráficos (Canvas)' },
+                    ]
+                },
                 { href: '/dashboard/biblioteca', icon: Library, label: 'Biblioteca de Medios' },
             ]
         },

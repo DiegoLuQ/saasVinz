@@ -17,7 +17,7 @@ export default function BlockedStatusPage({ status, reason, tenant }: BlockedSta
 
     const handleReactivate = async () => {
         if (tenant?.polar_customer_id) {
-            await openPortal(tenant.polar_customer_id, window.location.origin + '/tenant/dashboard');
+            await openPortal(tenant.polar_customer_id, window.location.origin + '/dashboard');
         } else {
             // If no customer ID, redirect to pricing or support
             window.location.href = '/pricing';

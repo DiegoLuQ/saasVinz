@@ -16,10 +16,30 @@ import {
     ZoomIn,
     ZoomOut,
     RotateCcw,
+    Plus,
+    Building2,
 } from 'lucide-react';
 import { apiRequest, getImageUrl } from '@/lib/admin/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import FarewellPreview from '@/app/(tenant)/tenant/dashboard/documentos/disenos/components/FarewellPreview';
+
+const TENANT_LOGO_PLACEHOLDER_SVG = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+  <circle cx="80" cy="80" r="74" fill="#0f172a" stroke="#d4af37" stroke-width="4"/>
+  <path d="M80 32 L88 54 L112 54 L93 69 L100 91 L80 77 L60 91 L67 69 L48 54 L72 54 Z" fill="#d4af37"/>
+  <text x="80" y="116" font-size="12" font-weight="900" font-family="sans-serif" fill="#f8fafc" text-anchor="middle" letter-spacing="1.5">LOGO EMPRESA</text>
+  <text x="80" y="132" font-size="8.5" font-weight="700" font-family="sans-serif" fill="#94a3b8" text-anchor="middle" letter-spacing="1">CREMATORIO</text>
+</svg>
+`);
+
+const LOGO_POSITIONS = [
+    { value: 'top-left', label: 'Sup. Izquierda' },
+    { value: 'top-center', label: 'Sup. Centro' },
+    { value: 'top-right', label: 'Sup. Derecha' },
+    { value: 'bottom-left', label: 'Inf. Izquierda' },
+    { value: 'bottom-center', label: 'Inf. Centro' },
+    { value: 'bottom-right', label: 'Inf. Derecha' },
+];
 
 interface FarewellTemplate {
     id: number;
@@ -32,6 +52,84 @@ interface FarewellTemplate {
     created_at: string;
 }
 
+const DEFAULT_NEW_TEMPLATE: FarewellTemplate = {
+    id: 0,
+    tenant_id: null,
+    name: 'Nueva Plantilla de Despedida',
+    description: 'Diseño conmemorativo personalizado',
+    is_default: false,
+    preview_url: null,
+    created_at: new Date().toISOString(),
+    config: {
+        format: '1:1',
+        theme: 'calm',
+        elements: {
+            petName: 'Nombre de Mascota',
+            petNameX: 0,
+            petNameY: -10,
+            subtitle: 'Siempre en nuestros corazones',
+            subtitleX: 0,
+            subtitleY: 50,
+            farewellText: 'Gracias por cada instante de ternura y lealtad. Tu recuerdo vivirá por siempre en nuestra memoria.',
+            farewellTextX: 0,
+            farewellTextY: 95,
+            image2Url: null,
+            image2X: 0,
+            image2Y: -140,
+        },
+        styles: {
+            background: '#FDFBF7',
+            color: '#2D3748',
+            font: 'serif',
+        },
+        petNameFormatting: {
+            fontSize: 36,
+            fontFamily: 'Playfair Display',
+        },
+        subtitleFormatting: {
+            fontSize: 16,
+        },
+        textFormatting: {
+            fontSize: 14,
+            width: 480,
+        },
+        frame: {
+            enabled: true,
+            color: '#d4af37',
+            width: 6,
+            margin: 8,
+        },
+        imageSettings: {
+            image1: {
+                shape: 'circle',
+                borderColor: '#d4af37',
+                borderWidth: 3,
+                glow: { enabled: true, color: 'rgba(212,175,55,0.65)', size: 24 },
+                size: 160,
+            },
+            image2: {
+                shape: 'circle',
+                borderColor: '#d4af37',
+                borderWidth: 3,
+                glow: { enabled: true, color: 'rgba(212,175,55,0.65)', size: 24 },
+                size: 160,
+            },
+        },
+        backgroundImage: {
+            url: null,
+            opacity: 0,
+        },
+        tenantLogo: {
+            enabled: true,
+            position: 'bottom-center',
+            size: 65,
+            x: 0,
+            y: 0,
+            opacity: 0.95,
+        },
+    },
+};
+
 const API = '/api/internal/creator/farewell-templates';
 
 export default function FarewellTemplatesAdminPage() {
@@ -39,7 +137,9 @@ export default function FarewellTemplatesAdminPage() {
     const [loading, setLoading] = useState(true);
     const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
     const [deletingId, setDeletingId] = useState<number | null>(null);
+    const [settingDefaultId, setSettingDefaultId] = useState<number | null>(null);
     const [editing, setEditing] = useState<FarewellTemplate | null>(null);
+    const [isCreating, setIsCreating] = useState(false);
 
     const showToast = (text: string, type: 'success' | 'error' = 'success') => {
         setMessage({ text, type });
@@ -61,6 +161,24 @@ export default function FarewellTemplatesAdminPage() {
     useEffect(() => {
         fetchTemplates();
     }, []);
+
+    const handleSetDefault = async (template: FarewellTemplate, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        if (template.is_default) return;
+        setSettingDefaultId(template.id);
+        try {
+            await apiRequest(`${API}/${template.id}`, {
+                method: 'PATCH',
+                body: { is_default: true }
+            });
+            showToast(`"${template.name}" ahora es la plantilla predeterminada`, 'success');
+            fetchTemplates();
+        } catch (err: any) {
+            showToast(err.message || 'Error al establecer plantilla predeterminada', 'error');
+        } finally {
+            setSettingDefaultId(null);
+        }
+    };
 
     const handleDelete = async (template: FarewellTemplate) => {
         if (!confirm(`¿Eliminar la plantilla "${template.name}"? Esta acción no se puede deshacer.`)) return;
@@ -105,13 +223,21 @@ export default function FarewellTemplatesAdminPage() {
                 <div>
                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-full mb-3">
                         <Sparkles className="text-primary" size={11} aria-hidden="true" />
-                        <span className="text-[10px] font-black text-primary uppercase tracking-[0.22em]">Plantillas Globales</span>
+                        <span className="text-[10px] font-black text-primary uppercase tracking-[0.22em]">Uso en Tenant: Formulario Web de Clientes y Módulo Homenajes</span>
                     </div>
-                    <h1 className="text-4xl font-black text-white tracking-tight">Diseños de Despedida</h1>
+                    <h1 className="text-4xl font-black text-white tracking-tight">Tarjetas de Homenaje</h1>
                     <p className="text-white/40 mt-2 font-medium max-w-2xl">
-                        Las plantillas se registran por código. Aquí puedes ajustar lo esencial: nombre, descripción, imagen de fondo y plantilla por defecto.
+                        Crea y personaliza las tarjetas conmemorativas que eligen los familiares al registrar a su mascota o desde el portal de despedidas.
                     </p>
                 </div>
+
+                <button
+                    onClick={() => setIsCreating(true)}
+                    className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white font-black py-3.5 px-6 rounded-2xl text-xs uppercase tracking-wider shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all self-start md:self-center cursor-pointer"
+                >
+                    <Plus size={16} />
+                    Nueva Plantilla
+                </button>
             </header>
 
             {/* Content */}
@@ -177,22 +303,48 @@ export default function FarewellTemplatesAdminPage() {
                                                 </p>
                                             </div>
                                         )}
-                                        {template.is_default && (
-                                            <span className="absolute top-3 right-3 text-[9px] bg-primary text-white px-2.5 py-1 rounded-full font-black uppercase tracking-[0.16em] shadow-lg flex items-center gap-1">
-                                                <Star size={9} /> Default
+                                        {template.is_default ? (
+                                            <span className="absolute top-3 right-3 text-[9px] bg-amber-500 text-slate-950 px-2.5 py-1 rounded-full font-black uppercase tracking-[0.16em] shadow-lg flex items-center gap-1">
+                                                <Star size={10} className="fill-slate-950" /> Predeterminada
+                                            </span>
+                                        ) : (
+                                            <button
+                                                onClick={(e) => handleSetDefault(template, e)}
+                                                disabled={settingDefaultId === template.id}
+                                                className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity text-[9px] bg-black/60 hover:bg-black/90 text-white/80 hover:text-amber-400 px-2.5 py-1 rounded-full font-bold uppercase tracking-[0.12em] backdrop-blur-md border border-white/10 flex items-center gap-1 shadow-lg"
+                                                title="Hacer predeterminada"
+                                            >
+                                                {settingDefaultId === template.id ? (
+                                                    <Loader2 size={10} className="animate-spin" />
+                                                ) : (
+                                                    <Star size={10} />
+                                                )}
+                                                Hacer Default
+                                            </button>
+                                        )}
+                                        {template.name.toLowerCase().includes('formulario') && (
+                                            <span className="absolute top-3 left-3 text-[9px] bg-primary text-white px-2.5 py-1 rounded-full font-black uppercase tracking-[0.14em] shadow-lg flex items-center gap-1">
+                                                <Sparkles size={9} /> Formulario Web
                                             </span>
                                         )}
                                     </div>
 
                                     <div className="p-5 flex-1 flex flex-col">
-                                        <h4 className="text-base font-black text-white tracking-tight truncate mb-1">
-                                            {template.name}
-                                        </h4>
+                                        <div className="flex items-start justify-between gap-2 mb-1">
+                                            <h4 className="text-base font-black text-white tracking-tight truncate flex-1">
+                                                {template.name}
+                                            </h4>
+                                        </div>
                                         <p className="text-xs text-white/50 line-clamp-2 mb-4 flex-1">
-                                            {template.description || 'Sin descripción'}
+                                            {template.description || (template.name.toLowerCase().includes('formulario') ? 'Plantilla utilizada para las tarjetas de homenaje creadas desde el formulario público de los tenants.' : 'Sin descripción')}
                                         </p>
 
                                         <div className="flex gap-2 flex-wrap mb-4">
+                                            {template.is_default && (
+                                                <span className="text-[9px] bg-amber-500/15 text-amber-300 px-2 py-1 rounded-md font-black uppercase tracking-wider border border-amber-500/30 flex items-center gap-1">
+                                                    <Star size={9} className="fill-amber-300" /> Default del sistema
+                                                </span>
+                                            )}
                                             <span className="text-[9px] bg-white/5 text-white/60 px-2 py-1 rounded-md font-black uppercase tracking-wider border border-white/[0.06]">
                                                 {cfg.format || '1:1'}
                                             </span>
@@ -214,6 +366,21 @@ export default function FarewellTemplatesAdminPage() {
                                         </div>
 
                                         <div className="flex gap-2 justify-end">
+                                            {!template.is_default && (
+                                                <button
+                                                    onClick={(e) => handleSetDefault(template, e)}
+                                                    disabled={settingDefaultId === template.id}
+                                                    className="flex items-center justify-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 py-2 px-3 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50"
+                                                    title="Establecer como predeterminada"
+                                                >
+                                                    {settingDefaultId === template.id ? (
+                                                        <Loader2 size={13} className="animate-spin" />
+                                                    ) : (
+                                                        <Star size={13} />
+                                                    )}
+                                                    Default
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => setEditing(template)}
                                                 className="flex-1 flex items-center justify-center gap-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/15 py-2 px-3 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all active:scale-95"
@@ -242,14 +409,20 @@ export default function FarewellTemplatesAdminPage() {
             </div>
 
             <AnimatePresence>
-                {editing && (
+                {(editing || isCreating) && (
                     <EditModal
-                        template={editing}
-                        onClose={() => setEditing(null)}
-                        onSaved={() => {
+                        template={editing || DEFAULT_NEW_TEMPLATE}
+                        isNew={isCreating}
+                        onClose={() => {
                             setEditing(null);
+                            setIsCreating(false);
+                        }}
+                        onSaved={() => {
+                            const wasCreating = isCreating;
+                            setEditing(null);
+                            setIsCreating(false);
                             fetchTemplates();
-                            showToast('Plantilla actualizada', 'success');
+                            showToast(wasCreating ? 'Plantilla creada correctamente' : 'Plantilla actualizada', 'success');
                         }}
                         onError={(msg) => showToast(msg, 'error')}
                     />
@@ -368,11 +541,13 @@ const getDimensions = (formatValue: Ratio) => {
 
 function EditModal({
     template,
+    isNew = false,
     onClose,
     onSaved,
     onError,
 }: {
     template: FarewellTemplate;
+    isNew?: boolean;
     onClose: () => void;
     onSaved: () => void;
     onError: (msg: string) => void;
@@ -426,6 +601,16 @@ function EditModal({
     const [farewellX, setFarewellX] = useState<number>(baseConfig.elements?.farewellTextX ?? 0);
     const [farewellY, setFarewellY] = useState<number>(baseConfig.elements?.farewellTextY ?? 0);
     const [farewellWidth, setFarewellWidth] = useState<number>(baseConfig.textFormatting?.width ?? 480);
+
+    const [logoEnabled, setLogoEnabled] = useState<boolean>(baseConfig.tenantLogo?.enabled !== undefined ? !!baseConfig.tenantLogo.enabled : true);
+    const [logoPosition, setLogoPosition] = useState<string>(baseConfig.tenantLogo?.position || 'bottom-center');
+    const [logoSize, setLogoSize] = useState<number>(baseConfig.tenantLogo?.size ?? 65);
+    const [logoX, setLogoX] = useState<number>(baseConfig.tenantLogo?.x ?? 0);
+    const [logoY, setLogoY] = useState<number>(baseConfig.tenantLogo?.y ?? 0);
+    const [logoOpacity, setLogoOpacity] = useState<number>(
+        typeof baseConfig.tenantLogo?.opacity === 'number' ? baseConfig.tenantLogo.opacity : 0.95
+    );
+
     const [previewZoom, setPreviewZoom] = useState<number>(0.55);
 
     const [uploading, setUploading] = useState(false);
@@ -500,6 +685,15 @@ function EditModal({
                 width: frameWidth,
                 margin: frameMargin,
             },
+            tenantLogo: {
+                ...(prev.tenantLogo || {}),
+                enabled: logoEnabled,
+                position: logoPosition,
+                size: logoSize,
+                x: logoX,
+                y: logoY,
+                opacity: logoOpacity,
+            },
             imageSettings: {
                 ...imageSettingsBase,
                 image1: {
@@ -542,6 +736,16 @@ function EditModal({
                 // aparecerá la foto real del tenant. No se persiste.
                 image2Url: PET_PLACEHOLDER_SVG,
             },
+            tenantLogo: {
+                ...c.tenantLogo,
+                enabled: logoEnabled,
+                position: logoPosition,
+                size: logoSize,
+                x: logoX,
+                y: logoY,
+                opacity: logoOpacity,
+                sampleUrl: TENANT_LOGO_PLACEHOLDER_SVG,
+            },
             imageSettings: {
                 ...c.imageSettings,
                 image2: {
@@ -551,7 +755,7 @@ function EditModal({
             },
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [format, bgColor, textColor, font, bgUrl, bgOpacity, photoShape, photoBorderColor, photoBorderWidth, glowEnabled, glowColor, glowSize, frameEnabled, frameColor, frameWidth, frameMargin, petNamePlaceholder, subtitleText, farewellDefault, photoSize, photoX, photoY, petNameFontSize, petNameX, petNameY, subtitleFontSize, subtitleX, subtitleY, farewellFontSize, farewellX, farewellY, farewellWidth, petNameFontFamily]);
+    }, [format, bgColor, textColor, font, bgUrl, bgOpacity, photoShape, photoBorderColor, photoBorderWidth, glowEnabled, glowColor, glowSize, frameEnabled, frameColor, frameWidth, frameMargin, petNamePlaceholder, subtitleText, farewellDefault, photoSize, photoX, photoY, petNameFontSize, petNameX, petNameY, subtitleFontSize, subtitleX, subtitleY, farewellFontSize, farewellX, farewellY, farewellWidth, petNameFontFamily, logoEnabled, logoPosition, logoSize, logoX, logoY, logoOpacity]);
 
     const handleSave = async () => {
         if (!name.trim()) {
@@ -560,15 +764,27 @@ function EditModal({
         }
         setSaving(true);
         try {
-            await apiRequest(`${API}/${template.id}`, {
-                method: 'PATCH',
-                body: {
-                    name: name.trim(),
-                    description: description.trim() || null,
-                    is_default: isDefault,
-                    config: buildNextConfig(),
-                },
-            });
+            if (isNew || template.id === 0) {
+                await apiRequest(API, {
+                    method: 'POST',
+                    body: {
+                        name: name.trim(),
+                        description: description.trim() || null,
+                        is_default: isDefault,
+                        config: buildNextConfig(),
+                    },
+                });
+            } else {
+                await apiRequest(`${API}/${template.id}`, {
+                    method: 'PATCH',
+                    body: {
+                        name: name.trim(),
+                        description: description.trim() || null,
+                        is_default: isDefault,
+                        config: buildNextConfig(),
+                    },
+                });
+            }
             onSaved();
         } catch (err: any) {
             onError(err.message || 'Error al guardar');
@@ -596,12 +812,14 @@ function EditModal({
             >
                 <header className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06]">
                     <div>
-                        <h2 className="text-lg font-black text-white tracking-tight">Editar plantilla</h2>
+                        <h2 className="text-lg font-black text-white tracking-tight">
+                            {isNew ? 'Nueva Plantilla Global' : 'Editar Plantilla'}
+                        </h2>
                         <p className="text-[11px] text-white/40 mt-0.5">
-                            Los cambios se reflejan en el preview de la derecha en tiempo real.
+                            {isNew ? 'Diseña y previsualiza en tiempo real el nuevo formato de despedida' : 'Los cambios se reflejan en el preview de la derecha en tiempo real.'}
                         </p>
                     </div>
-                    <button onClick={onClose} className="text-white/40 hover:text-white transition-colors">
+                    <button onClick={onClose} className="text-white/40 hover:text-white transition-colors cursor-pointer">
                         <X size={20} />
                     </button>
                 </header>
@@ -633,18 +851,23 @@ function EditModal({
                                     className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white text-sm font-medium outline-none focus:border-primary/40 resize-y"
                                 />
                             </div>
-                            <label className="flex items-center gap-3 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={isDefault}
-                                    onChange={(e) => setIsDefault(e.target.checked)}
-                                    className="w-5 h-5 accent-primary cursor-pointer"
-                                />
-                                <span className="text-sm font-bold text-white flex items-center gap-2">
-                                    <Star size={14} className="text-primary" />
-                                    Marcar como predeterminada
-                                </span>
-                            </label>
+                            <div className="bg-white/[0.02] border border-white/10 rounded-xl p-3.5 space-y-1">
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={isDefault}
+                                        onChange={(e) => setIsDefault(e.target.checked)}
+                                        className="w-5 h-5 accent-primary cursor-pointer"
+                                    />
+                                    <span className="text-sm font-bold text-white flex items-center gap-2">
+                                        <Star size={14} className="text-amber-400 fill-amber-400" />
+                                        Marcar como predeterminada (Default del sistema)
+                                    </span>
+                                </label>
+                                <p className="text-[11px] text-white/40 pl-8">
+                                    Será la plantilla por defecto cargada automáticamente en los formularios de registro público de los tenants y en el visualizador de homenajes.
+                                </p>
+                            </div>
                         </Section>
 
                         {/* Ratio */}
@@ -1110,6 +1333,114 @@ function EditModal({
                             )}
                         </Section>
 
+                        {/* Tenant Logo */}
+                        <Section title="Logo de la Empresa / Tenant">
+                            <label className="flex items-center gap-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={logoEnabled}
+                                    onChange={(e) => setLogoEnabled(e.target.checked)}
+                                    className="w-5 h-5 accent-primary cursor-pointer"
+                                />
+                                <div>
+                                    <span className="text-sm font-bold text-white block">Incluir Logo del Crematorio</span>
+                                    <span className="text-[11px] text-white/50 block">Inyecta el logo configurado por el tenant en la tarjeta conmemorativa</span>
+                                </div>
+                            </label>
+
+                            {logoEnabled && (
+                                <div className="space-y-4 pl-8 border-l border-white/10 mt-2">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-white/60 uppercase tracking-[0.16em] mb-2">
+                                            Ubicación en la tarjeta
+                                        </label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {LOGO_POSITIONS.map((pos) => (
+                                                <button
+                                                    key={pos.value}
+                                                    type="button"
+                                                    onClick={() => setLogoPosition(pos.value)}
+                                                    className={`py-2 px-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all ${
+                                                        logoPosition === pos.value
+                                                            ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20'
+                                                            : 'bg-white/[0.03] text-white/60 border-white/10 hover:border-primary/30'
+                                                    }`}
+                                                >
+                                                    {pos.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className="text-[10px] font-black text-white/60 uppercase tracking-[0.16em]">Tamaño del logo</label>
+                                                <span className="text-[10px] font-mono text-white/50">{logoSize}px</span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min={30}
+                                                max={160}
+                                                step={5}
+                                                value={logoSize}
+                                                onChange={(e) => setLogoSize(Number(e.target.value))}
+                                                className="w-full accent-primary"
+                                            />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className="text-[10px] font-black text-white/60 uppercase tracking-[0.16em]">Opacidad</label>
+                                                <span className="text-[10px] font-mono text-white/50">{Math.round(logoOpacity * 100)}%</span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min={0.2}
+                                                max={1.0}
+                                                step={0.05}
+                                                value={logoOpacity}
+                                                onChange={(e) => setLogoOpacity(Number(e.target.value))}
+                                                className="w-full accent-primary"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className="text-[10px] font-black text-white/60 uppercase tracking-[0.16em]">Ajuste fino X</label>
+                                                <span className="text-[10px] font-mono text-white/50">{logoX > 0 ? `+${logoX}` : logoX}px</span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min={-200}
+                                                max={200}
+                                                step={2}
+                                                value={logoX}
+                                                onChange={(e) => setLogoX(Number(e.target.value))}
+                                                className="w-full accent-primary"
+                                            />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className="text-[10px] font-black text-white/60 uppercase tracking-[0.16em]">Ajuste fino Y</label>
+                                                <span className="text-[10px] font-mono text-white/50">{logoY > 0 ? `+${logoY}` : logoY}px</span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min={-200}
+                                                max={200}
+                                                step={2}
+                                                value={logoY}
+                                                onChange={(e) => setLogoY(Number(e.target.value))}
+                                                className="w-full accent-primary"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </Section>
+
                         {/* Background image */}
                         <Section title="Imagen de fondo">
                             {!previewBg && (
@@ -1238,17 +1569,17 @@ function EditModal({
                 <footer className="border-t border-white/[0.06] px-6 py-4 flex gap-3 justify-end">
                     <button
                         onClick={onClose}
-                        className="px-4 py-2.5 text-white/60 hover:text-white text-[11px] font-black uppercase tracking-wider transition-colors"
+                        className="px-4 py-2.5 text-white/60 hover:text-white text-[11px] font-black uppercase tracking-wider transition-colors cursor-pointer"
                     >
                         Cancelar
                     </button>
                     <button
                         onClick={handleSave}
                         disabled={saving || uploading}
-                        className="px-6 py-2.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                        className="px-6 py-2.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2 cursor-pointer shadow-lg shadow-primary/20"
                     >
                         {saving && <Loader2 size={14} className="animate-spin" />}
-                        {saving ? 'Guardando…' : 'Guardar cambios'}
+                        {saving ? 'Guardando…' : isNew ? 'Crear Plantilla' : 'Guardar cambios'}
                     </button>
                 </footer>
             </motion.div>

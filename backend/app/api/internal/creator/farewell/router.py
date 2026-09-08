@@ -108,6 +108,11 @@ def create_global_farewell_template(
     _creator=Depends(get_current_creator),
 ):
     """Create a new global template. tenant_id is forced to NULL."""
+    if template_in.is_default:
+        db.query(models.FarewellTemplate).filter(
+            models.FarewellTemplate.tenant_id.is_(None)
+        ).update({"is_default": False})
+
     db_template = models.FarewellTemplate(
         **template_in.dict(),
         tenant_id=None,
@@ -137,6 +142,12 @@ def update_global_farewell_template(
         raise HTTPException(status_code=404, detail="Plantilla global no encontrada")
 
     update_data = template_update.dict(exclude_unset=True)
+    if update_data.get("is_default") is True:
+        db.query(models.FarewellTemplate).filter(
+            models.FarewellTemplate.tenant_id.is_(None),
+            models.FarewellTemplate.id != template_id,
+        ).update({"is_default": False})
+
     for key, value in update_data.items():
         setattr(db_template, key, value)
 

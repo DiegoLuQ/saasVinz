@@ -649,7 +649,8 @@ def generate_receipt_html(
     scheduled_at: datetime,
     issue_date: datetime = None,
     receipt_number: str = "REC-001",
-    base_url: str = "http://localhost:8000"
+    base_url: str = "http://localhost:8000",
+    weight_price: float = 0.0
 ) -> str:
     if not issue_date:
         issue_date = datetime.now()
@@ -688,6 +689,18 @@ def generate_receipt_html(
             </tr>
         """
         
+    # Recargo por peso: forma parte del total, así que debe figurar como línea
+    # o el detalle no cuadra con el "TOTAL A PAGAR".
+    if weight_price and weight_price > 0:
+        items_html += f"""
+            <tr>
+                <td style="padding: 10px; border-bottom: 1px solid #eee;">Recargo por peso{f' ({pet_weight} kg)' if pet_weight else ''}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">1</td>
+                <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">{format_currency(weight_price)}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">{format_currency(weight_price)}</td>
+            </tr>
+        """
+
     # Products
     for p in products:
         subtotal = p['quantity'] * p['unit_price']
@@ -707,8 +720,12 @@ def generate_receipt_html(
         <meta charset="UTF-8">
         <style>
             @page {{ size: Carta; margin: 0; }}
+            *, *::before, *::after {{ box-sizing: border-box; }}
             body {{ font-family: 'Helvetica', 'Arial', sans-serif; color: #333; margin: 0; padding: 20px; background-color: #f9f9f9; }}
-            .receipt-container {{ background-color: #fff; width: 190mm; margin: 0 auto; padding: 15mm; border: 1px solid #ddd; box-shadow: 0 0 10px rgba(0,0,0,0.1); }}
+            /* Ancho fluido con tope carta: en la vista previa el recibo va dentro
+               de un iframe más angosto que 220mm, y con ancho fijo los importes
+               (alineados a la derecha) quedaban fuera del área visible. */
+            .receipt-container {{ background-color: #fff; width: 100%; max-width: 190mm; margin: 0 auto; padding: 15mm; border: 1px solid #ddd; box-shadow: 0 0 10px rgba(0,0,0,0.1); }}
             .header {{ display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }}
             .company-info {{ display: flex; align-items: center; gap: 20px; }}
             .company-logo {{ height: 60px; max-width: 150px; object-fit: contain; }}
@@ -735,6 +752,16 @@ def generate_receipt_html(
             
             .footer {{ margin-top: 40px; padding-top: 20px; border-top: 1px dashed #ddd; text-align: center; color: #999; font-size: 11px; }}
             
+            /* Vista previa angosta (iframe del modal): aprieta márgenes para que
+               las columnas de importes no queden fuera del área visible. */
+            @media screen and (max-width: 760px) {{
+                body {{ padding: 8px; }}
+                .receipt-container {{ padding: 18px; }}
+                .info-grid {{ grid-template-columns: 1fr; }}
+                .items-table {{ font-size: 12px; }}
+                .items-table th, .items-table td {{ padding: 8px 6px !important; }}
+            }}
+
             @media print {{
                 body {{ background: none; padding: 0; }}
                 .receipt-container {{ border: none; box-shadow: none; margin: 0; width: 100%; }}
@@ -881,6 +908,47 @@ def _img_parse_date(value):
     return None
 
 
+# Fondo de los campos de texto. Debe coincidir con
+# `frontend-saas/src/lib/certText.ts`: si cambian los valores por defecto
+# alli, cambialos aqui tambien.
+_TEXT_BG_DEFAULTS = {"color": "#ffffff", "opacity": 0, "padX": 14, "padY": 6, "radius": 8}
+
+
+def _img_text_bg_css(field: dict) -> str:
+    """CSS del fondo de un campo de texto. Cadena vacia si no tiene fondo."""
+    try:
+        opacity = float(field.get("bgOpacity") or 0)
+    except (TypeError, ValueError):
+        opacity = 0.0
+    if opacity <= 0:
+        return ""
+
+    def _num(key, default):
+        try:
+            return float(field.get(key) if field.get(key) is not None else default)
+        except (TypeError, ValueError):
+            return float(default)
+
+    hex_color = str(field.get("bgColor") or _TEXT_BG_DEFAULTS["color"]).strip().lstrip("#")
+    if len(hex_color) == 3:
+        hex_color = "".join(c * 2 for c in hex_color)
+    if len(hex_color) != 6 or any(c not in "0123456789abcdefABCDEF" for c in hex_color):
+        hex_color = "ffffff"
+    r = int(hex_color[0:2], 16)
+    g = int(hex_color[2:4], 16)
+    b = int(hex_color[4:6], 16)
+    alpha = max(0.0, min(100.0, opacity)) / 100.0
+
+    pad_x = _num("bgPadX", _TEXT_BG_DEFAULTS["padX"])
+    pad_y = _num("bgPadY", _TEXT_BG_DEFAULTS["padY"])
+    radius = _num("bgRadius", _TEXT_BG_DEFAULTS["radius"])
+
+    return (
+        f"background-color:rgba({r},{g},{b},{alpha:.3f}); "
+        f"padding:{pad_y:g}px {pad_x:g}px; border-radius:{radius:g}px;"
+    )
+
+
 def _img_format_date(dt, fmt):
     """Formatea una fecha según el modo elegido (default/override)."""
     if not dt:
@@ -925,9 +993,12 @@ def generate_image_certificate_html(
     - background_url: URL de la imagen de fondo (global, categoría ImgCertificado).
     - aspect_ratio: "16:9" | "4:3" | "3:4".
     - fields: lista de dicts con {id, type, x, y, fontSize, fontFamily, color,
-      align, bold, format, slot, w, shape}. x/y/w en % relativos al lienzo.
-    - overrides: dict opcional {field_id: {format, image_url}} elegido por el
-      tenant al emitir (no mueve posiciones, solo ajusta valores).
+      align, bold, format, value, slot, w, shape} mas las props de fondo del
+      texto (bgColor, bgOpacity, bgPadX, bgPadY, bgRadius). x/y/w en %
+      relativos al lienzo. El tipo "texto_fijo" imprime literalmente `value`.
+    - overrides: dict opcional {field_id: {format, image_url, value, enabled,
+      frame}} elegido por el tenant al emitir (no mueve posiciones, solo ajusta
+      valores). `value` reescribe el texto de un campo "texto_fijo".
     """
     fields = fields or []
     elements = elements or []
@@ -1095,7 +1166,10 @@ def generate_image_certificate_html(
         elif ftype == "fecha_actual":
             value = _img_format_date(current_date, ov.get("format") or field.get("format"))
         elif ftype == "texto_fijo":
-            value = field.get("value", "")
+            # El tenant puede reescribir el texto al emitir; si no lo toca, se
+            # usa el que definio el admin en el diseno.
+            ov_value = ov.get("value")
+            value = ov_value if ov_value is not None else field.get("value", "")
         elif ftype == "rut_tenant":
             value = tenant_rut or ""
         elif ftype == "encargado_tenant":
@@ -1109,21 +1183,31 @@ def generate_image_certificate_html(
         else:
             continue
 
+        # Un texto vacio no se dibuja: sin esto, un campo con fondo dejaria una
+        # caja de color suelta en el certificado. Coincide con el render en
+        # canvas del cliente, que tambien omite los valores vacios.
+        if not str(value).strip():
+            continue
+
         font_size = field.get("fontSize", 24)
         font_family = field.get("fontFamily", "Georgia, serif")
         color = field.get("color", "#1a1a1a")
         align = field.get("align", "center")
         weight = "700" if field.get("bold") else "400"
+        bg_css = _img_text_bg_css(field)
         layers.append((FIELD_Z,
             f'<div class="cert-field" style="{base_pos} '
             f'font-size:{font_size}px; font-family:{font_family}; '
             f'color:{color}; text-align:{align}; font-weight:{weight}; '
-            f'white-space:nowrap;">{esc(value)}</div>'
+            f'white-space:nowrap; {bg_css}">{esc(value)}</div>'
         ))
         spec_items.append({
             "kind": "text", "value": value, "x": x, "y": y, "z": FIELD_Z,
             "fontSize": font_size, "fontFamily": font_family, "color": color,
             "align": align, "bold": bool(field.get("bold")),
+            "bgColor": field.get("bgColor"), "bgOpacity": field.get("bgOpacity"),
+            "bgPadX": field.get("bgPadX"), "bgPadY": field.get("bgPadY"),
+            "bgRadius": field.get("bgRadius"),
         })
 
     # Ordenar por z (estable) y unir; el fondo se renderiza aparte como capa base.

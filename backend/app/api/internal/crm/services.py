@@ -77,25 +77,31 @@ class CustomerService:
         return db_customer
 
     def delete(self, tenant_id: int, customer_id: int) -> dict:
-        """Delete a customer after verifying dependencies (Pets, Orders)."""
+        """Delete a customer and cascade delete their pets and orders using ORM cascade."""
+        from app.api.internal.operations.models import CremationOC
+
         db_customer = self.get_by_id(tenant_id, customer_id)
 
-        # 1. Verificar dependencias (Mascotas)
-        pet_exists = self.db.query(models.Pet).filter(
+        # 1. Obtener todas las mascotas del cliente
+        pets = self.db.query(models.Pet).filter(
             models.Pet.customer_id == customer_id,
             models.Pet.tenant_id == tenant_id
-        ).first()
+        ).all()
 
-        if pet_exists:
-            raise HTTPException(
-                status_code=409, 
-                detail="No se puede eliminar el cliente porque tiene mascotas registradas."
-            )
+        for pet in pets:
+            # 2. Buscar e iterar las órdenes de la mascota para disparar el cascade del ORM
+            orders = self.db.query(CremationOC).filter(
+                CremationOC.pet_id == pet.id,
+                CremationOC.tenant_id == tenant_id
+            ).all()
 
-        # 2. Verificar dependencias (Pedidos/Cremaciones - Future implementation)
-        # order_exists = ...
-        
+            for order in orders:
+                self.db.delete(order)
+            
+            self.db.delete(pet)
+
+        # 3. Eliminar el cliente
         self.db.delete(db_customer)
         self.db.commit()
-        
-        return {"status": "deleted", "message": f"Cliente {db_customer.name} eliminado correctamente"}
+
+        return {"status": "deleted", "message": f"Cliente {db_customer.name} y todos sus registros asociados fueron eliminados correctamente"}

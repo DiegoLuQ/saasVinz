@@ -37,7 +37,7 @@ def verify_token(token: str, tenant_slug: str, db: Session = Depends(get_db)):
     ).first()
     
     if not temp_token:
-        # Check permanent (deprecated)
+        # Check permanent public token
         if tenant.public_token == token:
             return {"valid": True, "expires_at": None, "expired": False}
         return {"valid": False, "expired": True, "message": "Token inválido"}
@@ -97,8 +97,8 @@ async def submit_public_form(
     owner_data: str = Form(...),
     pet_data: str = Form(...),
     selected_services: str = Form(default="[]"),
-    token: str = Form(...),
-    partner_id: int = Form(None),  # NEW: Optional partner ID
+    token: str | None = Form(None),
+    partner_id: int | None = Form(None),  # NEW: Optional partner ID
     recaptcha_token: str = Form(default=""),
     files: list[UploadFile] = File(default=[]),
     db: Session = Depends(get_db)
@@ -152,27 +152,31 @@ async def submit_public_form(
 
     # If no partner, check standard tokens
     if not token_valid:
-        # Primero intentar con token temporal
-        temp_token = db.query(models.TemporaryFormToken).filter(
-            models.TemporaryFormToken.token == token,
-            models.TemporaryFormToken.tenant_id == tenant_id,
-            models.TemporaryFormToken.is_active == True
-        ).first()
-        
-        if temp_token:
-            # Verificar que no esté expirado
-            now = datetime.utcnow()
-            if temp_token.expires_at > now:
-                token_valid = True
+        if token:
+            # Primero intentar con token temporal
+            temp_token = db.query(models.TemporaryFormToken).filter(
+                models.TemporaryFormToken.token == token,
+                models.TemporaryFormToken.tenant_id == tenant_id,
+                models.TemporaryFormToken.is_active == True
+            ).first()
+            
+            if temp_token:
+                # Verificar que no esté expirado
+                now = datetime.utcnow()
+                if temp_token.expires_at > now:
+                    token_valid = True
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN, 
+                        detail="El enlace ha expirado. Solicite un nuevo enlace a la empresa."
+                    )
             else:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN, 
-                    detail="El enlace ha expirado. Solicite un nuevo enlace a la empresa."
-                )
+                # Fallback: Verificar token permanente
+                if tenant.public_token and tenant.public_token == token:
+                    token_valid = True
         else:
-            # Fallback: Verificar token permanente (deprecated)
-            if tenant.public_token == token:
-                token_valid = True
+            # Enlace permanente público de la empresa (sin token en URL)
+            token_valid = True
     
     if not token_valid:
         raise HTTPException(
@@ -230,7 +234,10 @@ async def submit_public_form(
         if len(pet_age) > 3:
             raise HTTPException(status_code=400, detail="Edad no puede exceder 3 caracteres")
         
-        valid_types = ["Canino", "Felino", "Ave", "Mamífero pequeño", "Reptil / Anfibio", "Exótico", "Otro"]
+        valid_types = [
+            "Canino", "Felino", "Ave", "Mamífero pequeño", "Mamífero Pequeño",
+            "Reptil / Anfibio", "Exótico", "Roedor", "Otro"
+        ]
         if pet_type and pet_type not in valid_types:
              raise HTTPException(status_code=400, detail="Tipo de mascota inválido")
 

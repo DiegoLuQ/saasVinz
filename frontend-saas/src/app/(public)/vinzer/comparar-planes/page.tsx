@@ -40,9 +40,10 @@ const comparisonData: FeatureCategory[] = [
     {
         category: "Volumen y Capacidad",
         features: [
-            { name: "Mascotas / Órdenes al mes", description: "Cantidad máxima de servicios u órdenes que puedes ingresar mensualmente", free: "10 / mes", track: "35 / mes", normal: "40 / mes", pro: "60 / mes", ultra: "200 / mes (ampliable)" },
-            { name: "Usuarios incluidos", description: "Cuentas de usuario para tu personal con roles asignables", free: "2 usuarios", track: "2 usuarios", normal: "3 usuarios", pro: "4 usuarios", ultra: "5 usuarios (ampliable)" },
-            { name: "Clientes activos", description: "Límite de clientes en tu base de datos", free: "10 clientes", track: "50 clientes", normal: "50 clientes", pro: "50 clientes", ultra: "100 clientes (ampliable)" },
+            { name: "Mascotas al mes", description: "Cantidad máxima de mascotas que puedes registrar por mes calendario", free: "10 / mes", track: "35 / mes", normal: "40 / mes", pro: "60 / mes", ultra: "200 / mes" },
+            { name: "Órdenes de cremación al mes", description: "Cantidad máxima de órdenes que puedes ingresar por mes calendario", free: "10 / mes", track: "35 / mes", normal: "40 / mes", pro: "60 / mes", ultra: "250 / mes" },
+            { name: "Usuarios incluidos", description: "Cuentas de usuario para tu personal con roles asignables", free: "2 usuarios", track: "2 usuarios", normal: "3 usuarios", pro: "4 usuarios", ultra: "5 usuarios" },
+            { name: "Clientes nuevos al mes", description: "Cantidad máxima de clientes que puedes dar de alta por mes calendario", free: "10 / mes", track: "35 / mes", normal: "40 / mes", pro: "60 / mes", ultra: "100 / mes" },
         ]
     },
     {

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List, Any
 from datetime import datetime
 from app.models import PetStatus
@@ -17,6 +17,13 @@ class CustomerBase(BaseModel):
     region: Optional[str] = None
     city: Optional[str] = None
     country: Optional[str] = None
+
+    @field_validator('email', mode='before')
+    @classmethod
+    def empty_str_to_none(cls, v: Any) -> Any:
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
 
 class CustomerCreate(CustomerBase):
     pass

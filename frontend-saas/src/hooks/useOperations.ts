@@ -12,9 +12,10 @@ export function useOperations(options: {
     setConfirmModal: (modal: any) => void;
     setSelectedOrder: (order: any) => void;
     selectedOrder: any;
+    onOrderFinalized?: (order: any) => void;
 }) {
     const queryClient = useQueryClient();
-    const { showCompleted, startDate, endDate, specificStatus, sortOrder, showToast, setConfirmModal, setSelectedOrder, selectedOrder } = options;
+    const { showCompleted, startDate, endDate, specificStatus, sortOrder, showToast, setConfirmModal, setSelectedOrder, selectedOrder, onOrderFinalized } = options;
 
     // Evidence State
     const [evidenceStepId, setEvidenceStepId] = useState<number | null>(null);
@@ -86,6 +87,9 @@ export function useOperations(options: {
                     setSelectedOrder(updatedOrder);
                     queryClient.invalidateQueries({ queryKey: ['daily-orders'] });
                     setConfirmModal((prev: any) => ({ ...prev, isOpen: false }));
+                    if (onOrderFinalized) {
+                        onOrderFinalized(updatedOrder);
+                    }
                 } catch (err: any) {
                     showToast(err.message || 'Error al finalizar orden', 'error');
                 }

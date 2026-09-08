@@ -21,11 +21,12 @@ import {
     frameWrapperStyle, frameInnerInsetPct, frameImageMaskStyle,
     FRAME_BORDER_PCT, FEATHER_INNER_STOP,
 } from '@/lib/certFrame';
+import { TextBg, textBgStyle, drawTextBackground } from '@/lib/certText';
 
 // --- Tipos compartidos con el editor admin --------------------------------
-interface DesignField {
+interface DesignField extends TextBg {
     id: string;
-    type: 'nombre_mascota' | 'fecha_nacimiento' | 'fecha_fallecimiento' | 'fecha_actual' | 'imagen_mascota' | 'logo_tenant' | 'rut_tenant' | 'encargado_tenant' | 'rut_encargado' | 'celular_tenant' | 'direccion_tenant';
+    type: 'nombre_mascota' | 'fecha_nacimiento' | 'fecha_fallecimiento' | 'fecha_actual' | 'imagen_mascota' | 'logo_tenant' | 'rut_tenant' | 'encargado_tenant' | 'rut_encargado' | 'celular_tenant' | 'direccion_tenant' | 'texto_fijo';
     x: number;
     y: number;
     fontSize?: number;
@@ -34,6 +35,7 @@ interface DesignField {
     align?: 'left' | 'center' | 'right';
     bold?: boolean;
     format?: 'short' | 'long' | 'year' | 'month_year';
+    value?: string; // solo texto_fijo
     slot?: number;
     w?: number;
     shape?: 'circle' | 'rect';
@@ -76,10 +78,17 @@ const FIELD_LABELS: Record<DesignField['type'], string> = {
     rut_encargado: 'RUT Encargado',
     celular_tenant: 'Celular',
     direccion_tenant: 'Dirección',
+    texto_fijo: 'Texto libre',
 };
 
-const fieldLabel = (f: DesignField): string =>
-    f.type === 'imagen_mascota' ? `Foto #${(f.slot ?? 0) + 1}` : FIELD_LABELS[f.type] || 'Campo';
+const fieldLabel = (f: DesignField, effectiveText?: string): string => {
+    if (f.type === 'imagen_mascota') return `Foto #${(f.slot ?? 0) + 1}`;
+    if (f.type === 'texto_fijo') {
+        const t = (effectiveText ?? f.value ?? '').trim();
+        return t ? `Texto: ${t.length > 24 ? t.slice(0, 24) + '…' : t}` : 'Texto libre';
+    }
+    return FIELD_LABELS[f.type] || 'Campo';
+};
 
 interface CremationLite {
     id: number;
@@ -126,6 +135,9 @@ export default function EmitirDocumentosPage() {
     const [selectedCremId, setSelectedCremId] = useState<number | null>(null);
     const [dateOverrides, setDateOverrides] = useState<Record<string, string>>({});
     const [photoOverrides, setPhotoOverrides] = useState<Record<string, string>>({});
+    // Texto libre editable por el tenant al emitir. El diseño trae el texto por
+    // defecto; aquí se guarda el cambio, sin tocar la plantilla del admin.
+    const [textOverrides, setTextOverrides] = useState<Record<string, string>>({});
     // Visibilidad elegida por el tenant para cada elemento decorativo: { elementId: bool }
     const [elementToggles, setElementToggles] = useState<Record<string, boolean>>({});
     // Visibilidad elegida por el tenant para cada campo: { fieldId: bool }
@@ -175,6 +187,12 @@ export default function EmitirDocumentosPage() {
         setSelectedCremId(null);
         setDateOverrides({});
         setPhotoOverrides({});
+        // Se precarga con el texto del diseño para que el tenant lo vea y edite.
+        const initTexts: Record<string, string> = {};
+        (tpl.sections_config?.fields || []).forEach((f) => {
+            if (f.type === 'texto_fijo') initTexts[f.id] = f.value ?? '';
+        });
+        setTextOverrides(initTexts);
         // Inicializar marcos con el del diseño (el tenant puede cambiarlos)
         const initFrames: Record<string, CertFrame> = {};
         (tpl.sections_config?.fields || []).forEach((f) => {
@@ -231,6 +249,7 @@ export default function EmitirDocumentosPage() {
     const aspect = active?.sections_config?.aspect_ratio || '16:9';
     const dateFields = fields.filter((f) => f.type.startsWith('fecha'));
     const imageFields = fields.filter((f) => f.type === 'imagen_mascota');
+    const textFields = fields.filter((f) => f.type === 'texto_fijo');
 
     // ¿Se muestra el elemento? Según el toggle del tenant; por defecto, los
     // opcionales según su visibilidad por defecto y los fijos siempre.
@@ -265,6 +284,7 @@ export default function EmitirDocumentosPage() {
         if (f.type === 'rut_encargado') return tenantInfo.managerRut || '';
         if (f.type === 'celular_tenant') return tenantInfo.phone || '';
         if (f.type === 'direccion_tenant') return tenantInfo.address || '';
+        if (f.type === 'texto_fijo') return textOverrides[f.id] ?? f.value ?? '';
         return '';
     };
 
@@ -285,6 +305,10 @@ export default function EmitirDocumentosPage() {
         dateFields.forEach((f) => {
             const fmt = dateOverrides[f.id] || f.format;
             if (fmt) overrides[f.id] = { format: fmt };
+        });
+        textFields.forEach((f) => {
+            const v = textOverrides[f.id];
+            if (v !== undefined) overrides[f.id] = { ...(overrides[f.id] || {}), value: v };
         });
         imageFields.forEach((f) => {
             const entry: any = {};
@@ -557,10 +581,16 @@ export default function EmitirDocumentosPage() {
                         const value = fieldValue(f);
                         if (!value) return;
                         const weight = f.bold ? '700' : '400';
-                        ctx.font = `${weight} ${(f.fontSize || 32) * q}px ${f.fontFamily || 'Georgia, serif'}`;
-                        ctx.fillStyle = f.color || '#1a1a1a';
+                        const px = (f.fontSize || 32) * q;
+                        ctx.font = `${weight} ${px}px ${f.fontFamily || 'Georgia, serif'}`;
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
+
+                        // Fondo del texto: misma caja que el DOM, con el relleno
+                        // escalado por el factor q de exportación.
+                        drawTextBackground(ctx, f, { value, cx, cy, fontPx: px, scale: q });
+
+                        ctx.fillStyle = f.color || '#1a1a1a';
                         ctx.fillText(value, cx, cy);
                     },
                 });
@@ -715,13 +745,43 @@ export default function EmitirDocumentosPage() {
                                                     onClick={() => setFieldToggles((prev) => ({ ...prev, [f.id]: !on }))}
                                                     className="flex items-center gap-3 p-2.5 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/5 cursor-pointer transition-all"
                                                 >
-                                                    <span className="flex-1 text-xs font-bold text-white/70">{fieldLabel(f)}</span>
+                                                    <span className="flex-1 text-xs font-bold text-white/70">{fieldLabel(f, textOverrides[f.id])}</span>
                                                     <div className={`w-10 h-5 rounded-full relative transition-all ${on ? 'bg-primary' : 'bg-white/10'}`}>
                                                         <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-all ${on ? 'translate-x-5' : 'translate-x-0'}`} />
                                                     </div>
                                                 </div>
                                             );
                                         })}
+                                    </div>
+                                )}
+
+                                {/* Edición del texto libre */}
+                                {selectedCrem && textFields.length > 0 && (
+                                    <div className="space-y-3">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-white/40 flex items-center gap-2"><Type size={12} /> Textos</label>
+                                        {textFields.map((f, i) => (
+                                            <div key={f.id} className="space-y-1.5">
+                                                <span className="text-[10px] text-white/40 font-bold uppercase">
+                                                    {textFields.length > 1 ? `Texto #${i + 1}` : 'Texto libre'}
+                                                </span>
+                                                <textarea
+                                                    value={textOverrides[f.id] ?? f.value ?? ''}
+                                                    onChange={(e) => setTextOverrides((prev) => ({ ...prev, [f.id]: e.target.value }))}
+                                                    rows={2}
+                                                    placeholder="Escribe el texto para este certificado"
+                                                    className="w-full bg-black/40 border border-white/5 rounded-xl py-2 px-3 text-xs font-bold text-white outline-none focus:border-primary/50 resize-y"
+                                                />
+                                                {(textOverrides[f.id] ?? '') !== (f.value ?? '') && (
+                                                    <button
+                                                        onClick={() => setTextOverrides((prev) => ({ ...prev, [f.id]: f.value ?? '' }))}
+                                                        className="text-[10px] font-bold text-primary hover:underline"
+                                                    >
+                                                        Restaurar el texto del diseño
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                        <p className="text-[10px] text-white/20 font-medium">Solo cambia este certificado; el diseño original no se modifica.</p>
                                     </div>
                                 )}
 
@@ -932,6 +992,7 @@ export default function EmitirDocumentosPage() {
                                                             fontWeight: f.bold ? 700 : 400,
                                                             whiteSpace: 'nowrap',
                                                             lineHeight: 1.1,
+                                                            ...textBgStyle(f),
                                                         }}
                                                     >
                                                         {fieldValue(f)}

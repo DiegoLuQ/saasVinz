@@ -60,13 +60,15 @@ export default function PlantillasImagenPage() {
             {/* Header */}
             <div className="flex items-center justify-between mb-8">
                 <div>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-full mb-3">
+                        <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Uso en Tenant: Módulo Documentos → Catálogo de Diseños</span>
+                    </div>
                     <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
                         <ImageIcon className="text-primary" size={28} />
-                        Plantillas de Imagen
+                        Diseños Gráficos (Canvas)
                     </h1>
                     <p className="text-white/50 mt-2 text-sm">
-                        Recursos del sistema sembrados por código. Los tenants los reutilizan
-                        completando nombre, fecha y foto de la mascota.
+                        Plantillas gráficas y stickers generados sobre lienzo (Konva/Canvas). Los crematorios pueden personalizarlos con fotos y dedicatorias para redes o entrega digital.
                     </p>
                 </div>
             </div>

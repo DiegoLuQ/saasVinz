@@ -121,7 +121,7 @@ export const PlanLimitModal = ({
                         <div className="space-y-3">
                             <button
                                 onClick={() => {
-                                    router.push('/tenant/dashboard/configuracion?tab=facturacion');
+                                    router.push('/dashboard/configuracion?tab=facturacion');
                                     handleClose();
                                 }}
                                 className="w-full py-4 bg-primary text-primary-foreground font-black text-sm rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 uppercase tracking-wider"

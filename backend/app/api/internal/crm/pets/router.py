@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 import os
-import shutil
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app import models
@@ -8,6 +7,7 @@ from app import schemas
 from app.api.deps import get_tenant_id
 from app.api.internal.admin.rbac.router import check_permission
 from app.api.internal.common.media_service import MediaService
+from app.utils.upload_validation import read_and_validate_image
 from typing import List
 
 from app.api.deps_limits import check_resource_limit
@@ -27,8 +27,7 @@ def create_pet(
     pet_in: schemas.PetCreate,
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
-    _: bool = Depends(check_permission("mascotas", "create")),
-    __: bool = Depends(check_resource_limit("pets"))
+    _: bool = Depends(check_permission("mascotas", "create"))
 ):
     # Verify customer exists for this tenant
     customer = db.query(models.Customer).filter(
@@ -107,16 +106,16 @@ async def upload_image(
     tenant_id: int = Depends(get_tenant_id)
 ):
     """Sube una imagen de mascota usando el MediaService unificado."""
-    # Temporary save for the orchestrator
+    # Validar por contenido real (magic bytes) + tamaño, no por filename del cliente.
+    content, ext = await read_and_validate_image(file)
+
     temp_dir = "temp_uploads"
     os.makedirs(temp_dir, exist_ok=True)
-    ext = os.path.splitext(file.filename)[1]
     import uuid
-    import time
-    temp_path = os.path.join(temp_dir, f"{uuid.uuid4()}{ext}")
-    
+    temp_path = os.path.join(temp_dir, f"{uuid.uuid4().hex}.{ext}")
+
     with open(temp_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        buffer.write(content)
 
     try:
         # Normalizar nombre para el prefijo del archivo

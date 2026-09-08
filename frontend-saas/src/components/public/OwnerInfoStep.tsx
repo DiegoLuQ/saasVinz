@@ -62,7 +62,7 @@ const COUNTRY_CODES = [
 const CONTACT_OPTIONS = [
     { value: 'whatsapp' as const, label: 'WhatsApp', Icon: MessageCircle },
     { value: 'phone' as const, label: 'Llamada', Icon: Phone },
-    { value: 'any' as const, label: 'Cualquiera', Icon: Sparkles },
+    { value: 'any' as const, label: 'WhatsApp o Llamada', Icon: Sparkles },
 ];
 
 // Feature flag: pausar campo "Código de Servicio" hasta que vuelva a ser necesario.
@@ -148,9 +148,13 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="text-center mb-12">
-                <h2 className="text-4xl font-semibold tracking-tight text-slate-800 dark:text-slate-100 mb-3">Información de contacto</h2>
-                <p className="text-xs text-slate-400 dark:text-slate-500 font-medium tracking-wide">Estamos aquí para acompañarte y coordinar cada detalle.</p>
+            <div className="text-center mb-10">
+                <h2 className="text-3xl font-extrabold uppercase italic tracking-tight text-slate-800 dark:text-slate-100 mb-1.5">
+                    Información de la Familia
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-normal tracking-wide">
+                    Estamos aquí para acompañarte y coordinar cada detalle
+                </p>
             </div>
 
             <div className="form-card space-y-5">
@@ -167,60 +171,35 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                     {errors.fullName && <p className="text-[10px] text-red-500 mt-2 font-bold uppercase tracking-tight ml-2">! {errors.fullName}</p>}
                 </div>
 
-                <div>
-                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">RUT (Opcional)</label>
-                    <input
-                        type="text"
-                        value={data.rut || ''}
-                        onChange={handleRutChange}
-                        className="input-emotional"
-                        placeholder="Ej: 12.345.678-9"
-                        maxLength={13}
-                    />
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div>
-                        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Email *</label>
-                        <input
-                            type="email"
-                            value={data.email}
-                            onChange={(e) => updateData({ email: e.target.value.slice(0, 50) })}
-                            className={`input-emotional ${errors.email ? 'border-red-500/50 focus:ring-red-500/10' : ''}`}
-                            placeholder="tu@email.com"
-                            maxLength={50}
-                        />
-                        {errors.email && <p className="text-[10px] text-red-500 mt-2 font-bold uppercase tracking-tight ml-2">! {errors.email}</p>}
-                    </div>
-                    <div>
-                        <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Teléfono *</label>
-                        <div className="flex gap-2">
-                            <div className="relative w-28 shrink-0">
-                                <select
-                                    value={countryCode}
-                                    onChange={handleCountryCodeChange}
-                                    className="w-full input-emotional appearance-none pr-8 cursor-pointer text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-950"
-                                    style={{ paddingRight: '1.5rem' }}
-                                >
-                                    {COUNTRY_CODES.map((c) => (
-                                        <option key={c.country} value={c.code}>
-                                            {c.flag} {c.code}
-                                        </option>
-                                    ))}
-                                </select>
-                                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-                            </div>
-                            <input
-                                type="tel"
-                                value={localPhone}
-                                onChange={handleLocalPhoneChange}
-                                className={`flex-1 input-emotional ${errors.phone ? 'border-red-500/50 focus:ring-red-500/10' : ''}`}
-                                placeholder="9 1234 5678"
-                                maxLength={9}
-                            />
+                <div>
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Teléfono *</label>
+                    <div className="flex gap-2">
+                        <div className="relative w-32 shrink-0">
+                            <select
+                                value={countryCode}
+                                onChange={handleCountryCodeChange}
+                                className="w-full input-emotional appearance-none pr-8 cursor-pointer text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-950"
+                                style={{ paddingRight: '1.5rem' }}
+                            >
+                                {COUNTRY_CODES.map((c) => (
+                                    <option key={c.country} value={c.code}>
+                                        {c.flag} {c.code}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
                         </div>
-                        {errors.phone && <p className="text-[10px] text-red-500 mt-2 font-bold uppercase tracking-tight ml-2">! {errors.phone}</p>}
+                        <input
+                            type="tel"
+                            value={localPhone}
+                            onChange={handleLocalPhoneChange}
+                            className={`flex-1 input-emotional ${errors.phone ? 'border-red-500/50 focus:ring-red-500/10' : ''}`}
+                            placeholder="9 1234 5678"
+                            maxLength={9}
+                        />
                     </div>
+                    {errors.phone && <p className="text-[10px] text-red-500 mt-2 font-bold uppercase tracking-tight ml-2">! {errors.phone}</p>}
                 </div>
 
                 {/* Preferencia de contacto */}

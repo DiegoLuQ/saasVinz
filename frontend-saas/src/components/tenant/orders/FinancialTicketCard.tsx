@@ -49,15 +49,15 @@ interface FinancialTicketCardProps {
 const CLP = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' });
 
 // Compact ticket-style price input
-function PriceCell({ value, onChange, accentClass = 'text-white' }: { value: number; onChange: (v: number) => void; accentClass?: string }) {
+function PriceCell({ value, onChange, accentClass = 'text-foreground' }: { value: number; onChange: (v: number) => void; accentClass?: string }) {
     return (
-        <div className="bg-black/30 rounded-md px-2 py-0.5 border border-white/[0.06] flex items-center gap-0.5 shrink-0">
-            <span className="text-[9px] text-muted-foreground/60 font-mono">$</span>
+        <div className="bg-background border border-border rounded-lg px-2 py-1 flex items-center gap-0.5 shrink-0 shadow-sm focus-within:ring-2 focus-within:ring-primary/40">
+            <span className="text-[10px] text-muted-foreground font-mono font-bold">$</span>
             <input
                 type="number"
                 value={value}
                 onChange={(e) => onChange(Number(e.target.value))}
-                className={`w-16 bg-transparent text-right text-[11px] font-black outline-none p-0 font-mono ${accentClass}`}
+                className={`w-18 bg-transparent text-right text-xs font-extrabold outline-none p-0 font-mono ${accentClass}`}
             />
         </div>
     );
@@ -99,60 +99,60 @@ export default function FinancialTicketCard({
             {/* === Single dark ticket panel === */}
             <article
                 aria-label="Ticket financiero de la orden"
-                className="bg-zinc-950 rounded-3xl border border-white/[0.06] ring-1 ring-primary/[0.08] shadow-2xl shadow-black/40 overflow-hidden"
+                className="bg-card border border-border rounded-3xl shadow-xl overflow-hidden backdrop-blur-xl"
             >
                 {/* Ticket header */}
-                <header className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-white/[0.06]">
+                <header className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-border/60 bg-muted/30">
                     <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center text-primary" aria-hidden="true">
                             <Receipt size={17} />
                         </div>
                         <div>
-                            <h2 className="text-sm font-black text-white tracking-tight uppercase">Ticket de Orden</h2>
-                            <p className="text-[9px] text-muted-foreground/70 uppercase tracking-[0.18em]">Resumen y configuración</p>
+                            <h2 className="text-sm font-black text-foreground tracking-tight uppercase">Ticket de Orden</h2>
+                            <p className="text-[9px] text-muted-foreground font-semibold uppercase tracking-[0.18em]">Resumen y configuración</p>
                         </div>
                     </div>
                     {currentCremation?.oc_number && (
-                        <span className="text-[10px] font-mono font-black text-primary/80 bg-primary/10 px-2 py-1 rounded-md">
+                        <span className="text-[10px] font-mono font-black text-primary bg-primary/10 px-2.5 py-1 rounded-lg border border-primary/20">
                             OC #{String(currentCremation.oc_number).padStart(4, '0')}
                         </span>
                     )}
                 </header>
 
                 {/* === Add items section — Compact drawer triggers === */}
-                <section className="px-6 py-4 space-y-2 border-b border-dashed border-white/[0.06]">
+                <section className="px-6 py-4 space-y-2 border-b border-dashed border-border/60 bg-background/50">
                     <button
                         type="button"
                         onClick={() => setDrawerType('plan')}
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-dashed border-white/[0.08] bg-white/[0.01] hover:border-primary/30 hover:bg-primary/[0.04] transition-all group"
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-dashed border-primary/30 bg-primary/5 hover:border-primary hover:bg-primary/10 transition-all group"
                     >
-                        <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center text-primary shrink-0 group-hover:scale-110 transition-transform">
+                        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary shrink-0 group-hover:scale-110 transition-transform">
                             <Layers size={14} />
                         </div>
-                        <span className="text-[10px] font-black text-white/80 uppercase tracking-wider flex-1 text-left">Agregar Plan <span className="text-red-400">*</span></span>
-                        <Plus size={14} className="text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                        <span className="text-[10px] font-black text-foreground uppercase tracking-wider flex-1 text-left">Agregar Plan <span className="text-red-500">*</span></span>
+                        <Plus size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
                     </button>
 
                     <div className="grid grid-cols-2 gap-2">
                         <button
                             type="button"
                             onClick={() => setDrawerType('service')}
-                            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-white/[0.08] bg-white/[0.01] hover:border-blue-400/30 hover:bg-blue-400/[0.04] transition-all group"
+                            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-border bg-muted/40 hover:border-blue-500/40 hover:bg-blue-500/10 transition-all group"
                         >
-                            <div className="w-7 h-7 rounded-lg bg-blue-400/15 flex items-center justify-center text-blue-400 shrink-0 group-hover:scale-110 transition-transform">
+                            <div className="w-7 h-7 rounded-lg bg-blue-500/15 flex items-center justify-center text-blue-500 shrink-0 group-hover:scale-110 transition-transform">
                                 <Sparkles size={12} />
                             </div>
-                            <span className="text-[9px] font-black text-white/70 uppercase tracking-wider">Servicio</span>
+                            <span className="text-[9px] font-black text-foreground/80 uppercase tracking-wider">Servicio</span>
                         </button>
                         <button
                             type="button"
                             onClick={() => setDrawerType('product')}
-                            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-white/[0.08] bg-white/[0.01] hover:border-orange-400/30 hover:bg-orange-400/[0.04] transition-all group"
+                            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-border bg-muted/40 hover:border-amber-500/40 hover:bg-amber-500/10 transition-all group"
                         >
-                            <div className="w-7 h-7 rounded-lg bg-orange-400/15 flex items-center justify-center text-orange-400 shrink-0 group-hover:scale-110 transition-transform">
+                            <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center text-amber-500 shrink-0 group-hover:scale-110 transition-transform">
                                 <Package size={12} />
                             </div>
-                            <span className="text-[9px] font-black text-white/70 uppercase tracking-wider">Producto</span>
+                            <span className="text-[9px] font-black text-foreground/80 uppercase tracking-wider">Producto</span>
                         </button>
                     </div>
                 </section>
@@ -361,11 +361,11 @@ export default function FinancialTicketCard({
                 </section>
 
                 {/* === Discount + Total === */}
-                <section className="px-6 py-5 border-t border-dashed border-white/[0.06] space-y-4 bg-black/20">
+                <section className="px-6 py-5 border-t border-dashed border-border/60 space-y-4 bg-muted/20">
                     {selectedProducts.length > 0 && (
                         <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider">
-                            <span className="text-orange-400/70">Subtotal Productos ({selectedProducts.length})</span>
-                            <span className="text-orange-400 font-mono">{CLP.format(productsSubtotal)}</span>
+                            <span className="text-amber-500 font-semibold">Subtotal Productos ({selectedProducts.length})</span>
+                            <span className="text-amber-500 font-mono font-bold">{CLP.format(productsSubtotal)}</span>
                         </div>
                     )}
 
@@ -380,25 +380,25 @@ export default function FinancialTicketCard({
                             max="100"
                             value={discountValue}
                             onChange={(e) => setCurrentCremation(prev => ({ ...prev, discount: Number(e.target.value) }))}
-                            className="w-16 h-9 bg-black/40 border border-white/[0.06] rounded-lg px-2.5 text-right text-[12px] font-black text-white focus:border-primary outline-none font-mono"
+                            className="w-16 h-9 bg-background border border-border rounded-lg px-2.5 text-right text-xs font-black text-foreground focus:ring-2 focus:ring-primary focus:border-primary outline-none font-mono shadow-sm"
                             aria-label="Porcentaje de descuento"
                         />
                     </div>
 
-                    <div className="pt-4 border-t-2 border-white/[0.08] flex flex-col items-end gap-1">
+                    <div className="pt-4 border-t-2 border-border/80 flex flex-col items-end gap-1">
                         <p className="text-[9px] font-black text-primary uppercase tracking-[0.22em]">Total a Pagar</p>
-                        <p className="text-3xl lg:text-4xl font-black text-white tracking-tight font-mono">
+                        <p className="text-3xl lg:text-4xl font-black text-foreground tracking-tight font-mono">
                             {CLP.format(grandTotal)}
                         </p>
                     </div>
                 </section>
 
                 {/* === Actions === */}
-                <footer className="px-6 py-5 border-t border-white/[0.06] flex flex-col sm:flex-row gap-2.5">
+                <footer className="px-6 py-5 border-t border-border/60 flex flex-col sm:flex-row gap-2.5 bg-muted/10">
                     <button
                         type="button"
                         onClick={onBack}
-                        className="sm:flex-1 h-12 px-4 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] text-white/80 font-black uppercase text-[10px] tracking-[0.18em] transition-all active:scale-95"
+                        className="sm:flex-1 h-12 px-4 rounded-xl bg-background border border-border hover:bg-muted text-foreground/80 font-black uppercase text-[10px] tracking-[0.18em] transition-all active:scale-95 shadow-sm"
                     >
                         Cancelar
                     </button>
@@ -407,10 +407,10 @@ export default function FinancialTicketCard({
                         disabled={isSaving}
                         className={`
                             group relative sm:flex-[2] h-14 text-white px-6 rounded-xl font-black uppercase text-xs tracking-[0.22em]
-                            transition-all active:scale-95 flex items-center justify-center overflow-hidden
+                            transition-all active:scale-95 flex items-center justify-center overflow-hidden shadow-lg
                             ${allSectionsComplete
-                                ? 'bg-gradient-to-r from-primary to-[#00B377] shadow-xl shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-0.5 ring-1 ring-primary/40'
-                                : 'bg-gradient-to-r from-primary/40 to-[#00B377]/40 shadow-none cursor-default ring-1 ring-white/[0.05]'
+                                ? 'bg-gradient-to-r from-primary via-emerald-600 to-primary shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-0.5'
+                                : 'bg-primary/50 cursor-default opacity-80'
                             }
                             disabled:opacity-50 disabled:translate-y-0
                         `}

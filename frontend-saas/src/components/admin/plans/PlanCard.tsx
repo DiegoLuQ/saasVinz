@@ -46,8 +46,6 @@ interface PlanCardProps {
 }
 
 const LIMIT_FIELDS: { field: keyof PlanData; label: string; Icon: any }[] = [
-    { field: 'max_pets', label: 'Mascotas (Mens.)', Icon: Database },
-    { field: 'max_customers', label: 'Clientes (Mens.)', Icon: Users },
     { field: 'max_orders', label: 'Órdenes Crem. (Mens.)', Icon: ShoppingCart },
     { field: 'max_services', label: 'Servicios (Tot.)', Icon: Package },
     { field: 'max_plans', label: 'Planes Int. (Tot.)', Icon: FileText },

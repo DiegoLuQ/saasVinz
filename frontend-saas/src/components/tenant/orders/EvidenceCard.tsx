@@ -72,6 +72,13 @@ export default function EvidenceCard({
                             Cargar desde Mascota
                         </button>
                     </div>
+
+                    {totalImages === 0 && (
+                        <div className="bg-amber-500/10 border border-amber-500/20 text-amber-300 rounded-xl px-4 py-2.5 text-xs font-semibold flex items-center gap-2">
+                            <span>⚠️</span>
+                            <span>Debe adjuntar <strong>al menos 1 imagen obligatoria</strong> (foto de evidencia o mascota) para guardar o actualizar la orden.</span>
+                        </div>
+                    )}
                     <div
                         className="border-2 border-dashed border-white/[0.08] rounded-3xl p-6 sm:p-10 lg:p-12 hover:bg-white/[0.02] transition-all min-h-[200px] flex gap-5 overflow-x-auto items-center scrollbar-hide"
                         role="list"

@@ -16,6 +16,7 @@ interface ProfileCardProps {
     selectedPartner?: Partner;
     onPetChange: (val: string | number) => void;
     onStatusChange: (val: string | number) => void;
+    onNewPetClick?: () => void;
 }
 
 export default function ProfileCard({
@@ -26,6 +27,7 @@ export default function ProfileCard({
     selectedPartner,
     onPetChange,
     onStatusChange,
+    onNewPetClick,
 }: ProfileCardProps) {
     const hasPet = !!currentCremation?.pet_id && !!selectedPet;
 
@@ -35,9 +37,20 @@ export default function ProfileCard({
                 {/* Selectors row — minimal, no decorative chrome */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2.5">
-                        <label htmlFor="select-pet" className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.18em]">
-                            Mascota <span className="text-red-400">*</span>
-                        </label>
+                        <div className="flex items-center justify-between">
+                            <label htmlFor="select-pet" className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.18em]">
+                                Angelito <span className="text-red-400">*</span>
+                            </label>
+                            {onNewPetClick && (
+                                <button
+                                    type="button"
+                                    onClick={onNewPetClick}
+                                    className="text-xs text-primary hover:underline font-bold flex items-center gap-1"
+                                >
+                                    + Nuevo Angelito
+                                </button>
+                            )}
+                        </div>
                         <SearchableSelect
                             options={petOptions}
                             value={currentCremation?.pet_id || 0}
@@ -84,7 +97,7 @@ export default function ProfileCard({
                                 )}
                             </div>
 
-                            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.22em] mb-1">Mascota</p>
+                            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.22em] mb-1">Angelito</p>
                             <h3 className="text-xl font-black text-white tracking-tight mb-3 truncate max-w-full">{selectedPet.name}</h3>
 
                             <dl className="grid grid-cols-2 gap-3 w-full text-left">
@@ -173,7 +186,7 @@ export default function ProfileCard({
                     <div className="p-12 border-2 border-dashed border-white/[0.06] rounded-2xl flex flex-col items-center justify-center text-center" role="status">
                         <AlertTriangle className="text-muted-foreground/30 mb-3" size={32} aria-hidden="true" />
                         <p className="text-xs font-bold text-muted-foreground uppercase tracking-[0.18em]">
-                            Selecciona una mascota para mostrar el perfil
+                            Selecciona un angelito para mostrar el perfil
                         </p>
                     </div>
                 )}

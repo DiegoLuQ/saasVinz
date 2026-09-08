@@ -6,6 +6,7 @@ import { getClipPath, getImageFilter } from '../utils/imageUtils';
 
 function toLocalProxy(url: string | null | undefined): string {
     if (!url) return '';
+    if (url.startsWith('blob:') || url.startsWith('data:')) return url;
     try {
         if (url.startsWith('http')) {
             const parsed = new URL(url);
@@ -79,15 +80,22 @@ function FarewellPetImage({
             return;
         }
 
-        console.log("[FarewellPetImage] Starting image load:", src);
+        const isLocal = src.startsWith('blob:') || src.startsWith('data:');
+        console.log("[FarewellPetImage] Starting image load:", src, "isLocal:", isLocal);
         const img = new Image();
-        img.crossOrigin = 'anonymous';
+        if (!isLocal) {
+            img.crossOrigin = 'anonymous';
+        }
         img.onload = () => {
             console.log("[FarewellPetImage] Image loaded successfully:", src, "Dimensions:", img.naturalWidth, "x", img.naturalHeight);
             imgRef.current = img;
             drawFeathered(canvas, img, width, height, shape, glow!);
         };
         img.onerror = (err) => {
+            if (isLocal) {
+                console.error("[FarewellPetImage] Local blob/data image failed to load:", src, err);
+                return;
+            }
             console.warn("[FarewellPetImage] CORS loading failed for pet image with crossOrigin='anonymous', retrying without it:", src, err);
             const fallbackImg = new Image();
             fallbackImg.onload = () => {
@@ -537,6 +545,76 @@ const FarewellPreview = forwardRef<HTMLDivElement, FarewellPreviewProps>(({ conf
                     />
                 </div>
             ))}
+
+            {/* Tenant Logo (Logo oficial del Crematorio / Empresa) */}
+            {config.tenantLogo?.enabled && (
+                (() => {
+                    const rawLogoUrl = config.elements?.tenantLogoUrl || config.tenantLogo?.url || config.tenantLogo?.sampleUrl;
+                    if (!rawLogoUrl) return null;
+                    const pos = config.tenantLogo?.position || 'bottom-center';
+                    const size = px(config.tenantLogo?.size ?? 65, 65);
+                    const opacity = typeof config.tenantLogo?.opacity === 'number' ? config.tenantLogo.opacity : 0.9;
+                    const offsetX = pxX(config.tenantLogo?.x ?? 0);
+                    const offsetY = pxY(config.tenantLogo?.y ?? 0);
+
+                    let topStyle: string | number = 'auto';
+                    let bottomStyle: string | number = 'auto';
+                    let leftStyle: string | number = 'auto';
+                    let rightStyle: string | number = 'auto';
+                    let transformStyle = '';
+
+                    const margin = px(22, 22);
+
+                    if (pos === 'top-left') {
+                        topStyle = `${margin}px`;
+                        leftStyle = `${margin}px`;
+                        transformStyle = `translate(${offsetX}px, ${offsetY}px)`;
+                    } else if (pos === 'top-center') {
+                        topStyle = `${margin}px`;
+                        leftStyle = '50%';
+                        transformStyle = `translateX(-50%) translate(${offsetX}px, ${offsetY}px)`;
+                    } else if (pos === 'top-right') {
+                        topStyle = `${margin}px`;
+                        rightStyle = `${margin}px`;
+                        transformStyle = `translate(${offsetX}px, ${offsetY}px)`;
+                    } else if (pos === 'bottom-left') {
+                        bottomStyle = `${margin}px`;
+                        leftStyle = `${margin}px`;
+                        transformStyle = `translate(${offsetX}px, ${offsetY}px)`;
+                    } else if (pos === 'bottom-right') {
+                        bottomStyle = `${margin}px`;
+                        rightStyle = `${margin}px`;
+                        transformStyle = `translate(${offsetX}px, ${offsetY}px)`;
+                    } else { // default 'bottom-center'
+                        bottomStyle = `${margin}px`;
+                        leftStyle = '50%';
+                        transformStyle = `translateX(-50%) translate(${offsetX}px, ${offsetY}px)`;
+                    }
+
+                    return (
+                        <div
+                            className="absolute flex items-center justify-center pointer-events-none"
+                            style={{
+                                top: topStyle,
+                                bottom: bottomStyle,
+                                left: leftStyle,
+                                right: rightStyle,
+                                transform: transformStyle,
+                                width: `${size}px`,
+                                height: `${size}px`,
+                                opacity: opacity,
+                                zIndex: config.tenantLogo?.zIndex ?? 25,
+                            }}
+                        >
+                            <img
+                                src={toLocalProxy(getImageUrl(rawLogoUrl))}
+                                alt="Logo Empresa"
+                                className="max-w-full max-h-full object-contain filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.25)]"
+                            />
+                        </div>
+                    );
+                })()
+            )}
         </div>
     );
 });

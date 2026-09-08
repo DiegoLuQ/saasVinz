@@ -7,6 +7,7 @@ import {
     Filter,
     Eye,
     CheckCircle2,
+    Check,
     XSquare,
     Loader2,
     TrendingUp,
@@ -66,19 +67,112 @@ interface Customer {
     name: string;
 }
 
-const statusMap: Record<string, { label: string, color: string }> = {
-    'pendiente': { label: 'Pendiente', color: 'text-orange-400 bg-orange-400/10 border border-orange-400/20 font-bold' },
-    'pending': { label: 'Pendiente', color: 'text-orange-400 bg-orange-400/10 border border-orange-400/20 font-bold' },
-    'received': { label: 'Pendiente', color: 'text-orange-400 bg-orange-400/10 border border-orange-400/20 font-bold' },
-    'en_proceso': { label: 'En Proceso', color: 'text-blue-400 bg-blue-400/10 border border-blue-400/20 font-bold shadow-[0_0_10px_rgba(96,165,250,0.1)]' },
-    'processing': { label: 'En Proceso', color: 'text-blue-400 bg-blue-400/10 border border-blue-400/20 font-bold shadow-[0_0_10px_rgba(96,165,250,0.1)]' },
-    'completado': { label: 'Completado', color: 'text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 font-bold shadow-[0_0_10px_rgba(52,211,153,0.1)]' },
-    'cancelado': { label: 'Cancelado', color: 'text-red-400 bg-red-400/10 border border-red-400/20 font-bold' },
-    'canceled': { label: 'Cancelado', color: 'text-red-400 bg-red-400/10 border border-red-400/20 font-bold' },
-    'entregado': { label: 'Entregado', color: 'text-[#FFD700] bg-[#FFD700]/10 border border-[#FFD700]/20 font-bold shadow-[0_0_10px_rgba(255,215,0,0.1)]' },
-    'delivered': { label: 'Entregado', color: 'text-[#FFD700] bg-[#FFD700]/10 border border-[#FFD700]/20 font-bold shadow-[0_0_10px_rgba(255,215,0,0.1)]' },
-    'finished': { label: 'Entregado', color: 'text-[#FFD700] bg-[#FFD700]/10 border border-[#FFD700]/20 font-bold shadow-[0_0_10px_rgba(255,215,0,0.1)]' },
-    'completed': { label: 'Completado', color: 'text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 font-bold shadow-[0_0_10px_rgba(52,211,153,0.1)]' }
+interface StatusStyle {
+    label: string;
+    bg: string;
+    border: string;
+    text: string;
+    dot: string;
+    glow: string;
+}
+
+const statusMap: Record<string, StatusStyle> = {
+    'pendiente': {
+        label: 'Pendiente',
+        bg: 'bg-amber-500/10 hover:bg-amber-500/15',
+        border: 'border-amber-500/30',
+        text: 'text-amber-400',
+        dot: 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]',
+        glow: 'shadow-[0_0_12px_rgba(245,158,11,0.12)]'
+    },
+    'pending': {
+        label: 'Pendiente',
+        bg: 'bg-amber-500/10 hover:bg-amber-500/15',
+        border: 'border-amber-500/30',
+        text: 'text-amber-400',
+        dot: 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]',
+        glow: 'shadow-[0_0_12px_rgba(245,158,11,0.12)]'
+    },
+    'received': {
+        label: 'Pendiente',
+        bg: 'bg-amber-500/10 hover:bg-amber-500/15',
+        border: 'border-amber-500/30',
+        text: 'text-amber-400',
+        dot: 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]',
+        glow: 'shadow-[0_0_12px_rgba(245,158,11,0.12)]'
+    },
+    'en_proceso': {
+        label: 'En Proceso',
+        bg: 'bg-sky-500/15 hover:bg-sky-500/20',
+        border: 'border-sky-500/40',
+        text: 'text-sky-300',
+        dot: 'bg-sky-400 animate-pulse shadow-[0_0_10px_rgba(56,189,248,0.9)]',
+        glow: 'shadow-[0_0_16px_rgba(14,165,233,0.18)]'
+    },
+    'processing': {
+        label: 'En Proceso',
+        bg: 'bg-sky-500/15 hover:bg-sky-500/20',
+        border: 'border-sky-500/40',
+        text: 'text-sky-300',
+        dot: 'bg-sky-400 animate-pulse shadow-[0_0_10px_rgba(56,189,248,0.9)]',
+        glow: 'shadow-[0_0_16px_rgba(14,165,233,0.18)]'
+    },
+    'entregado': {
+        label: 'Entregado',
+        bg: 'bg-emerald-500/15 hover:bg-emerald-500/20',
+        border: 'border-emerald-500/40',
+        text: 'text-emerald-300',
+        dot: 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)]',
+        glow: 'shadow-[0_0_16px_rgba(16,185,129,0.18)]'
+    },
+    'delivered': {
+        label: 'Entregado',
+        bg: 'bg-emerald-500/15 hover:bg-emerald-500/20',
+        border: 'border-emerald-500/40',
+        text: 'text-emerald-300',
+        dot: 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)]',
+        glow: 'shadow-[0_0_16px_rgba(16,185,129,0.18)]'
+    },
+    'finished': {
+        label: 'Entregado',
+        bg: 'bg-emerald-500/15 hover:bg-emerald-500/20',
+        border: 'border-emerald-500/40',
+        text: 'text-emerald-300',
+        dot: 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)]',
+        glow: 'shadow-[0_0_16px_rgba(16,185,129,0.18)]'
+    },
+    'completado': {
+        label: 'Completado',
+        bg: 'bg-emerald-500/15 hover:bg-emerald-500/20',
+        border: 'border-emerald-500/40',
+        text: 'text-emerald-300',
+        dot: 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)]',
+        glow: 'shadow-[0_0_16px_rgba(16,185,129,0.18)]'
+    },
+    'completed': {
+        label: 'Completado',
+        bg: 'bg-emerald-500/15 hover:bg-emerald-500/20',
+        border: 'border-emerald-500/40',
+        text: 'text-emerald-300',
+        dot: 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)]',
+        glow: 'shadow-[0_0_16px_rgba(16,185,129,0.18)]'
+    },
+    'cancelado': {
+        label: 'Cancelado',
+        bg: 'bg-rose-500/10 hover:bg-rose-500/15',
+        border: 'border-rose-500/30',
+        text: 'text-rose-400',
+        dot: 'bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.7)]',
+        glow: 'shadow-[0_0_12px_rgba(244,63,94,0.12)]'
+    },
+    'canceled': {
+        label: 'Cancelado',
+        bg: 'bg-rose-500/10 hover:bg-rose-500/15',
+        border: 'border-rose-500/30',
+        text: 'text-rose-400',
+        dot: 'bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.7)]',
+        glow: 'shadow-[0_0_12px_rgba(244,63,94,0.12)]'
+    }
 };
 
 const GRADIENT_PALETTES = [
@@ -132,6 +226,7 @@ export default function OrdersPage() {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [specificStatus, setSpecificStatus] = useState('all');
+    const [showInProcess, setShowInProcess] = useState(false);
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
     // Cancellation State
@@ -157,7 +252,11 @@ export default function OrdersPage() {
             if (sortOrder) params.append('sort_order', sortOrder);
             return apiRequest(`/api/internal/cremations/?${params.toString()}`);
         },
-        staleTime: 5 * 60 * 1000,
+        // El listado debe reflejar siempre las órdenes más recientes: el cliente
+        // global trae refetchOnMount:false, así que al volver a esta página se
+        // servía la caché y las órdenes recién creadas no aparecían.
+        staleTime: 0,
+        refetchOnMount: 'always',
     });
 
     useEffect(() => {
@@ -180,6 +279,7 @@ export default function OrdersPage() {
         setStartDate('');
         setEndDate('');
         setSpecificStatus('all');
+        setShowInProcess(false);
         setSortOrder('desc');
         setSearchTerm('');
     };
@@ -331,16 +431,30 @@ export default function OrdersPage() {
         return s === 'completado' || s === 'completed' || s === 'entregado' || s === 'delivered';
     }).length;
 
-    // Helper to filter cremations (Only for Search Term which is local)
+    // Helper to filter cremations (Search Term & "En proceso" toggle)
     const filteredCremations = (cremations as any[]).filter(c => {
         const searchLower = searchTerm.toLowerCase();
-
-        return !searchTerm || (
+        const matchesSearch = !searchTerm || (
             c.id.toString().includes(searchLower) ||
             c.pet_name?.toLowerCase().includes(searchLower) ||
             c.customer_name?.toLowerCase().includes(searchLower) ||
             c.oc_number?.toString().includes(searchLower)
         );
+
+        if (!matchesSearch) return false;
+
+        // Si el usuario seleccionó un estado específico en el dropdown (ej: 'en_proceso' o 'pendiente'), respetarlo siempre
+        if (specificStatus !== 'all') return true;
+
+        // Cuando está en "all": si showInProcess está desmarcado, ocultamos las que están en proceso
+        const statusLower = (c.status || '').toLowerCase();
+        const isInProcess = statusLower === 'en_proceso' || statusLower === 'processing';
+
+        if (isInProcess && !showInProcess) {
+            return false;
+        }
+
+        return true;
     });
 
     // Pagination Logic
@@ -352,7 +466,7 @@ export default function OrdersPage() {
     // Reset to page 1 when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm, startDate, endDate, specificStatus]);
+    }, [searchTerm, startDate, endDate, specificStatus, showInProcess]);
 
     // Note: Date, Type, Status and Sort are handled in the backend now.
 
@@ -361,8 +475,8 @@ export default function OrdersPage() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Órdenes de Cremación</h1>
-                    <p className="text-muted-foreground mt-1 text-sm sm:text-base md:text-lg">Historial de solicitudes y ventas directas.</p>
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Historial y Cobros</h1>
+                    <p className="text-muted-foreground mt-1 text-sm sm:text-base md:text-lg">Registro financiero de órdenes, cobros y facturación comercial.</p>
                 </div>
                 <div className="text-xs font-semibold text-muted-foreground px-4 py-2 bg-white/5 rounded-full border border-white/5 h-fit">
                     Órdenes Completadas: {(cremations as any[]).filter(c => { const s = c.status?.toLowerCase(); return s === 'completado' || s === 'completed' || s === 'entregado' || s === 'delivered'; }).length} / {formatLimit(tenantData?.subscription_plan?.max_orders)}
@@ -421,9 +535,9 @@ export default function OrdersPage() {
             <div className="glass-card rounded-[2.5rem] overflow-hidden">
                 <div className="p-6 lg:p-8 border-b border-white/5 bg-white/5 space-y-6">
                     {/* Simplified Filters Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 items-end">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-12 gap-4 items-end">
                         {/* Search Bar */}
-                        <div className="xl:col-span-2 space-y-2">
+                        <div className="xl:col-span-4 space-y-2">
                             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Búsqueda rápida</label>
                             <div className="relative">
                                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
@@ -438,7 +552,7 @@ export default function OrdersPage() {
                         </div>
 
                         {/* Date Range */}
-                        <div className="space-y-2 lg:col-span-1">
+                        <div className="space-y-2 xl:col-span-3">
                             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Rango de Fechas</label>
                             <div className="flex items-center gap-2 h-[50px] bg-background border border-white/10 rounded-2xl px-3 group overflow-hidden">
                                 <input
@@ -458,7 +572,7 @@ export default function OrdersPage() {
                         </div>
 
                         {/* Status Filter */}
-                        <div className="space-y-2">
+                        <div className="space-y-2 xl:col-span-2">
                             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Estado</label>
                             <SearchableSelect
                                 options={[
@@ -471,19 +585,70 @@ export default function OrdersPage() {
                                 value={specificStatus}
                                 onChange={setSpecificStatus}
                                 placeholder="Estado..."
+                                renderOption={(opt, isSelected) => {
+                                    const st = statusMap[String(opt.value).toLowerCase()] || {
+                                        dot: 'bg-gray-400',
+                                        text: 'text-gray-700'
+                                    };
+                                    return (
+                                        <div
+                                            className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
+                                                isSelected
+                                                    ? 'bg-primary text-white shadow-md'
+                                                    : 'hover:bg-gray-100 text-gray-700 hover:text-gray-900'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2.5">
+                                                {opt.value !== 'all' ? (
+                                                    <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-white' : st.dot}`} />
+                                                ) : (
+                                                    <span className={`w-2.5 h-2.5 rounded-full border border-gray-400 ${isSelected ? 'border-white' : ''}`} />
+                                                )}
+                                                <span>{opt.label}</span>
+                                            </div>
+                                            {isSelected && <Check size={14} className="text-white" />}
+                                        </div>
+                                    );
+                                }}
                             />
                         </div>
 
-                        {/* Actions & Sort */}
-                        <div className="flex items-center gap-2 h-[50px]">
+                        {/* Actions, Sort & "Ver en proceso" Checkbox */}
+                        <div className="flex items-center gap-2 h-[50px] xl:col-span-3">
                             <button
                                 onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
-                                className="w-full flex items-center justify-center gap-2 px-3 bg-white/5 border border-white/10 text-foreground rounded-2xl hover:bg-white/10 transition-all h-full"
+                                className="flex items-center justify-center gap-2 px-3.5 bg-white/5 border border-white/10 text-foreground rounded-2xl hover:bg-white/10 transition-all h-[50px] shrink-0"
                                 title={sortOrder === 'desc' ? 'Más recientes primero' : 'Más antiguos primero'}
                             >
                                 <ArrowUpDown size={18} />
-                                <span className="text-[10px] font-bold uppercase tracking-widest">{sortOrder}</span>
+                                <span className="text-[10px] font-bold uppercase tracking-widest hidden sm:inline">{sortOrder}</span>
                             </button>
+
+                            <label
+                                className={`flex items-center justify-between sm:justify-start gap-2.5 px-4 h-[50px] rounded-2xl border cursor-pointer select-none transition-all flex-1 min-w-0 ${
+                                    showInProcess
+                                        ? 'bg-primary/10 border-primary/40 text-primary shadow-[0_0_15px_rgba(var(--primary-rgb),0.1)]'
+                                        : 'bg-white/5 border-white/10 text-muted-foreground hover:border-white/20 hover:text-foreground'
+                                }`}
+                                title="Mostrar también cremaciones activas en proceso"
+                            >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                    <input
+                                        type="checkbox"
+                                        checked={showInProcess}
+                                        onChange={(e) => setShowInProcess(e.target.checked)}
+                                        className="w-4 h-4 rounded border-white/20 text-primary focus:ring-0 focus:ring-offset-0 bg-background/50 accent-primary cursor-pointer shrink-0"
+                                    />
+                                    <span className="text-xs font-bold truncate">Ver en proceso</span>
+                                </div>
+                                {pedidosEnProceso > 0 && (
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold shrink-0 ${
+                                        showInProcess ? 'bg-primary text-white' : 'bg-white/10 text-muted-foreground'
+                                    }`}>
+                                        {pedidosEnProceso}
+                                    </span>
+                                )}
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -564,7 +729,7 @@ export default function OrdersPage() {
                                                 <span className="font-bold text-sm">${(cremation.total_price || 0).toLocaleString()}</span>
                                             </td>
                                             <td className="px-8 py-6">
-                                                <div className="w-44">
+                                                <div className="w-40">
                                                     <SearchableSelect
                                                         options={[
                                                             { value: "pendiente", label: "Pendiente" },
@@ -575,7 +740,57 @@ export default function OrdersPage() {
                                                         value={cremation.status}
                                                         onChange={(val) => handleStatusChange(cremation.id, val)}
                                                         placeholder="Estado..."
-                                                        triggerClassName={`${status.color} py-2 px-3 text-xs h-9`}
+                                                        renderTrigger={(selectedOpt, isOpen) => {
+                                                            const st = statusMap[cremation.status?.trim().toLowerCase()] || {
+                                                                label: selectedOpt?.label || cremation.status || 'Estado...',
+                                                                bg: 'bg-white/5 hover:bg-white/10',
+                                                                border: 'border-white/10',
+                                                                text: 'text-foreground',
+                                                                dot: 'bg-muted-foreground',
+                                                                glow: ''
+                                                            };
+                                                            return (
+                                                                <div
+                                                                    className={`group/badge flex items-center justify-between px-3 py-1.5 rounded-full border transition-all duration-200 backdrop-blur-md ${st.bg} ${st.border} ${st.glow} hover:scale-[1.02] active:scale-[0.98] ${
+                                                                        isOpen ? 'ring-2 ring-primary/40' : ''
+                                                                    }`}
+                                                                >
+                                                                    <div className="flex items-center gap-2 min-w-0">
+                                                                        <span className={`w-2 h-2 rounded-full shrink-0 ${st.dot}`} />
+                                                                        <span className={`text-xs font-black tracking-tight truncate ${st.text}`}>
+                                                                            {st.label}
+                                                                        </span>
+                                                                    </div>
+                                                                    <ChevronDown
+                                                                        size={14}
+                                                                        className={`shrink-0 ml-1.5 transition-transform duration-200 ${st.text} opacity-60 group-hover/badge:opacity-100 ${
+                                                                            isOpen ? 'rotate-180' : ''
+                                                                        }`}
+                                                                    />
+                                                                </div>
+                                                            );
+                                                        }}
+                                                        renderOption={(opt, isSelected) => {
+                                                            const st = statusMap[String(opt.value).toLowerCase()] || {
+                                                                dot: 'bg-gray-400',
+                                                                text: 'text-gray-700'
+                                                            };
+                                                            return (
+                                                                <div
+                                                                    className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
+                                                                        isSelected
+                                                                            ? 'bg-primary text-white shadow-md'
+                                                                            : 'hover:bg-gray-100 text-gray-700 hover:text-gray-900'
+                                                                    }`}
+                                                                >
+                                                                    <div className="flex items-center gap-2.5">
+                                                                        <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-white' : st.dot}`} />
+                                                                        <span>{opt.label}</span>
+                                                                    </div>
+                                                                    {isSelected && <Check size={14} className="text-white" />}
+                                                                </div>
+                                                            );
+                                                        }}
                                                     />
                                                 </div>
                                             </td>
@@ -583,7 +798,7 @@ export default function OrdersPage() {
                                                 <div className="flex items-center justify-end gap-2">
                                                     {/* Acciones principales */}
                                                     <button
-                                                        onClick={() => router.push(`/dashboard/asignacion-servicios?cremation_id=${cremation.id}`)}
+                                                        onClick={() => router.push(`/dashboard/recepcion-pedidos?cremation_id=${cremation.id}`)}
                                                         title="Modificar"
                                                         className="p-2.5 rounded-xl transition-all duration-200 shadow-md border bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white border-blue-500/20 hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/10 active:scale-95"
                                                     >

@@ -36,6 +36,7 @@ export interface BootstrapTenantData {
     email?: string;
     phone?: string;
     address?: string;
+    public_token?: string;
 }
 
 export interface BootstrapModulePermission {

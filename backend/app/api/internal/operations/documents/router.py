@@ -445,6 +445,7 @@ def generar_recibo(
             products=products_list,
             discount_percent=cremation.financial.discount if cremation.financial else 0.0,
             total_price=cremation.financial.total_price if cremation.financial else 0.0,
+            weight_price=(cremation.financial.weight_price or 0.0) if cremation.financial else 0.0,
             scheduled_at=cremation.scheduling.scheduled_at if cremation.scheduling else None,
             issue_date=now,
             receipt_number=f"REC-{(cremation.oc_number or cremation.id):04d}",

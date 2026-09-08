@@ -14,11 +14,13 @@ import {
     Camera,
     Activity,
     ChevronRight,
-    Filter
+    Filter,
+    Flame
 } from 'lucide-react';
 import SearchableSelect from '@/components/tenant/SearchableSelect';
 import { TableSkeleton, CardSkeleton } from '@/components/tenant/ui/Skeleton';
 import { apiRequest, API_URL, getImageUrl } from '@/lib/tenant/api';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePets, useSavePet, useDeletePet } from '@/hooks/usePets';
 import { useCustomers } from '@/hooks/useCustomers';
@@ -35,6 +37,7 @@ import getCroppedImg from '@/lib/tenant/imageUtils';
 import { usePermissions } from '@/app/(tenant)/tenant/context/PermissionContext';
 import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
 import { PlanLimitModal } from '@/components/tenant/PlanLimitModal';
+import QuickCustomerModal from '@/components/tenant/crm/QuickCustomerModal';
 
 interface Pet {
     id: number;
@@ -81,7 +84,7 @@ export default function PetsPage() {
     // Pagination & Sorting States
     const [currentPage, setCurrentPage] = useState(1);
     const [sortOption, setSortOption] = useState('created_desc');
-    const ITEMS_PER_PAGE = 12;
+    const ITEMS_PER_PAGE = 9;
 
     // Modal & Form States
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -101,31 +104,42 @@ export default function PetsPage() {
     const [petToDelete, setPetToDelete] = useState<Pet | null>(null);
     const [memorialPet, setMemorialPet] = useState<Pet | null>(null);
     const [isMemorialModalOpen, setIsMemorialModalOpen] = useState(false);
+    const [isQuickCustomerModalOpen, setIsQuickCustomerModalOpen] = useState(false);
     const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
-
     const [showLimitModal, setShowLimitModal] = useState(false);
 
-    const maxPets = tenantData?.subscription_plan?.max_pets || 0;
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const customerIdParam = searchParams.get('customer_id');
+    const autoOpenParam = searchParams.get('autoOpen');
 
-    // La cuota es POR MES (se reinicia el día 1); el backend cuenta solo los
-    // registros del mes actual (limit_checker.py, type "monthly"). El indicador
-    // y el bloqueo deben usar el uso mensual, no el total histórico.
+    const [nextStepPet, setNextStepPet] = useState<Pet | null>(null);
+
+    const maxPets = tenantData?.subscription_plan?.max_pets || 0;
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
     const monthlyUsage = pets.filter(
         (p) => p.created_at && new Date(p.created_at) >= startOfMonth
     ).length;
-
     const isLimitReached = maxPets > 0 && maxPets < 999999 && monthlyUsage >= maxPets;
 
+    useEffect(() => {
+        if (autoOpenParam === 'true' && customerIdParam && Number(customerIdParam)) {
+            const cid = Number(customerIdParam);
+            setCurrentPet({ name: '', species: 'canino', breed: '', customer_id: cid, status: 'received' });
+            setSelectedImages([]);
+            setImagePreviews([]);
+            setIsModalOpen(true);
+        }
+    }, [autoOpenParam, customerIdParam]);
 
     const handleOpenModal = (pet?: Pet) => {
         if (!pet && isLimitReached) {
             setShowLimitModal(true);
             return;
         }
-        setCurrentPet(pet || { name: '', species: 'canino', breed: '', customer_id: 0, status: 'received' });
+        setCurrentPet(pet || { name: '', species: 'canino', breed: '', customer_id: Number(customerIdParam) || 0, status: 'received' });
         setSelectedImages([]);
         setImagePreviews(pet?.images || []);
         setIsModalOpen(true);
@@ -218,12 +232,16 @@ export default function PetsPage() {
                 status: currentPet?.status ? currentPet.status.toLowerCase() : 'received'
             };
 
-            await savePetMutation.mutateAsync({
+            const saved = await savePetMutation.mutateAsync({
                 isEdit,
                 pet: sanitizedPet as any
             });
 
             setIsModalOpen(false);
+
+            if (!isEdit && saved?.id) {
+                setNextStepPet(saved);
+            }
         } catch (err: any) {
             // Error handling is already in the mutation, but we catch it here to stop the flow
         } finally {
@@ -321,28 +339,205 @@ export default function PetsPage() {
     }, [searchTerm, sortOption]);
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 max-w-7xl mx-auto pb-12">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Gestión de Mascotas</h1>
-                    <p className="text-muted-foreground mt-1 text-sm sm:text-base">Directorio completo de mascotas registradas por los clientes.</p>
+                    <p className="text-muted-foreground mt-1 text-sm sm:text-base">Inscribe a la mascota para iniciar la atención o consulta el directorio histórico más abajo.</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-                    <div className="text-xs font-semibold text-muted-foreground px-4 py-2 bg-white/5 rounded-full border border-white/5 h-fit whitespace-nowrap">
-                        Cuota del mes: {monthlyUsage} / {formatLimit(tenantData?.subscription_plan?.max_pets)}
-                        <span className="opacity-60"> · Total: {pets.length}</span>
+            </div>
+
+            {/* TOP SECTION: Formulario de Inscripción Directa de Mascota */}
+            <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 space-y-6">
+                <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20 text-primary">
+                            <Dog size={22} />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-bold text-white">
+                                {currentPet?.id ? 'Editar Datos de la Mascota' : 'Inscribir Nueva Mascota'}
+                            </h2>
+                            <p className="text-xs text-muted-foreground">Ingresa la información básica y el tutor asignado a la mascota.</p>
+                        </div>
                     </div>
-                    {canCreate('mascotas') && (
+                    {currentPet?.id && (
                         <button
-                            onClick={() => handleOpenModal()}
-                            disabled={isLimitReached}
-                            className={`bg-primary text-primary-foreground font-bold min-h-[44px] py-3 px-6 rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all text-sm ${isLimitReached ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
+                            type="button"
+                            onClick={() => {
+                                setCurrentPet({ name: '', species: 'canino', breed: '', customer_id: Number(customerIdParam) || 0, status: 'received' });
+                                setSelectedImages([]);
+                                setImagePreviews([]);
+                            }}
+                            className="text-xs text-primary font-bold hover:underline"
                         >
-                            <Plus className="mr-2" size={18} />
-                            Registrar Mascota
+                            + Limpiar / Crear Nueva
                         </button>
                     )}
+                </div>
+
+                <form onSubmit={handleSave} className="space-y-6">
+                    {/* Image Upload Row */}
+                    <div className="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/10">
+                        <div className="flex gap-3">
+                            {imagePreviews.map((preview, idx) => (
+                                <div key={idx} className="relative group">
+                                    <div className="w-16 h-16 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
+                                        <img src={getImageUrl(preview)} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const isRemote = preview.startsWith('/static') || preview.startsWith('http');
+                                            setImageToDelete({ index: idx, url: preview, isRemote });
+                                        }}
+                                        className="absolute -top-1 -right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-all"
+                                    >
+                                        <Trash2 size={10} />
+                                    </button>
+                                </div>
+                            ))}
+                            {imagePreviews.length < 3 && (
+                                <div className="relative group cursor-pointer" onClick={() => document.getElementById('pet-inline-image-upload')?.click()}>
+                                    <div className="w-16 h-16 rounded-xl bg-white/5 border-2 border-dashed border-white/10 flex items-center justify-center transition-all group-hover:border-primary/50">
+                                        <div className="text-center">
+                                            <Camera size={18} className="mx-auto text-muted-foreground" />
+                                            <span className="text-[8px] font-bold text-muted-foreground uppercase">Subir Foto</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        <input
+                            id="pet-inline-image-upload"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageChange}
+                            className="hidden"
+                        />
+                        <div className="text-center sm:text-left">
+                            <p className="text-xs font-bold text-white">Fotografías del Paciente</p>
+                            <p className="text-[10px] text-muted-foreground">Sube hasta 3 imágenes de la mascota para identificación y ficha técnica.</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Nombre de Mascota <span className="text-red-400">*</span></label>
+                            <input
+                                required
+                                value={currentPet?.name || ''}
+                                onChange={(e) => setCurrentPet({ ...currentPet, name: e.target.value })}
+                                placeholder="Ej: Rocky, Pelusa..."
+                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-primary/50 text-sm"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Tutor / Cliente <span className="text-red-400">*</span></label>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsQuickCustomerModalOpen(true)}
+                                    className="text-xs text-primary hover:underline font-semibold flex items-center gap-1"
+                                >
+                                    <Plus size={12} />
+                                    + Nuevo Cliente
+                                </button>
+                            </div>
+                            <SearchableSelect
+                                options={customers.map(c => ({
+                                    value: c.id,
+                                    label: `${c.name} (${c.rut || 'Sin RUT'})`
+                                }))}
+                                value={currentPet?.customer_id || 0}
+                                onChange={(val) => setCurrentPet({ ...currentPet, customer_id: Number(val) })}
+                                placeholder="Seleccionar un cliente..."
+                                icon={<User size={16} />}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Especie</label>
+                            <SearchableSelect
+                                options={[
+                                    { value: 'canino', label: 'Canino' },
+                                    { value: 'felino', label: 'Felino' },
+                                    { value: 'ave', label: 'Ave' },
+                                    { value: 'mamifero', label: 'Mamífero Pequeño' },
+                                    { value: 'reptil', label: 'Reptil / Anfibio' },
+                                    { value: 'exotico', label: 'Exótico' },
+                                    { value: 'otro', label: 'Otro' }
+                                ]}
+                                value={currentPet?.species || 'canino'}
+                                onChange={(val) => setCurrentPet({ ...currentPet, species: String(val) })}
+                                placeholder="Seleccionar especie..."
+                                icon={<Dog size={16} />}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Raza (Opcional)</label>
+                            <input
+                                value={currentPet?.breed || ''}
+                                onChange={(e) => setCurrentPet({ ...currentPet, breed: e.target.value })}
+                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-primary/50 text-sm"
+                                placeholder="Ej: Poodle, Mestizo..."
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Tamaño</label>
+                            <SearchableSelect
+                                options={[
+                                    { value: 'pequeño', label: 'Pequeño' },
+                                    { value: 'mediano', label: 'Mediano' },
+                                    { value: 'normal', label: 'Normal' },
+                                    { value: 'grande', label: 'Grande' },
+                                    { value: 'muy grande', label: 'Muy Grande' }
+                                ]}
+                                value={currentPet?.size || 'normal'}
+                                onChange={(val) => setCurrentPet({ ...currentPet, size: String(val) })}
+                                placeholder="Seleccionar tamaño..."
+                                icon={<Tag size={16} />}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Fecha Nacimiento (Opcional)</label>
+                            <input
+                                type="date"
+                                value={currentPet?.birth_date?.split('T')[0] || ''}
+                                onChange={(e) => setCurrentPet({ ...currentPet, birth_date: e.target.value })}
+                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-primary/50 text-sm"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end pt-4 border-t border-white/5">
+                        <button
+                            type="submit"
+                            disabled={isSaving}
+                            className="bg-primary text-primary-foreground min-h-[46px] px-8 py-3 rounded-2xl font-black text-sm uppercase tracking-wider shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
+                        >
+                            {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Plus size={18} />}
+                            {currentPet?.id ? 'Guardar Cambios' : 'Registrar Mascota & Iniciar Orden 🔥'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            {/* BOTTOM SECTION: Buscador & Grilla de Historial */}
+            <div className="space-y-4 pt-4">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h3 className="text-xl font-bold text-white">Historial de Mascotas Registradas</h3>
+                        <p className="text-xs text-muted-foreground">Directorio general de pacientes inscritos por cliente.</p>
+                    </div>
+                    <div className="text-xs font-semibold text-muted-foreground px-4 py-2 bg-white/5 rounded-full border border-white/5">
+                        Total Registradas: {pets.length}
+                    </div>
                 </div>
             </div>
 
@@ -532,6 +727,22 @@ export default function PetsPage() {
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* Botón directo: Iniciar Servicio / Cremación */}
+                                    <div className="pt-2 border-t border-white/5">
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                router.push(`/dashboard/recepcion-pedidos/registro?pet_id=${pet.id}`);
+                                            }}
+                                            className="w-full py-2.5 px-4 rounded-xl bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground font-black text-xs uppercase tracking-wider border border-primary/20 hover:border-primary transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-lg hover:shadow-primary/20 active:scale-95"
+                                            title="Crear orden de servicio para esta mascota"
+                                        >
+                                            <Flame size={14} className="animate-pulse" />
+                                            <span>Iniciar Servicio</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </motion.div>
                         ))}
@@ -674,11 +885,21 @@ export default function PetsPage() {
 
 
                         <div className="space-y-2">
-                            <label className="text-sm font-bold text-muted-foreground ml-1">Dueño (Cliente)</label>
+                            <div className="flex items-center justify-between">
+                                <label className="text-sm font-bold text-muted-foreground ml-1">Dueño (Cliente)</label>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsQuickCustomerModalOpen(true)}
+                                    className="text-xs text-primary hover:underline font-semibold flex items-center gap-1"
+                                >
+                                    <Plus size={12} />
+                                    Nuevo Cliente
+                                </button>
+                            </div>
                             <SearchableSelect
                                 options={customers.map(c => ({
                                     value: c.id,
-                                    label: c.name
+                                    label: `${c.name} (${c.rut || 'Sin RUT'})`
                                 }))}
                                 value={currentPet?.customer_id || 0}
                                 onChange={(val) => setCurrentPet({ ...currentPet, customer_id: Number(val) })}
@@ -873,6 +1094,56 @@ export default function PetsPage() {
                 pet={memorialPet}
                 tenantName={tenantData?.name}
             />
+            {/* Quick Customer Modal */}
+            <QuickCustomerModal
+                isOpen={isQuickCustomerModalOpen}
+                onClose={() => setIsQuickCustomerModalOpen(false)}
+                onCustomerCreated={(newCustomer) => {
+                    setCurrentPet(prev => ({ ...prev, customer_id: newCustomer.id }));
+                }}
+            />
+
+            {/* Modal de Continuación Directa: Iniciar Orden de Cremación */}
+            {nextStepPet && (
+                <Modal
+                    isOpen={!!nextStepPet}
+                    onClose={() => setNextStepPet(null)}
+                    title="¡Mascota Registrada!"
+                >
+                    <div className="space-y-6 text-center py-2">
+                        <div className="w-16 h-16 rounded-3xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center mx-auto">
+                            <Dog size={32} />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-black text-white">Mascota "{nextStepPet.name}" registrada</h3>
+                            <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                                ¿Deseas iniciar la Orden de Servicio de Cremación para esta mascota ahora mismo?
+                            </p>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-white/10">
+                            <button
+                                type="button"
+                                onClick={() => setNextStepPet(null)}
+                                className="flex-1 py-3.5 px-4 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs uppercase tracking-wider transition"
+                            >
+                                Quedarme en Mascotas
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const pid = nextStepPet.id;
+                                    setNextStepPet(null);
+                                    router.push(`/dashboard/recepcion-pedidos/registro?pet_id=${pid}`);
+                                }}
+                                className="flex-1 py-3.5 px-4 rounded-2xl bg-primary text-primary-foreground font-black text-xs uppercase tracking-wider shadow-lg shadow-primary/20 hover:brightness-110 transition flex items-center justify-center gap-2"
+                            >
+                                Iniciar Orden de Cremación
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
         </div >
     );
 }

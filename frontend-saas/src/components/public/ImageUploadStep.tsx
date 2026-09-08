@@ -1,5 +1,6 @@
-import React, { useCallback, useState } from 'react';
-import { UploadCloud, X, Image as ImageIcon, Crop, ZoomIn, Check } from 'lucide-react';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { X, Crop, ZoomIn, Check, Camera, Plus, Trash2, Star, Sparkles, RefreshCw } from 'lucide-react';
 import Image from 'next/image';
 import Cropper from 'react-easy-crop';
 import getCroppedImg from '../../lib/canvasUtils';
@@ -8,11 +9,20 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface Props {
     images: File[];
     setImages: (files: File[]) => void;
+    petName?: string;
 }
 
-export default function ImageUploadStep({ images, setImages }: Props) {
+const SLOT_TITLES = ['Foto Principal', 'Segundo Recuerdo', 'Tercer Recuerdo'];
+
+export default function ImageUploadStep({ images, setImages, petName }: Props) {
     const [isDragging, setIsDragging] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [targetSlotIndex, setTargetSlotIndex] = useState<number | null>(null);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     // Cropping State
     const [imageSrc, setImageSrc] = useState<string | null>(null);
@@ -20,7 +30,48 @@ export default function ImageUploadStep({ images, setImages }: Props) {
     const [zoom, setZoom] = useState(1);
     const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
     const [isCropModalOpen, setIsCropModalOpen] = useState(false);
-    const [currentFileName, setCurrentFileName] = useState<string>('image');
+    const [currentFileName, setCurrentFileName] = useState<string>('recuerdo');
+
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+    const onCropComplete = useCallback((croppedArea: any, croppedAreaPixels: any) => {
+        setCroppedAreaPixels(croppedAreaPixels);
+    }, []);
+
+    const processFile = (file: File, slotIndex: number | null = null) => {
+        const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (!validTypes.includes(file.type)) {
+            setError('Formato no compatible. Por favor sube una imagen JPG, PNG o WEBP.');
+            return;
+        }
+
+        setError(null);
+        setTargetSlotIndex(slotIndex);
+
+        const reader = new FileReader();
+        reader.addEventListener('load', () => {
+            setImageSrc(reader.result?.toString() || null);
+            setCurrentFileName(file.name.split('.')[0]);
+            setIsCropModalOpen(true);
+            setZoom(1);
+            setCrop({ x: 0, y: 0 });
+        });
+        reader.readAsDataURL(file);
+    };
+
+    const handleSlotClick = (index: number) => {
+        setTargetSlotIndex(index);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+            fileInputRef.current.click();
+        }
+    };
+
+    const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            processFile(e.target.files[0], targetSlotIndex);
+        }
+    };
 
     const handleDrag = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -32,40 +83,6 @@ export default function ImageUploadStep({ images, setImages }: Props) {
         }
     }, []);
 
-    const onCropComplete = useCallback((croppedArea: any, croppedAreaPixels: any) => {
-        setCroppedAreaPixels(croppedAreaPixels);
-    }, []);
-
-    // 1. Initial File Selection / Drop
-    const processFileSelection = (files: File[]) => {
-        if (images.length >= 3) {
-            setError('Solo puedes subir un máximo de 3 imágenes.');
-            return;
-        }
-
-        const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-        const file = files[0]; // We assume one by one cropping for better UX, or just take the first one
-
-        if (!file) return;
-
-        if (!validTypes.includes(file.type)) {
-            setError('Formato no válido. Solo JPG, PNG o WEBP.');
-            return;
-        }
-
-        // Read file for cropping
-        const reader = new FileReader();
-        reader.addEventListener('load', () => {
-            setImageSrc(reader.result?.toString() || null);
-            setCurrentFileName(file.name.split('.')[0]); // Keep simplified name
-            setIsCropModalOpen(true);
-            setZoom(1);
-            setCrop({ x: 0, y: 0 });
-            setError(null);
-        });
-        reader.readAsDataURL(file);
-    };
-
     const handleDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
@@ -73,30 +90,32 @@ export default function ImageUploadStep({ images, setImages }: Props) {
 
         const files = Array.from(e.dataTransfer.files);
         if (files.length > 0) {
-            processFileSelection(files);
+            const firstEmptySlot = images.length < 3 ? images.length : 0;
+            processFile(files[0], firstEmptySlot);
         }
     }, [images]);
 
-    const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0) {
-            processFileSelection(Array.from(e.target.files));
-        }
-        // Reset input so same file can be selected again if cancelled
-        e.target.value = '';
-    };
-
-    // 2. Perform Clip & Save
     const handleCropSave = async () => {
         if (!imageSrc || !croppedAreaPixels) return;
 
         try {
             const croppedBlob = (await getCroppedImg(imageSrc, croppedAreaPixels)) as Blob;
-            // Force PNG extension
-            const newFile = new File([croppedBlob], `${currentFileName}_cropped.png`, {
+            const newFile = new File([croppedBlob], `${currentFileName}_memorial.png`, {
                 type: 'image/png',
             });
 
-            setImages([...images, newFile]);
+            if (targetSlotIndex !== null && targetSlotIndex < images.length) {
+                // Reemplazar slot específico
+                const updated = [...images];
+                updated[targetSlotIndex] = newFile;
+                setImages(updated);
+            } else {
+                // Agregar al final
+                if (images.length < 3) {
+                    setImages([...images, newFile]);
+                }
+            }
+
             handleCloseModal();
         } catch (e) {
             console.error(e);
@@ -107,174 +126,237 @@ export default function ImageUploadStep({ images, setImages }: Props) {
     const handleCloseModal = () => {
         setIsCropModalOpen(false);
         setImageSrc(null);
+        setTargetSlotIndex(null);
     };
 
     const removeImage = (index: number) => {
         const newImages = [...images];
         newImages.splice(index, 1);
         setImages(newImages);
-        setError(null); // Clear potential "max limit" errors if we free up space
+        setError(null);
     };
 
     return (
-        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="text-center mb-4">
-                <h2 className="text-2xl sm:text-3xl font-black uppercase italic tracking-tight text-slate-800 dark:text-slate-100 mb-1">Galería de Recuerdos</h2>
-                <div className="flex flex-col sm:flex-row items-center justify-center text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] font-bold gap-2 mt-2">
-                    <p>Sube hasta <span className="font-black text-emerald-500">3 fotos</span></p>
-                    <span className="bg-emerald-50 dark:bg-emerald-950/20 px-3 py-0.5 rounded-full text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 shadow-sm">Formato Cuadrado (1:1)</span>
+        <div 
+            className="space-y-4"
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+        >
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileInput}
+                className="hidden"
+            />
+
+            {/* Cabecera de la Galería */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 border-b border-slate-100 dark:border-slate-800/80 pb-3">
+                <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                        <Camera size={15} />
+                    </div>
+                    <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                            Portarretratos del Homenaje
+                        </h3>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 font-normal">
+                            Sube hasta 3 fotos especiales para su certificado y memorial
+                        </p>
+                    </div>
+                </div>
+
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-3 py-1 rounded-full border border-amber-200/60 dark:border-amber-900/30 self-start sm:self-center">
+                    {images.length} de 3 enmarcadas
                 </div>
             </div>
 
-            {/* Main Drop Zone */}
-            {images.length < 3 ? (
-                <div
-                    onDragEnter={handleDrag}
-                    onDragLeave={handleDrag}
-                    onDragOver={handleDrag}
-                    onDrop={handleDrop}
-                    className={`relative border-2 border-dashed rounded-[2rem] p-6 sm:p-8 text-center transition-all duration-500 ${isDragging
-                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 shadow-lg'
-                        : 'border-slate-200 dark:border-slate-800 hover:border-emerald-400 hover:bg-slate-50 dark:hover:bg-slate-900/20'
-                        }`}
-                >
-                    <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileInput}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
-
-                    <div className="flex flex-col items-center justify-center space-y-5 pointer-events-none">
-                        <div className={`p-6 rounded-3xl transition-colors duration-500 ${isDragging ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'}`}>
-                            <UploadCloud className={`w-10 h-10`} />
-                        </div>
-                        <div>
-                            <p className="text-slate-700 dark:text-slate-300 font-black uppercase tracking-widest text-xs italic">
-                                Arrastra o selecciona una foto
-                            </p>
-                            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 font-bold uppercase tracking-tight">
-                                Se abrirá el editor para recortar
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            ) : (
-                <div className="p-6 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/40 rounded-3xl text-center text-yellow-600 dark:text-yellow-400 text-[10px] font-black uppercase tracking-widest">
-                    Has alcanzado el límite de 3 imágenes. Elimina una para agregar otra.
-                </div>
-            )}
-
             {error && (
-                <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 text-red-500 dark:text-red-400 text-[10px] rounded-2xl text-center font-black uppercase tracking-widest animate-pulse">
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs rounded-xl text-center font-semibold">
                     {error}
                 </div>
             )}
 
-            {/* Preview Grid */}
-            {images.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 mt-10">
-                    {images.map((file, index) => (
-                        <div key={index} className="relative aspect-square rounded-[2rem] overflow-hidden border border-slate-200 dark:border-slate-800 group shadow-lg bg-slate-50 dark:bg-slate-950 transition-all hover:border-red-300">
-                            <Image
-                                src={URL.createObjectURL(file)}
-                                alt={`Preview ${index}`}
-                                fill
-                                className="object-cover transition-transform duration-700 group-hover:scale-110"
-                            />
-                            <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+            {/* Grid de 3 Marcos Grandes */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {[0, 1, 2].map((index) => {
+                    const file = images[index];
+                    const hasImage = !!file;
+                    const previewUrl = hasImage ? URL.createObjectURL(file) : null;
+                    const isPrimary = index === 0;
+
+                    return (
+                        <div key={index} className="space-y-1.5">
+                            {/* Título de slot */}
+                            <div className="flex items-center justify-between px-1">
+                                <span className="text-[11px] uppercase font-semibold tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                                    {isPrimary && <Star size={10} className="text-amber-500" fill="currentColor" />}
+                                    {SLOT_TITLES[index]}
+                                </span>
+                            </div>
+
+                            {hasImage && previewUrl ? (
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    className="relative aspect-square rounded-2xl overflow-hidden bg-white dark:bg-slate-900 border-2 border-amber-200/70 dark:border-amber-500/30 shadow-md group"
+                                >
+                                    <Image
+                                        src={previewUrl}
+                                        alt={SLOT_TITLES[index]}
+                                        fill
+                                        className="object-cover transition-transform duration-700 group-hover:scale-105"
+                                    />
+
+                                    {/* Overlay de acciones */}
+                                    <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-xs">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSlotClick(index)}
+                                            className="p-2.5 bg-white/90 hover:bg-white text-slate-800 rounded-xl shadow-lg transition-all hover:scale-110 flex items-center justify-center cursor-pointer"
+                                            title="Cambiar o recortar foto"
+                                        >
+                                            <RefreshCw size={14} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => removeImage(index)}
+                                            className="p-2.5 bg-red-500/90 hover:bg-red-600 text-white rounded-xl shadow-lg transition-all hover:scale-110 flex items-center justify-center cursor-pointer"
+                                            title="Eliminar foto"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+
+                                    {isPrimary && (
+                                        <div className="absolute top-2 left-2 bg-amber-500 text-slate-950 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest shadow-sm">
+                                            Principal
+                                        </div>
+                                    )}
+                                </motion.div>
+                            ) : (
                                 <button
-                                    onClick={() => removeImage(index)}
-                                    className="p-4 bg-white text-red-500 border border-red-200 rounded-full hover:bg-red-500 hover:text-white transition-all shadow-xl transform hover:scale-110"
                                     type="button"
+                                    onClick={() => handleSlotClick(index)}
+                                    className={`w-full aspect-square rounded-2xl border-2 border-dashed transition-all duration-300 flex flex-col items-center justify-center p-4 text-center cursor-pointer group ${
+                                        isDragging
+                                            ? 'border-amber-400 bg-amber-500/10'
+                                            : isPrimary
+                                            ? 'border-amber-300/80 dark:border-amber-500/30 bg-amber-50/20 dark:bg-amber-950/10 hover:border-amber-400 hover:bg-amber-50/40 dark:hover:bg-amber-950/20'
+                                            : 'border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-950/20 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/30'
+                                    }`}
                                 >
-                                    <X size={20} />
+                                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-2.5 transition-transform group-hover:scale-110 ${
+                                        isPrimary
+                                            ? 'bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 shadow-sm'
+                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500'
+                                    }`}>
+                                        <Plus size={20} className="stroke-[2.5]" />
+                                    </div>
+                                    <span className={`text-[11px] font-black uppercase tracking-wider ${
+                                        isPrimary
+                                            ? 'text-amber-700 dark:text-amber-400'
+                                            : 'text-slate-600 dark:text-slate-400'
+                                    }`}>
+                                        {isPrimary ? 'Enmarcar foto' : 'Agregar foto'}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium">
+                                        Haz clic para elegir
+                                    </span>
                                 </button>
-                            </div>
-                            <div className="absolute bottom-3 right-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur px-3 py-1 rounded-full text-[9px] font-black text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 shadow-sm pointer-events-none uppercase tracking-widest">
-                                PNG
-                            </div>
+                            )}
                         </div>
-                    ))}
-                </div>
-            )}
+                    );
+                })}
+            </div>
 
-            {images.length === 0 && (
-                <div className="text-center py-10 opacity-60">
-                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-[2rem] bg-slate-50 dark:bg-slate-900/50 mb-4">
-                        <ImageIcon className="text-slate-300 dark:text-slate-700" size={32} />
-                    </div>
-                    <p className="text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-widest">Aún no hay fotos seleccionadas</p>
-                </div>
-            )}
-
-            {/* CROP MODAL */}
-            <AnimatePresence>
-                {isCropModalOpen && imageSrc && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4"
-                    >
+            {/* Modal de Recorte Cuadrado renderizado al nivel de body con Portal */}
+            {mounted && createPortal(
+                <AnimatePresence>
+                    {isCropModalOpen && imageSrc && (
                         <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-[3rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4"
                         >
-                            <div className="p-8 border-b border-slate-100 dark:border-slate-800/80 flex justify-between items-center bg-slate-50 dark:bg-slate-950">
-                                <h3 className="text-xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-3 uppercase italic tracking-tight">
-                                    <Crop size={24} className="text-emerald-500" /> Recortar Imagen
-                                </h3>
-                                <button
-                                    onClick={handleCloseModal}
-                                    className="p-3 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-2xl transition-all"
-                                >
-                                    <X size={24} className="text-slate-400 dark:text-slate-500" />
-                                </button>
-                            </div>
+                            <motion.div
+                                initial={{ scale: 0.95, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 0.95, opacity: 0 }}
+                                className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+                            >
+                                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-950/50">
+                                    <div>
+                                        <h3 className="text-lg font-black text-slate-800 dark:text-slate-100 flex items-center gap-2 uppercase italic tracking-tight">
+                                            <Crop size={18} className="text-amber-500" /> Enmarcar Recuerdo
+                                        </h3>
+                                        <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                                            Ajusta y encuadra la imagen para el portarretratos
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={handleCloseModal}
+                                        className="p-2.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
+                                    >
+                                        <X size={18} className="text-slate-400 dark:text-slate-500" />
+                                    </button>
+                                </div>
 
-                            <div className="relative w-full h-[25rem] sm:h-[30rem] bg-slate-900">
-                                <Cropper
-                                    image={imageSrc}
-                                    crop={crop}
-                                    zoom={zoom}
-                                    aspect={1}
-                                    onCropChange={setCrop}
-                                    onCropComplete={onCropComplete}
-                                    onZoomChange={setZoom}
-                                    showGrid={false}
-                                />
-                            </div>
-
-                            <div className="p-8 bg-white dark:bg-slate-900 space-y-8">
-                                <div className="flex items-center gap-6">
-                                    <ZoomIn size={20} className="text-slate-400 dark:text-slate-500 shrink-0" />
-                                    <input
-                                        type="range"
-                                        value={zoom}
-                                        min={1}
-                                        max={3}
-                                        step={0.1}
-                                        aria-labelledby="Zoom"
-                                        onChange={(e) => setZoom(Number(e.target.value))}
-                                        className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full appearance-none cursor-pointer accent-emerald-500"
+                                <div className="relative w-full h-[22rem] bg-slate-950">
+                                    <Cropper
+                                        image={imageSrc}
+                                        crop={crop}
+                                        zoom={zoom}
+                                        aspect={1}
+                                        onCropChange={setCrop}
+                                        onCropComplete={onCropComplete}
+                                        onZoomChange={setZoom}
+                                        showGrid={false}
                                     />
                                 </div>
 
-                                <button
-                                    onClick={handleCropSave}
-                                    className="w-full bg-emerald-500 text-white font-black py-5 rounded-2xl text-xs uppercase tracking-[0.2em] shadow-2xl shadow-emerald-500/20 hover:scale-[1.03] active:scale-[0.97] transition-all flex items-center justify-center gap-3"
-                                >
-                                    <Check size={20} />
-                                    Confirmar Recorte
-                                </button>
-                            </div>
+                                <div className="p-6 bg-white dark:bg-slate-900 space-y-5">
+                                    <div className="flex items-center gap-4">
+                                        <ZoomIn size={16} className="text-slate-400 dark:text-slate-500 shrink-0" />
+                                        <input
+                                            type="range"
+                                            value={zoom}
+                                            min={1}
+                                            max={3}
+                                            step={0.1}
+                                            aria-labelledby="Zoom"
+                                            onChange={(e) => setZoom(Number(e.target.value))}
+                                            className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full appearance-none cursor-pointer accent-amber-500"
+                                        />
+                                    </div>
+
+                                    <div className="flex gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={handleCloseModal}
+                                            className="w-1/3 py-3.5 px-4 rounded-xl text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleCropSave}
+                                            className="w-2/3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-3.5 rounded-xl text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                                        >
+                                            <Check size={16} />
+                                            Guardar en Álbum
+                                        </button>
+                                    </div>
+                                </div>
+                            </motion.div>
                         </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
         </div>
     );
 }

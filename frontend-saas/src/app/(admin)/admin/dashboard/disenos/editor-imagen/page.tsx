@@ -33,6 +33,7 @@ import { apiRequest, getImageUrl } from '@/lib/admin/api';
 import ImageCropper from '@/components/tenant/ImageCropper';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CertFrame, FRAME_COLOR_LIST, frameActive, frameWrapperStyle, frameInnerInsetPct, frameImageMaskStyle } from '@/lib/certFrame';
+import { TextBg, TEXT_BG_DEFAULTS, textBgActive, textBgStyle, resolveTextBg } from '@/lib/certText';
 
 // Generador de id robusto: crypto.randomUUID solo existe en contexto seguro
 // (HTTPS o localhost). En admin.lvh.me sobre HTTP no está disponible.
@@ -57,9 +58,10 @@ type FieldType =
     | 'encargado_tenant'
     | 'rut_encargado'
     | 'celular_tenant'
-    | 'direccion_tenant';
+    | 'direccion_tenant'
+    | 'texto_fijo';
 
-interface DesignField {
+interface DesignField extends TextBg {
     id: string;
     type: FieldType;
     x: number; // % (centro)
@@ -71,6 +73,7 @@ interface DesignField {
     align?: 'left' | 'center' | 'right';
     bold?: boolean;
     format?: 'short' | 'long' | 'year' | 'month_year';
+    value?: string; // solo texto_fijo: el texto escrito por el admin
     // imagen
     slot?: number;
     w?: number; // % ancho
@@ -128,6 +131,7 @@ const FIELD_META: Record<FieldType, { label: string; icon: any; isImage?: boolea
     rut_encargado: { label: 'RUT Encargado', icon: Fingerprint },
     celular_tenant: { label: 'Celular', icon: Phone },
     direccion_tenant: { label: 'Dirección', icon: MapPin },
+    texto_fijo: { label: 'Texto Libre', icon: Type },
 };
 
 const MESES = [
@@ -161,6 +165,7 @@ function fieldDemoValue(f: DesignField): string {
     if (f.type === 'rut_encargado') return '12.345.678-9';
     if (f.type === 'celular_tenant') return '+56 9 1234 5678';
     if (f.type === 'direccion_tenant') return 'Av. Siempre Viva 742, Santiago';
+    if (f.type === 'texto_fijo') return f.value || 'Texto libre';
     return '';
 }
 
@@ -386,6 +391,7 @@ function EditorImagenContent() {
             align: 'center',
             bold: false,
             ...(meta.isDate ? { format: 'short' as const } : {}),
+            ...(type === 'texto_fijo' ? { value: 'Texto libre' } : {}),
         };
         setFields((prev) => [...prev, nf]);
         setSelectedId(nf.id);
@@ -654,7 +660,7 @@ function EditorImagenContent() {
                                                 fontWeight: f.bold ? 700 : 400,
                                                 whiteSpace: 'nowrap',
                                                 lineHeight: 1.1,
-                                                padding: '2px 6px',
+                                                ...textBgStyle(f, '2px 6px'),
                                                 outline: isSel ? '2px solid #6366f1' : '1px dashed rgba(0,0,0,0.25)',
                                             }}
                                         >
@@ -877,6 +883,19 @@ function EditorImagenContent() {
                                     </>
                                 ) : (
                                     <>
+                                        {selectedField.type === 'texto_fijo' && (
+                                            <div className="space-y-1.5">
+                                                <label className="text-[9px] font-black uppercase text-white/30">Texto</label>
+                                                <textarea
+                                                    value={selectedField.value ?? ''}
+                                                    onChange={(e) => updateField(selectedField.id, { value: e.target.value })}
+                                                    rows={2}
+                                                    placeholder="Escribe el texto que aparecerá en el certificado"
+                                                    className="w-full bg-black/40 border border-white/5 rounded-xl py-2 px-3 text-xs font-bold text-white outline-none focus:border-primary/50 resize-y"
+                                                />
+                                                <p className="text-[10px] text-white/20 font-medium">Texto fijo: se imprime igual en todos los certificados que usen este diseño.</p>
+                                            </div>
+                                        )}
                                         <div className="space-y-1.5">
                                             <div className="flex justify-between"><label className="text-[9px] font-black uppercase text-white/30">Tamaño de fuente</label><span className="text-[9px] font-black text-primary">{selectedField.fontSize}px</span></div>
                                             <input type="range" min={10} max={120} value={selectedField.fontSize || 32} onChange={(e) => updateField(selectedField.id, { fontSize: Number(e.target.value) })} className="w-full accent-primary" />
@@ -917,6 +936,66 @@ function EditorImagenContent() {
                                                 <p className="text-[10px] text-white/20 font-medium">El tenant podrá cambiar este formato al emitir.</p>
                                             </div>
                                         )}
+
+                                        {/* Fondo del texto (aplica a cualquier campo de texto) */}
+                                        {(() => {
+                                            const bg = resolveTextBg(selectedField);
+                                            const on = textBgActive(selectedField);
+                                            return (
+                                                <div className="space-y-3 pt-3 mt-1 border-t border-white/5">
+                                                    <div className="flex items-center justify-between">
+                                                        <label className="text-[9px] font-black uppercase text-white/30">Fondo del texto</label>
+                                                        <button
+                                                            onClick={() => updateField(selectedField.id, on
+                                                                ? { bgOpacity: 0 }
+                                                                : {
+                                                                    bgOpacity: 70,
+                                                                    bgColor: selectedField.bgColor || TEXT_BG_DEFAULTS.color,
+                                                                    bgPadX: selectedField.bgPadX ?? TEXT_BG_DEFAULTS.padX,
+                                                                    bgPadY: selectedField.bgPadY ?? TEXT_BG_DEFAULTS.padY,
+                                                                    bgRadius: selectedField.bgRadius ?? TEXT_BG_DEFAULTS.radius,
+                                                                })}
+                                                            className={`w-10 h-5 rounded-full relative transition-all ${on ? 'bg-primary' : 'bg-white/10'}`}
+                                                            aria-pressed={on}
+                                                            aria-label="Activar fondo del texto"
+                                                        >
+                                                            <span className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-all ${on ? 'translate-x-5' : 'translate-x-0'}`} />
+                                                        </button>
+                                                    </div>
+
+                                                    {on ? (
+                                                        <>
+                                                            <div className="grid grid-cols-2 gap-3">
+                                                                <div className="space-y-1.5">
+                                                                    <label className="text-[9px] font-black uppercase text-white/30">Color</label>
+                                                                    <input type="color" value={bg.color} onChange={(e) => updateField(selectedField.id, { bgColor: e.target.value })} className="w-full h-9 bg-black/40 border border-white/5 rounded-xl cursor-pointer" />
+                                                                </div>
+                                                                <div className="space-y-1.5">
+                                                                    <div className="flex justify-between"><label className="text-[9px] font-black uppercase text-white/30">Opacidad</label><span className="text-[9px] font-black text-primary">{bg.opacity}%</span></div>
+                                                                    <input type="range" min={5} max={100} value={bg.opacity} onChange={(e) => updateField(selectedField.id, { bgOpacity: Number(e.target.value) })} className="w-full accent-primary mt-2.5" />
+                                                                </div>
+                                                            </div>
+                                                            <div className="grid grid-cols-3 gap-3">
+                                                                <div className="space-y-1.5">
+                                                                    <div className="flex justify-between"><label className="text-[9px] font-black uppercase text-white/30">Ancho</label><span className="text-[9px] font-black text-primary">{bg.padX}</span></div>
+                                                                    <input type="range" min={0} max={60} value={bg.padX} onChange={(e) => updateField(selectedField.id, { bgPadX: Number(e.target.value) })} className="w-full accent-primary" />
+                                                                </div>
+                                                                <div className="space-y-1.5">
+                                                                    <div className="flex justify-between"><label className="text-[9px] font-black uppercase text-white/30">Alto</label><span className="text-[9px] font-black text-primary">{bg.padY}</span></div>
+                                                                    <input type="range" min={0} max={40} value={bg.padY} onChange={(e) => updateField(selectedField.id, { bgPadY: Number(e.target.value) })} className="w-full accent-primary" />
+                                                                </div>
+                                                                <div className="space-y-1.5">
+                                                                    <div className="flex justify-between"><label className="text-[9px] font-black uppercase text-white/30">Borde</label><span className="text-[9px] font-black text-primary">{bg.radius}</span></div>
+                                                                    <input type="range" min={0} max={40} value={bg.radius} onChange={(e) => updateField(selectedField.id, { bgRadius: Number(e.target.value) })} className="w-full accent-primary" />
+                                                                </div>
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <p className="text-[10px] text-white/20 font-medium italic">Sin fondo. Actívalo para destacar el texto sobre imágenes con mucho detalle.</p>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
                                     </>
                                 )}
                             </div>

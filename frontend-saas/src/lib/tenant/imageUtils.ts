@@ -77,10 +77,10 @@ export default async function getCroppedImg(
     // As Base64 string
     // return canvas.toDataURL('image/jpeg');
 
-    // As a Blob
+    // As a Blob in WebP optimized format
     return new Promise((resolve) => {
         canvas.toBlob((blob) => {
             resolve(blob);
-        }, 'image/png');
+        }, 'image/webp', 0.85);
     });
 }

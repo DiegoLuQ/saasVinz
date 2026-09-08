@@ -97,16 +97,16 @@
   }
 
   [data-theme='light'] {
-    --primary-color: #10b981;
+    --primary-color: #059669;
     --primary-foreground: #ffffff;
     --background-color: #f8fafc;
     --foreground-color: #0f172a;
     --muted-color: #f1f5f9;
-    --muted-foreground: #64748b;
-    --accent-color: #059669;
+    --muted-foreground: #475569;
+    --accent-color: #047857;
     --accent-foreground: #ffffff;
     --card-color: #ffffff;
-    --card-border-color: #e2e8f0;
+    --card-border-color: #cbd5e1;
   }
 
   * {
@@ -164,22 +164,36 @@
 }
 
 /* ==========================================================================
-   Paleta "Light": correcciones de contraste.
-   El panel se construyó "dark-first" con colores hardcodeados (text-white,
-   grises claros y algunos fondos oscuros fijos) que en fondo claro pierden
-   contraste. Aquí se reescriben a tonos legibles. Va SIN @layer y con
-   !important para ganarle a las utilidades de Tailwind (incl. variantes de
-   opacidad). Todo scopeado a [data-theme='light'] para no afectar otras paletas.
+   Paleta "Light": correcciones de contraste avanzadas.
+   Ajusta automáticamente el contraste para títulos, párrafos, tarjetas,
+   bordes e inputs en modo claro.
    ========================================================================== */
 
-/* Gris muteado más oscuro (afecta text-muted-foreground y sus variantes) */
 [data-theme='light'] {
+  color-scheme: light;
   --muted-foreground: #475569; /* slate-600 */
 }
 
-/* Texto blanco hardcodeado -> texto oscuro (incluye text-white/NN) */
+/* Headings & Títulos */
+[data-theme='light'] h1,
+[data-theme='light'] h2,
+[data-theme='light'] h3,
+[data-theme='light'] h4,
+[data-theme='light'] h5,
+[data-theme='light'] h6 {
+  color: #0f172a !important; /* slate-900 */
+}
+
+/* Párrafos, Etiquetas y Contenidos */
+[data-theme='light'] p,
+[data-theme='light'] label,
+[data-theme='light'] dt {
+  color: #334155; /* slate-700 */
+}
+
+/* Texto blanco hardcodeado -> slate-900 oscuro en Light mode */
 [data-theme='light'] [class*="text-white"] {
-  color: #1e293b !important; /* slate-800 */
+  color: #0f172a !important; /* slate-900 */
 }
 
 /* Grises claros hardcodeados (100-500) -> gris oscuro legible */
@@ -187,19 +201,56 @@
 [data-theme='light'] [class*="text-slate-2"],
 [data-theme='light'] [class*="text-slate-3"],
 [data-theme='light'] [class*="text-slate-4"],
-[data-theme='light'] [class*="text-slate-5"],
 [data-theme='light'] [class*="text-gray-1"],
 [data-theme='light'] [class*="text-gray-2"],
 [data-theme='light'] [class*="text-gray-3"],
-[data-theme='light'] [class*="text-gray-4"],
-[data-theme='light'] [class*="text-gray-5"] {
+[data-theme='light'] [class*="text-gray-4"] {
   color: #475569 !important; /* slate-600 */
 }
 
-/* Fondos oscuros hardcodeados frecuentes (tarjetas / kanban) -> claros */
+/* Color para text-muted-foreground */
+[data-theme='light'] .text-muted-foreground {
+  color: #475569 !important; /* slate-600 */
+}
+
+/* Fondos oscuros / translúcidos hardcodeados -> tarjetas blancas limpias */
 [data-theme='light'] [class*="bg-[#0f172a]"],
 [data-theme='light'] [class*="bg-[#1e293b]"],
 [data-theme='light'] [class*="bg-[#0a192f]"],
-[data-theme='light'] [class*="bg-[#0b1a2f]"] {
+[data-theme='light'] [class*="bg-[#0b1a2f]"],
+[data-theme='light'] [class*="bg-black/"],
+[data-theme='light'] [class*="bg-white/[0.01]"],
+[data-theme='light'] [class*="bg-white/[0.02]"],
+[data-theme='light'] [class*="bg-white/[0.03]"],
+[data-theme='light'] [class*="bg-white/[0.05]"],
+[data-theme='light'] [class*="bg-white/5"],
+[data-theme='light'] [class*="bg-white/10"] {
   background-color: #ffffff !important;
+}
+
+/* Bordes blancos translúcidos hardcodeados -> bordes slate-200/300 nítidos */
+[data-theme='light'] [class*="border-white/"],
+[data-theme='light'] [class*="border-white\\["] {
+  border-color: #e2e8f0 !important; /* slate-200 */
+}
+
+/* Botones neutros / grises en light mode */
+[data-theme='light'] button[class*="bg-white/"],
+[data-theme='light'] a[class*="bg-white/"] {
+  background-color: #f1f5f9 !important; /* slate-100 */
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme='light'] button[class*="bg-white/"]:hover,
+[data-theme='light'] a[class*="bg-white/"]:hover {
+  background-color: #e2e8f0 !important; /* slate-200 */
+}
+
+/* Dropdown menus & Popovers */
+[data-theme='light'] [class*="glass-card"],
+[data-theme='light'] [class*="glass"] {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04) !important;
 }

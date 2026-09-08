@@ -29,7 +29,8 @@ import {
     Compass,
     Stamp,
     Lock,
-    CreditCard as CreditCardIcon
+    CreditCard as CreditCardIcon,
+    HelpCircle
 } from 'lucide-react';
 import { getSubscriptionInfo, isModuleAllowedWhenLocked } from '@/lib/tenant/subscription';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -58,8 +59,8 @@ const navItems: NavItem[] = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, moduleKey: 'dashboard' },
     { name: 'Clientes', href: '/dashboard/clientes', icon: Users, moduleKey: 'clientes' },
     { name: 'Mascotas', href: '/dashboard/mascotas', icon: Dog, moduleKey: 'mascotas' },
-    { name: 'Gestionar Servicios', href: '/dashboard/gestion-servicios', icon: Palette, moduleKey: 'servicios' },
-    { name: 'Asignar Servicios', href: '/dashboard/asignacion-servicios', icon: Flame, moduleKey: 'ordenes' },
+    { name: 'Catálogo de Servicios', href: '/dashboard/gestion-servicios', icon: Palette, moduleKey: 'servicios' },
+    { name: 'Recepción y Pedidos', href: '/dashboard/recepcion-pedidos', icon: Flame, moduleKey: 'ordenes' },
     {
         name: 'Inventario',
         href: '#',
@@ -79,7 +80,7 @@ const navItems: NavItem[] = [
         children: [
             { name: 'Emitir Certificado', href: '/dashboard/documentos', icon: Stamp, featureKey: 'certificados:generar_pdf' },
             { name: 'Repositorio', href: '/dashboard/documentos/repositorio', icon: FileText, featureKey: 'certificados:repositorio' },
-            { name: 'Catálogo Diseños', href: '/dashboard/documentos/disenos', icon: Palette, featureKey: 'certificados:diseno' },
+            { name: 'Tarjetas de Homenaje', href: '/dashboard/documentos/disenos', icon: Palette, featureKey: 'certificados:diseno' },
         ]
     },
     {
@@ -89,10 +90,10 @@ const navItems: NavItem[] = [
         moduleKey: 'operaciones',
         children: [
             { name: 'Panel de Trabajo', href: '/dashboard/operaciones/lista', icon: Activity, allowedRoles: ['admin', 'operator', 'driver', 'operador_cremacion'], moduleKey: 'operaciones', featureKey: 'operaciones:panel' },
-            { name: 'Crear Seguimiento', href: '/dashboard/operaciones/crear-seguimiento', icon: Compass, moduleKey: 'operaciones', featureKey: 'operaciones:seguimiento:crear' },
+            { name: 'Iniciar Nuevo Tracking', href: '/dashboard/operaciones/crear-seguimiento', icon: Compass, moduleKey: 'operaciones', featureKey: 'operaciones:seguimiento:crear' },
         ]
     },
-    { name: 'Órdenes Cremación', href: '/dashboard/ordenes-cremacion', icon: CreditCard, moduleKey: 'pagos', featureKey: 'pagos:ver_historial' },
+    { name: 'Historial y Cobros', href: '/dashboard/ordenes-cremacion', icon: CreditCard, moduleKey: 'pagos', featureKey: 'pagos:ver_historial' },
     {
         name: 'Veterinarios',
         href: '#',
@@ -105,7 +106,7 @@ const navItems: NavItem[] = [
         ]
     },
     { name: 'Roles y Módulos', href: '/dashboard/roles-modulos', icon: ShieldCheck, moduleKey: 'configuracion', featureKey: 'configuracion:roles' }, // Nuevo
-    // 'Configuración' se removió del sidebar: ahora está en el menú de usuario del Navbar.
+    { name: 'Ayuda y Tutoriales', href: '/dashboard/ayuda', icon: HelpCircle },
 ];
 
 export default function Sidebar() {
@@ -268,7 +269,11 @@ export default function Sidebar() {
                         // de la sección desde el primer hijo (p. ej. /dashboard/documentos),
                         // así rutas hermanas no listadas (como .../disenos) marcan el módulo.
                         const matchesPath = (href?: string) =>
-                            !!href && href !== '#' && (pathname === href || pathname.startsWith(href + '/'));
+                            !!href && href !== '#' && (
+                                href === '/dashboard'
+                                    ? pathname === '/dashboard'
+                                    : (pathname === href || pathname.startsWith(href + '/'))
+                            );
                         const firstChildHref = item.children?.[0]?.href;
                         const sectionBase = hasChildren
                             ? (item.href !== '#'

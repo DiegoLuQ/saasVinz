@@ -338,6 +338,8 @@ class PublicTrackingResponse(BaseModel):
     timeline: List[TrackingTimelineEvent]
     tenant_name: str
     tenant_logo: Optional[str] = None
+    pet_dedication: Optional[str] = None
+    farewell_template_config: Optional[dict] = None
 
 # Workflow Steps
 class WorkflowStepBase(BaseModel):

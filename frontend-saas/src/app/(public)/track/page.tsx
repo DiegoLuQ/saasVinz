@@ -1,11 +1,56 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { PawPrint, ShieldCheck } from 'lucide-react';
+import { PawPrint, ShieldCheck, Loader2 } from 'lucide-react';
 import TrackingSearch from '@/components/public/TrackingSearch';
+import { apiRequest } from '@/lib/api';
 
-export default function TrackHomePage() {
+function TrackHomeContent() {
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const codeParam = searchParams.get('code');
+    const [resolving, setResolving] = useState(!!codeParam);
+    const [errorMsg, setErrorMsg] = useState('');
+
+    useEffect(() => {
+        if (!codeParam) return;
+        const clean = codeParam.trim().toUpperCase();
+
+        const autoResolve = async () => {
+            try {
+                const apiBase = typeof window !== 'undefined' ? '' : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
+                const response = await fetch(`${apiBase}/api/public/tracking/resolve/${encodeURIComponent(clean)}`);
+                if (!response.ok) {
+                    throw new Error('NotFound');
+                }
+                const res = await response.json();
+                if (res?.tenant_slug && res?.code) {
+                    window.location.href = `/${res.tenant_slug}/track/${encodeURIComponent(res.pet_name || 'mascota')}/${res.code}`;
+                } else {
+                    throw new Error('InvalidResponse');
+                }
+            } catch (err) {
+                console.error('Error resolviendo código vía URL:', err);
+                setErrorMsg('No encontramos un seguimiento con ese código. Por favor verifica e intentalo de nuevo.');
+                setResolving(false);
+            }
+        };
+
+        autoResolve();
+    }, [codeParam, router]);
+
+    if (resolving) {
+        return (
+            <main className="relative min-h-[100dvh] flex flex-col items-center justify-center p-5 bg-gradient-to-b from-stone-50 via-white to-amber-50/50 text-stone-800 text-center">
+                <Loader2 className="animate-spin text-amber-500 mb-4" size={40} />
+                <h2 className="text-lg font-bold">Buscando seguimiento {codeParam}...</h2>
+                <p className="text-xs text-stone-500 mt-1">Cargando la información en tiempo real</p>
+            </main>
+        );
+    }
+
     return (
         <main className="relative min-h-[100dvh] flex flex-col items-center justify-center px-5 py-10 overflow-hidden bg-gradient-to-b from-stone-50 via-white to-amber-50/50 text-stone-800">
             {/* Resplandores de fondo suaves */}
@@ -38,6 +83,12 @@ export default function TrackHomePage() {
                     </p>
                 </div>
 
+                {errorMsg && (
+                    <div className="mb-4 p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 text-xs font-semibold text-center">
+                        {errorMsg}
+                    </div>
+                )}
+
                 {/* Tarjeta con el campo */}
                 <TrackingSearch
                     theme="light"
@@ -53,5 +104,17 @@ export default function TrackHomePage() {
                 </div>
             </motion.div>
         </main>
+    );
+}
+
+export default function TrackHomePage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center">
+                <Loader2 className="animate-spin text-amber-500" size={32} />
+            </div>
+        }>
+            <TrackHomeContent />
+        </Suspense>
     );
 }

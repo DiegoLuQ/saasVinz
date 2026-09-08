@@ -55,6 +55,15 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+from fastapi.exceptions import RequestValidationError
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.error(f"422 Validation Error on {request.method} {request.url.path}: {exc.errors()}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
+    )
+
 
 app.add_middleware(AuditMiddleware)
 
@@ -255,12 +264,16 @@ from app.api.public.tenants.router import router as public_tenants_router
 from app.api.public.qr.router import router as qr_router
 from app.api.public.partners.router import router as public_partners_router
 from app.api.public.contact.router import router as public_contact_router
+from app.api.public.plans.router import router as public_plans_router
+from app.api.public.leads.router import router as public_leads_router
 app.include_router(public_forms_router, prefix="/api/public", tags=["Público - Formularios"])
 app.include_router(public_tenants_router, prefix="/api/public", tags=["Público - Tenants"])
 app.include_router(qr_router, prefix="/api/public", tags=["Público - QR"])
 app.include_router(public_partners_router, prefix="/api/public", tags=["Público - Partners"])
 app.include_router(landing_router, prefix="/api/public", tags=["Público - Landing"])
 app.include_router(public_contact_router, prefix="/api/public", tags=["Público - Contacto"])
+app.include_router(public_plans_router, prefix="/api/public", tags=["Público - Planes"])
+app.include_router(public_leads_router, prefix="/api/public", tags=["Público - Leads"])
 
 from app.api.public.widget.router import router as public_widget_router
 app.include_router(public_widget_router, prefix="/api/public/widget", tags=["Público - Widget"])

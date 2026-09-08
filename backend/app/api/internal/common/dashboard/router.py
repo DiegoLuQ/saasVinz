@@ -190,8 +190,8 @@ def get_dashboard_summary(
             "monthly_revenue": monthly_revenue
         },
         "limits": {
-            "pets": {"usage": monthly_pets, "max": plan.max_pets if plan else 0},
-            "customers": {"usage": monthly_customers, "max": plan.max_customers if plan else 0},
+            "pets": {"usage": total_pets_total, "max": 999999},
+            "customers": {"usage": total_customers_total, "max": 999999},
             "orders": {"usage": monthly_orders, "max": plan.max_orders if plan else 0},
             "services": {"usage": total_services, "max": plan.max_services if plan else 0},
             "products": {"usage": total_products, "max": plan.max_products if plan else 0},
@@ -308,7 +308,7 @@ def search_global(
             "id": o.id,
             "name": num_lbl,
             "subtitle": f"{o.cremation_type or 'Cremación'} de {pet_name} (Cliente: {cust_name}) • Estatus: {status_lbl}{tracking_lbl}",
-            "url": f"/dashboard/asignacion-servicios/registro?id={o.id}"
+            "url": f"/dashboard/recepcion-pedidos/registro?id={o.id}"
         })
 
     formatted_services = []

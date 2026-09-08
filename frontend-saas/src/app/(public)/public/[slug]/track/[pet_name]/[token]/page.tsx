@@ -19,8 +19,13 @@ import {
     Package,
     User,
     Scale,
+    Sparkles,
+    Download,
+    Loader2,
 } from 'lucide-react';
 import EvidenceModal from '@/components/public/EvidenceModal';
+import html2canvas from 'html2canvas';
+import FarewellPreview from '@/app/(tenant)/tenant/dashboard/documentos/disenos/components/FarewellPreview';
 
 const getStepIcon = (index: number) => {
     switch (index) {
@@ -79,7 +84,60 @@ export default function TrackingPage() {
     const [error, setError] = useState('');
     const [selectedEvidence, setSelectedEvidence] = useState<any>(null);
     const [isDarkMode, setIsDarkMode] = useState(false);
+    const [mobileTab, setMobileTab] = useState<'tracking' | 'tribute'>('tracking');
     const [stars, setStars] = useState<{ id: number; top: string; left: string; size: number; delay: string; duration: string }[]>([]);
+    const [isDownloadingCard, setIsDownloadingCard] = useState(false);
+    const cardExportRef = React.useRef<HTMLDivElement>(null);
+
+    const handleDownloadCard = async () => {
+        if (!cardExportRef.current) return;
+        setIsDownloadingCard(true);
+        try {
+            const canvas = await html2canvas(cardExportRef.current, {
+                useCORS: true,
+                scale: 2,
+                backgroundColor: null,
+                logging: false,
+            });
+            const dataUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = `homenaje-${(data?.pet_name || 'angelito').replace(/\s+/g, '-').toLowerCase()}.png`;
+            link.click();
+        } catch (err) {
+            console.error('Error al exportar homenaje:', err);
+        } finally {
+            setIsDownloadingCard(false);
+        }
+    };
+
+    const farewellConfig = React.useMemo(() => {
+        if (!data?.pet_image_url) return null;
+        const base = data.farewell_template_config || {
+            format: '1:1',
+            theme: 'warm',
+            styles: { font: 'serif', color: '#1e293b', background: '#FDFBF7' },
+            frame: { enabled: true, color: '#d4af37', width: 6, margin: 10 },
+            petNameFormatting: { bold: true, fontSize: 38, fontFamily: 'Playfair Display', textAlign: 'center', letterSpacing: 2 },
+            subtitleFormatting: { bold: false, italic: true, fontSize: 14, textAlign: 'center', width: 420 },
+            textFormatting: { bold: false, italic: true, fontSize: 15, textAlign: 'center', width: 440, lineHeight: 1.6 },
+            imageSettings: {
+                image2: { shape: 'circle', size: 180, borderColor: '#d4af37', borderWidth: 4, glow: { enabled: true, color: 'rgba(212, 175, 55, 0.5)', size: 24 } }
+            },
+            backgroundImage: { url: null, opacity: 0 }
+        };
+        return {
+            ...base,
+            elements: {
+                ...(base.elements || {}),
+                petName: data.pet_name || 'Tu Angelito',
+                subtitle: '',
+                farewellText: data.pet_dedication || 'Gracias por cada instante de ternura y amor incondicional. Tu recuerdo vivirá por siempre en nuestra memoria.',
+                image2Url: getImageUrl(data.pet_image_url),
+                tenantLogoUrl: data.tenant_logo ? getImageUrl(data.tenant_logo) : null,
+            },
+        };
+    }, [data]);
 
     useEffect(() => {
         const generatedStars = Array.from({ length: 40 }).map((_, i) => ({
@@ -418,13 +476,88 @@ export default function TrackingPage() {
                     </div>
                 </motion.div>
 
+                {/* Selector de Pestañas en Móvil */}
+                {farewellConfig && (
+                    <div className="lg:hidden flex p-1 rounded-2xl bg-black/5 dark:bg-neutral-900/80 border border-emerald-500/20 backdrop-blur-md mb-6 shadow-sm sticky top-4 z-20">
+                        <button
+                            type="button"
+                            onClick={() => setMobileTab('tracking')}
+                            className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                mobileTab === 'tracking'
+                                    ? 'bg-white dark:bg-neutral-800 text-emerald-700 dark:text-emerald-400 shadow-md scale-[1.01]'
+                                    : 'text-gray-500 dark:text-neutral-400 hover:text-gray-900'
+                            }`}
+                        >
+                            <PawPrint size={15} />
+                            <span>Seguimiento</span>
+                            <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-650 dark:text-emerald-400 font-bold">
+                                {progressPercentage}%
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setMobileTab('tribute')}
+                            className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                mobileTab === 'tribute'
+                                    ? 'bg-white dark:bg-neutral-800 text-amber-700 dark:text-amber-300 shadow-md scale-[1.01]'
+                                    : 'text-gray-500 dark:text-neutral-400 hover:text-gray-900'
+                            }`}
+                        >
+                            <Sparkles size={15} className="text-amber-500" />
+                            <span>Homenaje</span>
+                        </button>
+                    </div>
+                )}
+
+                {/* Banner compacto de estado para móvil cuando está en pestaña de Seguimiento */}
+                <div className={`lg:hidden mb-6 p-4 rounded-2xl border backdrop-blur-md ${
+                    isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white/90 border-emerald-100/80 shadow-md shadow-emerald-500/5'
+                } ${mobileTab === 'tracking' ? 'block' : 'hidden'}`}>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                            <h4 className="text-xs font-black text-emerald-650 dark:text-emerald-400 truncate">
+                                {currentStepName}
+                            </h4>
+                        </div>
+                        <span className="text-xs font-black text-emerald-650 dark:text-emerald-400 shrink-0">
+                            {progressPercentage}%
+                        </span>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="flex gap-1 my-2">
+                        {Array.from({ length: totalSteps || 5 }).map((_, idx) => {
+                            const isStepCompleted = idx < completedCount;
+                            const isStepCurrent = idx === completedCount;
+                            return (
+                                <div 
+                                    key={idx} 
+                                    className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
+                                        isStepCompleted 
+                                            ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' 
+                                            : isStepCurrent 
+                                                ? 'bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.4)] animate-pulse'
+                                                : (isDarkMode ? 'bg-neutral-800' : 'bg-gray-200')
+                                    }`} 
+                                />
+                            );
+                        })}
+                    </div>
+                    <p className={`text-[10px] font-bold ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>
+                        {completedCount} de {totalSteps} etapas completadas
+                    </p>
+                </div>
+
                 {/* Layout Principal Grid 2 Columnas */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                     
-                    {/* Panel Izquierdo: Tarjetas Informativas */}
-                    <div className="lg:col-span-4 space-y-4 lg:sticky lg:top-24">
-                                          {/* Tarjeta 1: Estado Actual */}
-                        <div className={`p-6 rounded-[2rem] border backdrop-blur-md transition-all duration-300 ${
+                    {/* Panel Izquierdo: Tarjetas Informativas en Desktop / Vista Homenaje en Móvil */}
+                    <div className={`lg:col-span-4 space-y-4 lg:sticky lg:top-24 ${
+                        mobileTab === 'tribute' ? 'block' : 'hidden lg:block'
+                    }`}>
+                        {/* Tarjeta 1: Estado Actual (Desktop) */}
+                        <div className={`hidden lg:block p-6 rounded-[2rem] border backdrop-blur-md transition-all duration-300 ${
                             isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white/90 border-emerald-100/80 shadow-md shadow-emerald-500/5'
                         }`}>
                             <div className="flex items-center gap-3 mb-3">
@@ -440,19 +573,19 @@ export default function TrackingPage() {
                             </div>
                             <p className={`text-xs leading-relaxed mt-1 ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>
                                 {currentEvent?.status === 'current' 
-                                    ? `Tu mascota se encuentra actualmente en esta etapa. Recibirás una notificación cuando avance.` 
-                                    : `El proceso está en marcha. Te notificaremos a medida que avance el estado.`}
+                                    ? `Tu mascota se encuentra actualmente en esta etapa.` 
+                                    : `El proceso se encuentra en marcha.`}
                             </p>
                         </div>
 
-                        {/* Tarjeta 2: Progreso del Proceso */}
-                        <div className={`p-6 rounded-[2rem] border backdrop-blur-md transition-all duration-300 ${
+                        {/* Tarjeta 2: Progreso del Proceso (Desktop) */}
+                        <div className={`hidden lg:block p-6 rounded-[2rem] border backdrop-blur-md transition-all duration-300 ${
                             isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white/90 border-emerald-100/80 shadow-md shadow-emerald-500/5'
                         }`}>
                             <div className="flex justify-between items-center mb-3">
                                 <span className={`text-[10px] font-bold uppercase tracking-widest ${
                                     isDarkMode ? 'text-slate-500' : 'text-gray-400'
-                                }`}>Progreso del proceso</span>
+                                }}`}>Progreso del proceso</span>
                                 <span className="text-lg font-black text-emerald-650 dark:text-emerald-400">{progressPercentage}%</span>
                             </div>
                             
@@ -481,8 +614,8 @@ export default function TrackingPage() {
                             </p>
                         </div>
 
-                        {/* Tarjeta 3: Última actualización */}
-                        <div className={`p-6 rounded-[2rem] border backdrop-blur-md transition-all duration-300 ${
+                        {/* Tarjeta 3: Última actualización (Desktop) */}
+                        <div className={`hidden lg:block p-6 rounded-[2rem] border backdrop-blur-md transition-all duration-300 ${
                             isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white/90 border-emerald-100/80 shadow-md shadow-emerald-500/5'
                         }`}>
                             <span className={`text-[10px] font-bold uppercase tracking-widest block mb-2 ${
@@ -502,7 +635,96 @@ export default function TrackingPage() {
                             )}
                         </div>
 
-                        {/* Tarjeta 4: Mensaje Emocional */}
+                        {/* Tarjeta 4: Homenaje Conmemorativo (Permanente con Descarga HD) */}
+                        {farewellConfig && (
+                            <div className={`p-5 rounded-[2rem] border backdrop-blur-md transition-all duration-300 flex flex-col items-center text-center overflow-hidden ${
+                                isDarkMode ? 'bg-neutral-900/60 border-amber-500/30' : 'bg-gradient-to-br from-amber-50/70 to-white border-amber-200/80 shadow-md shadow-amber-500/5'
+                            }`}>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Sparkles size={16} className="text-amber-500" />
+                                    <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                                        Homenaje Conmemorativo
+                                    </span>
+                                </div>
+
+                                {(() => {
+                                    const baseHeight = 550;
+                                    const fmt = farewellConfig.format || '3:4';
+                                    let dims = { width: baseHeight * (3 / 4), height: baseHeight };
+                                    if (fmt === '9:16') dims = { width: baseHeight * (9 / 16), height: baseHeight };
+                                    else if (fmt === '3:4') dims = { width: baseHeight * (3 / 4), height: baseHeight };
+                                    else if (fmt === '4:3') dims = { width: baseHeight, height: baseHeight * (3 / 4) };
+                                    else if (fmt === '1:1') dims = { width: baseHeight, height: baseHeight };
+
+                                    const targetWidth = 260;
+                                    const scale = Math.min(0.58, targetWidth / dims.width);
+                                    return (
+                                        <>
+                                            {/* Off-screen HD Target */}
+                                            <div 
+                                                style={{ 
+                                                    position: 'fixed', 
+                                                    left: '-9999px', 
+                                                    top: '-9999px', 
+                                                    width: `${dims.width}px`, 
+                                                    height: `${dims.height}px`,
+                                                    pointerEvents: 'none',
+                                                    zIndex: -999,
+                                                }}
+                                            >
+                                                <FarewellPreview ref={cardExportRef} config={farewellConfig} />
+                                            </div>
+
+                                            {/* Visual Scaled Card */}
+                                            <div 
+                                                style={{ 
+                                                    width: `${dims.width * scale}px`, 
+                                                    height: `${dims.height * scale}px`,
+                                                }}
+                                                className="rounded-2xl overflow-hidden shadow-2xl border border-amber-500/30 relative flex-shrink-0 my-1 bg-black/40"
+                                            >
+                                                <div 
+                                                    style={{
+                                                        transform: `scale(${scale})`,
+                                                        transformOrigin: 'top left',
+                                                        width: `${dims.width}px`,
+                                                        height: `${dims.height}px`,
+                                                    }}
+                                                    className="absolute inset-0"
+                                                >
+                                                    <FarewellPreview config={farewellConfig} />
+                                                </div>
+                                            </div>
+                                        </>
+                                    );
+                                })()}
+
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 italic mt-2.5">
+                                    Inmortalizando la memoria de {data.pet_name}.
+                                </p>
+
+                                <button
+                                    type="button"
+                                    onClick={handleDownloadCard}
+                                    disabled={isDownloadingCard}
+                                    className="mt-4 w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 cursor-pointer"
+                                >
+                                    {isDownloadingCard ? (
+                                        <>
+                                            <Loader2 size={15} className="animate-spin" />
+                                            <span>Generando en HD...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Download size={15} />
+                                            <span>Guardar / Descargar (HD)</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Tarjeta 5: Mensaje Emocional */}
                         <div className={`p-6 rounded-[2rem] border backdrop-blur-md transition-all duration-300 ${
                             isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white/90 border-emerald-100/80 shadow-md shadow-emerald-500/5'
                         }`}>
@@ -516,8 +738,10 @@ export default function TrackingPage() {
 
                     </div>
 
-                    {/* Panel Derecho: Timeline */}
-                    <div className="lg:col-span-8">
+                    {/* Panel Derecho: Timeline (Visible en Desktop y en Móvil si la pestaña es Seguimiento) */}
+                    <div className={`lg:col-span-8 ${
+                        mobileTab === 'tracking' ? 'block' : 'hidden lg:block'
+                    }`}>
                         <div className={`relative space-y-0 pl-8 sm:pl-10 border-l-4 ml-2 sm:ml-3 pb-12 transition-colors duration-500 ${theme.timelineLine}`}>
                             {data.timeline.map((event: any, idx: number) => {
                                 const isCompleted = event.status === 'completed';

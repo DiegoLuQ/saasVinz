@@ -16,6 +16,7 @@ interface PatientCardProps {
     selectedPartner?: Partner;
     onPetChange: (val: string | number) => void;
     onStatusChange: (val: string | number) => void;
+    onNewPetClick?: () => void;
 }
 
 export default function PatientCard({
@@ -26,6 +27,7 @@ export default function PatientCard({
     selectedPartner,
     onPetChange,
     onStatusChange,
+    onNewPetClick,
 }: PatientCardProps) {
     return (
         <div className="relative bg-white/[0.015] rounded-3xl border border-white/[0.07] transition-colors duration-300 hover:border-white/[0.12] overflow-hidden">
@@ -48,9 +50,20 @@ export default function PatientCard({
                 {/* Selectors */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8" role="group" aria-labelledby="section-patient">
                     <div className="space-y-3">
-                        <label htmlFor="select-pet" className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-[0.18em] ml-1">
-                            Mascota Seleccionada <span className="text-red-400">*</span>
-                        </label>
+                        <div className="flex items-center justify-between">
+                            <label htmlFor="select-pet" className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-[0.18em] ml-1">
+                                Mascota Seleccionada <span className="text-red-400">*</span>
+                            </label>
+                            {onNewPetClick && (
+                                <button
+                                    type="button"
+                                    onClick={onNewPetClick}
+                                    className="text-xs text-primary hover:underline font-bold flex items-center gap-1"
+                                >
+                                    + Nueva Mascota
+                                </button>
+                            )}
+                        </div>
                         <SearchableSelect
                             options={petOptions}
                             value={currentCremation?.pet_id || 0}

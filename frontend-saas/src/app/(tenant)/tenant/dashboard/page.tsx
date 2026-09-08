@@ -22,16 +22,22 @@ import {
     ChevronDown,
     ChevronUp,
     Inbox,
+    FileText,
+    Share2,
+    Compass,
 } from 'lucide-react';
 import { getImageUrl } from '@/lib/tenant/api';
 import { useRouter } from 'next/navigation';
 import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
 import { StatsSkeleton, Skeleton } from '@/components/tenant/ui/Skeleton';
 import { PlanLimitModal } from '@/components/tenant/PlanLimitModal';
-import SubmissionsTable from '@/components/tenant/SubmissionsTable';
 import DashboardTrendChart from '@/components/tenant/DashboardTrendChart';
 import { useDashboardSummary, useCompleteCremation } from '@/hooks/useDashboard';
-import { useCurrentUser } from '@/hooks/useSessionBootstrap';
+import { useCurrentUser, useInitialSubmissions } from '@/hooks/useSessionBootstrap';
+import QuickRegistrationModal from '@/components/tenant/dashboard/QuickRegistrationModal';
+import QuickTrackingModal from '@/components/tenant/dashboard/QuickTrackingModal';
+import SubmissionDetailModal from '@/components/tenant/modals/SubmissionDetailModal';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface RecentCremation {
     id: number;
@@ -52,12 +58,16 @@ const DAYS_ES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'
 const MONTHS_ES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
 function CremationRow({ item, onComplete }: { item: RecentCremation; onComplete: (id: number) => void }) {
+    const router = useRouter();
     const statusLower = item.status.toLowerCase();
     const isProcessing = ['processing', 'en_proceso'].includes(statusLower);
     const isPending = ['pending', 'pendiente', 'received', 'recibido'].includes(statusLower);
 
     return (
-        <div className="flex items-center justify-between p-3 rounded-2xl bg-foreground/5 border border-foreground/5 hover:border-foreground/10 transition-all group overflow-hidden">
+        <div 
+            onClick={() => router.push(`/dashboard/recepcion-pedidos`)}
+            className="flex items-center justify-between p-3 rounded-2xl bg-foreground/5 border border-foreground/5 hover:border-foreground/15 hover:bg-foreground/[0.07] transition-all group overflow-hidden cursor-pointer"
+        >
             <div className="flex items-center flex-1 min-w-0">
                 <div className="w-10 h-10 rounded-xl bg-foreground/5 flex items-center justify-center font-bold text-xs ring-1 ring-foreground/10 uppercase overflow-hidden flex-shrink-0">
                     {item.pet_image ? (
@@ -102,7 +112,7 @@ function CremationRow({ item, onComplete }: { item: RecentCremation; onComplete:
                 )}
             </div>
 
-            <div className="flex items-center gap-2 ml-3">
+            <div className="flex items-center gap-2 ml-3" onClick={(e) => e.stopPropagation()}>
                 {!['entregado', 'delivered', 'completado', 'completed', 'cancelado', 'canceled'].includes((item.status || '').toLowerCase()) && (
                     <button
                         onClick={() => onComplete(item.id)}
@@ -118,12 +128,17 @@ function CremationRow({ item, onComplete }: { item: RecentCremation; onComplete:
 }
 
 export default function DashboardPage() {
-    const { data } = useDashboardSummary();
+    const { data, refetch } = useDashboardSummary();
     const completeCremationMutation = useCompleteCremation();
     const router = useRouter();
+    const queryClient = useQueryClient();
     const { tenantData } = useTenant();
     const currentUser = useCurrentUser();
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+    const [showQuickRegistrationModal, setShowQuickRegistrationModal] = useState(false);
+    const [showQuickTrackingModal, setShowQuickTrackingModal] = useState(false);
+    const [selectedSubmissionId, setSelectedSubmissionId] = useState<number | null>(null);
+    const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState(false);
     const [exceededResource, setExceededResource] = useState<{ name: string; icon: React.ComponentType } | null>(null);
     const [catalogExpanded, setCatalogExpanded] = useState(false);
 
@@ -135,10 +150,12 @@ export default function DashboardPage() {
     const showFinancials = isOwner && !isRegistrarBloqueado;
     const showTrend = isOwner && !isRegistrarBloqueado;
     const showCatalogCards = isOwner && !isRegistrarBloqueado;
-    const showSubmissions = !isOperator;
 
     const now = new Date();
     const todayLabel = `${DAYS_ES[now.getDay()]} ${now.getDate()} ${MONTHS_ES[now.getMonth()]}`;
+
+    const rawSubmissions = useInitialSubmissions();
+    const pendingSubmissions = rawSubmissions.filter((s: any) => s.status === 'pending' || s.status === 'pendiente');
 
     const monthlyRevenue = data?.stats.monthly_revenue || 0;
     const previousRevenue = data?.stats.previous_month_revenue || 0;
@@ -178,21 +195,21 @@ export default function DashboardPage() {
         {
             name: 'Clientes',
             value: data?.stats.total_customers || 0,
-            usage: data?.limits?.customers?.usage || 0,
-            max: data?.limits?.customers?.max || 0,
-            quota: data?.limits?.customers ? formatLimit(data.limits.customers.usage, data.limits.customers.max) : '0 / 0',
+            usage: data?.stats.total_customers || 0,
+            max: 0,
+            quota: null,
             icon: Users,
-            limitInfo: 'Cuota Mensual',
+            limitInfo: 'Total Registrados',
             href: '/dashboard/clientes',
         },
         {
             name: 'Mascotas',
             value: data?.stats.total_pets || 0,
-            usage: data?.limits?.pets?.usage || 0,
-            max: data?.limits?.pets?.max || 0,
-            quota: data?.limits?.pets ? formatLimit(data.limits.pets.usage, data.limits.pets.max) : '0 / 0',
+            usage: data?.stats.total_pets || 0,
+            max: 0,
+            quota: null,
             icon: Dog,
-            limitInfo: 'Cuota Mensual',
+            limitInfo: 'Total Registradas',
             href: '/dashboard/mascotas',
         },
         {
@@ -203,7 +220,7 @@ export default function DashboardPage() {
             quota: data?.limits?.orders ? formatLimit(data.limits.orders.usage, data.limits.orders.max) : '0 / 0',
             icon: CheckCircle2,
             limitInfo: 'Cuota Mensual',
-            href: '/dashboard/operaciones',
+            href: '/dashboard/recepcion-pedidos',
         },
         {
             name: 'Usuarios',
@@ -214,7 +231,7 @@ export default function DashboardPage() {
                 ? `${data?.stats.total_users || 0} / ${tenantData.subscription_plan.max_users}`
                 : null,
             icon: UserCircle,
-            limitInfo: 'Staff',
+            limitInfo: 'Licencias Staff',
             href: '/dashboard/configuracion',
         },
     ];
@@ -364,6 +381,48 @@ export default function DashboardPage() {
 
     return (
         <div className="space-y-8">
+            {/* Alerta de Solicitudes Web Pendientes */}
+            {pendingSubmissions.length > 0 && (
+                <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    onClick={() => {
+                        if (pendingSubmissions.length === 1) {
+                            setSelectedSubmissionId(pendingSubmissions[0].id);
+                            setIsSubmissionModalOpen(true);
+                        } else {
+                            // Si hay varias, abrir la primera o el modal
+                            setSelectedSubmissionId(pendingSubmissions[0].id);
+                            setIsSubmissionModalOpen(true);
+                        }
+                    }}
+                    className="p-4 rounded-3xl bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-primary/10 border border-amber-500/30 flex items-center justify-between gap-4 cursor-pointer hover:border-amber-500/50 hover:bg-amber-500/10 transition-all shadow-lg shadow-amber-500/5 group"
+                >
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-2.5 rounded-2xl bg-amber-500/20 text-amber-400 shrink-0 group-hover:scale-110 transition-transform">
+                            <Inbox size={22} className="animate-bounce" />
+                        </div>
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-black uppercase tracking-wider text-amber-400 bg-amber-500/20 px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                                    {pendingSubmissions.length} Solicitud{pendingSubmissions.length !== 1 ? 'es' : ''} Web Pendiente{pendingSubmissions.length !== 1 ? 's' : ''}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                    {pendingSubmissions[0]?.owner_name ? `Cliente: ${pendingSubmissions[0].owner_name}` : ''}
+                                    {pendingSubmissions[0]?.pet_name ? ` · Mascota: ${pendingSubmissions[0].pet_name}` : ''}
+                                </span>
+                            </div>
+                            <p className="text-xs sm:text-sm font-bold text-foreground mt-1 truncate">
+                                Haz clic aquí para ver los datos del formulario y convertirlos en orden de cremación.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400 group-hover:text-amber-300 shrink-0 bg-amber-500/20 px-3 py-2 rounded-xl border border-amber-500/20">
+                        <span>Revisar Ahora</span>
+                        <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                    </div>
+                </motion.div>
+            )}
 
             {/* Panel HOY */}
             <div className={`rounded-3xl border p-5 sm:p-6 ${todayItems.length > 0 ? 'bg-orange-500/5 border-orange-500/20' : 'glass-card border-foreground/5'}`}>
@@ -380,7 +439,7 @@ export default function DashboardPage() {
                         )}
                     </h2>
                     <button
-                        onClick={() => router.push('/dashboard/operaciones')}
+                        onClick={() => router.push('/dashboard/recepcion-pedidos')}
                         className="text-[10px] font-bold uppercase tracking-widest text-primary hover:underline flex items-center gap-1 underline-offset-4"
                     >
                         Ver todas <ArrowRight size={12} />
@@ -431,15 +490,49 @@ export default function DashboardPage() {
                 )}
             </div>
 
-            {/* Header with Welcome Message & Financial Cards */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 md:gap-4">
-                <div className="text-center md:text-left">
+            {/* Header with Welcome Message & Quick Action Buttons */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="text-center sm:text-left">
                     <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-foreground leading-tight">Bienvenido de nuevo, 👋</h1>
-                    <p className="text-muted-foreground mt-2 text-sm sm:text-base md:text-lg font-medium">Aquí tienes lo que está pasando hoy en tu negocio.</p>
+                    <p className="text-muted-foreground mt-1 text-sm sm:text-base font-medium">Aquí tienes el estado operativo y comercial de hoy.</p>
                 </div>
 
-                {showFinancials && (
-                    <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+                <div className="flex items-center justify-center sm:justify-end gap-2.5 flex-wrap">
+                    <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => setShowQuickTrackingModal(true)}
+                        className="px-4 py-3 rounded-2xl bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 font-bold text-xs sm:text-sm text-foreground transition-all flex items-center gap-2"
+                        title="Buscar orden en vivo y compartir tracking"
+                    >
+                        <Compass size={16} className="text-primary" />
+                        <span>Buscar Tracking</span>
+                    </motion.button>
+
+                    <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => router.push('/dashboard/recepcion-pedidos')}
+                        className="px-4 py-3 rounded-2xl bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 font-bold text-xs sm:text-sm text-foreground transition-all flex items-center gap-2"
+                    >
+                        <Clock size={16} className="text-muted-foreground" />
+                        <span>Ver Pedidos</span>
+                    </motion.button>
+
+                    <motion.button
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => setShowQuickRegistrationModal(true)}
+                        className="px-5 py-3 rounded-2xl bg-gradient-to-r from-primary via-primary/90 to-emerald-500 text-primary-foreground font-extrabold text-xs sm:text-sm tracking-wide shadow-xl shadow-primary/20 hover:shadow-primary/30 transition-all flex items-center gap-2"
+                    >
+                        <Sparkles size={18} className="animate-pulse text-yellow-300" />
+                        <span>+ Nuevo Registro Rápido</span>
+                    </motion.button>
+                </div>
+            </div>
+
+            {showFinancials && (
+                <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
                         {/* Ingresos */}
                         <motion.div
                             initial={{ opacity: 0, scale: 0.9 }}
@@ -503,7 +596,6 @@ export default function DashboardPage() {
                         </motion.div>
                     </div>
                 )}
-            </div>
 
             {/* Primary Stats Grid — se oculta solo para operadores puros */}
             {!isOperator && (
@@ -559,39 +651,63 @@ export default function DashboardPage() {
                         Actividad Reciente
                     </h2>
                     <button
-                        onClick={() => router.push('/dashboard/operaciones')}
+                        onClick={() => router.push('/dashboard/recepcion-pedidos')}
                         className="text-[10px] font-bold uppercase tracking-widest text-primary hover:underline transition-all underline-offset-4 flex items-center"
                     >
                         Ver todos <ArrowRight size={12} className="ml-1" />
                     </button>
                 </div>
                 <div className="space-y-3">
-                    {data?.recent_cremations && data.recent_cremations.length > 0
-                        ? data.recent_cremations.map((item: RecentCremation) => (
-                            <CremationRow key={item.id} item={item} onComplete={handleComplete} />
-                        ))
-                        : <p className="text-center py-10 text-muted-foreground italic text-xs">No hay actividad reciente.</p>
-                    }
+                    {(() => {
+                        const activeRecent = (data?.recent_cremations || []).filter(
+                            (item: RecentCremation) => !['entregado', 'delivered', 'completado', 'completed'].includes((item.status || '').toLowerCase())
+                        );
+                        return activeRecent.length > 0 ? (
+                            activeRecent.map((item: RecentCremation) => (
+                                <CremationRow key={item.id} item={item} onComplete={handleComplete} />
+                            ))
+                        ) : (
+                            <p className="text-center py-10 text-muted-foreground italic text-xs">No hay actividad reciente.</p>
+                        );
+                    })()}
                 </div>
             </div>
 
-            {/* Submissions — jerarquía secundaria, solo si corresponde por rol */}
-            {showSubmissions && (
-                <div className="glass-card rounded-3xl p-5 sm:p-8 overflow-hidden border border-foreground/5">
-                    <div className="flex items-center gap-2 mb-4">
-                        <div className="p-1.5 rounded-lg bg-foreground/5 text-muted-foreground">
-                            <Inbox size={16} />
-                        </div>
-                        <h2 className="text-base font-bold text-muted-foreground">Bandeja de Entrada</h2>
-                    </div>
-                    <SubmissionsTable />
-                </div>
-            )}
+            {/* La "Bandeja de Entrada" se retiró: duplicaba la campana del Navbar,
+               que ya notifica cada solicitud del formulario (type "new_submission")
+               y lleva al mismo detalle /dashboard/registros/{id}. */}
 
             <PlanLimitModal
                 isOpen={showUpgradeModal}
                 onClose={() => setShowUpgradeModal(false)}
                 resourceName={exceededResource?.name}
+            />
+
+            <QuickRegistrationModal
+                isOpen={showQuickRegistrationModal}
+                onClose={() => setShowQuickRegistrationModal(false)}
+                onSuccess={() => {
+                    refetch();
+                }}
+            />
+
+            <QuickTrackingModal
+                isOpen={showQuickTrackingModal}
+                onClose={() => setShowQuickTrackingModal(false)}
+            />
+
+            <SubmissionDetailModal
+                isOpen={isSubmissionModalOpen}
+                submissionId={selectedSubmissionId}
+                onClose={() => setIsSubmissionModalOpen(false)}
+                onProcessed={() => {
+                    queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
+                    setIsSubmissionModalOpen(false);
+                }}
+                onDeleted={() => {
+                    queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
+                    setIsSubmissionModalOpen(false);
+                }}
             />
         </div>
     );

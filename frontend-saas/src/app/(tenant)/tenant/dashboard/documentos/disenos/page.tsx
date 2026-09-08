@@ -18,6 +18,7 @@ import html2canvas from 'html2canvas';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiRequest, getImageUrl } from '@/lib/tenant/api';
+import { useSessionBootstrap } from '@/hooks/useSessionBootstrap';
 import FarewellPreview from './components/FarewellPreview';
 import TemplateCanvas from '@/components/admin/imageTemplates/TemplateCanvas';
 import { ASPECT_RATIOS } from '@/lib/admin/imageTemplates/constants';
@@ -60,6 +61,7 @@ export default function FarewellPickerPage() {
     const searchParams = useSearchParams();
     const cremationId = searchParams.get('cremation_id');
     const templateId = searchParams.get('id');
+    const { data: bootstrapData } = useSessionBootstrap();
 
     // ==========================================
     // Unified gallery & editor states
@@ -270,6 +272,7 @@ export default function FarewellPickerPage() {
                 subtitle: effectiveSubtitle,
                 farewellText: farewellText || base.elements?.farewellText || '',
                 image2Url: petPhotoUrl || base.elements?.image2Url || null,
+                tenantLogoUrl: bootstrapData?.tenant?.logo_url ? getImageUrl(bootstrapData.tenant.logo_url) : null,
             },
         };
     }, [
@@ -278,6 +281,7 @@ export default function FarewellPickerPage() {
         farewellText,
         petPhotoUrl,
         effectiveSubtitle,
+        bootstrapData,
     ]);
 
     const canvasBindings = useMemo(() => {
@@ -459,11 +463,11 @@ export default function FarewellPickerPage() {
                         <div>
                             {cremationId && (
                                 <button
-                                    onClick={() => router.push('/dashboard/asignacion-servicios')}
+                                    onClick={() => router.push('/dashboard/recepcion-pedidos')}
                                     className="group inline-flex items-center text-slate-400 hover:text-white transition-colors mb-4 text-xs font-bold uppercase tracking-widest bg-white/[0.03] border border-white/5 hover:border-white/20 px-4 py-2 rounded-xl backdrop-blur-md"
                                 >
                                     <ArrowLeft size={14} className="mr-2 group-hover:-translate-x-1 transition-transform duration-300" />
-                                    Volver a Servicios
+                                    Volver a Pedidos
                                 </button>
                             )}
                             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-primary/10 border border-primary/25 rounded-full mb-4 shadow-sm backdrop-blur-md">

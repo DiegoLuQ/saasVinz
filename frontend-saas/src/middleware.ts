@@ -91,6 +91,13 @@ export default async function middleware(req: NextRequest) {
     }
 
     if (currentHost === 'app') {
+        if (url.pathname.startsWith('/track')) {
+            return NextResponse.next();
+        }
+        if (url.pathname.includes('/track/')) {
+            url.pathname = `/public${url.pathname}`;
+            return NextResponse.rewrite(url);
+        }
         url.pathname = `/tenant${url.pathname}`;
         return NextResponse.rewrite(url);
     }

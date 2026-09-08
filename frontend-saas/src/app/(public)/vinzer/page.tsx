@@ -1,6 +1,8 @@
 import React from 'react';
 import type { Metadata } from 'next';
 import VinzerLandingClient from '@/components/vinzer/VinzerLandingClient';
+import { fetchPublicPlans } from '@/lib/api/plans';
+import { VINZER_FAQS } from '@/lib/vinzer-faqs';
 
 // Server-Side Metadata Generation for the main Vinzer landing page
 export async function generateMetadata(): Promise<Metadata> {
@@ -18,18 +20,18 @@ export async function generateMetadata(): Promise<Metadata> {
         return {
             metadataBase: new URL('https://vinzer.app'),
             title: seo.title || "Software para Crematorios de Mascotas y Funerarias | Vinzer",
-            description: seo.description || "Optimiza la gestión de tu crematorio de mascotas con Vinzer. Controla la trazabilidad QR, evidencias fotográficas y clientes en un solo sistema. Pruébalo gratis.",
+            description: seo.description || "Optimiza la gestión de tu crematorio de mascotas con Vinzer: código de verificación único, evidencia fotográfica por fase y seguimiento público para las familias. Pruébalo gratis.",
             keywords: seo.keywords || [
                 'software para crematorios de mascotas',
                 'gestión funeraria mascotas',
-                'trazabilidad qr cremaciones',
+                'trazabilidad de cremaciones',
                 'vinzer software chile',
                 'sistema de gestion de cementerios de mascotas',
             ],
             robots: seo.robots || "index, follow",
             openGraph: {
                 title: seo.ogTitle || "Software de Gestión y Trazabilidad para Crematorios de Mascotas | Vinzer",
-                description: seo.ogDescription || "Vinzer te ayuda a profesionalizar tu crematorio o cementerio de mascotas con tecnología QR e informes transparentes.",
+                description: seo.ogDescription || "Vinzer te ayuda a profesionalizar tu crematorio o cementerio de mascotas con trazabilidad verificable e informes transparentes.",
                 images: seo.ogImage
                     ? [{ url: seo.ogImage }]
                     : [{ url: '/images/og-image-vinzer.jpg', width: 1200, height: 630, alt: 'Panel de gestión de Vinzer' }],
@@ -41,7 +43,7 @@ export async function generateMetadata(): Promise<Metadata> {
             twitter: {
                 card: 'summary_large_image',
                 title: seo.ogTitle || "Software de Gestión y Trazabilidad para Crematorios de Mascotas | Vinzer",
-                description: seo.ogDescription || "Vinzer te ayuda a profesionalizar tu crematorio o cementerio de mascotas con tecnología QR e informes transparentes.",
+                description: seo.ogDescription || "Vinzer te ayuda a profesionalizar tu crematorio o cementerio de mascotas con trazabilidad verificable e informes transparentes.",
                 images: seo.ogImage ? [seo.ogImage] : ['/images/og-image-vinzer.jpg'],
             },
             alternates: {
@@ -53,13 +55,17 @@ export async function generateMetadata(): Promise<Metadata> {
         return {
             metadataBase: new URL('https://vinzer.app'),
             title: "Software para Crematorios de Mascotas y Funerarias | Vinzer",
-            description: "Optimiza la gestión de tu crematorio de mascotas con Vinzer. Controla la trazabilidad QR, evidencias fotográficas y clientes en un solo sistema. Pruébalo gratis.",
+            description: "Optimiza la gestión de tu crematorio de mascotas con Vinzer: código de verificación único, evidencia fotográfica por fase y seguimiento público para las familias. Pruébalo gratis.",
         };
     }
 }
 
 export default async function VinzerLandingPage() {
     let config = null;
+
+    // Los planes se leen en el servidor para que los precios queden en el HTML
+    // (SEO) y salgan de la misma tabla que aplica los topes en el backend.
+    const plans = await fetchPublicPlans();
 
     try {
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -79,7 +85,7 @@ export default async function VinzerLandingPage() {
         <>
             {/* Structured Schema JSON-LD can be here */}
             <VinzerLandingPageSchema />
-            <VinzerLandingClient initialConfig={config} />
+            <VinzerLandingClient initialConfig={config} initialPlans={plans} />
         </>
     );
 }
@@ -92,7 +98,7 @@ function VinzerLandingPageSchema() {
         'name': 'Vinzer',
         'operatingSystem': 'All',
         'applicationCategory': 'BusinessApplication',
-        'description': 'Plataforma SaaS multi-tenant para la gestión de crematorios de mascotas y funerarias. Trazabilidad QR, plan de tracking en tiempo real para familias y memoriales digitales interactivos.',
+        'description': 'Plataforma SaaS multi-tenant para la gestión de crematorios de mascotas y funerarias. Código de verificación único por servicio, evidencia fotográfica por fase, seguimiento público en tiempo real para las familias y memoriales digitales interactivos.',
         'offers': {
             '@type': 'Offer',
             'price': '29900',
@@ -106,44 +112,20 @@ function VinzerLandingPageSchema() {
         }
     };
 
-    // Definición de Esquema JSON-LD para FAQPage (Rich Snippets)
+    // Definición de Esquema JSON-LD para FAQPage (Rich Snippets).
+    // Se genera desde VINZER_FAQS, la misma fuente que alimenta el acordeón:
+    // duplicar el texto aquí hacía que el schema y la página se desincronizaran.
     const faqSchema = {
         '@context': 'https://schema.org',
         '@type': 'FAQPage',
-        'mainEntity': [
-            {
-                '@type': 'Question',
-                'name': '¿Cómo garantiza Vinzer la trazabilidad del servicio?',
-                'acceptedAnswer': {
-                    '@type': 'Answer',
-                    'text': 'Cada servicio genera un código de verificación único de 10 caracteres más un token de tracking público. El flujo de trabajo es configurable por crematorio y cada fase requiere evidencia fotográfica, notas y firma del operador. El sistema registra usuario, hora y cambios en cada acción crítica, dejando un historial de auditoría completo.'
-                }
+        'mainEntity': VINZER_FAQS.map((faq) => ({
+            '@type': 'Question',
+            'name': faq.q,
+            'acceptedAnswer': {
+                '@type': 'Answer',
+                'text': faq.a,
             },
-            {
-                '@type': 'Question',
-                'name': '¿Qué es el Plan de Tracking público para la familia?',
-                'acceptedAnswer': {
-                    '@type': 'Answer',
-                    'text': 'Es un enlace único por servicio que la familia abre sin iniciar sesión. Muestra una línea de tiempo con cada fase completada, foto de evidencia, descripción y hora exacta. La familia acompaña el proceso en tiempo real, reduciendo las llamadas de seguimiento al crematorio.'
-                }
-            },
-            {
-                '@type': 'Question',
-                'name': '¿Cómo funcionan los certificados de cremación?',
-                'acceptedAnswer': {
-                    '@type': 'Answer',
-                    'text': 'Vinzer genera certificados PDF automáticos con datos de la mascota, dueño, tipo de servicio, firma digital, marca de agua del crematorio y numeración secuencial. Las plantillas son editables en secciones, colores, orden y tipografías. Disponibles a partir del plan PRO.'
-                }
-            },
-            {
-                '@type': 'Question',
-                'name': '¿Cómo son los memoriales digitales?',
-                'acceptedAnswer': {
-                    '@type': 'Answer',
-                    'text': 'Cada servicio puede generar un memorial público interactivo, temas configurables (fondos, partículas, colores), galería de imágenes, dedicatorias y velas virtuales. Las dedicatorias requieren aprobación del crematorio antes de publicarse y los memoriales privados pueden protegerse con un PIN de 6 dígitos.'
-                }
-            }
-        ]
+        })),
     };
 
     return (

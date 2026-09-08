@@ -110,8 +110,8 @@ export default function PlansPage() {
                 body: {
                     name,
                     price: 0,
-                    max_pets: 10,
-                    max_customers: 10,
+                    max_pets: 999999,
+                    max_customers: 999999,
                     max_orders: 10,
                     max_services: 10,
                     max_plans: 5,

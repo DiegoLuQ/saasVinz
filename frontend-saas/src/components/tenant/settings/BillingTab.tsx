@@ -64,7 +64,7 @@ export function BillingTab({ bootstrapTenant, bootstrapData, bootstrapUser }: Bi
 
         try {
             if (plan.polar_product_id) {
-                const successUrl = `${window.location.origin}/tenant/dashboard/configuracion?tab=facturacion&success=true`;
+                const successUrl = `${window.location.origin}/dashboard/configuracion?tab=facturacion&success=true`;
 
                 await createCheckout({
                     product_id: plan.polar_product_id,

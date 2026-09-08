@@ -28,8 +28,7 @@ def create_customer(
     customer_in: schemas.CustomerCreate,
     tenant_id: int = Depends(get_tenant_id),
     service: CustomerService = Depends(get_customer_service),
-    _: bool = Depends(check_permission("clientes", "create")),
-    __: bool = Depends(check_resource_limit("customers"))
+    _: bool = Depends(check_permission("clientes", "create"))
 ):
     return service.create(tenant_id, customer_in)
 

@@ -422,7 +422,7 @@ def get_bootstrap(
         selectinload(models.CremationOC.pet).selectinload(models.Pet.customer)
     ).filter(
         models.CremationOC.tenant_id == tenant_id,
-        models.CremationOC.status.in_(['pendiente', 'en_proceso', 'pending', 'processing', 'entregado', 'delivered'])
+        models.CremationOC.status.in_(['pendiente', 'en_proceso', 'pending', 'processing'])
     ).order_by(models.CremationOC.id.desc()).limit(5).all()
 
     formatted_recent = []

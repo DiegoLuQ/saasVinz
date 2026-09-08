@@ -16,7 +16,11 @@ import {
     Copy,
     Share2,
     Menu,
-    Search
+    Search,
+    Link2,
+    Clock,
+    Globe,
+    ShieldCheck
 } from 'lucide-react';
 import Modal from '@/components/tenant/Modal';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -80,6 +84,7 @@ export default function Navbar() {
     const { tenantData } = useTenant();
     const isRegistrarBloqueado = false;
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [shareMode, setShareMode] = useState<'permanent' | 'temporary'>('permanent');
 
     const [tempToken, setTempToken] = useState<string | null>(null);
     const [tokenExpiry, setTokenExpiry] = useState<Date | null>(null);
@@ -148,7 +153,9 @@ export default function Navbar() {
 
     const handleShareLink = async () => {
         setIsShareModalOpen(true);
-        await generateTemporaryToken();
+        if (!tempToken) {
+            await generateTemporaryToken();
+        }
     };
 
     const generateTemporaryToken = async () => {
@@ -170,16 +177,33 @@ export default function Navbar() {
         }
     };
 
-    const copyToClipboardHandler = async () => {
-        if (!tenantData) return;
+    const getFormUrl = (mode: 'permanent' | 'temporary') => {
+        if (!tenantData?.slug) return '';
         const baseUrl = process.env.NEXT_PUBLIC_PUBLIC_FORM_URL ||
             (typeof window !== 'undefined'
                 ? `${window.location.protocol}//${process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000'}`
                 : 'http://localhost:3000');
-        const token = tempToken || tenantData.public_token;
-        const link = `${baseUrl}/${tenantData.slug}/form?token=${token}`;
+        
+        if (mode === 'permanent') {
+            const permToken = tenantData.public_token;
+            return permToken 
+                ? `${baseUrl}/${tenantData.slug}/form?token=${permToken}` 
+                : `${baseUrl}/${tenantData.slug}/form`;
+        } else {
+            return tempToken 
+                ? `${baseUrl}/${tenantData.slug}/form?token=${tempToken}` 
+                : '';
+        }
+    };
 
-        const success = await copyToClipboard(link);
+    const copyToClipboardHandler = async (textToCopy?: string) => {
+        const targetText = textToCopy || getFormUrl(shareMode);
+        if (!targetText) {
+            showToast('Enlace no disponible aún', 'error');
+            return;
+        }
+
+        const success = await copyToClipboard(targetText);
         if (success) {
             showToast('Enlace copiado al portapapeles', 'success');
         } else {
@@ -524,71 +548,123 @@ export default function Navbar() {
                 isOpen={isShareModalOpen}
                 onClose={() => setIsShareModalOpen(false)}
                 title="Compartir Formulario Público"
-                maxWidth="max-w-md"
+                maxWidth="max-w-lg"
             >
                 <div className="space-y-6">
-                    <div className="space-y-2">
-                        <p className="text-muted-foreground text-sm">
-                            Copia este enlace temporal para compartir el formulario de registro con tus clientes.
-                        </p>
-                        {tokenExpiry && (
-                            <div className="flex items-center gap-2 text-xs">
-                                <span className="text-muted-foreground">Tiempo restante:</span>
-                                <span className={`font-mono font-bold ${timeRemaining === 'Expirado' ? 'text-red-500' :
-                                    timeRemaining.startsWith('0:') && parseInt(timeRemaining.split(':')[1]) < 10 ? 'text-orange-500' :
-                                        'text-primary'
-                                    }`}>
-                                    {timeRemaining}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="relative group">
-                        <input
-                            readOnly
-                            value={tempToken && tenantData ?
-                                `${process.env.NEXT_PUBLIC_PUBLIC_FORM_URL ||
-                                (typeof window !== 'undefined'
-                                    ? `${window.location.protocol}//${process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000'}`
-                                    : 'http://localhost:3000')
-                                }/${tenantData.slug}/form?token=${tempToken}` :
-                                'Generando enlace...'
-                            }
-                            className="w-full bg-foreground/5 border border-foreground/10 rounded-2xl py-4 pl-4 pr-12 outline-none text-sm font-mono text-primary truncate"
-                        />
+                    {/* Selector de tipo de enlace */}
+                    <div className="grid grid-cols-2 p-1.5 bg-foreground/5 rounded-2xl border border-foreground/10 gap-1.5">
                         <button
-                            onClick={copyToClipboardHandler}
-                            disabled={!tempToken}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-primary/20 text-primary rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                            title="Copiar enlace"
+                            onClick={() => setShareMode('permanent')}
+                            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
+                                shareMode === 'permanent'
+                                    ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
+                                    : 'text-muted-foreground hover:text-foreground hover:bg-foreground/5'
+                            }`}
                         >
-                            <Copy size={18} />
+                            <Globe size={15} />
+                            Enlace Permanente
+                        </button>
+                        <button
+                            onClick={() => setShareMode('temporary')}
+                            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
+                                shareMode === 'temporary'
+                                    ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
+                                    : 'text-muted-foreground hover:text-foreground hover:bg-foreground/5'
+                            }`}
+                        >
+                            <Clock size={15} />
+                            Enlace Temporal (3 Días)
                         </button>
                     </div>
 
-                    <button
-                        onClick={generateTemporaryToken}
-                        disabled={isGeneratingToken}
-                        className="w-full py-2.5 text-xs bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 rounded-xl font-bold transition-all disabled:opacity-50"
-                    >
-                        {isGeneratingToken ? 'Generando...' : '🔄 Generar Nuevo Enlace'}
-                    </button>
+                    {/* Contenido según pestaña activa */}
+                    {shareMode === 'permanent' ? (
+                        <div className="space-y-4">
+                            <div className="p-3.5 bg-primary/10 border border-primary/20 rounded-2xl flex items-start gap-3">
+                                <ShieldCheck size={20} className="text-primary shrink-0 mt-0.5" />
+                                <div className="space-y-1 text-xs">
+                                    <p className="font-bold text-foreground">Enlace Fijo para Redes y Sitio Web</p>
+                                    <p className="text-muted-foreground">
+                                        Este enlace nunca expira. Es ideal para vincular en tu sitio web, perfil de Instagram, WhatsApp Business o folletos.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="relative group">
+                                <input
+                                    readOnly
+                                    value={getFormUrl('permanent') || 'Cargando enlace...'}
+                                    className="w-full bg-foreground/5 border border-foreground/10 rounded-2xl py-3.5 pl-4 pr-12 outline-none text-xs sm:text-sm font-mono text-primary truncate selection:bg-primary/20"
+                                />
+                                <button
+                                    onClick={() => copyToClipboardHandler(getFormUrl('permanent'))}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-primary/20 text-primary rounded-xl transition-all"
+                                    title="Copiar enlace permanente"
+                                >
+                                    <Copy size={17} />
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <p className="text-muted-foreground text-xs sm:text-sm">
+                                    Enlace con vigencia de 3 días diseñado para enviar a clientes particulares en atenciones puntuales.
+                                </p>
+                                {tokenExpiry && (
+                                    <div className="flex items-center gap-2 text-xs bg-foreground/5 px-3 py-1.5 rounded-xl w-fit border border-foreground/5">
+                                        <span className="text-muted-foreground">Tiempo restante:</span>
+                                        <span className={`font-mono font-bold ${
+                                            timeRemaining === 'Expirado' ? 'text-red-500' :
+                                            timeRemaining.startsWith('0:') && parseInt(timeRemaining.split(':')[1]) < 10 ? 'text-orange-500' :
+                                            'text-primary'
+                                        }`}>
+                                            {timeRemaining}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="relative group">
+                                <input
+                                    readOnly
+                                    value={getFormUrl('temporary') || (isGeneratingToken ? 'Generando enlace temporal...' : 'Genera un nuevo enlace')}
+                                    className="w-full bg-foreground/5 border border-foreground/10 rounded-2xl py-3.5 pl-4 pr-12 outline-none text-xs sm:text-sm font-mono text-primary truncate selection:bg-primary/20"
+                                />
+                                <button
+                                    onClick={() => copyToClipboardHandler(getFormUrl('temporary'))}
+                                    disabled={!tempToken}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-primary/20 text-primary rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                    title="Copiar enlace temporal"
+                                >
+                                    <Copy size={17} />
+                                </button>
+                            </div>
+
+                            <button
+                                onClick={generateTemporaryToken}
+                                disabled={isGeneratingToken}
+                                className="w-full py-2.5 text-xs bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 rounded-xl font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {isGeneratingToken ? 'Generando nuevo token...' : '🔄 Generar Nuevo Enlace Temporal'}
+                            </button>
+                        </div>
+                    )}
 
                     <div className="flex justify-end gap-3 pt-4 border-t border-foreground/5">
                         <button
                             onClick={() => setIsShareModalOpen(false)}
-                            className="px-6 py-3 rounded-2xl hover:bg-foreground/5 font-bold transition-all text-muted-foreground hover:text-white"
+                            className="px-5 py-2.5 rounded-xl hover:bg-foreground/5 font-bold transition-all text-muted-foreground hover:text-foreground text-xs sm:text-sm"
                         >
-                            Cancelar
+                            Cerrar
                         </button>
                         <button
-                            onClick={copyToClipboardHandler}
-                            disabled={!tempToken}
-                            className="bg-primary text-primary-foreground px-8 py-3 rounded-2xl font-bold shadow-lg shadow-primary/20 hover:opacity-90 transition-all flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={() => copyToClipboardHandler()}
+                            disabled={shareMode === 'temporary' && !tempToken}
+                            className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-primary/20 hover:opacity-90 transition-all flex items-center gap-2 text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            <Copy size={18} className="mr-2" />
-                            Copiar URL
+                            <Copy size={16} />
+                            Copiar {shareMode === 'permanent' ? 'Enlace Permanente' : 'Enlace Temporal'}
                         </button>
                     </div>
                 </div>

@@ -306,10 +306,10 @@ export default function CrearSeguimientoPage() {
                             Nuevo Seguimiento
                         </button>
                         <button
-                            onClick={() => window.location.assign('/dashboard/asignacion-servicios')}
+                            onClick={() => window.location.assign('/dashboard/recepcion-pedidos')}
                             className="px-6 py-3 rounded-2xl bg-primary text-primary-foreground hover:brightness-110 transition-all font-medium shadow-lg shadow-primary/20"
                         >
-                            Ver Servicios
+                            Ver Recepción y Pedidos
                             <ArrowRight size={18} className="inline ml-2" />
                         </button>
                     </div>
@@ -328,8 +328,8 @@ export default function CrearSeguimientoPage() {
                         <Compass className="text-primary" size={24} />
                     </div>
                     <div>
-                        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Crear Seguimiento</h1>
-                        <p className="text-sm text-muted-foreground">Registra un seguimiento rápido para un cliente y su mascota</p>
+                        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Iniciar Nuevo Tracking</h1>
+                        <p className="text-sm text-muted-foreground">Registra un seguimiento operativo rápido para un cliente y su mascota</p>
                     </div>
                 </div>
             </motion.div>

@@ -4,8 +4,9 @@
 // backend en el HTML guardado). Pensado para generar PDFs fieles a la impresión.
 
 import { CertFrame, getFrameColor, frameActive, FRAME_BORDER_PCT, FEATHER_INNER_STOP } from './certFrame';
+import { TextBg, drawTextBackground } from './certText';
 
-export interface CertDrawItem {
+export interface CertDrawItem extends TextBg {
     kind: 'image' | 'text';
     x: number; // % centro
     y: number; // %
@@ -138,10 +139,15 @@ export async function renderCertSpecToCanvas(spec: CertDrawSpec, baseWidth = 816
         if (it.kind === 'text') {
             if (!it.value) continue;
             const weight = it.bold ? '700' : '400';
-            ctx.font = `${weight} ${(it.fontSize || 32) * scale}px ${it.fontFamily || 'Georgia, serif'}`;
-            ctx.fillStyle = it.color || '#1a1a1a';
+            const fontPx = (it.fontSize || 32) * scale;
+            ctx.font = `${weight} ${fontPx}px ${it.fontFamily || 'Georgia, serif'}`;
             ctx.textAlign = (it.align as CanvasTextAlign) || 'center';
             ctx.textBaseline = 'middle';
+            // El fondo se pinta antes del texto y con ctx.font ya configurado.
+            drawTextBackground(ctx, it, {
+                value: it.value, cx, cy, fontPx, align: it.align, scale,
+            });
+            ctx.fillStyle = it.color || '#1a1a1a';
             ctx.fillText(it.value, cx, cy);
             continue;
         }

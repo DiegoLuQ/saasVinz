@@ -20,6 +20,8 @@ interface SearchableSelectProps {
     isMulti?: boolean;
     icon?: React.ReactNode;
     triggerClassName?: string;
+    renderTrigger?: (selectedOption: Option | undefined, isOpen: boolean) => React.ReactNode;
+    renderOption?: (option: Option, isSelected: boolean) => React.ReactNode;
 }
 
 export default function SearchableSelect({
@@ -31,7 +33,9 @@ export default function SearchableSelect({
     required = false,
     isMulti = false,
     icon,
-    triggerClassName = ''
+    triggerClassName = '',
+    renderTrigger,
+    renderOption
 }: SearchableSelectProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -45,6 +49,8 @@ export default function SearchableSelect({
         setMounted(true);
     }, []);
 
+    const selectedOption = !isMulti ? options.find(opt => opt.value === value) : undefined;
+
     const getDisplayValue = () => {
         if (isMulti && Array.isArray(value)) {
             if (value.length === 0) return placeholder;
@@ -52,8 +58,7 @@ export default function SearchableSelect({
             if (labels.length === 1) return labels[0];
             return `${labels.length} seleccionados`;
         }
-        const selected = options.find(opt => opt.value === value);
-        return selected ? selected.label : placeholder;
+        return selectedOption ? selectedOption.label : placeholder;
     };
 
     const filteredOptions = options.filter(opt =>
@@ -68,11 +73,6 @@ export default function SearchableSelect({
             const margin = 16;
             const spaceBelow = window.innerHeight - rect.bottom - margin;
             const spaceAbove = rect.top - margin;
-            // Abrimos siempre hacia el lado con MÁS espacio y limitamos la altura
-            // del panel completo (header + lista) al espacio realmente disponible,
-            // sin forzar un mínimo que lo haga desbordar la pantalla. Así la lista
-            // siempre cabe en el viewport y scrollea internamente (antes, dentro de
-            // un modal el panel se salía por abajo y se cortaban opciones y scroll).
             const preferBottom = spaceBelow >= spaceAbove;
             const available = preferBottom ? spaceBelow : spaceAbove;
 
@@ -81,8 +81,6 @@ export default function SearchableSelect({
         }
     };
 
-    // Use useLayoutEffect to calculate position immediately when isOpen changes to true
-    // before the browser paints the component
     useLayoutEffect(() => {
         if (isOpen) {
             updatePosition();
@@ -135,19 +133,26 @@ export default function SearchableSelect({
 
     return (
         <div className={`relative ${className}`} ref={containerRef}>
-            <div
-                onClick={handleToggle}
-                className={`w-full h-[52px] backdrop-blur-md border rounded-2xl px-5 flex items-center justify-between cursor-pointer transition-all duration-300 group shadow-lg shadow-black/5 ${isOpen ? 'border-primary/50 ring-4 ring-primary/10 bg-black/20' : 'border-white/10 bg-card/40 hover:bg-card/60'
-                    } ${triggerClassName}`}
-            >
-                <div className="flex items-center min-w-0 flex-1">
-                    {icon && <div className={`mr-3 transition-colors ${isOpen ? 'text-primary' : 'text-muted-foreground'}`}>{icon}</div>}
-                    <span className={`block truncate text-sm font-bold tracking-tight ${(!value || (Array.isArray(value) && value.length === 0)) ? 'text-muted-foreground/40' : 'text-foreground'}`}>
-                        {getDisplayValue()}
-                    </span>
+            {renderTrigger ? (
+                <div onClick={handleToggle} className="cursor-pointer">
+                    {renderTrigger(selectedOption, isOpen)}
                 </div>
-                <ChevronDown size={18} className={`text-muted-foreground transition-transform duration-300 ${isOpen ? 'rotate-180 text-primary' : ''}`} />
-            </div>
+            ) : (
+                <div
+                    onClick={handleToggle}
+                    className={`w-full h-[52px] backdrop-blur-md border rounded-2xl px-5 flex items-center justify-between cursor-pointer transition-all duration-300 group shadow-lg shadow-black/5 ${
+                        isOpen ? 'border-primary/50 ring-4 ring-primary/10 bg-black/20' : 'border-white/10 bg-card/40 hover:bg-card/60'
+                    } ${triggerClassName}`}
+                >
+                    <div className="flex items-center min-w-0 flex-1">
+                        {icon && <div className={`mr-3 transition-colors ${isOpen ? 'text-primary' : 'text-muted-foreground'}`}>{icon}</div>}
+                        <span className={`block truncate text-sm font-bold tracking-tight ${(!value || (Array.isArray(value) && value.length === 0)) ? 'text-muted-foreground/40' : 'text-foreground'}`}>
+                            {getDisplayValue()}
+                        </span>
+                    </div>
+                    <ChevronDown size={18} className={`text-muted-foreground transition-transform duration-300 ${isOpen ? 'rotate-180 text-primary' : ''}`} />
+                </div>
+            )}
 
             {isOpen && mounted && dropdownRect && createPortal(
                 <div
@@ -186,6 +191,18 @@ export default function SearchableSelect({
                                     const isSelected = isMulti
                                         ? (Array.isArray(value) && value.includes(option.value))
                                         : value === option.value;
+
+                                    if (renderOption) {
+                                        return (
+                                            <div
+                                                key={option.value}
+                                                onClick={() => handleSelect(option.value)}
+                                                className="cursor-pointer"
+                                            >
+                                                {renderOption(option, isSelected)}
+                                            </div>
+                                        );
+                                    }
 
                                     return (
                                         <div

@@ -292,7 +292,7 @@ def create_customer_from_submission(
         tenant_id=tenant_id,
         name=owner.get("fullName"),
         rut=rut,
-        email=owner.get("email"),
+        email=(owner.get("email") or "").strip() or None,
         phone=owner.get("phone"),
         address=owner.get("address") or owner.get("Dirección"),
         region=region,

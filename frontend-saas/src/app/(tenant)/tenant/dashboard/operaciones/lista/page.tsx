@@ -49,7 +49,12 @@ import { copyToClipboard } from '@/lib/clipboard';
 import { buildTrackingUrl } from '@/lib/publicUrls';
 import { Scale } from 'lucide-react';
 
+import { useSearchParams } from 'next/navigation';
+
 export default function OperationsPanelPage() {
+    const searchParams = useSearchParams();
+    const openTrackingCode = searchParams.get('openTracking');
+
     const { showToast } = useToast();
     const queryClient = useQueryClient();
     const bootstrapSteps = useOperationSteps();
@@ -133,8 +138,30 @@ export default function OperationsPanelPage() {
         showToast,
         setConfirmModal,
         setSelectedOrder,
-        selectedOrder
+        selectedOrder,
+        onOrderFinalized: () => {
+            setShowModal(false);
+            setSelectedOrder(null);
+        }
     });
+
+    // Auto-open tracking modal if openTracking code is present in URL
+    const openedFromUrlRef = useRef(false);
+    useEffect(() => {
+        if (!openTrackingCode || openedFromUrlRef.current || orders.length === 0) return;
+        const targetOrder = orders.find(
+            (o: any) => 
+                o.verification_code?.toLowerCase() === openTrackingCode.toLowerCase() ||
+                String(o.id) === openTrackingCode ||
+                String(o.oc_number) === openTrackingCode
+        );
+        if (targetOrder) {
+            openedFromUrlRef.current = true;
+            setSelectedOrder(targetOrder);
+            setShowModal(true);
+            fetchServerTime();
+        }
+    }, [openTrackingCode, orders, fetchServerTime]);
 
 
     const statusLabels: Record<string, string> = {
@@ -322,6 +349,7 @@ export default function OperationsPanelPage() {
                     {paginatedOrders.map(order => {
                         const currentStep = steps.find(s => s.id === order.current_step_id);
                         const isCoordinado = order.status.toLowerCase() === 'coordinado';
+                        const isConcluded = ['completed', 'delivered', 'completado', 'entregado'].includes(order.status.toLowerCase());
                         const colorStyles = getStatusColor(order.status);
                         
                         return (
@@ -334,13 +362,24 @@ export default function OperationsPanelPage() {
                                     setShowModal(true);
                                     fetchServerTime();
                                 }}
-                                className={`bg-[#161a22] p-5 rounded-2xl hover:shadow-xl hover:shadow-primary/5 transition-all group border-l-4 relative overflow-hidden shadow-sm flex flex-col gap-3 ${colorStyles.split(' ')[1]} ${isCoordinado ? 'cursor-default opacity-80 grayscale-[50%]' : 'cursor-pointer hover:-translate-y-1'}`}
+                                className={`bg-[#161a22] p-5 rounded-2xl hover:shadow-xl hover:shadow-primary/5 transition-all group relative overflow-hidden shadow-sm flex flex-col gap-3 ${
+                                    isConcluded
+                                        ? 'border-2 border-emerald-500/40 bg-gradient-to-br from-emerald-500/[0.04] to-[#161a22] shadow-[0_0_15px_rgba(16,185,129,0.07)]'
+                                        : `border-l-4 ${colorStyles.split(' ')[1]}`
+                                } ${isCoordinado ? 'cursor-default opacity-80 grayscale-[50%]' : 'cursor-pointer hover:-translate-y-1'}`}
                             >
                                 <div className="flex justify-between items-start">
                                     <div className="flex flex-col">
-                                        <h3 className="text-lg font-black text-white leading-tight flex items-center gap-2">
-                                            {order.pet_name || 'Sin Nombre'}
-                                        </h3>
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="text-lg font-black text-white leading-tight">
+                                                {order.pet_name || 'Sin Nombre'}
+                                            </h3>
+                                            {isConcluded && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                                    <CheckCircle2 size={10} /> Concluido
+                                                </span>
+                                            )}
+                                        </div>
                                         <span className="text-xs font-medium text-muted-foreground mt-0.5">
                                             {order.pet_species || 'Mascota'} {order.pet_breed ? `• ${order.pet_breed}` : ''} {order.weight ? `• ${order.weight} kg` : ''}
                                         </span>
@@ -369,9 +408,13 @@ export default function OperationsPanelPage() {
                                 </div>
 
                                 <div className="mt-auto pt-3 border-t border-white/5 flex items-center justify-between gap-2">
-                                    <div className={`flex items-center gap-2 font-bold text-xs uppercase tracking-wider ${colorStyles.split(' ')[0]}`}>
-                                        <Activity size={12} className={['processing', 'en_proceso'].includes(order.status.toLowerCase()) ? "animate-pulse" : ""} />
-                                        {currentStep?.name || statusLabels[order.status.toLowerCase()] || order.status}
+                                    <div className={`flex items-center gap-2 font-bold text-xs uppercase tracking-wider ${isConcluded ? 'text-emerald-400' : colorStyles.split(' ')[0]}`}>
+                                        {isConcluded ? (
+                                            <CheckCircle2 size={14} className="text-emerald-400" />
+                                        ) : (
+                                            <Activity size={12} className={['processing', 'en_proceso'].includes(order.status.toLowerCase()) ? "animate-pulse" : ""} />
+                                        )}
+                                        {isConcluded ? 'Proceso Concluido' : (currentStep?.name || statusLabels[order.status.toLowerCase()] || order.status)}
                                     </div>
 
                                     {/* Action Buttons inside Card */}
@@ -615,6 +658,15 @@ export default function OperationsPanelPage() {
                             {/* Footer Main Action */}
                             <div className="p-3 sm:p-4 bg-[#0f1115] border-t border-white/10 shrink-0">
                                 {(() => {
+                                    const isOrderFinished = ['completed', 'delivered', 'completado', 'entregado'].includes(selectedOrder.status.toLowerCase());
+                                    if (isOrderFinished) {
+                                        return (
+                                            <div className="w-full py-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-2xl text-sm font-black uppercase tracking-widest flex justify-center items-center gap-2">
+                                                <CheckCircle2 size={20} /> Proceso Concluido y Entregado
+                                            </div>
+                                        );
+                                    }
+
                                     const currentIndex = steps.findIndex(s => s.id === selectedOrder.current_step_id);
                                     const isLastStep = currentIndex === steps.length - 1;
                                     

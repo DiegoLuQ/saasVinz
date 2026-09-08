@@ -23,7 +23,7 @@ import argparse
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
 from app.database import SessionLocal
 from app import models
@@ -343,8 +343,111 @@ TEMPLATE_RETRATO_PLENO = {
     },
 }
 
+TEMPLATE_PLANTILLA_FORMULARIO = {
+    "format": "1:1",
+    "theme": "warm",
+    "elements": {
+        "petName": "Mascota",
+        "petNameX": 0,
+        "petNameY": 15,
+        "subtitle": "Siempre en nuestros corazones",
+        "subtitleX": 0,
+        "subtitleY": 56,
+        "farewellText": "Gracias por cada instante de ternura y amor incondicional. Tu recuerdo vivirá por siempre en nuestra memoria.",
+        "farewellTextX": 0,
+        "farewellTextY": 115,
+        "image1Url": None,
+        "image1X": 0,
+        "image1Y": 0,
+        "image2Url": None,
+        "image2X": 0,
+        "image2Y": -115,
+        "decorativeElements": [],
+    },
+    "styles": {
+        "font": "serif",
+        "color": "#1e293b",
+        "background": "#FDFBF7",
+    },
+    "frame": {
+        "enabled": True,
+        "color": "#d4af37",
+        "width": 6,
+        "margin": 10,
+    },
+    "textFormatting": {
+        "bold": False,
+        "italic": True,
+        "hasBackground": False,
+        "backgroundColor": "rgba(255, 255, 255, 0)",
+        "padding": 12,
+        "fontSize": 15,
+        "textAlign": "center",
+        "width": 440,
+        "height": 120,
+        "zIndex": 20,
+        "maxCharacters": 500,
+        "lineHeight": 1.6,
+    },
+    "subtitleFormatting": {
+        "bold": False,
+        "italic": True,
+        "hasBackground": False,
+        "backgroundColor": "rgba(255, 255, 255, 0)",
+        "padding": 4,
+        "fontSize": 14,
+        "textAlign": "center",
+        "width": 420,
+        "height": 28,
+        "zIndex": 15,
+    },
+    "petNameFormatting": {
+        "bold": True,
+        "italic": False,
+        "fontSize": 38,
+        "fontFamily": "Playfair Display",
+        "textAlign": "center",
+        "letterSpacing": 2,
+    },
+    "imageSettings": {
+        "image1": {
+            "shape": "circle",
+            "size": 0,
+            "objectFit": "cover",
+            "borderColor": "transparent",
+            "borderWidth": 0,
+            "zIndex": 10,
+            "hidden": True,
+        },
+        "image2": {
+            "shape": "circle",
+            "size": 180,
+            "objectFit": "cover",
+            "borderColor": "#d4af37",
+            "borderWidth": 4,
+            "zIndex": 10,
+            "glow": {
+                "enabled": True,
+                "color": "rgba(212, 175, 55, 0.5)",
+                "size": 24,
+            },
+        },
+    },
+    "backgroundImage": {
+        "url": None,
+        "opacity": 0,
+        "size": "cover",
+        "filter": "none",
+    },
+}
 
 SEED_TEMPLATES = [
+    {
+        "name": "Plantilla Formulario",
+        "description": "Plantilla conmemorativa cuadrada optimizada para el formulario de recepción de mascotas.",
+        "config": TEMPLATE_PLANTILLA_FORMULARIO,
+        "is_default": False,
+    },
     {
         "name": "Silencio Sublime",
         "description": "Diseño minimalista en marfil y carbón. Solemne, pacífico, discreto.",

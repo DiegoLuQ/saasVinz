@@ -7,6 +7,7 @@ export interface Cremation {
     pet_id: number;
     service_id?: number;
     plan_id?: number;
+    cremation_type?: string;
     scheduled_at: string;
     completed_at?: string;
     created_at?: string;
@@ -23,9 +24,14 @@ export interface Cremation {
     pet?: {
         id: number;
         name: string;
+        species?: string;
+        breed?: string;
+        size?: string;
         image_url?: string;
         customer?: {
             name: string;
+            phone?: string;
+            email?: string;
         };
     };
 }
@@ -34,6 +40,8 @@ export const useCremations = () => {
     return useQuery<Cremation[]>({
         queryKey: ['cremations-simple'],
         queryFn: () => apiRequest('/api/internal/cremations/'),
+        staleTime: 0,
+        refetchOnMount: 'always',
     });
 };
 
@@ -49,6 +57,9 @@ export const useUpdateCremationStatus = () => {
             }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['cremations-simple'] });
+            // La tabla de Órdenes de Cremación usa la clave ['cremations', ...filtros];
+            // sin esto seguía mostrando la lista cacheada tras crear/editar/borrar.
+            queryClient.invalidateQueries({ queryKey: ['cremations'] });
             queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
             showToast('Estado actualizado correctamente', 'success');
         },
@@ -66,6 +77,9 @@ export const useDeleteCremation = () => {
         mutationFn: (id: number) => apiRequest(`/api/internal/cremations/${id}`, { method: 'DELETE' }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['cremations-simple'] });
+            // La tabla de Órdenes de Cremación usa la clave ['cremations', ...filtros];
+            // sin esto seguía mostrando la lista cacheada tras crear/editar/borrar.
+            queryClient.invalidateQueries({ queryKey: ['cremations'] });
             queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
             showToast('Servicio eliminado correctamente', 'success');
         },

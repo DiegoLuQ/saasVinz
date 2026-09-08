@@ -35,7 +35,7 @@ export interface Service {
 interface ServiceSelectionStepProps {
     services: Service[];
     selectedServices: string[];
-    toggleService: (id: string) => void;
+    toggleService: (id: string, singleSelect?: boolean) => void;
 }
 
 function resolveImageUrl(url?: string | null): string | null {
@@ -94,11 +94,11 @@ export default function ServiceSelectionStep({
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="text-center mb-2">
-                <h2 className="text-3xl font-black uppercase italic tracking-tight text-slate-800 dark:text-slate-100 mb-2">
+                <h2 className="text-3xl font-extrabold uppercase italic tracking-tight text-slate-800 dark:text-slate-100 mb-1.5">
                     {isFallback ? 'Servicios' : 'Elige tu Plan'}
                 </h2>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] font-bold">
-                    {isFallback ? 'Selecciona los servicios que necesitas' : 'Selecciona el plan que mejor se adapte'}
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-normal tracking-wide">
+                    {isFallback ? 'Selecciona los servicios que necesitas' : 'Selecciona el plan que mejor se adapte a tu familia'}
                 </p>
             </div>
 
@@ -115,7 +115,7 @@ export default function ServiceSelectionStep({
                             key={service.id}
                             whileTap={{ scale: 0.985 }}
                             transition={{ type: 'spring', stiffness: 500, damping: 28 }}
-                            onClick={() => toggleService(service.id)}
+                            onClick={() => toggleService(service.id, !isFallback || isPlan)}
                             className={`relative overflow-hidden rounded-3xl border-2 cursor-pointer transition-all duration-300 ${
                                 isSelected
                                     ? 'border-emerald-500 bg-gradient-to-br from-white via-emerald-50/30 to-emerald-50/60 dark:from-slate-900 dark:via-emerald-950/10 dark:to-emerald-950/20 shadow-xl shadow-emerald-500/15'
@@ -123,7 +123,7 @@ export default function ServiceSelectionStep({
                             }`}
                             role="button"
                             tabIndex={0}
-                            onKeyDown={(e) => e.key === 'Enter' && toggleService(service.id)}
+                            onKeyDown={(e) => e.key === 'Enter' && toggleService(service.id, !isFallback || isPlan)}
                         >
                             {/* Brillo decorativo cuando está seleccionado */}
                             {isSelected && (
@@ -162,13 +162,13 @@ export default function ServiceSelectionStep({
                                             {isSelected && <Check size={14} className="text-white" strokeWidth={3} />}
                                         </motion.div>
                                         <div className="flex-1 min-w-0">
-                                            <h3 className={`text-xl sm:text-2xl font-black leading-tight tracking-tight ${
+                                            <h3 className={`text-xl sm:text-2xl font-bold leading-tight tracking-tight ${
                                                 isSelected ? 'text-emerald-900 dark:text-emerald-300' : 'text-slate-800 dark:text-slate-100'
                                             }`}>
                                                 {service.name}
                                             </h3>
                                             {service.description && (
-                                                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
+                                                <p className="text-sm text-slate-500 dark:text-slate-400 font-normal mt-1 leading-relaxed">
                                                     {service.description}
                                                 </p>
                                             )}
@@ -180,7 +180,7 @@ export default function ServiceSelectionStep({
                                         <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
                                             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-900/30">
                                                 <Gem size={11} className="text-amber-600 dark:text-amber-400" />
-                                                <span className="text-[10px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                                                <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">
                                                     {itemCount} {itemCount === 1 ? 'incluido' : 'incluidos'}
                                                 </span>
                                             </div>
@@ -191,9 +191,9 @@ export default function ServiceSelectionStep({
                                                     e.stopPropagation();
                                                     setViewingPlan(service);
                                                 }}
-                                                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/30 hover:text-sky-800 dark:hover:text-sky-300 transition-all text-[10px] font-black uppercase tracking-widest border border-transparent hover:border-sky-200 dark:hover:border-sky-900"
+                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/30 hover:text-sky-800 dark:hover:text-sky-300 transition-all text-[11px] font-semibold uppercase tracking-wider border border-transparent hover:border-sky-200 dark:hover:border-sky-900 cursor-pointer"
                                             >
-                                                <Info size={12} />
+                                                <Info size={13} />
                                                 Detalles
                                             </button>
                                         </div>
@@ -262,8 +262,8 @@ export default function ServiceSelectionStep({
                                         <div className="w-16 h-16 bg-gradient-to-br from-amber-200 to-amber-100 dark:from-amber-900/30 dark:to-amber-950/40 text-amber-700 dark:text-amber-400 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-lg dark:shadow-none shadow-amber-500/20">
                                             <Sparkles size={28} fill="currentColor" />
                                         </div>
-                                        <div className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-700 dark:text-amber-400 mb-2">Plan</div>
-                                        <h3 className="text-2xl sm:text-3xl font-black tracking-tight italic text-slate-800 dark:text-slate-100 leading-tight">
+                                        <div className="text-[11px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-1.5">Plan</div>
+                                        <h3 className="text-2xl sm:text-3xl font-bold tracking-tight italic text-slate-800 dark:text-slate-100 leading-tight">
                                             {viewingPlan.name}
                                         </h3>
                                     </div>
@@ -272,7 +272,7 @@ export default function ServiceSelectionStep({
 
                             <div className="p-6 sm:p-8 space-y-6 overflow-y-auto">
                                 {viewingPlan.description && (
-                                    <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                                    <p className="text-sm text-slate-600 dark:text-slate-300 font-normal leading-relaxed">
                                         {viewingPlan.description}
                                     </p>
                                 )}
@@ -280,7 +280,7 @@ export default function ServiceSelectionStep({
                                 <div>
                                     <div className="flex items-center gap-2 mb-4">
                                         <Gem size={12} className="text-amber-500" />
-                                        <div className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
+                                        <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                                             Incluye
                                         </div>
                                         <div className="flex-1 h-px bg-gradient-to-r from-slate-200 dark:from-slate-800 to-transparent" />
@@ -294,7 +294,7 @@ export default function ServiceSelectionStep({
                                                     initial={{ opacity: 0, x: -8 }}
                                                     animate={{ opacity: 1, x: 0 }}
                                                     transition={{ delay: idx * 0.04 }}
-                                                    className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50/70 border border-slate-100 dark:bg-slate-950/40 dark:border-slate-900 hover:bg-slate-50 transition-colors"
+                                                    className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50/70 border border-slate-100 dark:bg-slate-950/40 dark:border-slate-800/80 hover:bg-slate-100/80 dark:hover:bg-slate-800/60 transition-colors"
                                                 >
                                                     {itemImg ? (
                                                         <div className="relative w-11 h-11 rounded-xl overflow-hidden shrink-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
@@ -316,8 +316,8 @@ export default function ServiceSelectionStep({
                                                         </div>
                                                     )}
                                                     <div className="flex-1 min-w-0">
-                                                        <div className="text-sm font-bold text-slate-800 dark:text-slate-100 leading-tight">{item.name}</div>
-                                                        <div className="text-[9px] text-slate-400 dark:text-slate-500 font-black uppercase tracking-[0.2em] mt-0.5">
+                                                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-tight">{item.name}</div>
+                                                        <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider mt-0.5">
                                                             {item.type === 'producto' ? 'Producto' : 'Servicio'}
                                                         </div>
                                                     </div>
@@ -333,7 +333,7 @@ export default function ServiceSelectionStep({
                             <div className="p-6 sm:p-8 pt-0 shrink-0">
                                 <button
                                     onClick={() => setViewingPlan(null)}
-                                    className="w-full bg-gradient-to-r from-slate-800 to-slate-900 dark:from-slate-950 dark:to-slate-900 hover:from-slate-900 hover:to-black text-white dark:border dark:border-slate-800 dark:text-slate-300 font-black py-4 rounded-2xl text-[10px] uppercase tracking-[0.25em] shadow-lg transition-all hover:scale-[1.01] active:scale-[0.99]"
+                                    className="w-full bg-gradient-to-r from-slate-800 to-slate-900 dark:from-slate-950 dark:to-slate-900 hover:from-slate-900 hover:to-black text-white dark:border dark:border-slate-800 dark:text-slate-300 font-bold py-3.5 rounded-2xl text-xs uppercase tracking-wider shadow-lg transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
                                 >
                                     Entendido
                                 </button>
