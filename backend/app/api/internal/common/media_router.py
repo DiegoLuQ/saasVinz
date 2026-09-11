@@ -41,10 +41,17 @@ async def upload_media(
         f.write(await file.read())
         
     # Identificar tipo
-    media_type = "image" if ext.lower() in [".jpg", ".jpeg", ".png", ".webp"] else "video"
-    if ext.lower() not in [".jpg", ".jpeg", ".png", ".webp", ".mp4", ".mov", ".avi"]:
-         os.remove(temp_path)
-         raise HTTPException(status_code=400, detail="Unsupported file format")
+    ext_clean = ext.lower()
+    image_exts = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"]
+    video_exts = [".mp4", ".webm", ".mov", ".avi", ".mkv", ".m4v"]
+
+    if ext_clean in image_exts:
+        media_type = "image"
+    elif ext_clean in video_exts:
+        media_type = "video"
+    else:
+        os.remove(temp_path)
+        raise HTTPException(status_code=400, detail=f"Unsupported file format '{ext}'")
 
     try:
         media_item = MediaService.upload_media(

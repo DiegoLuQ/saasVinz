@@ -52,14 +52,14 @@ const traditional = [
     'Etiquetas de papel escritas a mano que se pueden extraviar o dañar en el proceso.',
     'Certificados impresos en Word, con riesgo de alteración o desorganización.',
     'La familia llama para preguntar y nadie puede darle una respuesta verificable.',
-    'Ausencia de un espacio virtual de recuerdo para que la familia canalice el duelo.',
+    'Falta de visibilidad y transparencia para la familia durante el proceso.',
 ];
 
 const modern = [
     'Código de verificación único e irrepetible por cada servicio.',
     'Flujo de trabajo configurable con evidencia fotográfica obligatoria por fase.',
     'Certificados PDF automáticos con firma digital y marca de agua personalizable.',
-    'Seguimiento público para la familia + memorial digital interactivo.',
+    'Seguimiento público y transparente en tiempo real para la familia.',
     'Historial completo: cada acción queda registrada con responsable, fecha y detalle.',
 ];
 
@@ -87,7 +87,7 @@ export function VinzerFeatures({ theme = 'dark' }: VinzerFeaturesProps) {
                         </div>
 
                         <h2 className={`text-3xl md:text-5xl font-black leading-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                            Un solo software para la gestión operativa, documental y memorial de tu crematorio
+                            Un solo software para la gestión operativa, trazabilidad y control de tu crematorio
                         </h2>
 
                         <p className={`font-medium ${isLight ? 'text-slate-600' : 'text-[#C0C0C0]'}`}>

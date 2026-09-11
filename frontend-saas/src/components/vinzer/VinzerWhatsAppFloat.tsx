@@ -2,17 +2,31 @@
 
 import React from 'react';
 
-const DEMO_MESSAGE = 'Hola, quiero coordinar una demo de Vinzer';
-const WHATSAPP_URL = `https://wa.me/56982395940?text=${encodeURIComponent(DEMO_MESSAGE)}`;
+interface VinzerWhatsAppFloatProps {
+    phone?: string;
+    message?: string;
+    show?: boolean;
+}
 
 /**
- * Botón flotante de WhatsApp con mensaje precargado.
+ * Botón flotante de WhatsApp con mensaje precargado dinámico.
  * Se oculta al imprimir y respeta prefers-reduced-motion.
  */
-export function VinzerWhatsAppFloat() {
+export function VinzerWhatsAppFloat({
+    phone = '56982395940',
+    message = 'Hola, quiero coordinar una demo de Vinzer',
+    show = true
+}: VinzerWhatsAppFloatProps) {
+    if (show === false) return null;
+
+    const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
+    const finalPhone = cleanPhone || '56982395940';
+    const finalMessage = message || 'Hola, quiero coordinar una demo de Vinzer';
+    const whatsappUrl = `https://wa.me/${finalPhone}?text=${encodeURIComponent(finalMessage)}`;
+
     return (
         <a
-            href={WHATSAPP_URL}
+            href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Coordinar una demo por WhatsApp"

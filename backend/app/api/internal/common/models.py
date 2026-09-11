@@ -102,7 +102,8 @@ class UserAnnouncementView(Base):
 class FarewellTemplate(Base):
     __tablename__ = "ops_farewell_templates"
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(Integer, ForeignKey("sys_tenants.id"), nullable=False, index=True)
+    # Tenant dueño de la plantilla (NULL = plantilla global del sistema/SuperAdmin)
+    tenant_id = Column(Integer, ForeignKey("sys_tenants.id"), nullable=True, index=True)
     name = Column(String, nullable=False)
     description = Column(String)
     config = Column(JSON, nullable=False)

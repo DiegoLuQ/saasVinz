@@ -224,6 +224,7 @@ def get_submission_detail(
         "selected_services": submission.selected_services,
         "images": resolved_images,
         "status": submission.status,
+        "code": submission.code,
         "created_at": format_tenant_datetime(submission.created_at, db, tenant_id),
         "resolved_services": resolved_services,
         "total": total,

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ClipboardList, Camera, Heart, Sparkles, Award } from 'lucide-react';
+import { ClipboardList, Camera, FileCheck, Sparkles, Award } from 'lucide-react';
 
 // Tres pasos que corresponden al flujo real del sistema. No se menciona
 // escaneo de QR ni app de choferes: esas funciones no existen todavía.
@@ -25,12 +25,12 @@ const journeyData = [
         badge: "Operaciones"
     },
     {
-        title: "3. Certificado, Memorial y Entrega",
-        actor: "Familia y Despedida",
-        desc: "El sistema genera el certificado PDF con firma digital, marca de agua y numeración correlativa, y registra la entrega. Si el crematorio lo activa, la familia recibe el enlace a su memorial digital.",
-        details: "El memorial es personalizable (temas, partículas, fondos) y las dedicatorias son moderadas por el crematorio antes de publicarse. Los memoriales privados se protegen con una clave de acceso.",
-        icon: Heart,
-        color: "text-purple-400 bg-purple-400/10 border-purple-400/30",
+        title: "3. Certificado Oficial y Entrega",
+        actor: "Familia y Entrega",
+        desc: "El sistema genera el certificado PDF con firma digital, marca de agua y numeración correlativa única, registrando la entrega conforme y el cierre del servicio.",
+        details: "El documento cuenta con validación pública para que la familia o la clínica verifiquen en cualquier momento la autenticidad y el historial de trazabilidad del proceso.",
+        icon: FileCheck,
+        color: "text-emerald-400 bg-emerald-400/10 border-emerald-400/30",
         badge: "Entrega Final"
     }
 ];

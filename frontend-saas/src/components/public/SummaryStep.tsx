@@ -13,6 +13,8 @@ interface OwnerData {
     address: string;
     commune: string;
     region?: string;
+    pickupRegion?: string;
+    pickupCommune?: string;
     rut?: string;
     comments?: string;
     veterinary?: string;
@@ -274,10 +276,15 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
                     <DataRow label="Email" value={ownerData.email} />
                     <DataRow label="Teléfono" value={ownerData.phone} />
                     {ownerData.rut && <DataRow label="RUT" value={ownerData.rut} />}
-                    {ownerData.veterinary && <DataRow label="Lugar de Retiro" value={ownerData.veterinary} />}
+                    {ownerData.veterinary && (
+                        <DataRow 
+                            label="Lugar de Retiro" 
+                            value={`${ownerData.veterinary}${ownerData.pickupCommune ? `, ${ownerData.pickupCommune}` : ''}${ownerData.pickupRegion ? `, ${ownerData.pickupRegion}` : ''}`} 
+                        />
+                    )}
                     <DataRow label="Dirección Entrega" value={ownerData.address} />
-                    <DataRow label="Comuna" value={ownerData.commune} />
-                    {ownerData.region && <DataRow label="Región" value={ownerData.region} />}
+                    <DataRow label="Comuna Entrega" value={ownerData.commune} />
+                    {ownerData.region && <DataRow label="Región Entrega" value={ownerData.region} />}
                     {ownerData.contactPreference && (
                         <DataRow label="Contacto" value={CONTACT_LABELS[ownerData.contactPreference] || ownerData.contactPreference} />
                     )}

@@ -9,8 +9,7 @@ import {
     Play
 } from 'lucide-react';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
-import { authHeader } from '@/lib/auth/token';
-import { getImageUrl } from '@/lib/admin/api';
+import { apiRequest, getImageUrl } from '@/lib/admin/api';
 
 interface MediaItem {
     id: number;
@@ -46,59 +45,28 @@ export default function MediaSelector({ isOpen, onClose, onSelect, categoryFilte
     const fetchMedia = async () => {
         setLoading(true);
         try {
-            // Note: We're using the admin token from localStorage. 
-            // In a public context (memorial management), we might need to adjust this 
-            // or use a different endpoint if the user isn't an admin.
-            // However, based on the context, the memorial manager seems to have admin-like powers 
-            // or we are in the admin dashboard. 
-            // WAIT: The memorial management page uses `access-key` (PIN). 
-            // The media library is currently an INTERNAL Admin API.
-            // If the user is a client managing their memorial, they might not have a `saasc_token`.
-            // BUT, the request is to "use the library we just created".
-            // Assuming for now we can access it or we need to expose a public-facing readonly endpoint.
-            // Let's try to use the same endpoint. If it fails due to auth, we might need a proxy.
+            const queryParams = new URLSearchParams();
+            if (categoryFilter) queryParams.append('category', categoryFilter);
+            queryParams.append('page_size', '100');
 
-            // Re-reading context: "Gestión del Memorial" uses `publicApiRequest` with `access-key`.
-            // The media library requires `Bearer token` (Admin).
-            // This is a conflict if the user is just a client.
-            // However, if the user asking is the Admin (User of the SaaS), they might expect this to work for their clients.
-            // Let's check `media_router.py`. It uses `Depends(get_current_user)` which implies Admin Auth.
-            // If this is for the *client* (family), they can't access this API directly unless we open it.
-
-            // DECISION: For this task, I'll assume the user logged in to the management page *might* need access.
-            // OR I should use `publicApiRequest` and maybe the backend needs to allow it?
-            // Actually, `MediaLibrary` is for the SaaS Admin to upload assets (backgrounds).
-            // The *Client* just selects them.
-            // So the endpoint to LIST generic backgrounds ("fondos de altar") should probably be public or accessible via PIN.
-
-            // Let's check `media_router.py` again.
-            // It allows `get_db`. It does NOT strictly enforce `get_current_user` on the GET list endpoint?
-            // Let's verify `media_router.py` content from previous turns.
-
-            const headers: any = { ...authHeader() };
-            // If no token, maybe it works if the endpoint is public?
-
-            const isServer = typeof window === 'undefined';
-            const API_URL = !isServer ? '' : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
-
-            // Let's try fetching. 
-            const res = await fetch(`${API_URL}/api/internal/media/?category=${categoryFilter}`, {
-                headers
-            });
-
-            if (res.ok) {
-                const data = await res.json();
+            const data = await apiRequest(`/api/internal/media?${queryParams.toString()}`);
+            if (Array.isArray(data)) {
                 setMediaItems(data);
+            } else if (data && Array.isArray(data.items)) {
+                setMediaItems(data.items);
+            } else {
+                setMediaItems([]);
             }
         } catch (error) {
-            console.error(error);
+            console.error('Error fetching media in MediaSelector:', error);
             showToast("No se pudo cargar la galería", "error");
+            setMediaItems([]);
         } finally {
             setLoading(false);
         }
     };
 
-    const filteredItems = mediaItems.filter(item => {
+    const filteredItems = (Array.isArray(mediaItems) ? mediaItems : []).filter(item => {
         if (activeTab === 'all') return true;
         return item.media_type === activeTab;
     });

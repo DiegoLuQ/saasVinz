@@ -147,7 +147,10 @@ class MediaService:
             if media_type == "image":
                 processed_path = cls.process_image(local_path, ratio, processing_mode=processing_mode)
             elif media_type == "video":
-                processed_path = cls.process_video(local_path, processing_mode=processing_mode)
+                if processing_mode == "original":
+                    processed_path = local_path
+                else:
+                    processed_path = cls.process_video(local_path, processing_mode=processing_mode)
             else:
                 processed_path = local_path # Fallback
 

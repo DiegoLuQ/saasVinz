@@ -18,12 +18,16 @@ import {
     Store,
     Calendar,
     MessageSquare,
-    AlertCircle
+    AlertCircle,
+    Copy,
+    Check,
+    ExternalLink
 } from 'lucide-react';
 import { apiRequest, getImageUrl } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { useDashboardSummary, useCurrentTenant } from '@/hooks/useSessionBootstrap';
 import { useQueryClient } from '@tanstack/react-query';
+import { buildTrackingUrl } from '@/lib/publicUrls';
 import { PlanLimitModal } from '@/components/tenant/PlanLimitModal';
 import Modal from '@/components/tenant/Modal';
 
@@ -64,12 +68,30 @@ export default function SubmissionDetailPage() {
     const [isDeleting, setIsDeleting] = useState(false);
     const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
     const [whatsAppMessage, setWhatsAppMessage] = useState('');
+    const [copiedTracking, setCopiedTracking] = useState(false);
 
     const limits = dashboardData?.limits;
 
     const isCustomerLimitReached = limits?.customers ? (limits.customers.max > 0 && limits.customers.usage >= limits.customers.max) : false;
     const isPetLimitReached = limits?.pets ? (limits.pets.max > 0 && limits.pets.usage >= limits.pets.max) : false;
     const isOrderLimitReached = limits?.orders ? (limits.orders.max > 0 && limits.orders.usage >= limits.orders.max) : false;
+
+    const handleCopyTracking = (trackingUrl: string) => {
+        if (!trackingUrl) return;
+        if (navigator?.clipboard?.writeText) {
+            navigator.clipboard.writeText(trackingUrl);
+        } else {
+            const el = document.createElement('textarea');
+            el.value = trackingUrl;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+        }
+        setCopiedTracking(true);
+        showToast('Enlace de tracking copiado al portapapeles', 'success');
+        setTimeout(() => setCopiedTracking(false), 2000);
+    };
 
     useEffect(() => {
         const storedUser = localStorage.getItem('saasc_user');
@@ -250,6 +272,67 @@ export default function SubmissionDetailPage() {
                     </button>
                 )}
             </div>
+
+            {/* Tracking Link & Code Bar */}
+            {submission.code && (
+                (() => {
+                    const tenantSlug = tenant?.slug || submission.slug || '';
+                    const petName = submission.pet_name || submission.pet_data?.name || 'mascota';
+                    const trackingUrl = buildTrackingUrl(tenantSlug, petName, submission.code);
+
+                    return (
+                        <div className="p-5 rounded-3xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border border-primary/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg backdrop-blur-md">
+                            <div className="flex items-center gap-4 min-w-0">
+                                <div className="w-12 h-12 rounded-2xl bg-primary/20 border border-primary/30 flex items-center justify-center text-primary shrink-0 shadow-inner">
+                                    <Shield size={24} />
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-primary">Enlace de Tracking del Tutor</span>
+                                        <span className="px-2.5 py-0.5 rounded-md bg-primary/20 text-primary font-mono text-xs font-black tracking-wider border border-primary/30">
+                                            {submission.code}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground truncate mt-1 font-mono max-w-sm sm:max-w-xl" title={trackingUrl}>
+                                        {trackingUrl}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => handleCopyTracking(trackingUrl)}
+                                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-white/20 text-xs font-bold transition-all active:scale-95 shadow-sm"
+                                    title="Copiar enlace completo de seguimiento"
+                                >
+                                    {copiedTracking ? (
+                                        <>
+                                            <Check size={14} className="text-emerald-400" />
+                                            <span className="text-emerald-400">¡Copiado!</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Copy size={14} />
+                                            <span>Copiar Link</span>
+                                        </>
+                                    )}
+                                </button>
+                                <a
+                                    href={trackingUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 active:scale-95"
+                                    title="Abrir vista de tracking como la ve el tutor"
+                                >
+                                    <ExternalLink size={14} />
+                                    <span>Ver Tracking</span>
+                                </a>
+                            </div>
+                        </div>
+                    );
+                })()
+            )}
 
             {/* Main grid info */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -596,19 +679,42 @@ export default function SubmissionDetailPage() {
                         )}
                     </div>
 
-                    {/* Additional Details (Veterinary & Comments) */}
-                    {(submission.owner_data?.veterinary || submission.owner_data?.comments) && (
+                    {/* Logistics & Locations (Retiro, Entrega, Comentarios) */}
+                    {(submission.owner_data?.veterinary || submission.owner_data?.address || submission.owner_data?.comments) && (
                         <div className="bg-[#0b1329] border border-white/5 rounded-3xl p-6 space-y-4">
                             <h3 className="text-sm font-black uppercase tracking-widest text-indigo-400/70 flex items-center gap-2">
-                                <MessageSquare size={16} /> Detalles Adicionales
+                                <MapPin size={16} /> Logística y Direcciones
                             </h3>
                             <div className="space-y-4">
-                                {submission.owner_data?.veterinary && (
-                                    <div>
-                                        <p className="text-[10px] text-muted-foreground uppercase font-black">Lugar de Retiro</p>
-                                        <p className="text-sm font-semibold text-white/95 mt-1">{submission.owner_data.veterinary}</p>
-                                    </div>
-                                )}
+                                {/* Dirección de Retiro */}
+                                <div>
+                                    <p className="text-[10px] text-muted-foreground uppercase font-black flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                                        Dirección / Lugar de Retiro
+                                    </p>
+                                    <p className="text-sm font-semibold text-white/95 mt-1">
+                                        {submission.owner_data?.veterinary
+                                            ? `${submission.owner_data.veterinary}${submission.owner_data?.pickupCommune ? `, ${submission.owner_data.pickupCommune}` : ''}${submission.owner_data?.pickupRegion ? `, ${submission.owner_data.pickupRegion}` : ''}`
+                                            : (submission.owner_data?.pickupCommune || submission.owner_data?.pickupRegion 
+                                                ? `${submission.owner_data?.pickupCommune || ''}${submission.owner_data?.pickupCommune && submission.owner_data?.pickupRegion ? ', ' : ''}${submission.owner_data?.pickupRegion || ''}`
+                                                : 'No especificado (Consultar con el tutor)')}
+                                    </p>
+                                </div>
+
+                                {/* Dirección de Entrega */}
+                                <div>
+                                    <p className="text-[10px] text-muted-foreground uppercase font-black flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                                        Dirección de Entrega (Cenizas)
+                                    </p>
+                                    <p className="text-sm font-semibold text-white/95 mt-1">
+                                        {submission.owner_data?.address
+                                            ? `${submission.owner_data.address}${submission.owner_data?.commune ? `, ${submission.owner_data.commune}` : ''}${submission.owner_data?.region ? `, ${submission.owner_data.region}` : ''}`
+                                            : (submission.owner_data?.commune || submission.owner_data?.region ? `${submission.owner_data?.commune || ''}, ${submission.owner_data?.region || ''}` : 'Misma del retiro / A coordinar')}
+                                    </p>
+                                </div>
+
+                                {/* Comentarios / Referencias */}
                                 {submission.owner_data?.comments && (
                                     <div>
                                         <p className="text-[10px] text-muted-foreground uppercase font-black">Comentarios / Referencias</p>

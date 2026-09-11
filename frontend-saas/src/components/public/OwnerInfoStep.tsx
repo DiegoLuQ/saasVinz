@@ -17,6 +17,8 @@ export interface OwnerData {
     rut?: string;
     comments?: string;
     veterinary?: string;
+    pickupRegion?: string;
+    pickupCommune?: string;
     service_code?: string;
     contactPreference?: 'whatsapp' | 'phone' | 'any' | '';
 }
@@ -83,7 +85,7 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
         return State.getStatesOfCountry(countryIso);
     }, [countryIso]);
 
-    // Comunas filtradas por la región seleccionada
+    // Comunas de Entrega filtradas por la región seleccionada
     const availableCommunes = useMemo(() => {
         const selectedRegion = data.region || tenantRegion;
         if (!selectedRegion) return [];
@@ -94,12 +96,26 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
         return City.getCitiesOfState(countryIso, state.isoCode);
     }, [countryIso, data.region, tenantRegion]);
 
+    // Comunas de Retiro filtradas por la región de retiro seleccionada
+    const availablePickupCommunes = useMemo(() => {
+        const selectedPickupRegion = data.pickupRegion || data.region || tenantRegion;
+        if (!selectedPickupRegion) return [];
+        const state = State.getStatesOfCountry(countryIso).find(
+            s => s.name === selectedPickupRegion || s.isoCode === selectedPickupRegion
+        );
+        if (!state) return [];
+        return City.getCitiesOfState(countryIso, state.isoCode);
+    }, [countryIso, data.pickupRegion, data.region, tenantRegion]);
+
     // Inicializar región por defecto si está vacía
     useEffect(() => {
         if (!data.region && tenantRegion) {
             updateData({ region: tenantRegion });
         }
-    }, [tenantRegion, data.region, updateData]);
+        if (!data.pickupRegion && tenantRegion) {
+            updateData({ pickupRegion: tenantRegion });
+        }
+    }, [tenantRegion, data.region, data.pickupRegion, updateData]);
 
     useEffect(() => {
         const fetchPartners = async () => {
@@ -230,25 +246,77 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                 </div>
             </div>
 
-            <div className="form-card">
-                <div className="flex items-center gap-2 mb-6">
-                    <div className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg">
-                        <Sparkles size={16} className="text-amber-600 dark:text-amber-400" />
+            <div className="form-card space-y-6">
+                <div>
+                    <div className="flex items-center gap-2 mb-6">
+                        <div className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg">
+                            <Sparkles size={16} className="text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">Lugar de Retiro</h3>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500">¿Dónde se encuentra ahora tu mascota?</p>
+                        </div>
                     </div>
-                    <div>
-                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">Lugar de Retiro</h3>
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500">¿Dónde se encuentra ahora tu mascota?</p>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div className="sm:col-span-2">
+                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Dirección o Lugar de Retiro</label>
+                            <input
+                                type="text"
+                                value={data.veterinary || ''}
+                                onChange={(e) => updateData({ veterinary: e.target.value.slice(0, 100) })}
+                                className="input-emotional"
+                                placeholder="Ej: Mi domicilio, Clínica Veterinaria Andes, etc."
+                                maxLength={100}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Región de Retiro</label>
+                            <div className="relative">
+                                <select
+                                    value={data.pickupRegion || data.region || ''}
+                                    onChange={(e) => {
+                                        updateData({ pickupRegion: e.target.value, pickupCommune: '' });
+                                    }}
+                                    className="input-emotional appearance-none cursor-pointer text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-950 pr-9"
+                                >
+                                    <option value="">Selecciona...</option>
+                                    {availableRegions.map((r: any) => (
+                                        <option key={r.isoCode} value={r.name}>{r.name}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Comuna de Retiro (Opcional)</label>
+                            {availablePickupCommunes.length > 0 ? (
+                                <div className="relative">
+                                    <select
+                                        value={data.pickupCommune || ''}
+                                        onChange={(e) => updateData({ pickupCommune: e.target.value })}
+                                        className="input-emotional appearance-none cursor-pointer text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-950 pr-9"
+                                    >
+                                        <option value="">Selecciona...</option>
+                                        {availablePickupCommunes.map((c: any) => (
+                                            <option key={c.name} value={c.name}>{c.name}</option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+                                </div>
+                            ) : (
+                                <input
+                                    type="text"
+                                    value={data.pickupCommune || ''}
+                                    onChange={(e) => updateData({ pickupCommune: e.target.value.slice(0, 50) })}
+                                    className="input-emotional"
+                                    placeholder="Ej: Providencia"
+                                    maxLength={50}
+                                />
+                            )}
+                        </div>
                     </div>
                 </div>
-                
-                <input
-                    type="text"
-                    value={data.veterinary || ''}
-                    onChange={(e) => updateData({ veterinary: e.target.value.slice(0, 100) })}
-                    className="input-emotional"
-                    placeholder="Ej: Mi domicilio, Clínica Veterinaria Andes, etc."
-                    maxLength={100}
-                />
             </div>
 
             <div className="form-card space-y-6">

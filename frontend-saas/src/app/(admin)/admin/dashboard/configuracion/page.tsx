@@ -4,15 +4,18 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { apiRequest } from '@/lib/admin/api';
 import { motion } from 'framer-motion';
-import { Save, Plus, Trash2, Layout, Type, Search, CreditCard, Palette, ArrowUp, ArrowDown, HelpCircle, Building2, Globe, Mail, Phone, MapPin, Instagram, Facebook, Twitter, Youtube, Upload, ImageIcon, Database } from 'lucide-react';
+import { Save, Plus, Trash2, Layout, Type, Search, CreditCard, Palette, ArrowUp, ArrowDown, HelpCircle, Building2, Globe, Mail, Phone, MapPin, Instagram, Facebook, Twitter, Youtube, Upload, ImageIcon, Database, ExternalLink } from 'lucide-react';
 import ImageCropper from '@/components/tenant/ImageCropper';
 import BackupSettings from './BackupSettings';
+import HeroAssetSelector from '@/components/admin/landing/HeroAssetSelector';
+import MediaSelector from '@/components/admin/media/MediaSelector';
 
 export default function LandingConfigPage() {
     const [config, setConfig] = useState<any>({
         seo: { title: '', description: '' },
         hero: { h1: '', h2: '', subtitle: '' },
         theme: 'emerald',
+        carousel: { enabled: false, images: [], transition: 'fade', borderRadius: '1.5rem', ctaText: 'Solicitar Demo por WhatsApp', ctaUrl: 'https://wa.me/56998239540' },
         plans: [],
         features: [],
         whatsapp: { show: false, phone: '56998239540', message: 'Hola, me gustaría más información.', color: '#25D366' }
@@ -20,7 +23,11 @@ export default function LandingConfigPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [saasConfig, setSaasConfig] = useState<any>(null);
-    const [activeTab, setActiveTab] = useState('general'); // general, plans, features, style, whatsapp, institucional
+    const [activeTab, setActiveTab] = useState('general'); // general, hero, carousel, plans, whatsapp, institucional, backups
+
+    // Media Selector for Carousel
+    const [isMediaSelectorOpen, setIsMediaSelectorOpen] = useState(false);
+    const [currentEditingImageIdx, setCurrentEditingImageIdx] = useState<number | null>(null);
 
     // Logo Upload State
     const [showCropper, setShowCropper] = useState(false);
@@ -305,12 +312,10 @@ export default function LandingConfigPage() {
                 <div className="w-64 space-y-2 sticky top-32 h-fit">
                     {[
                         { id: 'general', label: 'General & SEO', icon: Search },
-                        { id: 'style', label: 'Estilo & Tema', icon: Palette },
                         { id: 'hero', label: 'Hero Section', icon: Layout },
-                        { id: 'carousel', label: 'Galería Fotos', icon: Layout },
-                        { id: 'features', label: 'Características', icon: Layout },
-                        { id: 'plans', label: 'Planes', icon: CreditCard },
-                        { id: 'whatsapp', label: 'WhatsApp / Contacto', icon: ArrowDown },
+                        { id: 'carousel', label: 'Galería Fotos (Carrusel)', icon: ImageIcon },
+                        { id: 'plans', label: 'Planes & Precios', icon: CreditCard },
+                        { id: 'whatsapp', label: 'WhatsApp / Contacto', icon: Phone },
                         { id: 'institucional', label: 'Datos del SaaS', icon: Building2 },
                         { id: 'backups', label: 'Respaldos', icon: Database },
                     ].map(tab => (
@@ -522,114 +527,115 @@ export default function LandingConfigPage() {
                         </div>
                     )}
 
-                    {/* Style & Theme */}
-                    {activeTab === 'style' && (
-                        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-                            <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Palette className="text-primary" size={20} /> Tema Visual</h3>
-                            <div className="grid grid-cols-2 gap-4">
-                                {[
-                                    { id: 'default', name: 'Azul Original', color: '#00a3ff' },
-                                    { id: 'warm', name: 'Lino Cálido', color: '#c5a059' },
-                                ].map(theme => (
-                                    <button
-                                        key={theme.id}
-                                        onClick={() => updateNestedStart('theme', theme.id)}
-                                        className={`relative p-4 rounded-2xl border-2 transition-all text-left group overflow-hidden ${config.theme === theme.id ? 'border-primary bg-primary/10' : 'border-white/10 bg-white/5 hover:border-white/20'
-                                            }`}
-                                    >
-                                        <div className="w-8 h-8 rounded-full mb-3 shadow-lg" style={{ backgroundColor: theme.color }} />
-                                        <div className="font-bold">{theme.name}</div>
-                                        {config.theme === theme.id && <div className="absolute top-2 right-2 w-3 h-3 bg-primary rounded-full" />}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
                     {/* Carousel Section */}
                     {activeTab === 'carousel' && (
                         <div className="space-y-6">
-                            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-                                <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><Layout className="text-primary" size={20} /> Configuración de Galería</h3>
-                                <div className="space-y-4">
-                                    <div className="flex gap-8">
-                                        <div>
-                                            <label className="text-xs uppercase font-bold text-white/40 mb-1 block">Efecto de Transición</label>
-                                            <div className="flex gap-2">
-                                                {['fade', 'slide', 'zoom'].map((effect) => (
-                                                    <button
-                                                        key={effect}
-                                                        onClick={() => updateNestedStart('carousel.transition', effect)}
-                                                        className={`px-3 py-2 rounded-lg border text-xs font-bold capitalize ${config.carousel?.transition === effect
-                                                            ? 'bg-primary text-white border-primary'
+                            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-6">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+                                    <div>
+                                        <h3 className="text-xl font-bold flex items-center gap-2">
+                                            <ImageIcon className="text-primary" size={22} />
+                                            Carrusel de la Landing Page
+                                        </h3>
+                                        <p className="text-xs text-white/40 mt-1">
+                                            Muestra capturas o fotos de la plataforma con navegación interactiva en la página principal.
+                                        </p>
+                                    </div>
+                                    <label className="flex items-center gap-3 cursor-pointer p-3 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors">
+                                        <input
+                                            type="checkbox"
+                                            checked={config.carousel?.enabled || false}
+                                            onChange={(e) => updateNestedStart('carousel.enabled', e.target.checked)}
+                                            className="w-5 h-5 rounded border-white/20 text-primary focus:ring-primary accent-primary"
+                                        />
+                                        <span className="text-xs font-bold text-white">
+                                            {config.carousel?.enabled ? '✓ Visible en la Landing' : 'Oculto en la Landing'}
+                                        </span>
+                                    </label>
+                                </div>
+
+                                <div className="grid md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="text-xs uppercase font-bold text-white/40 mb-2 block">Efecto de Transición</label>
+                                        <div className="flex gap-2">
+                                            {['fade', 'slide', 'zoom'].map((effect) => (
+                                                <button
+                                                    key={effect}
+                                                    type="button"
+                                                    onClick={() => updateNestedStart('carousel.transition', effect)}
+                                                    className={`px-4 py-2 rounded-xl border text-xs font-bold capitalize transition-all ${
+                                                        config.carousel?.transition === effect
+                                                            ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20'
                                                             : 'bg-white/5 text-white/50 border-white/10 hover:bg-white/10'
-                                                            }`}
-                                                    >
-                                                        {effect}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="text-xs uppercase font-bold text-white/40 mb-1 block">Bordes Redondeados</label>
-                                            <div className="flex gap-2">
-                                                {[
-                                                    { label: 'Cuadrado', value: '0px' },
-                                                    { label: 'Sutil', value: '0.5rem' },
-                                                    { label: 'Normal', value: '1rem' },
-                                                    { label: 'Redondo', value: '2rem' },
-                                                ].map((radius) => (
-                                                    <button
-                                                        key={radius.value}
-                                                        onClick={() => updateNestedStart('carousel.borderRadius', radius.value)}
-                                                        className={`px-3 py-2 rounded-lg border text-xs font-bold ${config.carousel?.borderRadius === radius.value
-                                                            ? 'bg-primary text-white border-primary'
-                                                            : 'bg-white/5 text-white/50 border-white/10 hover:bg-white/10'
-                                                            }`}
-                                                    >
-                                                        {radius.label}
-                                                    </button>
-                                                ))}
-                                            </div>
+                                                    }`}
+                                                >
+                                                    {effect}
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
 
-                                    <div className="grid md:grid-cols-2 gap-4 pt-4 border-t border-white/10">
-                                        <div>
-                                            <label className="text-xs uppercase font-bold text-white/40 mb-1 block">Texto Botón WhatsApp</label>
-                                            <input
-                                                value={config.carousel?.ctaText || ''}
-                                                onChange={(e) => updateNestedStart('carousel.ctaText', e.target.value)}
-                                                className="w-full bg-[#0a192f] border border-white/10 rounded-xl p-3 outline-none focus:border-primary"
-                                                placeholder="Solicitar Demo..."
-                                            />
+                                    <div>
+                                        <label className="text-xs uppercase font-bold text-white/40 mb-2 block">Bordes del Marco</label>
+                                        <div className="flex gap-2">
+                                            {[
+                                                { label: 'Sutil', value: '0.75rem' },
+                                                { label: 'Normal', value: '1.5rem' },
+                                                { label: 'Redondo', value: '2.5rem' },
+                                            ].map((radius) => (
+                                                <button
+                                                    key={radius.value}
+                                                    type="button"
+                                                    onClick={() => updateNestedStart('carousel.borderRadius', radius.value)}
+                                                    className={`px-4 py-2 rounded-xl border text-xs font-bold transition-all ${
+                                                        config.carousel?.borderRadius === radius.value
+                                                            ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20'
+                                                            : 'bg-white/5 text-white/50 border-white/10 hover:bg-white/10'
+                                                    }`}
+                                                >
+                                                    {radius.label}
+                                                </button>
+                                            ))}
                                         </div>
-                                        <div>
-                                            <label className="text-xs uppercase font-bold text-white/40 mb-1 block">URL WhatsApp (ctaUrl)</label>
-                                            <input
-                                                value={config.carousel?.ctaUrl || ''}
-                                                onChange={(e) => updateNestedStart('carousel.ctaUrl', e.target.value)}
-                                                className="w-full bg-[#0a192f] border border-white/10 rounded-xl p-3 outline-none focus:border-primary font-mono text-xs"
-                                                placeholder="https://wa.me/..."
-                                            />
-                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="grid md:grid-cols-2 gap-4 pt-4 border-t border-white/10">
+                                    <div>
+                                        <label className="text-xs uppercase font-bold text-white/40 mb-1 block">Texto Botón WhatsApp / CTA</label>
+                                        <input
+                                            value={config.carousel?.ctaText || ''}
+                                            onChange={(e) => updateNestedStart('carousel.ctaText', e.target.value)}
+                                            className="w-full bg-[#0a192f] border border-white/10 rounded-xl p-3 outline-none focus:border-primary text-sm"
+                                            placeholder="Solicitar Demo por WhatsApp"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs uppercase font-bold text-white/40 mb-1 block">Enlace de Destino (ctaUrl)</label>
+                                        <input
+                                            value={config.carousel?.ctaUrl || ''}
+                                            onChange={(e) => updateNestedStart('carousel.ctaUrl', e.target.value)}
+                                            className="w-full bg-[#0a192f] border border-white/10 rounded-xl p-3 outline-none focus:border-primary font-mono text-xs"
+                                            placeholder="https://wa.me/... o #demo"
+                                        />
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-                                <div className="flex justify-between items-center mb-4">
+                            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-4">
+                                <div className="flex justify-between items-center">
                                     <div>
-                                        <h3 className="text-xl font-bold">Imágenes del Carrusel ({config.carousel?.images?.length || 0}/10)</h3>
-                                        <p className="text-xs text-white/40 mt-1">Tamaño sugerido: <span className="text-primary font-mono">1920x1080 (16:9)</span> para mejor visualización.</p>
+                                        <h3 className="text-xl font-bold">Diapositivas / Imágenes del Carrusel ({config.carousel?.images?.length || 0}/10)</h3>
+                                        <p className="text-xs text-white/40 mt-1">Formato sugerido: <span className="text-primary font-mono">16:9 (1920x1080)</span>.</p>
                                     </div>
                                     {(!config.carousel?.images || config.carousel.images.length < 10) && (
                                         <button
+                                            type="button"
                                             onClick={() => {
                                                 const newImages = [...(config.carousel?.images || []), ''];
                                                 updateNestedStart('carousel.images', newImages);
                                             }}
-                                            className="text-primary text-sm font-bold flex items-center gap-1 hover:underline"
+                                            className="px-4 py-2 bg-primary/20 text-primary hover:bg-primary/30 border border-primary/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all"
                                         >
                                             <Plus size={16} /> Agregar Foto
                                         </button>
@@ -638,32 +644,69 @@ export default function LandingConfigPage() {
 
                                 <div className="space-y-3">
                                     {config.carousel?.images?.map((url: string, idx: number) => (
-                                        <div key={idx} className="flex gap-2 items-center">
-                                            <span className="text-white/30 font-mono text-xs w-6">{idx + 1}.</span>
-                                            <input
-                                                value={url}
-                                                onChange={(e) => {
-                                                    const newImages = [...config.carousel.images];
-                                                    newImages[idx] = e.target.value;
-                                                    updateNestedStart('carousel.images', newImages);
-                                                }}
-                                                className="flex-1 bg-[#0a192f] border border-white/10 rounded-lg p-3 outline-none focus:border-primary font-mono text-xs"
-                                                placeholder="https://ejemplo.com/foto.jpg"
-                                            />
+                                        <div key={idx} className="bg-[#0a192f] border border-white/10 rounded-xl p-3 flex flex-col sm:flex-row gap-3 items-center">
+                                            {/* Preview Thumbnail */}
+                                            <div className="w-24 h-16 rounded-lg bg-black/40 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center relative">
+                                                {url ? (
+                                                    <img src={url} alt={`Slide ${idx + 1}`} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <ImageIcon size={20} className="text-white/20" />
+                                                )}
+                                            </div>
+
+                                            <div className="flex-1 w-full space-y-1">
+                                                <div className="flex items-center justify-between text-xs text-white/40">
+                                                    <span className="font-bold">Diapositiva #{idx + 1}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setCurrentEditingImageIdx(idx);
+                                                            setIsMediaSelectorOpen(true);
+                                                        }}
+                                                        className="text-primary hover:underline text-[11px] font-bold flex items-center gap-1"
+                                                    >
+                                                        <Upload size={12} /> Elegir de Biblioteca
+                                                    </button>
+                                                </div>
+                                                <input
+                                                    value={url}
+                                                    onChange={(e) => {
+                                                        const newImages = [...config.carousel.images];
+                                                        newImages[idx] = e.target.value;
+                                                        updateNestedStart('carousel.images', newImages);
+                                                    }}
+                                                    className="w-full bg-white/5 border border-white/10 rounded-lg p-2 outline-none focus:border-primary font-mono text-xs text-white"
+                                                    placeholder="https://ejemplo.com/foto.jpg o selecciona de la biblioteca..."
+                                                />
+                                            </div>
+
                                             <button
+                                                type="button"
                                                 onClick={() => {
                                                     const newImages = config.carousel.images.filter((_: any, i: number) => i !== idx);
                                                     updateNestedStart('carousel.images', newImages);
                                                 }}
-                                                className="p-3 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                                                className="p-2.5 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors shrink-0"
+                                                title="Eliminar diapositiva"
                                             >
                                                 <Trash2 size={16} />
                                             </button>
                                         </div>
                                     ))}
+
                                     {(!config.carousel?.images || config.carousel.images.length === 0) && (
-                                        <div className="text-center py-8 text-white/20 italic border border-dashed border-white/10 rounded-xl">
-                                            No hay imágenes en el carrusel.
+                                        <div className="text-center py-10 text-white/30 border border-dashed border-white/10 rounded-xl space-y-2">
+                                            <ImageIcon size={32} className="mx-auto text-white/20" />
+                                            <p className="text-xs">No hay imágenes en el carrusel.</p>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    updateNestedStart('carousel.images', ['']);
+                                                }}
+                                                className="text-primary text-xs font-bold hover:underline"
+                                            >
+                                                + Agregar primera foto
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -711,48 +754,25 @@ export default function LandingConfigPage() {
                                     />
                                 </div>
 
-                                <div className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-4">
-                                    <h4 className="font-bold text-sm text-white/60 mb-2">Imagen de Fondo</h4>
-                                    <div>
-                                        <label className="text-xs uppercase font-bold text-white/40 mb-1 block">URL de Imagen</label>
-                                        <input
-                                            value={config.hero?.backgroundImage || ''}
-                                            onChange={(e) => updateNestedStart('hero.backgroundImage', e.target.value)}
-                                            className="w-full bg-[#0a192f] border border-white/10 rounded-xl p-3 outline-none focus:border-primary text-xs font-mono"
-                                            placeholder="https://..."
-                                        />
-                                    </div>
-                                    <div className="flex gap-4 items-center">
-                                        <div className="flex-1">
-                                            <label className="text-xs uppercase font-bold text-white/40 mb-1 block">Opacidad ({config.hero?.bgOpacity || 0.5})</label>
-                                            <input
-                                                type="range"
-                                                min="0"
-                                                max="1"
-                                                step="0.1"
-                                                value={config.hero?.bgOpacity || 0.5}
-                                                onChange={(e) => updateNestedStart('hero.bgOpacity', parseFloat(e.target.value))}
-                                                className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
-                                            />
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <input
-                                                type="checkbox"
-                                                checked={config.hero?.bgCenter !== false}
-                                                onChange={(e) => updateNestedStart('hero.bgCenter', e.target.checked)}
-                                            />
-                                            <label className="text-xs">Centrar</label>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <input
-                                                type="checkbox"
-                                                checked={config.hero?.bgStretch !== false}
-                                                onChange={(e) => updateNestedStart('hero.bgStretch', e.target.checked)}
-                                            />
-                                            <label className="text-xs">Estirar (Cover)</label>
-                                        </div>
-                                    </div>
-                                </div>
+                                <HeroAssetSelector
+                                    value={{
+                                        mediaType: config.hero?.mediaType || (config.hero?.backgroundImage?.match(/\.(mp4|webm|mov)(\?.*)?$/i) ? 'video' : 'image'),
+                                        backgroundImage: config.hero?.backgroundImage || '',
+                                        bgOpacity: config.hero?.bgOpacity ?? 0.8,
+                                        bgCenter: config.hero?.bgCenter,
+                                        bgStretch: config.hero?.bgStretch,
+                                        videoPosterUrl: config.hero?.videoPosterUrl || ''
+                                    }}
+                                    onChange={(updated) => {
+                                        setConfig((prev: any) => ({
+                                            ...prev,
+                                            hero: {
+                                                ...(prev.hero || {}),
+                                                ...updated
+                                            }
+                                        }));
+                                    }}
+                                />
 
                                 <div className="grid md:grid-cols-2 gap-4">
                                     <div className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-2">
@@ -790,237 +810,27 @@ export default function LandingConfigPage() {
                         </div>
                     )}
 
-                    {/* Features Cards */}
-                    {activeTab === 'features' && (
-                        <div className="space-y-6">
-                            <div className="flex justify-between items-center">
-                                <h3 className="text-xl font-bold">Tarjetas "Lo que necesitas"</h3>
-                                <button
-                                    onClick={() => addListItem('features', { title: 'Nueva Característica', desc: 'Descripción aquí...', icon: 'Star' })}
-                                    className="text-primary text-sm font-bold flex items-center gap-1 hover:underline"
-                                >
-                                    <Plus size={16} /> Agregar
-                                </button>
-                            </div>
-
-                            <div className="grid gap-4">
-                                {config.features?.map((feature: any, i: number) => (
-                                    <div key={i} className="bg-white/5 border border-white/10 rounded-xl p-4 flex gap-4 group">
-                                        <div className="flex-1 space-y-2">
-                                            <input
-                                                value={feature.title}
-                                                onChange={(e) => {
-                                                    const newFeatures = [...config.features];
-                                                    newFeatures[i].title = e.target.value;
-                                                    updateNestedStart('features', newFeatures);
-                                                }}
-                                                className="w-full bg-transparent font-bold outline-none border-b border-white/10 focus:border-primary"
-                                                placeholder="Título"
-                                            />
-                                            <textarea
-                                                value={feature.desc}
-                                                onChange={(e) => {
-                                                    const newFeatures = [...config.features];
-                                                    newFeatures[i].desc = e.target.value;
-                                                    updateNestedStart('features', newFeatures);
-                                                }}
-                                                className="w-full bg-transparent text-sm text-white/60 outline-none resize-none"
-                                                placeholder="Descripción"
-                                            />
-                                        </div>
-                                        <div className="flex flex-col gap-2">
-                                            <button
-                                                onClick={() => removeListItem('features', i)}
-                                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                                {(!config.features || config.features.length === 0) && (
-                                    <div className="text-center py-10 border border-dashed border-white/10 rounded-xl text-white/30">
-                                        No hay características definidas.
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Plans */}
+                    {/* Planes & Precios (Centralized) */}
                     {activeTab === 'plans' && (
-                        <div className="space-y-6">
-                            <div className="flex justify-between items-center">
-                                <h3 className="text-xl font-bold">Planes de Suscripción</h3>
-                                <button
-                                    onClick={() => addListItem('plans', { name: 'Nuevo Plan', price: '0', period: '/mes', features: ['Feature 1'] })}
-                                    className="text-primary text-sm font-bold flex items-center gap-1 hover:underline"
-                                >
-                                    <Plus size={16} /> Agregar Plan
-                                </button>
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-8 space-y-6 text-center max-w-2xl mx-auto my-8">
+                            <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center mx-auto shadow-lg shadow-primary/5">
+                                <CreditCard size={32} />
                             </div>
-
-                            <div className="grid md:grid-cols-2 gap-6">
-                                {config.plans?.map((plan: any, i: number) => (
-                                    <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-6 relative">
-                                        <button
-                                            onClick={() => removeListItem('plans', i)}
-                                            className="absolute top-4 right-4 text-white/20 hover:text-red-400"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-
-                                        <div className="space-y-4">
-                                            <input
-                                                value={plan.name}
-                                                onChange={(e) => {
-                                                    const newPlans = [...config.plans];
-                                                    newPlans[i].name = e.target.value;
-                                                    updateNestedStart('plans', newPlans);
-                                                }}
-                                                className="w-full bg-transparent text-xl font-black outline-none border-b border-white/10 focus:border-primary"
-                                            />
-                                        </div>
-
-                                        <div className="flex items-center gap-4 bg-white/5 p-3 rounded-xl border border-white/5">
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={plan.isPopular || false}
-                                                    onChange={(e) => {
-                                                        const newPlans = [...config.plans];
-                                                        newPlans[i].isPopular = e.target.checked;
-                                                        updateNestedStart('plans', newPlans);
-                                                    }}
-                                                    className="w-4 h-4 rounded border-white/20 bg-white/5 text-primary focus:ring-primary"
-                                                />
-                                                <label className="text-xs font-bold uppercase">Es Popular</label>
-                                            </div>
-
-                                            {plan.isPopular && (
-                                                <div className="flex items-center gap-2 flex-1">
-                                                    <input
-                                                        type="color"
-                                                        value={plan.popularColor || '#10b981'}
-                                                        onChange={(e) => {
-                                                            const newPlans = [...config.plans];
-                                                            newPlans[i].popularColor = e.target.value;
-                                                            updateNestedStart('plans', newPlans);
-                                                        }}
-                                                        className="w-6 h-6 rounded cursor-pointer bg-transparent border-none"
-                                                    />
-                                                    <label className="text-[10px] text-white/50">Color Badge</label>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex gap-4">
-                                            <div className="flex-1">
-                                                <label className="text-[10px] uppercase font-bold text-white/30">Precio</label>
-                                                <input
-                                                    type="number"
-                                                    value={plan.price}
-                                                    onChange={(e) => {
-                                                        const newPlans = [...config.plans];
-                                                        newPlans[i].price = e.target.value;
-                                                        updateNestedStart('plans', newPlans);
-                                                    }}
-                                                    className="w-full bg-transparent text-2xl font-black outline-none border-b border-white/10 focus:border-green-400 appearance-none"
-                                                    placeholder="0"
-                                                />
-                                            </div>
-                                            <div className="w-24">
-                                                <label className="text-[10px] uppercase font-bold text-white/30">Divisa</label>
-                                                <input
-                                                    value={plan.currency || 'CLP'}
-                                                    onChange={(e) => {
-                                                        const newPlans = [...config.plans];
-                                                        newPlans[i].currency = e.target.value;
-                                                        updateNestedStart('plans', newPlans);
-                                                    }}
-                                                    className="w-full bg-transparent text-lg font-bold outline-none border-b border-white/10 focus:border-white/50 text-right uppercase"
-                                                    placeholder="CLP"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div>
-                                            <div className="flex justify-between items-center mb-1">
-                                                <label className="text-[10px] uppercase font-bold text-white/30">Descuento (%)</label>
-                                                {plan.discountPercent > 0 && (
-                                                    <span className="text-[10px] text-green-400 font-bold">
-                                                        Precio Final: ${Number(plan.price * (1 - plan.discountPercent / 100)).toLocaleString()} {plan.currency || 'CLP'}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="flex items-center gap-3 bg-[#0a192f] border border-white/10 rounded-xl p-3">
-                                                <input
-                                                    type="range"
-                                                    min="0"
-                                                    max="100"
-                                                    value={plan.discountPercent || 0}
-                                                    onChange={(e) => {
-                                                        const newPlans = [...config.plans];
-                                                        newPlans[i].discountPercent = Number(e.target.value);
-                                                        updateNestedStart('plans', newPlans);
-                                                    }}
-                                                    className="flex-1 accent-primary h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
-                                                />
-                                                <div className="w-12 text-right font-bold text-white/80">
-                                                    {plan.discountPercent || 0}%
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div>
-                                            <div className="flex justify-between items-center mb-2">
-                                                <label className="text-[10px] uppercase font-bold text-white/30">Características ({plan.features?.length || 0}/8)</label>
-                                                {plan.features?.length < 8 && (
-                                                    <button
-                                                        onClick={() => {
-                                                            const newPlans = [...config.plans];
-                                                            if (!newPlans[i].features) newPlans[i].features = [];
-                                                            newPlans[i].features.push('Nueva característica');
-                                                            updateNestedStart('plans', newPlans);
-                                                        }}
-                                                        className="text-primary text-[10px] font-bold hover:underline flex items-center gap-1"
-                                                    >
-                                                        <Plus size={12} /> Agregar
-                                                    </button>
-                                                )}
-                                            </div>
-                                            <div className="space-y-2">
-                                                {plan.features?.map((feature: string, fIdx: number) => (
-                                                    <div key={fIdx} className="flex gap-2">
-                                                        <input
-                                                            value={feature}
-                                                            onChange={(e) => {
-                                                                const newPlans = [...config.plans];
-                                                                newPlans[i].features[fIdx] = e.target.value;
-                                                                updateNestedStart('plans', newPlans);
-                                                            }}
-                                                            className="flex-1 bg-[#0a192f] border border-white/10 rounded-lg p-2 text-xs outline-none focus:border-primary"
-                                                        />
-                                                        <button
-                                                            onClick={() => {
-                                                                const newPlans = [...config.plans];
-                                                                newPlans[i].features = newPlans[i].features.filter((_: any, idx: number) => idx !== fIdx);
-                                                                updateNestedStart('plans', newPlans);
-                                                            }}
-                                                            className="w-8 flex items-center justify-center rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20"
-                                                        >
-                                                            <Trash2 size={14} />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                                {(!plan.features || plan.features.length === 0) && (
-                                                    <div className="text-center py-4 text-xs text-white/20 border border-dashed border-white/10 rounded-lg">
-                                                        Sin características
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
+                            <div className="space-y-2">
+                                <h3 className="text-2xl font-bold text-white">Gestión Centralizada de Planes</h3>
+                                <p className="text-white/60 text-sm leading-relaxed">
+                                    Los planes y precios se gestionan desde el módulo oficial de Suscripciones para garantizar la sincronización automática con la base de datos de clientes, límites de uso y pasarela de pago.
+                                </p>
+                            </div>
+                            <div className="pt-4 flex justify-center">
+                                <a
+                                    href="/admin/dashboard/planes"
+                                    className="px-6 py-3 bg-primary text-black font-bold rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 flex items-center gap-2"
+                                >
+                                    <CreditCard size={18} />
+                                    Ir al Módulo de Planes y Precios
+                                    <ExternalLink size={16} />
+                                </a>
                             </div>
                         </div>
                     )}
@@ -1328,7 +1138,29 @@ export default function LandingConfigPage() {
                 message={feedbackModal.message}
                 variant={feedbackModal.variant}
                 confirmText="Aceptar"
-                cancelText="Cerrar" // Not used often in single button mode, but required prop? Let's check ConfirmModal source
+                cancelText="Cerrar"
+            />
+
+            <MediaSelector
+                isOpen={isMediaSelectorOpen}
+                onClose={() => {
+                    setIsMediaSelectorOpen(false);
+                    setCurrentEditingImageIdx(null);
+                }}
+                onSelect={(url) => {
+                    if (currentEditingImageIdx !== null && currentEditingImageIdx >= 0) {
+                        const newImages = [...(config.carousel?.images || [])];
+                        newImages[currentEditingImageIdx] = url;
+                        updateNestedStart('carousel.images', newImages);
+                    } else {
+                        // Append if index wasn't set
+                        const newImages = [...(config.carousel?.images || []), url];
+                        updateNestedStart('carousel.images', newImages);
+                    }
+                    setIsMediaSelectorOpen(false);
+                    setCurrentEditingImageIdx(null);
+                }}
+                categoryFilter=""
             />
         </div>
     );

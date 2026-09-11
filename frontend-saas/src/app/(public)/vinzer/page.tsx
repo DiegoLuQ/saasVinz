@@ -98,7 +98,7 @@ function VinzerLandingPageSchema() {
         'name': 'Vinzer',
         'operatingSystem': 'All',
         'applicationCategory': 'BusinessApplication',
-        'description': 'Plataforma SaaS multi-tenant para la gestión de crematorios de mascotas y funerarias. Código de verificación único por servicio, evidencia fotográfica por fase, seguimiento público en tiempo real para las familias y memoriales digitales interactivos.',
+        'description': 'Plataforma SaaS multi-tenant para la gestión de crematorios de mascotas y funerarias. Código de verificación único por servicio, evidencia fotográfica por fase, seguimiento público en tiempo real para las familias y certificados digitales verificables.',
         'offers': {
             '@type': 'Offer',
             'price': '29900',

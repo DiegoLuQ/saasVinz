@@ -47,6 +47,8 @@ fi
 if [ "$RUN_MIGRATIONS" != "false" ]; then
     echo "Running Database Setup & Migrations..."
     echo "yes" | python scripts/database/setup_initial_db.py
+    echo "Running Alembic Migrations..."
+    python scripts/database/run_alembic_migrations.py
 fi
 
 # Start Uvicorn

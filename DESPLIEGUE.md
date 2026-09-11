@@ -107,7 +107,7 @@ persistente `postgres_data` y healthcheck — el backend espera a que esté
    de la app `vinzer_app` (sin superusuario, con RLS), crea la base `v3_saas` y
    otorga los privilegios —incluidos los *default privileges*, para que las
    tablas que creen las migraciones queden accesibles al rol de la app.
-3. Aplica el esquema, **todas** las migraciones (`sql/*.sql`) y los seeds.
+3. Aplica el esquema base, las migraciones automáticas de **Alembic** (`alembic upgrade head`) y los seeds correspondientes.
 
 Todo usa las credenciales del `.env` raíz. **Único requisito:** que
 `POSTGRES_USER` (el superusuario del Postgres compartido) tenga privilegios para

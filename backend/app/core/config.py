@@ -68,7 +68,7 @@ class Settings(BaseSettings):
             # Para simplicidad, asumimos el mismo host/db
             from sqlalchemy.engine.url import make_url
             url = make_url(self.SQLALCHEMY_DATABASE_URL)
-            return str(url.set(username=self.DB_ADMIN_USER, password=self.DB_ADMIN_PASS))
+            return url.set(username=self.DB_ADMIN_USER, password=self.DB_ADMIN_PASS).render_as_string(hide_password=False)
         return self.SQLALCHEMY_DATABASE_URL
 
     # Rate Limiting

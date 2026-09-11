@@ -14,7 +14,11 @@ import {
     Search,
     CreditCard,
     Sun,
-    Moon
+    Moon,
+    BarChart3,
+    TrendingUp,
+    Users,
+    Monitor
 } from 'lucide-react';
 
 import { VinzerLogo } from './VinzerLogo';
@@ -26,15 +30,39 @@ import { VinzerFaqs } from './VinzerFaqs';
 import { VinzerTracking } from './VinzerTracking';
 import { VinzerDemoForm } from './VinzerDemoForm';
 import { VinzerWhatsAppFloat } from './VinzerWhatsAppFloat';
+import VinzerCarousel from './VinzerCarousel';
 import ReCaptchaProvider from '@/components/captcha/ReCaptchaProvider';
 import type { PublicPlan } from '@/lib/api/plans';
 
+interface HeroConfig {
+    mediaType?: 'image' | 'video';
+    backgroundImage?: string;
+    bgOpacity?: number;
+    videoPosterUrl?: string;
+}
+
 interface VinzerLandingClientProps {
-    initialConfig?: unknown;
+    initialConfig?: {
+        hero?: HeroConfig;
+        [key: string]: unknown;
+    } | null;
     initialPlans?: PublicPlan[] | null;
 }
 
-export default function VinzerLandingClient({ initialPlans = null }: VinzerLandingClientProps) {
+const resolveMediaUrl = (url?: string | null) => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
+    return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
+export default function VinzerLandingClient({ initialConfig = null, initialPlans = null }: VinzerLandingClientProps) {
+    // Hero Background & Media Config
+    const heroConfig = initialConfig?.hero || {};
+    const heroBgUrl = heroConfig.backgroundImage || 'https://i.postimg.cc/mD9jZNX2/portada-1.webp';
+    const isHeroVideo = heroConfig.mediaType === 'video' || /\.(mp4|webm|mov)(\?.*)?$/i.test(heroBgUrl);
+    const heroOpacity = typeof heroConfig.bgOpacity === 'number' ? heroConfig.bgOpacity : 1;
+
     // Estado para el menú móvil
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -99,28 +127,24 @@ export default function VinzerLandingClient({ initialPlans = null }: VinzerLandi
     };
 
     return (
-        <div className={`min-h-screen transition-colors duration-500 font-sans antialiased overflow-x-hidden ${
-            theme === 'light'
-                ? 'bg-[#F4F6F9] text-[#0F172A] selection:bg-[#0284C7]/20 selection:text-[#0F172A] [data-theme="light"]'
-                : 'bg-[#020210] text-[#FFFFFF] selection:bg-[#19B5FE]/30 selection:text-[#FFFFFF]'
-        }`}>
+        <div className={`min-h-screen transition-colors duration-500 font-sans antialiased overflow-x-hidden ${theme === 'light'
+            ? 'bg-[#f8fafc] text-[#0F172A] selection:bg-[#0284C7]/20 selection:text-[#0F172A] [data-theme="light"]'
+            : 'bg-[#020210] text-[#FFFFFF] selection:bg-[#19B5FE]/30 selection:text-[#FFFFFF]'
+            }`}>
             {/* Luces de Fondo (Glows) */}
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-screen pointer-events-none z-0 overflow-hidden">
-                <div className={`absolute top-[-10%] left-[-10%] w-[500px] h-[500px] blur-[150px] rounded-full ${
-                    theme === 'light' ? 'bg-[#0284C7]/10' : 'bg-[#19B5FE]/10'
-                }`} />
-                <div className={`absolute top-[20%] right-[-10%] w-[600px] h-[600px] blur-[170px] rounded-full ${
-                    theme === 'light' ? 'bg-[#D97706]/10' : 'bg-[#E0B84D]/5'
-                }`} />
+                <div className={`absolute top-[-10%] left-[-10%] w-[500px] h-[500px] blur-[150px] rounded-full ${theme === 'light' ? 'bg-[#0284C7]/10' : 'bg-[#19B5FE]/10'
+                    }`} />
+                <div className={`absolute top-[20%] right-[-10%] w-[600px] h-[600px] blur-[170px] rounded-full ${theme === 'light' ? 'bg-[#D97706]/10' : 'bg-[#E0B84D]/5'
+                    }`} />
             </div>
 
-            {/* Header / Barra Superior Clásica Integrada (Ancho Completo) */}
-            <header className={`fixed top-0 inset-x-0 z-50 w-full backdrop-blur-md border-b flex items-center transition-all duration-300 h-16 md:h-20 px-6 ${
-                theme === 'light'
-                    ? 'bg-white/90 border-slate-200/80 shadow-xs'
-                    : 'bg-[#020210]/90 border-[#19B5FE]/20'
-            }`}>
-                <div className="w-full max-w-7xl mx-auto flex items-center justify-between pointer-events-auto">
+            {/* Header / Barra Superior Flotante Ovalada (15% más ancha: max-w-[1180px]) */}
+            <header className="fixed top-4 inset-x-0 z-50 max-w-[1180px] mx-auto px-4 pointer-events-none">
+                <nav className={`w-full rounded-full px-7 sm:px-10 py-2.5 sm:py-3 flex items-center justify-between border transition-all duration-300 pointer-events-auto ${theme === 'light'
+                    ? 'bg-white/80 backdrop-blur-md border-slate-200/80 shadow-md shadow-slate-900/5'
+                    : 'bg-[#020210]/80 backdrop-blur-md border-[#19B5FE]/20 shadow-lg shadow-black/40'
+                    }`}>
                     {/* Lado Izquierdo: Logo */}
                     <div className="flex items-center shrink-0">
                         <Link href="/" className="transition-transform duration-300 hover:scale-103 active:scale-95">
@@ -128,16 +152,31 @@ export default function VinzerLandingClient({ initialPlans = null }: VinzerLandi
                         </Link>
                     </div>
 
-                    {/* xl: los 7 items + CTA necesitan ~1100px; entre md y xl el nav
-                        desktop se rompía (items en dos líneas chocando con el CTA) */}
-                    <nav className="hidden xl:flex items-center gap-8">
+                    {/* Links de navegación */}
+                    <div className="hidden xl:flex items-center gap-7">
                         {[
                             { href: '#modulos', label: 'Módulos' },
                             { href: '#trazabilidad', label: 'Cómo Funciona' },
+                            { href: '/tour', label: 'Tour App', isExternalRoute: true, hidden: true },
                             { href: '#sitio-web', label: 'Sitio Web' },
                             { href: '#precios', label: 'Precios' },
                             { href: '#faqs', label: 'FAQ' },
+                            { href: '#seguimiento', label: 'Seguimiento' },
                         ].map((link) => {
+                            if (link.isExternalRoute) {
+                                return (
+                                    <Link
+                                        key={link.href + '-' + link.label}
+                                        href={link.href}
+                                        className={`${link.hidden ? 'hidden' : 'flex'} relative text-[11px] font-bold tracking-widest uppercase transition-all duration-300 focus:outline-none py-1 items-center gap-1.5 ${theme === 'light' ? 'text-cyan-600 hover:text-cyan-700' : 'text-cyan-400 hover:text-cyan-300'
+                                            }`}
+                                    >
+                                        <span>{link.label}</span>
+                                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                                    </Link>
+                                );
+                            }
+
                             const sectionId = link.href.replace('#', '');
                             const active = activeSection === sectionId;
                             return (
@@ -159,57 +198,41 @@ export default function VinzerLandingClient({ initialPlans = null }: VinzerLandi
                                     {active && (
                                         <motion.div
                                             layoutId="integratedActiveIndicator"
-                                            className={`absolute bottom-0 inset-x-0 h-[2px] ${
-                                                theme === 'light' ? 'bg-[#0284C7] shadow-[0_0_8px_rgba(2,132,199,0.5)]' : 'bg-[#19B5FE] shadow-[0_0_8px_rgba(25,181,254,0.8)]'
-                                            }`}
+                                            className={`absolute bottom-0 inset-x-0 h-[2px] ${theme === 'light' ? 'bg-[#0284C7] shadow-[0_0_8px_rgba(2,132,199,0.5)]' : 'bg-[#19B5FE] shadow-[0_0_8px_rgba(25,181,254,0.8)]'
+                                                }`}
                                             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                                         />
                                     )}
                                 </motion.a>
                             );
                         })}
-                    </nav>
+                    </div>
 
                     {/* Lado Derecho: Acciones Desktop */}
-                    <div className="hidden xl:flex items-center gap-4 shrink-0">
+                    <div className="hidden xl:flex items-center gap-3 shrink-0">
                         {/* Switcher Tema Claro / Oscuro */}
                         <button
                             onClick={toggleTheme}
-                            className={`p-2.5 rounded-full border transition-all duration-300 flex items-center justify-center ${
-                                theme === 'light'
-                                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 hover:bg-amber-500/20'
-                                    : 'bg-white/5 border-white/10 text-cyan-400 hover:bg-white/10'
-                            }`}
+                            className={`p-2 rounded-full border transition-all duration-300 flex items-center justify-center ${theme === 'light'
+                                ? 'bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                                : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10'
+                                }`}
                             title={theme === 'light' ? 'Cambiar a modo Oscuro' : 'Cambiar a modo Claro'}
                             aria-label="Toggle dark/light theme"
                         >
-                            {theme === 'light' ? <Sun size={18} /> : <Moon size={18} />}
+                            {theme === 'light' ? <Sun size={16} /> : <Moon size={16} />}
                         </button>
-
-                        {/* Acceso directo al buscador público, sin estorbar el embudo de venta */}
-                        <a
-                            href="#seguimiento"
-                            onClick={(e) => handleNavLinkClick(e, '#seguimiento')}
-                            className={`flex items-center gap-2 font-bold text-[11px] tracking-wide px-4 py-2.5 rounded-full border transition-all duration-300 ${
-                                theme === 'light'
-                                    ? 'bg-white border-slate-300 text-slate-700 hover:border-[#0284C7] hover:text-[#0284C7]'
-                                    : 'bg-white/5 border-white/15 text-[#C0C0C0] hover:border-[#19B5FE]/60 hover:text-[#19B5FE]'
-                            }`}
-                        >
-                            <Search size={14} className="shrink-0" />
-                            Estado del Servicio
-                        </a>
 
                         <a
                             href="#demo"
                             onClick={(e) => handleNavLinkClick(e, '#demo')}
-                            className={`flex items-center justify-center gap-2 font-black text-xs tracking-wider px-6 py-2.5 rounded-full transition-all duration-300 ${
-                                theme === 'light'
-                                    ? 'bg-[#0284C7] hover:bg-[#0369A1] text-white shadow-[0_4px_14px_rgba(2,132,199,0.25)] hover:scale-103 active:scale-97'
-                                    : 'bg-[#19B5FE] hover:bg-[#0e9ce0] text-[#020210] shadow-[0_4px_14px_rgba(25,181,254,0.3)] hover:scale-103 active:scale-97'
-                            }`}
+                            className={`flex items-center justify-center gap-2 font-bold text-xs tracking-wide px-5 py-2.5 rounded-full transition-all duration-300 ${theme === 'light'
+                                ? 'bg-[#0284C7] hover:bg-[#0369A1] text-white shadow-[0_4px_14px_rgba(2,132,199,0.2)] hover:shadow-[0_6px_20px_rgba(2,132,199,0.3)] hover:scale-[1.02] active:scale-[0.98]'
+                                : 'bg-[#19B5FE] hover:bg-[#0e9ce0] text-[#020210] shadow-[0_4px_14px_rgba(25,181,254,0.25)] hover:shadow-[0_6px_20px_rgba(25,181,254,0.35)] hover:scale-[1.02] active:scale-[0.98]'
+                                }`}
                         >
                             Solicitar Demo
+                            <ArrowRight size={14} className="shrink-0" />
                         </a>
                     </div>
 
@@ -217,92 +240,83 @@ export default function VinzerLandingClient({ initialPlans = null }: VinzerLandi
                     <div className="flex xl:hidden items-center gap-2">
                         <button
                             onClick={toggleTheme}
-                            className={`p-2.5 rounded-xl border transition-all duration-300 flex items-center justify-center ${
-                                theme === 'light'
-                                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-600'
-                                    : 'bg-white/5 border-white/10 text-cyan-400'
-                            }`}
+                            className={`p-2 rounded-full border transition-all duration-300 flex items-center justify-center ${theme === 'light'
+                                ? 'bg-amber-500/10 border-amber-500/30 text-amber-600'
+                                : 'bg-white/5 border-white/10 text-cyan-400'
+                                }`}
                             aria-label="Toggle dark/light theme"
                         >
                             {theme === 'light' ? <Sun size={18} /> : <Moon size={18} />}
                         </button>
                         <button
                             onClick={() => setIsMobileMenuOpen(true)}
-                            className={`p-2.5 transition-all duration-300 rounded-xl border active:scale-90 ${
-                                theme === 'light'
-                                    ? 'text-slate-700 bg-slate-100 border-slate-200'
-                                    : 'text-[#C0C0C0] hover:text-[#19B5FE] bg-white/5 border-white/10'
-                            }`}
+                            className={`p-2 transition-all duration-300 rounded-full border active:scale-90 ${theme === 'light'
+                                ? 'text-slate-700 bg-slate-100 border-slate-200'
+                                : 'text-[#C0C0C0] hover:text-[#19B5FE] bg-white/5 border-white/10'
+                                }`}
                             aria-label="Open menu"
                         >
                             <Menu size={18} />
                         </button>
                     </div>
-                </div>
+                </nav>
             </header>
 
             {/* Hero Section */}
-            <section id="inicio" className="relative pt-36 md:pt-44 pb-20 px-6 z-10">
-                {/* Background Image */}
-                <div className="absolute inset-0 z-0">
-                    <img
-                        src="https://i.postimg.cc/mD9jZNX2/portada-1.webp"
-                        alt=""
-                        className="w-full h-full object-cover object-center"
-                        aria-hidden="true"
-                    />
-                    <div className={`absolute inset-0 transition-colors duration-500 ${
-                        theme === 'light'
-                            ? 'bg-gradient-to-r from-slate-100/95 via-slate-100/90 to-slate-100/70'
-                            : 'bg-gradient-to-r from-[#020210] via-[#020210]/90 to-[#020210]/60 opacity-60'
-                    }`} />
-                    <div className={`absolute inset-0 transition-colors duration-500 ${
-                        theme === 'light'
-                            ? 'bg-gradient-to-t from-[#F4F6F9] via-transparent to-slate-100/80'
-                            : 'bg-gradient-to-t from-[#020210] via-transparent to-[#020210]/80 opacity-50'
-                    }`} />
+            <section id="inicio" className="relative pt-28 pb-20 px-4 sm:px-6 z-10 overflow-hidden">
+                {/* Background Media (Light & Dark modes) */}
+                <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+                    {/* Media de fondo (siempre presente en modo claro y modo oscuro) */}
+                    {isHeroVideo ? (
+                        <video
+                            src={resolveMediaUrl(heroBgUrl)}
+                            poster={heroConfig.videoPosterUrl ? resolveMediaUrl(heroConfig.videoPosterUrl) : undefined}
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            className="w-full h-full object-cover object-center"
+                            style={{ opacity: heroOpacity }}
+                            aria-hidden="true"
+                        />
+                    ) : (
+                        <img
+                            src={resolveMediaUrl(heroBgUrl)}
+                            alt="Hero Background"
+                            className="w-full h-full object-cover object-center"
+                            style={{ opacity: heroOpacity }}
+                            aria-hidden="true"
+                        />
+                    )}
+
+
                 </div>
+
                 <div className="relative z-10 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-                    {/* Contenido de Hero */}
-                    <div className="lg:col-span-7 space-y-8 text-center lg:text-left">
+                    {/* Contenido de Hero: texto fluido y libre, sin cajas rígidas */}
+                    <div className="lg:col-span-7 max-w-3xl space-y-8 text-center lg:text-left">
                         {/* Tag Badge */}
-                        <div className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border ${
-                            theme === 'light'
-                                ? 'bg-sky-500/10 border-sky-500/20 text-[#0284C7]'
-                                : 'bg-[#19B5FE]/10 border-[#19B5FE]/30 text-[#19B5FE]'
-                        }`}>
-                            <Zap size={14} className={theme === 'light' ? 'text-[#0284C7]' : 'text-[#19B5FE]'} />
-                            <span className="text-[10px] font-black uppercase tracking-widest">✨ Software integral para la industria funeraria de mascotas</span>
+                        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border shadow-xs transition-all bg-[#19B5FE]/10 border-[#19B5FE]/30 text-[#19B5FE]">
+                            <Zap size={14} className="text-[#19B5FE]" />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Software integral para la industria funeraria de mascotas</span>
                         </div>
 
                         {/* Título Principal H1 (SEO) */}
-                        <h1 className={`text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight leading-[1.05] ${
-                            theme === 'light' ? 'text-slate-900' : 'text-[#FFFFFF]'
-                        }`}>
-                            Software de control operativo y <span className={`text-transparent bg-clip-text ${
-                                theme === 'light'
-                                    ? 'bg-gradient-to-r from-[#0284C7] via-[#0369A1] to-[#D97706]'
-                                    : 'bg-gradient-to-r from-[#19B5FE] via-[#19B5FE] to-[#E0B84D]'
-                            }`}>trazabilidad total</span> para tu crematorio de mascotas.
+                        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[62px] font-black tracking-tight leading-[1.08] text-white">
+                            Software de control operativo y <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-400 to-sky-500 drop-shadow-[0_0_24px_rgba(56,189,248,0.3)]">trazabilidad total</span> para tu crematorio de mascotas.
                         </h1>
 
                         {/* Subtítulo descriptivo */}
-                        <p className={`text-base sm:text-lg md:text-xl max-w-2xl mx-auto lg:mx-0 font-medium leading-relaxed ${
-                            theme === 'light' ? 'text-slate-600' : 'text-[#C0C0C0]'
-                        }`}>
+                        <p className="text-base sm:text-lg md:text-xl max-w-2xl mx-auto lg:mx-0 font-normal leading-relaxed text-slate-200">
                             Automatiza el registro de servicios, el flujo de trabajo de planta, la emisión de certificados y el seguimiento público para las familias, en un solo sistema en la nube.
                         </p>
 
                         {/* Botones de acción */}
-                        <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
+                        <div className="pt-2 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
                             <a
                                 href="#demo"
                                 onClick={(e) => handleNavLinkClick(e, '#demo')}
-                                className={`group w-full sm:w-auto text-center px-8 py-4 rounded-3xl font-bold uppercase tracking-wider text-xs hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 shadow-xl flex items-center justify-center gap-3 ${
-                                    theme === 'light'
-                                        ? 'bg-[#0284C7] hover:bg-[#0369A1] text-white shadow-sky-500/20'
-                                        : 'bg-[#19B5FE] hover:bg-[#0e9ce0] text-[#020210] shadow-[#19B5FE]/20'
-                                }`}
+                                className="group w-full sm:w-auto text-center px-8 py-4 rounded-xl font-bold uppercase tracking-wider text-xs hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-3 bg-[#0284C7] hover:bg-[#0369A1] text-white shadow-lg shadow-sky-600/30"
                                 id="hero-primary-cta"
                             >
                                 <span className="font-extrabold">Agendar demostración gratis</span>
@@ -312,11 +326,7 @@ export default function VinzerLandingClient({ initialPlans = null }: VinzerLandi
                             <a
                                 href="#precios"
                                 onClick={(e) => handleNavLinkClick(e, '#precios')}
-                                className={`group w-full sm:w-auto text-center border px-8 py-4 rounded-3xl font-bold uppercase tracking-wider text-xs hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-3 ${
-                                    theme === 'light'
-                                        ? 'border-slate-300 bg-white/70 text-slate-700 hover:bg-white'
-                                        : 'border-[#E0B84D]/30 bg-[#E0B84D]/5 text-[#E0B84D] hover:bg-[#E0B84D]/10'
-                                }`}
+                                className="group w-full sm:w-auto text-center border border-white/20 bg-white/10 backdrop-blur-md text-white hover:bg-white/20 px-8 py-4 rounded-xl font-bold uppercase tracking-wider text-xs hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-3 shadow-xs"
                                 id="hero-secondary-cta"
                             >
                                 <CreditCard size={16} className="shrink-0" />
@@ -324,133 +334,20 @@ export default function VinzerLandingClient({ initialPlans = null }: VinzerLandi
                             </a>
                         </div>
 
-                        {/* Badge de Seguridad */}
-                        <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 sm:gap-6 pt-4 text-slate-400 text-xs">
-                            <span className="flex items-center gap-1.5">
-                                <ShieldCheck size={16} className="text-[#E0B84D]" /> Trazabilidad garantizada desde el ingreso
+                        {/* Fila de Micro-Confianza / Risk Reversal B2B */}
+                        <div className="flex flex-wrap items-center justify-center lg:justify-start gap-x-6 gap-y-2.5 pt-2 text-xs text-slate-300">
+                            <span className="inline-flex items-center gap-1.5 font-semibold">
+                                <CheckCircle2 size={15} className="shrink-0 text-cyan-400" />
+                                Implementación guiada en 48 hrs
                             </span>
-                            <span className="flex items-center gap-1.5">
-                                <CheckCircle2 size={16} className="text-[#19B5FE]" /> Gestión integral de mascotas y servicios
+                            <span className="inline-flex items-center gap-1.5 font-semibold">
+                                <CheckCircle2 size={15} className="shrink-0 text-cyan-400" />
+                                Sin tarjeta ni contratos forzosos
                             </span>
-                        </div>
-                    </div>
-
-                    {/* Simulación del Software en Hero (Aesthetic UI) */}
-                    <div className="lg:col-span-5 relative mt-8 lg:mt-0">
-                        {/* Glow decorativo detrás del mockup */}
-                        <div className={`absolute inset-0 rounded-[2.5rem] blur-2xl -z-10 ${
-                            theme === 'light'
-                                ? 'bg-gradient-to-tr from-sky-400/20 to-indigo-500/20'
-                                : 'bg-gradient-to-tr from-[#19B5FE]/10 to-indigo-600/10'
-                        }`} />
-
-                        {/* Interfaz de Software Simulada */}
-                        <div className={`border rounded-[2.5rem] p-6 shadow-2xl backdrop-blur-sm overflow-hidden transition-colors duration-500 ${
-                            theme === 'light'
-                                ? 'bg-white/95 border-slate-200/90 shadow-slate-300/40'
-                                : 'bg-[#0b0a24]/90 border-white/10'
-                        }`}>
-                            {/* Barra superior de la ventana del navegador */}
-                            <div className={`flex items-center justify-between pb-4 mb-4 border-b ${
-                                theme === 'light' ? 'border-slate-100' : 'border-white/5'
-                            }`}>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full bg-red-500/80" />
-                                    <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
-                                    <div className="w-3 h-3 rounded-full bg-green-500/80" />
-                                </div>
-                                <div className={`text-[10px] font-mono tracking-wider px-3 py-1 rounded-full ${
-                                    theme === 'light' ? 'bg-slate-100 text-slate-600' : 'bg-white/5 text-slate-500'
-                                }`}>
-                                    track.vinzer.cl
-                                </div>
-                                <div className="w-4" /> {/* Spacer */}
-                            </div>
-
-                            {/* Header del Dashboard */}
-                            <div className="flex items-center justify-between mb-6">
-                                <div>
-                                    <span className={`text-[10px] uppercase font-bold tracking-widest ${
-                                        theme === 'light' ? 'text-amber-600' : 'text-[#E0B84D]'
-                                    }`}>Estado del Servicio</span>
-                                    <h4 className={`text-lg font-bold mt-0.5 ${
-                                        theme === 'light' ? 'text-slate-900' : 'text-[#FFFFFF]'
-                                    }`}>Seguimiento · SMROE2STJ4</h4>
-                                </div>
-                                <div className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                                    theme === 'light'
-                                        ? 'bg-sky-50 text-[#0284C7] border-sky-200'
-                                        : 'bg-[#19B5FE]/10 border-[#19B5FE]/30 text-[#19B5FE]'
-                                }`}>
-                                    En Proceso
-                                </div>
-                            </div>
-
-                            {/* Info de la Mascota */}
-                            <div className={`border rounded-2xl p-4 space-y-3 mb-6 ${
-                                theme === 'light' ? 'bg-slate-50/80 border-slate-100' : 'bg-white/5 border-white/5'
-                            }`}>
-                                <div className="flex justify-between text-xs">
-                                    <span className={theme === 'light' ? 'text-slate-500' : 'text-slate-400'}>Mascota:</span>
-                                    <span className={`font-semibold ${theme === 'light' ? 'text-slate-900' : 'text-[#FFFFFF]'}`}>Toby (Labrador, 32kg)</span>
-                                </div>
-                                <div className="flex justify-between text-xs">
-                                    <span className={theme === 'light' ? 'text-slate-500' : 'text-slate-400'}>Registrado por:</span>
-                                    <span className={`font-semibold ${theme === 'light' ? 'text-slate-900' : 'text-[#FFFFFF]'}`}>Recepción · J. Pérez</span>
-                                </div>
-                                <div className="flex justify-between text-xs">
-                                    <span className={theme === 'light' ? 'text-slate-500' : 'text-slate-400'}>Servicio Contratado:</span>
-                                    <span className={`font-semibold flex items-center gap-1 ${
-                                        theme === 'light' ? 'text-amber-700' : 'text-[#E0B84D]'
-                                    }`}>
-                                        Cremación Individual Premium <Star size={12} className={theme === 'light' ? 'fill-amber-600 text-amber-600' : 'fill-[#E0B84D] text-[#E0B84D]'} />
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Línea de tiempo visual */}
-                            <div className="space-y-4">
-                                <div className={`relative pl-6 pb-2 border-l ${
-                                    theme === 'light' ? 'border-[#0284C7]' : 'border-[#19B5FE]'
-                                }`}>
-                                    <div className={`absolute left-[-5px] top-1 w-2.5 h-2.5 rounded-full ${
-                                        theme === 'light' ? 'bg-[#0284C7] ring-4 ring-sky-100' : 'bg-[#19B5FE] ring-4 ring-[#19B5FE]/20'
-                                    }`} />
-                                    <div className="flex items-center justify-between text-xs">
-                                        <span className={`font-bold ${theme === 'light' ? 'text-slate-900' : 'text-[#FFFFFF]'}`}>Registrado en recepción</span>
-                                        <span className={`text-[10px] ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>10:30 AM</span>
-                                    </div>
-                                    <p className={`text-[11px] mt-0.5 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Código de verificación emitido y enlace enviado a la familia.</p>
-                                </div>
-
-                                <div className={`relative pl-6 pb-2 border-l ${
-                                    theme === 'light' ? 'border-slate-200' : 'border-white/10'
-                                }`}>
-                                    <div className={`absolute left-[-5px] top-1 w-2.5 h-2.5 rounded-full ${
-                                        theme === 'light' ? 'bg-[#0284C7] ring-4 ring-sky-100' : 'bg-[#19B5FE] ring-4 ring-[#19B5FE]/20'
-                                    }`} />
-                                    <div className="flex items-center justify-between text-xs">
-                                        <span className={`font-bold ${theme === 'light' ? 'text-slate-900' : 'text-[#FFFFFF]'}`}>Custodia Confirmada</span>
-                                        <span className={`text-[10px] ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>11:15 AM</span>
-                                    </div>
-                                    <p className={`text-[11px] mt-0.5 ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'}`}>Retiro confirmado con foto y firma del responsable.</p>
-                                </div>
-
-                                <div className="relative pl-6">
-                                    <div className={`absolute left-[-5px] top-1 w-2.5 h-2.5 rounded-full animate-ping ${
-                                        theme === 'light' ? 'bg-slate-300' : 'bg-white/20'
-                                    }`} />
-                                    <div className={`absolute left-[-5px] top-1 w-2.5 h-2.5 rounded-full ${
-                                        theme === 'light' ? 'bg-slate-400' : 'bg-white/30'
-                                    }`} />
-                                    <div className="flex items-center justify-between text-xs">
-                                        <span className={`font-bold ${theme === 'light' ? 'text-slate-700' : 'text-[#C0C0C0]'}`}>En Planta / Crematorio</span>
-                                        <span className={`text-[10px] ${theme === 'light' ? 'text-slate-400' : 'text-slate-500'}`}>En espera</span>
-                                    </div>
-                                    <p className={`text-[11px] mt-0.5 ${theme === 'light' ? 'text-slate-500' : 'text-slate-500'}`}>Validando identidad con el código de verificación antes de iniciar.</p>
-                                </div>
-                            </div>
-
+                            <span className="inline-flex items-center gap-1.5 font-semibold">
+                                <CheckCircle2 size={15} className="shrink-0 text-cyan-400" />
+                                Datos 100% seguros y respaldados
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -465,6 +362,9 @@ export default function VinzerLandingClient({ initialPlans = null }: VinzerLandi
             {/* Cómo funciona: 3 pasos */}
             <VinzerJourney theme={theme} />
 
+            {/* Carrusel Dinámico de Fotos / Software (Opcional según Admin) */}
+            <VinzerCarousel config={(initialConfig as any)?.carousel} theme={theme} />
+
             {/* El sitio web va ANTES de precios para que el visitante llegue
                 cargado a la tarjeta ULTRA */}
             <VinzerWebService theme={theme} />
@@ -475,25 +375,21 @@ export default function VinzerLandingClient({ initialPlans = null }: VinzerLandi
 
             {/* CTA Final: captura del lead en 3 campos */}
             <section id="demo" className="py-28 px-6 relative overflow-hidden z-10 max-w-7xl mx-auto">
-                <div className={`relative border rounded-[3rem] p-8 md:p-14 overflow-hidden transition-all duration-500 ${
-                    theme === 'light'
-                        ? 'bg-white border-slate-200 shadow-2xl shadow-slate-200/60'
-                        : 'bg-gradient-to-tr from-[#0b0a24] to-[#020210] border-white/10 shadow-2xl'
-                }`}>
+                <div className={`relative border rounded-[3rem] p-8 md:p-14 overflow-hidden transition-all duration-500 ${theme === 'light'
+                    ? 'bg-white border-slate-200 shadow-2xl shadow-slate-200/60'
+                    : 'bg-gradient-to-tr from-[#0b0a24] to-[#020210] border-white/10 shadow-2xl'
+                    }`}>
                     <div className="absolute inset-0 bg-gradient-to-tr from-[#19B5FE]/5 to-[#E0B84D]/5 pointer-events-none -z-10" />
-                    <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] blur-[120px] rounded-full pointer-events-none -z-10 ${
-                        theme === 'light' ? 'bg-[#0284C7]/10' : 'bg-[#19B5FE]/5'
-                    }`} />
+                    <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] blur-[120px] rounded-full pointer-events-none -z-10 ${theme === 'light' ? 'bg-[#0284C7]/10' : 'bg-[#19B5FE]/5'
+                        }`} />
 
                     <div className="max-w-3xl mx-auto space-y-5 text-center mb-10">
-                        <h2 className={`text-3xl md:text-5xl font-black leading-tight ${
-                            theme === 'light' ? 'text-slate-900' : 'text-[#FFFFFF]'
-                        }`}>
+                        <h2 className={`text-3xl md:text-5xl font-black leading-tight ${theme === 'light' ? 'text-slate-900' : 'text-[#FFFFFF]'
+                            }`}>
                             Lleva la trazabilidad de tu crematorio al estándar que tus clientes esperan.
                         </h2>
-                        <p className={`text-base font-medium ${
-                            theme === 'light' ? 'text-slate-600' : 'text-[#C0C0C0]'
-                        }`}>
+                        <p className={`text-base font-medium ${theme === 'light' ? 'text-slate-600' : 'text-[#C0C0C0]'
+                            }`}>
                             Déjanos tres datos y coordinamos una demostración guiada de la plataforma.
                         </p>
                     </div>
@@ -504,9 +400,8 @@ export default function VinzerLandingClient({ initialPlans = null }: VinzerLandi
                         </ReCaptchaProvider>
                     </div>
 
-                    <div className={`max-w-3xl mx-auto mt-8 pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-4 ${
-                        theme === 'light' ? 'border-slate-100' : 'border-white/5'
-                    }`}>
+                    <div className={`max-w-3xl mx-auto mt-8 pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-4 ${theme === 'light' ? 'border-slate-100' : 'border-white/5'
+                        }`}>
                         <p className={`text-xs ${theme === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>
                             ¿Prefieres escribirnos directo?
                         </p>
@@ -527,11 +422,10 @@ export default function VinzerLandingClient({ initialPlans = null }: VinzerLandi
             </section>
 
             {/* Footer Semántico */}
-            <footer className={`border-t py-16 px-6 relative z-10 transition-colors duration-500 ${
-                theme === 'light'
-                    ? 'bg-white border-slate-200'
-                    : 'bg-[#020210] border-white/5'
-            }`}>
+            <footer className={`border-t py-16 px-6 relative z-10 transition-colors duration-500 ${theme === 'light'
+                ? 'bg-white border-slate-200'
+                : 'bg-[#020210] border-white/5'
+                }`}>
                 <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-12 mb-12">
                     {/* Izquierda: Info de Marca */}
                     <div className="md:col-span-5 space-y-6">
@@ -544,12 +438,11 @@ export default function VinzerLandingClient({ initialPlans = null }: VinzerLandi
                     {/* Derecha: Columnas de Enlaces */}
                     <div className="md:col-span-7 grid grid-cols-2 sm:grid-cols-3 gap-8">
                         <div className="space-y-4">
-                            <h5 className={`text-[10px] font-black uppercase tracking-wider ${
-                                theme === 'light' ? 'text-amber-700' : 'text-[#E0B84D]'
-                            }`}>Software</h5>
-                            <ul className={`space-y-2 text-xs ${
-                                theme === 'light' ? 'text-slate-600' : 'text-slate-400'
-                            }`}>
+                            <h5 className={`text-[10px] font-black uppercase tracking-wider ${theme === 'light' ? 'text-amber-700' : 'text-[#E0B84D]'
+                                }`}>Software</h5>
+                            <ul className={`space-y-2 text-xs ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'
+                                }`}>
+                                <li className="hidden"><Link href="/tour" className="text-cyan-400 font-semibold hover:underline flex items-center gap-1.5">Tour de la App (Capturas) <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded">Nuevo</span></Link></li>
                                 <li><a href="#trazabilidad" className="hover:text-[#0284C7] transition-colors">Cómo Funciona</a></li>
                                 <li><a href="#modulos" className="hover:text-[#0284C7] transition-colors">Módulos del Sistema</a></li>
                                 <li><a href="#seguimiento" className="hover:text-[#0284C7] transition-colors">Estado del Servicio</a></li>
@@ -557,24 +450,20 @@ export default function VinzerLandingClient({ initialPlans = null }: VinzerLandi
                             </ul>
                         </div>
                         <div className="space-y-4">
-                            <h5 className={`text-[10px] font-black uppercase tracking-wider ${
-                                theme === 'light' ? 'text-amber-700' : 'text-[#E0B84D]'
-                            }`}>Recursos</h5>
-                            <ul className={`space-y-2 text-xs ${
-                                theme === 'light' ? 'text-slate-600' : 'text-slate-400'
-                            }`}>
+                            <h5 className={`text-[10px] font-black uppercase tracking-wider ${theme === 'light' ? 'text-amber-700' : 'text-[#E0B84D]'
+                                }`}>Recursos</h5>
+                            <ul className={`space-y-2 text-xs ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'
+                                }`}>
                                 <li><a href="#faqs" className="hover:text-[#0284C7] transition-colors">Preguntas Frecuentes</a></li>
                                 <li><Link href="/manual" className="hover:text-[#0284C7] transition-colors">Guías Operativas</Link></li>
-                                <li><Link href="/memorials" className="hover:text-[#0284C7] transition-colors">Memoriales Públicos</Link></li>
+                                <li><a href="#trazabilidad" className="hover:text-[#0284C7] transition-colors">Trazabilidad en Vivo</a></li>
                             </ul>
                         </div>
                         <div className="space-y-4">
-                            <h5 className={`text-[10px] font-black uppercase tracking-wider ${
-                                theme === 'light' ? 'text-amber-700' : 'text-[#E0B84D]'
-                            }`}>Legal</h5>
-                            <ul className={`space-y-2 text-xs ${
-                                theme === 'light' ? 'text-slate-600' : 'text-slate-400'
-                            }`}>
+                            <h5 className={`text-[10px] font-black uppercase tracking-wider ${theme === 'light' ? 'text-amber-700' : 'text-[#E0B84D]'
+                                }`}>Legal</h5>
+                            <ul className={`space-y-2 text-xs ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'
+                                }`}>
                                 <li><Link href="/privacidad" className="hover:text-[#0284C7] transition-colors">Privacidad</Link></li>
                                 <li><Link href="/terminos" className="hover:text-[#0284C7] transition-colors">Términos del Servicio</Link></li>
                                 <li><Link href="/cookies" className="hover:text-[#0284C7] transition-colors">Política de Cookies</Link></li>
@@ -584,11 +473,10 @@ export default function VinzerLandingClient({ initialPlans = null }: VinzerLandi
                 </div>
 
                 {/* Línea Inferior de Derechos */}
-                <div className={`max-w-7xl mx-auto pt-8 border-t flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-medium ${
-                    theme === 'light'
-                        ? 'border-slate-100 text-slate-500'
-                        : 'border-white/5 text-slate-600'
-                }`}>
+                <div className={`max-w-7xl mx-auto pt-8 border-t flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-medium ${theme === 'light'
+                    ? 'border-slate-100 text-slate-500'
+                    : 'border-white/5 text-slate-600'
+                    }`}>
                     <p>© 2026 Vinzer SaaS. Todos los derechos reservados.</p>
                     <div className="flex gap-4">
                         <span className="hover:text-[#0284C7] cursor-pointer">LinkedIn</span>
@@ -642,10 +530,30 @@ export default function VinzerLandingClient({ initialPlans = null }: VinzerLandi
                                     { href: '#seguimiento', label: 'Estado del Servicio' },
                                     { href: '#modulos', label: 'Módulos' },
                                     { href: '#trazabilidad', label: 'Cómo Funciona' },
+                                    { href: '/tour', label: 'Tour App (Capturas)', isExternalRoute: true, hidden: true },
                                     { href: '#sitio-web', label: 'Sitio Web' },
                                     { href: '#precios', label: 'Precios' },
                                     { href: '#faqs', label: 'FAQ' },
                                 ].map((link, index) => {
+                                    if (link.isExternalRoute) {
+                                        return (
+                                            <div key={link.href} className={`w-full ${link.hidden ? 'hidden' : ''}`}>
+                                                <Link
+                                                    href={link.href}
+                                                    onClick={() => setIsMobileMenuOpen(false)}
+                                                    className="group block py-2 relative cursor-pointer select-none"
+                                                >
+                                                    <span className="text-xs font-mono mr-2 text-cyan-400">
+                                                        0{index + 1}.
+                                                    </span>
+                                                    <span className="text-2xl font-sans tracking-wide font-bold text-cyan-400 group-hover:text-cyan-300">
+                                                        {link.label}
+                                                    </span>
+                                                </Link>
+                                            </div>
+                                        );
+                                    }
+
                                     const sectionId = link.href.replace('#', '');
                                     const active = activeSection === sectionId;
 
@@ -738,7 +646,11 @@ export default function VinzerLandingClient({ initialPlans = null }: VinzerLandi
                 )}
             </AnimatePresence>
 
-            <VinzerWhatsAppFloat />
+            <VinzerWhatsAppFloat
+                phone={(initialConfig as any)?.whatsapp?.phone}
+                message={(initialConfig as any)?.whatsapp?.message}
+                show={(initialConfig as any)?.whatsapp?.show}
+            />
         </div>
     );
 }

@@ -30,6 +30,8 @@ export interface OwnerData {
     service_code: string;
     contactPreference: 'whatsapp' | 'phone' | 'any' | '';
     region: string;
+    pickupRegion?: string;
+    pickupCommune?: string;
 }
 
 export interface PetData {
@@ -58,6 +60,8 @@ export const INITIAL_OWNER_DATA: OwnerData = {
     service_code: '',
     contactPreference: '',
     region: '',
+    pickupRegion: '',
+    pickupCommune: '',
 };
 
 export const INITIAL_PET_DATA: PetData = {
