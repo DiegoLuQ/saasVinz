@@ -8,44 +8,74 @@ if BASE_DIR not in sys.path:
 
 from sqlalchemy import create_engine, inspect, text
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from alembic import command
+from alembic.util.exc import CommandError
 from app.core.config import settings
+
+BASELINE_REVISION = "3bf566cddb7d"
 
 def run_migrations():
     print("===================================================")
     print("   Alembic Migrations Runner")
     print("===================================================")
     
-    # 1. Inspect current database state
     admin_url = settings.DB_ADMIN_URL or settings.SQLALCHEMY_DATABASE_URL
     engine = create_engine(admin_url)
     
     ini_path = os.path.join(BASE_DIR, "alembic.ini")
     cfg = Config(ini_path)
+    script = ScriptDirectory.from_config(cfg)
     
     try:
         inspector = inspect(engine)
         tables = inspector.get_table_names()
         
-        # Check if database has existing tables (e.g. from an existing DB or backup)
-        # but has never been stamped with Alembic
-        if "sys_tenants" in tables or "crm_customers" in tables:
+        # 1. Verificar si la BD ya tiene tablas de negocio (ej. sys_tenants o crm_customers)
+        is_existing_db = "sys_tenants" in tables or "crm_customers" in tables
+        
+        if is_existing_db:
             has_alembic_table = "alembic_version" in tables
-            has_stamp = False
-            if has_alembic_table:
-                with engine.connect() as conn:
-                    res = conn.execute(text("SELECT version_num FROM alembic_version")).fetchone()
-                    has_stamp = bool(res and res[0])
+            needs_stamp = False
             
-            if not has_stamp:
-                print("-> Base de datos existente detectada sin versión Alembic.")
-                print("-> Marcando baseline inicial (stamp 3bf566cddb7d)...")
-                command.stamp(cfg, "3bf566cddb7d")
+            if not has_alembic_table:
+                needs_stamp = True
+            else:
+                with engine.connect() as conn:
+                    rows = conn.execute(text("SELECT version_num FROM alembic_version")).fetchall()
+                    if not rows:
+                        needs_stamp = True
+                    else:
+                        for (rev,) in rows:
+                            try:
+                                script.get_revision(rev)
+                            except CommandError:
+                                print(f"-> Revisión huérfana/antigua detectada en la BD ('{rev}'). Limpiando...")
+                                conn.execute(text("DELETE FROM alembic_version WHERE version_num = :rev"), {"rev": rev})
+                                conn.commit()
+                                needs_stamp = True
+            
+            if needs_stamp:
+                print(f"-> Base de datos existente: Marcando baseline ({BASELINE_REVISION})...")
+                command.stamp(cfg, BASELINE_REVISION)
                 print("-> Baseline marcado exitosamente.")
         
-        # 2. Run upgrade head
+        # 2. Ejecutar upgrade head
         print("-> Aplicando migraciones pendientes (alembic upgrade head)...")
-        command.upgrade(cfg, "head")
+        try:
+            command.upgrade(cfg, "head")
+        except CommandError as ce:
+            if "Can't locate revision" in str(ce) and is_existing_db:
+                print(f"-> Error de revisión no encontrada ({ce}). Reparando con stamp {BASELINE_REVISION}...")
+                with engine.connect() as conn:
+                    conn.execute(text("DELETE FROM alembic_version"))
+                    conn.commit()
+                command.stamp(cfg, BASELINE_REVISION)
+                print("-> Reintentando upgrade head...")
+                command.upgrade(cfg, "head")
+            else:
+                raise ce
+
         print("-> Migraciones de Alembic completadas con éxito.")
         print("===================================================")
     except Exception as e:
