@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTenant } from "@/app/(tenant)/tenant/context/TenantContext";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, Clock, CreditCard, Lock } from "lucide-react";
+import { AlertTriangle, Clock, CreditCard, Lock, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { getSubscriptionInfo, SubscriptionState } from "@/lib/tenant/subscription";
 
@@ -11,7 +11,19 @@ export function SubscriptionAlertBanner() {
     const { tenantData } = useTenant();
     const [status, setStatus] = useState<Exclude<SubscriptionState, "active"> | null>(null);
     const [daysRemaining, setDaysRemaining] = useState<number>(0);
+    const [dismissed, setDismissed] = useState(false);
     const router = useRouter();
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && sessionStorage.getItem('dismiss_sub_banner') === 'true') {
+            setDismissed(true);
+        }
+    }, []);
+
+    const handleDismiss = () => {
+        setDismissed(true);
+        sessionStorage.setItem('dismiss_sub_banner', 'true');
+    };
 
     useEffect(() => {
         if (!tenantData || !tenantData.next_billing_date) return;
@@ -29,7 +41,7 @@ export function SubscriptionAlertBanner() {
         return () => clearInterval(timer);
     }, [tenantData]);
 
-    if (!status) return null;
+    if (!status || (dismissed && status === "warning")) return null;
 
     const isLocked = status === "locked";
     const isGrace = status === "grace";
@@ -43,7 +55,7 @@ export function SubscriptionAlertBanner() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
-                className="w-full px-4 sm:px-6 lg:px-10 pb-4 relative z-20"
+                className="w-full px-4 sm:px-6 lg:px-10 pb-4 relative z-10"
             >
                 <div
                     className={`
@@ -113,19 +125,31 @@ export function SubscriptionAlertBanner() {
                         </div>
                     </div>
 
-                    <button
-                        onClick={() => router.push("/dashboard/configuracion")}
-                        className={`
-                            shrink-0 py-3 px-6 rounded-xl font-bold flex items-center gap-2.5 transition-all relative z-10 active:scale-[0.98] shadow-lg
-                            ${isRed
-                                ? "bg-red-500 hover:bg-red-600 text-white shadow-red-500/20"
-                                : "bg-amber-500 hover:bg-amber-600 text-black shadow-amber-500/20"
-                            }
-                        `}
-                    >
-                        <CreditCard size={18} />
-                        {isRed ? "Regularizar Pago" : "Renovar Ahora"}
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0 relative z-10">
+                        <button
+                            onClick={() => router.push("/dashboard/configuracion")}
+                            className={`
+                                py-3 px-6 rounded-xl font-bold flex items-center gap-2.5 transition-all active:scale-[0.98] shadow-lg
+                                ${isRed
+                                    ? "bg-red-500 hover:bg-red-600 text-white shadow-red-500/20"
+                                    : "bg-amber-500 hover:bg-amber-600 text-black shadow-amber-500/20"
+                                }
+                            `}
+                        >
+                            <CreditCard size={18} />
+                            {isRed ? "Regularizar Pago" : "Renovar Ahora"}
+                        </button>
+                        {!isLocked && (
+                            <button
+                                onClick={handleDismiss}
+                                className="p-3 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/5 transition-all cursor-pointer"
+                                aria-label="Cerrar aviso"
+                                title="Cerrar aviso"
+                            >
+                                <X size={18} />
+                            </button>
+                        )}
+                    </div>
                 </div>
             </motion.div>
         </AnimatePresence>

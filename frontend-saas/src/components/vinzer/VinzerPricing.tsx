@@ -96,11 +96,12 @@ export function VinzerPricing({ theme = 'dark', initialPlans = null }: VinzerPri
 
     return (
         <section
-            id="precios"
+            id="planes"
             className={`py-28 border-y relative z-10 transition-colors duration-500 ${
                 isLight ? 'bg-slate-100/70 border-slate-200' : 'bg-[#0b0a24]/30 border-white/5'
             }`}
         >
+            <div id="precios" className="sr-only" />
             <div className="max-w-7xl mx-auto px-6">
                 <div className="text-center max-w-3xl mx-auto mb-12 space-y-4">
                     <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border ${
@@ -113,7 +114,7 @@ export function VinzerPricing({ theme = 'dark', initialPlans = null }: VinzerPri
                     </div>
 
                     <h2 className={`text-3xl md:text-5xl font-black leading-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                        Planes diseñados para impulsar el crecimiento de tu crematorio.
+                        Planes
                     </h2>
 
                     {/* Garantía transversal. El seguimiento público no está limitado por plan. */}

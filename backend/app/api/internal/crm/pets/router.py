@@ -20,7 +20,12 @@ def get_pets(
     tenant_id: int = Depends(get_tenant_id),
     _: bool = Depends(check_permission("mascotas", "view"))
 ):
-    return db.query(models.Pet).filter(models.Pet.tenant_id == tenant_id).all()
+    return (
+        db.query(models.Pet)
+        .filter(models.Pet.tenant_id == tenant_id)
+        .order_by(models.Pet.created_at.desc(), models.Pet.id.desc())
+        .all()
+    )
 
 @router.post("", response_model=schemas.PetInDB)
 def create_pet(

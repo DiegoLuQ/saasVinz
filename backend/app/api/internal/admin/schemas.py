@@ -864,5 +864,6 @@ class CreatorBootstrapResponse(BaseModel):
     billing_transactions: List[BillingTransactionResponse]
     subscription_plans: List[SubscriptionPlanInDB]
     announcements: List[AnnouncementInDB]
+    saas_config: Optional[SaaSConfigInDB] = None
     metadata: BootstrapMetadata
 

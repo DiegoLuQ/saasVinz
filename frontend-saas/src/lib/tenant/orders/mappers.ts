@@ -48,6 +48,30 @@ export function normalizeProducts(raw: any[]): Product[] {
 }
 
 /**
+ * Normalize raw region string to match chile-data region labels.
+ */
+function normalizeRegion(rawRegion?: string | null): string {
+    if (!rawRegion) return '';
+    const normalizeText = (text: string) => {
+        return text.toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/\bregion\b/gi, "")
+            .trim();
+    };
+    const searchNorm = normalizeText(rawRegion);
+    const found = regions.find(r => {
+        const labelNorm = normalizeText(r.label);
+        const valueNorm = normalizeText(r.value);
+        return labelNorm === searchNorm || 
+               valueNorm === searchNorm ||
+               labelNorm.includes(searchNorm) ||
+               searchNorm.includes(labelNorm);
+    });
+    return found ? found.label : rawRegion;
+}
+
+/**
  * Map a cremation API response to the form state used by the editor.
  */
 export function mapCremationToFormState(
@@ -74,27 +98,12 @@ export function mapCremationToFormState(
                 : [],
         discount: cremationData.discount || 0,
         weight_price: cremationData.weight_price || 0,
-        region: (() => {
-            if (!cremationData.region) return '';
-            const normalizeText = (text: string) => {
-                return text.toLowerCase()
-                    .normalize("NFD")
-                    .replace(/[\u0300-\u036f]/g, "")
-                    .replace(/\bregion\b/gi, "")
-                    .trim();
-            };
-            const searchNorm = normalizeText(cremationData.region);
-            const found = regions.find(r => {
-                const labelNorm = normalizeText(r.label);
-                const valueNorm = normalizeText(r.value);
-                return labelNorm === searchNorm || 
-                       valueNorm === searchNorm ||
-                       labelNorm.includes(searchNorm) ||
-                       searchNorm.includes(labelNorm);
-            });
-            return found ? found.label : cremationData.region;
-        })(),
+        region: normalizeRegion(cremationData.region),
         city: cremationData.city || '',
+        address: cremationData.address || '',
+        pickup_region: normalizeRegion(cremationData.pickup_region),
+        pickup_city: cremationData.pickup_city || '',
+        pickup_address: cremationData.pickup_address || '',
         partner_id: cremationData.partner_id || undefined,
         images:
             cremationData.images && cremationData.images.length > 0

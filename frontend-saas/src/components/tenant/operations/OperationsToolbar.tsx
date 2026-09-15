@@ -3,7 +3,7 @@
 import React from 'react';
 import { Search, X } from 'lucide-react';
 
-export type StatusPillFilter = 'all' | 'pendiente' | 'en_proceso' | 'coordinado' | 'completado' | 'cancelado';
+export type StatusPillFilter = 'all' | 'pendiente' | 'en_proceso' | 'completado' | 'cancelado';
 
 interface OperationsToolbarProps {
     searchTerm: string;
@@ -19,7 +19,6 @@ const PILLS: { key: StatusPillFilter; label: string; dot: string }[] = [
     { key: 'all', label: 'Todos', dot: 'bg-white/40' },
     { key: 'pendiente', label: 'Pendientes', dot: 'bg-orange-400' },
     { key: 'en_proceso', label: 'En Proceso', dot: 'bg-blue-400' },
-    { key: 'coordinado', label: 'Coordinado', dot: 'bg-indigo-400' },
     { key: 'completado', label: 'Entregados', dot: 'bg-emerald-400' },
     { key: 'cancelado', label: 'Cancelados', dot: 'bg-red-400' },
 ];

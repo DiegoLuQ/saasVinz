@@ -45,7 +45,7 @@ import { PlanLimitModal } from '@/components/tenant/PlanLimitModal';
 // ==========================================
 const normalizeStatus = (raw: string): string => {
     const v = raw.trim().toLowerCase();
-    if (['pending', 'received'].includes(v)) return 'pendiente';
+    if (['pending', 'received', 'coordinado'].includes(v)) return 'pendiente';
     // 'ready' (técnica terminada en Operaciones) se considera aún en proceso hasta la entrega
     if (['processing', 'ready'].includes(v)) return 'en_proceso';
     // Estado final único = entregado. 'completado'/'completed' quedan retirados → entregado
@@ -79,7 +79,7 @@ export default function CremationsPage() {
     // Local state
     // ==========================================
     const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
-    const [mobileTab, setMobileTab] = useState<'all' | 'pendiente' | 'en_proceso' | 'completado'>('all');
+    const [mobileTab, setMobileTab] = useState<'all' | 'pendiente' | 'en_proceso' | 'completado' | 'cancelado'>('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null);
     const [opsFilter, setOpsFilter] = useState<OpsFilter>('all');
@@ -120,7 +120,6 @@ export default function CremationsPage() {
             all: cremations.length,
             pendiente: 0,
             en_proceso: 0,
-            coordinado: 0,
             completado: 0,
             cancelado: 0,
             today: 0,
@@ -177,23 +176,27 @@ export default function CremationsPage() {
         const cols = {
             pendiente: [] as Cremation[],
             en_proceso: [] as Cremation[],
-            completado: [] as Cremation[]
+            completado: [] as Cremation[],
+            cancelado: [] as Cremation[],
         };
-
-        const now = new Date();
-        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
         filteredCremations.forEach(c => {
             const s = normalizeStatus(c.status);
-            if (s === 'pendiente' || s === 'coordinado') cols.pendiente.push(c);
+            if (s === 'pendiente') cols.pendiente.push(c);
             else if (s === 'en_proceso') cols.en_proceso.push(c);
             else if (s === 'completado' || s === 'entregado') {
                 cols.completado.push(c);
+            } else if (s === 'cancelado') {
+                cols.cancelado.push(c);
             }
         });
 
         return cols;
     }, [filteredCremations]);
+
+    // Máximo 7 en la columna de Entregados para no saturar la vista
+    const displayedCompletados = useMemo(() => kanbanColumns.completado.slice(0, 7), [kanbanColumns.completado]);
+    const extraCompletadosCount = kanbanColumns.completado.length - displayedCompletados.length;
 
     // ==========================================
     // Handlers
@@ -256,6 +259,7 @@ export default function CremationsPage() {
     // Kanban Card Component
     const KanbanCard = ({ item, nextStatus, nextLabel, icon: Icon, colorClass, glowColor, isSelected, onSelect }: any) => {
         const isCompleted = ['delivered', 'completed', 'completado', 'entregado'].includes(normalizeStatus(item.status));
+        const isCancelled = normalizeStatus(item.status) === 'cancelado';
 
         const handleCopyCode = async (e: React.MouseEvent) => {
             e.stopPropagation();
@@ -285,6 +289,8 @@ export default function CremationsPage() {
                 className={`cursor-pointer border-2 rounded-2xl p-4 shadow-xl transition-all group flex flex-col gap-3 relative overflow-hidden ${
                     isSelected 
                     ? `border-primary bg-[#1e293b] shadow-primary/20 ring-4 ring-primary/10` 
+                    : isCancelled
+                    ? `bg-[#0f172a] border-red-500/20 hover:border-red-500/40 hover:shadow-2xl`
                     : `bg-[#0f172a] border-white/5 hover:border-white/20 hover:shadow-2xl`
                 }`}
             >
@@ -294,7 +300,7 @@ export default function CremationsPage() {
                     </div>
                 )}
 
-                {(normalizeStatus(item.status) === 'en_proceso' || item.status.trim().toLowerCase() === 'processing' || normalizeStatus(item.status) === 'pendiente') && (
+                {(normalizeStatus(item.status) === 'en_proceso' || item.status.trim().toLowerCase() === 'processing' || normalizeStatus(item.status) === 'pendiente' || isCancelled) && (
                     <button
                         type="button"
                         onClick={(e) => {
@@ -336,7 +342,12 @@ export default function CremationsPage() {
                         <span className="text-[10px] font-bold bg-white/5 text-muted-foreground px-2 py-0.5 rounded-md border border-white/5">
                             ORD-{item.id}
                         </span>
-                        {item.verification_code && (
+                        {isCancelled && (
+                            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-red-500/15 text-red-400 border border-red-500/25">
+                                Cancelada
+                            </span>
+                        )}
+                        {item.verification_code && !isCancelled && (
                             <button
                                 type="button"
                                 onClick={handleCopyCode}
@@ -422,6 +433,12 @@ export default function CremationsPage() {
                             <FileText size={14} />
                             Certificado
                         </Link>
+                    )}
+
+                    {isCancelled && (
+                        <div className="flex-1 text-[11px] text-red-400/80 font-medium truncate">
+                            {item.notes ? `Motivo: ${item.notes}` : 'Orden anulada'}
+                        </div>
                     )}
 
                     <button
@@ -555,102 +572,186 @@ export default function CremationsPage() {
                         >
                             Entregados ({kanbanColumns.completado.length})
                         </button>
-                    </div>
-
-                    /* KANBAN BOARD */
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 items-start">
-                        {/* Columna Pendientes */}
-                        {(mobileTab === 'all' || mobileTab === 'pendiente') && (
-                            <div className="bg-white/[0.01] border border-white/5 rounded-3xl p-4 flex flex-col gap-4">
-                                <div className="flex items-center justify-between px-2">
-                                    <h3 className="font-bold text-white flex items-center gap-2">
-                                        <span className="w-2.5 h-2.5 rounded-full bg-orange-400 shadow-[0_0_8px_rgba(251,146,60,0.5)]" />
-                                        Recibidos
-                                    </h3>
-                                    <span className="text-xs font-black text-muted-foreground bg-white/5 px-2.5 py-1 rounded-lg">{kanbanColumns.pendiente.length}</span>
-                                </div>
-                                <div className="flex flex-col gap-3 min-h-[150px]">
-                                    <AnimatePresence>
-                                        {kanbanColumns.pendiente.map(c => (
-                                            <KanbanCard 
-                                                key={c.id} item={c} 
-                                                isSelected={selectedId === c.id}
-                                                onSelect={() => setSelectedId(selectedId === c.id ? null : c.id)}
-                                                nextStatus="en_proceso" nextLabel="Iniciar Proceso" icon={PlayCircle} 
-                                                colorClass="bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white"
-                                                glowColor="orange-400"
-                                            />
-                                        ))}
-                                    </AnimatePresence>
-                                    {kanbanColumns.pendiente.length === 0 && (
-                                        <div className="flex-1 border-2 border-dashed border-white/5 rounded-2xl flex items-center justify-center p-6 text-muted-foreground/30 text-sm font-medium">Sin pendientes</div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Columna En Proceso */}
-                        {(mobileTab === 'all' || mobileTab === 'en_proceso') && (
-                            <div className="bg-white/[0.01] border border-white/5 rounded-3xl p-4 flex flex-col gap-4 relative overflow-hidden">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-3xl pointer-events-none rounded-full" />
-                                <div className="flex items-center justify-between px-2 relative z-10">
-                                    <h3 className="font-bold text-white flex items-center gap-2">
-                                        <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
-                                        En Proceso
-                                    </h3>
-                                    <span className="text-xs font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-lg">{kanbanColumns.en_proceso.length}</span>
-                                </div>
-                                <div className="flex flex-col gap-3 min-h-[150px] relative z-10">
-                                    <AnimatePresence>
-                                        {kanbanColumns.en_proceso.map(c => (
-                                            <KanbanCard 
-                                                key={c.id} item={c} 
-                                                isSelected={selectedId === c.id}
-                                                onSelect={() => setSelectedId(selectedId === c.id ? null : c.id)}
-                                                nextStatus="entregado" nextLabel="Marcar Entregado" icon={CheckCircle2}
-                                                colorClass="bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white"
-                                                glowColor="blue-500"
-                                            />
-                                        ))}
-                                    </AnimatePresence>
-                                    {kanbanColumns.en_proceso.length === 0 && (
-                                        <div className="flex-1 border-2 border-dashed border-white/5 rounded-2xl flex items-center justify-center p-6 text-muted-foreground/30 text-sm font-medium">Hornos vacíos</div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Columna Entregados */}
-                        {(mobileTab === 'all' || mobileTab === 'completado') && (
-                            <div className="bg-white/[0.01] border border-white/5 rounded-3xl p-4 flex flex-col gap-4">
-                                <div className="flex items-center justify-between px-2">
-                                    <h3 className="font-bold text-white flex items-center gap-2">
-                                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
-                                        Entregados
-                                    </h3>
-                                    <span className="text-xs font-black text-muted-foreground bg-white/5 px-2.5 py-1 rounded-lg">{kanbanColumns.completado.length}</span>
-                                </div>
-                                <div className="flex flex-col gap-3 min-h-[150px]">
-                                    <AnimatePresence>
-                                        {kanbanColumns.completado.map(c => (
-                                            <KanbanCard 
-                                                key={c.id} item={c} 
-                                                isSelected={selectedId === c.id}
-                                                onSelect={() => setSelectedId(selectedId === c.id ? null : c.id)}
-                                                nextStatus={normalizeStatus(c.status) === 'completado' ? 'entregado' : null} 
-                                                nextLabel="Entregado al Dueño" icon={ArrowRight} 
-                                                colorClass="bg-white/5 text-white hover:bg-white hover:text-black"
-                                                glowColor="emerald-400"
-                                            />
-                                        ))}
-                                    </AnimatePresence>
-                                    {kanbanColumns.completado.length === 0 && (
-                                        <div className="flex-1 border-2 border-dashed border-white/5 rounded-2xl flex items-center justify-center p-6 text-muted-foreground/30 text-sm font-medium">Sin entregas pendientes</div>
-                                    )}
-                                </div>
-                            </div>
+                        {kanbanColumns.cancelado.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => setMobileTab('cancelado')}
+                                className={`flex-1 py-2 px-3 rounded-xl transition ${mobileTab === 'cancelado' ? 'bg-red-500 text-white shadow' : 'text-muted-foreground hover:text-white'}`}
+                            >
+                                Cancelados ({kanbanColumns.cancelado.length})
+                            </button>
                         )}
                     </div>
+
+                    {/* VISTA KANBAN: Si se filtra específicamente por Cancelados, se muestra su vista dedicada */}
+                    {statusFilter === 'cancelado' || mobileTab === 'cancelado' ? (
+                        <div className="bg-white/[0.01] border border-red-500/20 rounded-3xl p-6">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="font-bold text-white flex items-center gap-2.5 text-base">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.5)]" />
+                                    Órdenes Canceladas
+                                </h3>
+                                <span className="text-xs font-black text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-1 rounded-lg font-mono">
+                                    {kanbanColumns.cancelado.length} {kanbanColumns.cancelado.length === 1 ? 'orden' : 'órdenes'}
+                                </span>
+                            </div>
+
+                            {kanbanColumns.cancelado.length === 0 ? (
+                                <div className="border-2 border-dashed border-white/5 rounded-2xl flex flex-col items-center justify-center p-12 text-muted-foreground/40 text-sm font-medium">
+                                    No hay órdenes canceladas que coincidan con la búsqueda
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                                    <AnimatePresence>
+                                        {kanbanColumns.cancelado.map(c => (
+                                            <KanbanCard 
+                                                key={c.id} item={c} 
+                                                isSelected={selectedId === c.id}
+                                                onSelect={() => setSelectedId(selectedId === c.id ? null : c.id)}
+                                                nextStatus={null} nextLabel={null} icon={null} 
+                                                colorClass=""
+                                                glowColor="red-500"
+                                            />
+                                        ))}
+                                    </AnimatePresence>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 items-start">
+                                {/* Columna Pendientes */}
+                                {(mobileTab === 'all' || mobileTab === 'pendiente') && (
+                                    <div className="bg-white/[0.01] border border-white/5 rounded-3xl p-4 flex flex-col gap-4">
+                                        <div className="flex items-center justify-between px-2">
+                                            <h3 className="font-bold text-white flex items-center gap-2">
+                                                <span className="w-2.5 h-2.5 rounded-full bg-orange-400 shadow-[0_0_8px_rgba(251,146,60,0.5)]" />
+                                                Recibidos
+                                            </h3>
+                                            <span className="text-xs font-black text-muted-foreground bg-white/5 px-2.5 py-1 rounded-lg">{kanbanColumns.pendiente.length}</span>
+                                        </div>
+                                        <div className="flex flex-col gap-3 min-h-[150px]">
+                                            <AnimatePresence>
+                                                {kanbanColumns.pendiente.map(c => (
+                                                    <KanbanCard 
+                                                        key={c.id} item={c} 
+                                                        isSelected={selectedId === c.id}
+                                                        onSelect={() => setSelectedId(selectedId === c.id ? null : c.id)}
+                                                        nextStatus="en_proceso" nextLabel="Iniciar Proceso" icon={PlayCircle} 
+                                                        colorClass="bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white"
+                                                        glowColor="orange-400"
+                                                    />
+                                                ))}
+                                            </AnimatePresence>
+                                            {kanbanColumns.pendiente.length === 0 && (
+                                                <div className="flex-1 border-2 border-dashed border-white/5 rounded-2xl flex items-center justify-center p-6 text-muted-foreground/30 text-sm font-medium">Sin pendientes</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Columna En Proceso */}
+                                {(mobileTab === 'all' || mobileTab === 'en_proceso') && (
+                                    <div className="bg-white/[0.01] border border-white/5 rounded-3xl p-4 flex flex-col gap-4 relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-3xl pointer-events-none rounded-full" />
+                                        <div className="flex items-center justify-between px-2 relative z-10">
+                                            <h3 className="font-bold text-white flex items-center gap-2">
+                                                <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                                                En Proceso
+                                            </h3>
+                                            <span className="text-xs font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-lg">{kanbanColumns.en_proceso.length}</span>
+                                        </div>
+                                        <div className="flex flex-col gap-3 min-h-[150px] relative z-10">
+                                            <AnimatePresence>
+                                                {kanbanColumns.en_proceso.map(c => (
+                                                    <KanbanCard 
+                                                        key={c.id} item={c} 
+                                                        isSelected={selectedId === c.id}
+                                                        onSelect={() => setSelectedId(selectedId === c.id ? null : c.id)}
+                                                        nextStatus="entregado" nextLabel="Marcar Entregado" icon={CheckCircle2}
+                                                        colorClass="bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white"
+                                                        glowColor="blue-500"
+                                                    />
+                                                ))}
+                                            </AnimatePresence>
+                                            {kanbanColumns.en_proceso.length === 0 && (
+                                                <div className="flex-1 border-2 border-dashed border-white/5 rounded-2xl flex items-center justify-center p-6 text-muted-foreground/30 text-sm font-medium">Hornos vacíos</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Columna Entregados (Tope máximo de 7) */}
+                                {(mobileTab === 'all' || mobileTab === 'completado') && (
+                                    <div className="bg-white/[0.01] border border-white/5 rounded-3xl p-4 flex flex-col gap-4">
+                                        <div className="flex items-center justify-between px-2">
+                                            <h3 className="font-bold text-white flex items-center gap-2">
+                                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
+                                                Entregados
+                                            </h3>
+                                            <span className="text-xs font-black text-muted-foreground bg-white/5 px-2.5 py-1 rounded-lg">{kanbanColumns.completado.length}</span>
+                                        </div>
+                                        <div className="flex flex-col gap-3 min-h-[150px]">
+                                            <AnimatePresence>
+                                                {displayedCompletados.map(c => (
+                                                    <KanbanCard 
+                                                        key={c.id} item={c} 
+                                                        isSelected={selectedId === c.id}
+                                                        onSelect={() => setSelectedId(selectedId === c.id ? null : c.id)}
+                                                        nextStatus={normalizeStatus(c.status) === 'completado' ? 'entregado' : null} 
+                                                        nextLabel="Entregado al Dueño" icon={ArrowRight} 
+                                                        colorClass="bg-white/5 text-white hover:bg-white hover:text-black"
+                                                        glowColor="emerald-400"
+                                                    />
+                                                ))}
+                                            </AnimatePresence>
+                                            {kanbanColumns.completado.length === 0 && (
+                                                <div className="flex-1 border-2 border-dashed border-white/5 rounded-2xl flex items-center justify-center p-6 text-muted-foreground/30 text-sm font-medium">Sin entregas pendientes</div>
+                                            )}
+                                            {extraCompletadosCount > 0 && (
+                                                <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/[0.06] text-center space-y-1.5 mt-1">
+                                                    <p className="text-[11px] text-muted-foreground font-medium">
+                                                        Mostrando las 7 más recientes de {kanbanColumns.completado.length} entregadas
+                                                    </p>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setStatusFilter('completado');
+                                                            setViewMode('list');
+                                                        }}
+                                                        className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors inline-flex items-center gap-1.5"
+                                                    >
+                                                        Ver historial completo en Lista (+{extraCompletadosCount})
+                                                        <ArrowRight size={12} />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Banner discreto si existen canceladas en la vista general */}
+                            {counts.cancelado > 0 && (
+                                <div className="mt-4 px-4 py-3 rounded-2xl bg-red-500/[0.04] border border-red-500/15 flex items-center justify-between">
+                                    <div className="flex items-center gap-2.5">
+                                        <span className="w-2 h-2 rounded-full bg-red-400" />
+                                        <span className="text-xs text-muted-foreground font-medium">
+                                            Hay <strong className="text-white font-bold">{counts.cancelado}</strong> {counts.cancelado === 1 ? 'orden cancelada' : 'órdenes canceladas'} en el sistema.
+                                        </span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setStatusFilter('cancelado')}
+                                        className="text-xs font-bold text-red-400 hover:text-red-300 transition-colors inline-flex items-center gap-1 text-[11px] uppercase tracking-wider"
+                                    >
+                                        Ver Canceladas
+                                        <ArrowRight size={12} />
+                                    </button>
+                                </div>
+                            )}
+                        </>
+                    )}
                 </div>
             ) : (
                 /* LIST VIEW */

@@ -172,7 +172,7 @@ export function VinzerDemoForm({ theme = 'dark' }: VinzerDemoFormProps) {
                 {status === 'sending' ? (
                     <><Loader2 size={16} className="animate-spin" /> Enviando…</>
                 ) : (
-                    <>Solicitar demostración guiada <ArrowRight size={16} /></>
+                    <>Solicitar demostración <ArrowRight size={16} /></>
                 )}
             </button>
 

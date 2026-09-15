@@ -162,5 +162,11 @@ export function useAdminTransactions() {
 
 export function useAdminSaasConfig() {
     const { data } = useAdminBootstrap();
-    return data?.saas_config;
+    const fallbackQuery = useQuery({
+        queryKey: ['admin-saas-config'],
+        queryFn: () => apiRequest('/api/internal/creator/config'),
+        enabled: !data?.saas_config && typeof window !== 'undefined',
+        staleTime: 60 * 1000,
+    });
+    return data?.saas_config || fallbackQuery.data;
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
     ArrowLeft,
     Download,
@@ -51,6 +52,14 @@ interface Pet {
     customer_id: number;
     image_url?: string;
     images?: string[];
+    created_at?: string;
+    latest_order?: {
+        id: number;
+        oc_number?: string;
+        created_at?: string;
+        scheduled_at?: string;
+    };
+    effective_time?: number;
 }
 
 const MAX_FAREWELL_LENGTH = 300;
@@ -76,6 +85,11 @@ export default function FarewellPickerPage() {
     const [allPets, setAllPets] = useState<Pet[]>([]);
     const [loadingPets, setLoadingPets] = useState(false);
     const [petSearchQuery, setPetSearchQuery] = useState('');
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     // Pet customization fields
     const [petName, setPetName] = useState('');
@@ -157,9 +171,49 @@ export default function FarewellPickerPage() {
         const fetchPets = async () => {
             setLoadingPets(true);
             try {
-                const petsData = await apiRequest('/api/internal/pets/');
+                const [petsData, cremationsData] = await Promise.all([
+                    apiRequest('/api/internal/pets/'),
+                    apiRequest('/api/internal/cremations?sort_order=desc').catch(() => [])
+                ]);
+
+                // Mapear la última orden de cremación de cada mascota
+                const latestOrderByPetId = new Map<number, any>();
+                if (Array.isArray(cremationsData)) {
+                    for (const c of cremationsData) {
+                        if (c.pet_id && !latestOrderByPetId.has(c.pet_id)) {
+                            latestOrderByPetId.set(c.pet_id, c);
+                        }
+                    }
+                }
+
                 if (Array.isArray(petsData)) {
-                    setAllPets(petsData);
+                    const enrichedPets: Pet[] = petsData.map((pet: any) => {
+                        const latestCrem = latestOrderByPetId.get(pet.id);
+                        const orderDate = latestCrem?.created_at || latestCrem?.scheduled_at;
+                        const petDate = pet.created_at;
+
+                        const orderTime = orderDate ? new Date(orderDate).getTime() : 0;
+                        const petTime = petDate ? new Date(petDate).getTime() : 0;
+                        const effectiveTime = Math.max(
+                            isNaN(orderTime) ? 0 : orderTime,
+                            isNaN(petTime) ? 0 : petTime
+                        ) || pet.id;
+
+                        return {
+                            ...pet,
+                            latest_order: latestCrem ? {
+                                id: latestCrem.id,
+                                oc_number: latestCrem.oc_number,
+                                created_at: latestCrem.created_at,
+                                scheduled_at: latestCrem.scheduled_at,
+                            } : undefined,
+                            effective_time: effectiveTime,
+                        };
+                    });
+
+                    // Ordenar estrictamente por último ingreso u orden (más reciente primero)
+                    enrichedPets.sort((a, b) => (b.effective_time || b.id) - (a.effective_time || a.id));
+                    setAllPets(enrichedPets);
                 }
             } catch (err) {
                 console.error('Error fetching pets:', err);
@@ -398,7 +452,7 @@ export default function FarewellPickerPage() {
         if (pet) {
             setPetName(pet.name);
             setBirthDateISO(pet.birth_date);
-            setDeathDateISO(pet.death_date || null);
+            setDeathDateISO(pet.death_date || pet.latest_order?.scheduled_at || null);
             if (pet.image_url) {
                 setPetPhotoUrl(getImageUrl(pet.image_url));
             } else if (pet.images && pet.images.length > 0) {
@@ -838,165 +892,183 @@ export default function FarewellPickerPage() {
                 </>
             )}
             {/* Modal de Selección de Mascota */}
-            <AnimatePresence>
-                {isPetModalOpen && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md"
-                    >
+            {mounted && typeof document !== 'undefined' && createPortal(
+                <AnimatePresence>
+                    {isPetModalOpen && (
                         <motion.div
-                            initial={{ scale: 0.95, y: 20 }}
-                            animate={{ scale: 1, y: 0 }}
-                            exit={{ scale: 0.95, y: 20 }}
-                            transition={{ type: 'spring', duration: 0.5 }}
-                            className="relative w-full max-w-2xl bg-slate-900/90 border border-white/10 rounded-[2.5rem] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col max-h-[85vh] backdrop-blur-2xl"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md"
                         >
-                            {/* Decorative glowing gradient circle */}
-                            <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/20 rounded-full blur-3xl pointer-events-none" />
-                            <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
+                            <motion.div
+                                initial={{ scale: 0.95, y: 20 }}
+                                animate={{ scale: 1, y: 0 }}
+                                exit={{ scale: 0.95, y: 20 }}
+                                transition={{ type: 'spring', duration: 0.5 }}
+                                className="relative w-full max-w-2xl bg-slate-900/90 border border-white/10 rounded-[2.5rem] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col max-h-[85vh] backdrop-blur-2xl"
+                            >
+                                {/* Decorative glowing gradient circle */}
+                                <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/20 rounded-full blur-3xl pointer-events-none" />
+                                <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
 
-                            {/* Header */}
-                            <div className="p-6 md:p-8 border-b border-white/[0.08] flex items-start justify-between relative z-10">
-                                <div>
-                                    <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
-                                        Selecciona una Mascota
-                                        <span className="text-primary font-bold">.</span>
-                                    </h2>
-                                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                                        Elige la mascota de la cual deseas generar el diseño de despedida. Cargaremos sus datos automáticamente.
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={() => {
-                                        setIsPetModalOpen(false);
-                                        setPendingTemplate(null);
-                                    }}
-                                    className="p-2 rounded-xl bg-white/[0.03] border border-white/5 hover:border-white/20 text-slate-400 hover:text-white transition-all cursor-pointer"
-                                >
-                                    <X size={18} />
-                                </button>
-                            </div>
-
-                            {/* Search Bar */}
-                            <div className="px-6 md:px-8 py-4 border-b border-white/[0.05] relative z-10">
-                                <div className="relative">
-                                    <Search className="absolute left-4 top-3 text-slate-500" size={16} />
-                                    <input
-                                        type="text"
-                                        placeholder="Buscar mascota por nombre o especie..."
-                                        value={petSearchQuery}
-                                        onChange={(e) => setPetSearchQuery(e.target.value)}
-                                        className="w-full h-11 bg-slate-950/40 border border-white/10 rounded-xl pl-11 pr-4 text-white text-sm placeholder:text-slate-600 outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all"
-                                    />
-                                    {petSearchQuery && (
-                                        <button
-                                            onClick={() => setPetSearchQuery('')}
-                                            className="absolute right-3.5 top-3 text-xs text-slate-500 hover:text-white font-bold"
-                                        >
-                                            Limpiar
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Pet List Content */}
-                            <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-4 relative z-10 min-h-[250px] max-h-[45vh]">
-                                {loadingPets ? (
-                                    <div className="py-12 flex flex-col items-center justify-center gap-3">
-                                        <Loader2 className="animate-spin text-primary" size={28} />
-                                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest animate-pulse">Cargando tus mascotas...</span>
+                                {/* Header */}
+                                <div className="p-6 md:p-8 border-b border-white/[0.08] flex items-start justify-between relative z-10">
+                                    <div>
+                                        <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
+                                            Selecciona una Mascota
+                                            <span className="text-primary font-bold">.</span>
+                                        </h2>
+                                        <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                                            Elige la mascota de la cual deseas generar el diseño de despedida. Cargaremos sus datos automáticamente.
+                                        </p>
                                     </div>
-                                ) : (
-                                    (() => {
-                                        const filtered = allPets.filter(pet => {
-                                            const query = petSearchQuery.toLowerCase();
-                                            return (
-                                                (pet.name || '').toLowerCase().includes(query) ||
-                                                (pet.species || '').toLowerCase().includes(query) ||
-                                                (pet.breed || '').toLowerCase().includes(query)
-                                            );
-                                        });
+                                    <button
+                                        onClick={() => {
+                                            setIsPetModalOpen(false);
+                                            setPendingTemplate(null);
+                                        }}
+                                        className="p-2 rounded-xl bg-white/[0.03] border border-white/5 hover:border-white/20 text-slate-400 hover:text-white transition-all cursor-pointer"
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                </div>
 
-                                        if (filtered.length === 0) {
+                                {/* Search Bar */}
+                                <div className="px-6 md:px-8 py-4 border-b border-white/[0.05] relative z-10">
+                                    <div className="relative">
+                                        <Search className="absolute left-4 top-3 text-slate-500" size={16} />
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar mascota por nombre o especie..."
+                                            value={petSearchQuery}
+                                            onChange={(e) => setPetSearchQuery(e.target.value)}
+                                            className="w-full h-11 bg-slate-950/40 border border-white/10 rounded-xl pl-11 pr-4 text-white text-sm placeholder:text-slate-600 outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all"
+                                        />
+                                        {petSearchQuery && (
+                                            <button
+                                                onClick={() => setPetSearchQuery('')}
+                                                className="absolute right-3.5 top-3 text-xs text-slate-500 hover:text-white font-bold"
+                                            >
+                                                Limpiar
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Pet List Content */}
+                                <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-4 relative z-10 min-h-[250px] max-h-[45vh]">
+                                    {loadingPets ? (
+                                        <div className="py-12 flex flex-col items-center justify-center gap-3">
+                                            <Loader2 className="animate-spin text-primary" size={28} />
+                                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest animate-pulse">Cargando tus mascotas...</span>
+                                        </div>
+                                    ) : (
+                                        (() => {
+                                            const filtered = allPets.filter(pet => {
+                                                const query = petSearchQuery.toLowerCase();
+                                                const matchesOrder = pet.latest_order
+                                                    ? String(pet.latest_order.oc_number || pet.latest_order.id).toLowerCase().includes(query)
+                                                    : false;
+                                                return (
+                                                    (pet.name || '').toLowerCase().includes(query) ||
+                                                    (pet.species || '').toLowerCase().includes(query) ||
+                                                    (pet.breed || '').toLowerCase().includes(query) ||
+                                                    matchesOrder
+                                                );
+                                            });
+
+                                            if (filtered.length === 0) {
+                                                return (
+                                                    <div className="py-12 text-center text-slate-500">
+                                                        <p className="text-sm font-semibold">No se encontraron mascotas</p>
+                                                        <p className="text-xs text-slate-600 mt-1">Intenta con otra búsqueda o continúa con un diseño vacío.</p>
+                                                    </div>
+                                                );
+                                            }
+
                                             return (
-                                                <div className="py-12 text-center text-slate-500">
-                                                    <p className="text-sm font-semibold">No se encontraron mascotas</p>
-                                                    <p className="text-xs text-slate-600 mt-1">Intenta con otra búsqueda o continúa con un diseño vacío.</p>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                    {filtered.map((pet) => {
+                                                        const photo = pet.image_url || (pet.images && pet.images.length > 0 ? pet.images[0] : null);
+                                                        const years = pet.birth_date ? (
+                                                            `${new Date(pet.birth_date).getFullYear()} — ${pet.death_date ? new Date(pet.death_date).getFullYear() : 'Presente'}`
+                                                        ) : null;
+
+                                                        return (
+                                                            <div
+                                                                key={pet.id}
+                                                                onClick={() => handleSelectPet(pet)}
+                                                                className="group flex items-center gap-4 p-4 rounded-2xl bg-slate-950/20 border border-white/[0.04] hover:border-primary/40 hover:bg-primary/[0.02] cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-primary/5"
+                                                            >
+                                                                <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-900 border border-white/5 flex items-center justify-center shrink-0">
+                                                                    {photo ? (
+                                                                        <img
+                                                                            src={getImageUrl(photo)}
+                                                                            alt={pet.name}
+                                                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                                        />
+                                                                    ) : (
+                                                                        <Heart size={20} className="text-slate-600 group-hover:text-primary transition-colors" />
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center justify-between gap-2">
+                                                                        <h4 className="text-sm font-bold text-white truncate group-hover:text-primary transition-colors">
+                                                                            {pet.name}
+                                                                        </h4>
+                                                                        {pet.latest_order ? (
+                                                                            <span className="shrink-0 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                                                                Orden #{pet.latest_order.oc_number || pet.latest_order.id}
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="shrink-0 text-[10px] font-medium text-slate-400 bg-white/[0.04] px-2 py-0.5 rounded-full border border-white/5">
+                                                                                Ingreso
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <p className="text-xs text-slate-400 truncate mt-0.5">
+                                                                        {pet.species} {pet.breed ? `· ${pet.breed}` : ''}
+                                                                    </p>
+                                                                    {years && (
+                                                                        <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                                                                            {years}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             );
-                                        }
+                                        })()
+                                    )}
+                                </div>
 
-                                        return (
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                {filtered.map((pet) => {
-                                                    const photo = pet.image_url || (pet.images && pet.images.length > 0 ? pet.images[0] : null);
-                                                    const years = pet.birth_date ? (
-                                                        `${new Date(pet.birth_date).getFullYear()} — ${pet.death_date ? new Date(pet.death_date).getFullYear() : 'Presente'}`
-                                                    ) : null;
-
-                                                    return (
-                                                        <div
-                                                            key={pet.id}
-                                                            onClick={() => handleSelectPet(pet)}
-                                                            className="group flex items-center gap-4 p-4 rounded-2xl bg-slate-950/20 border border-white/[0.04] hover:border-primary/40 hover:bg-primary/[0.02] cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-primary/5"
-                                                        >
-                                                            <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-900 border border-white/5 flex items-center justify-center shrink-0">
-                                                                {photo ? (
-                                                                    <img
-                                                                        src={getImageUrl(photo)}
-                                                                        alt={pet.name}
-                                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                                                    />
-                                                                ) : (
-                                                                    <Heart size={20} className="text-slate-600 group-hover:text-primary transition-colors" />
-                                                                )}
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <h4 className="text-sm font-bold text-white truncate group-hover:text-primary transition-colors">
-                                                                    {pet.name}
-                                                                </h4>
-                                                                <p className="text-xs text-slate-400 truncate">
-                                                                    {pet.species} {pet.breed ? `· ${pet.breed}` : ''}
-                                                                </p>
-                                                                {years && (
-                                                                    <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                                                                        {years}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        );
-                                    })()
-                                )}
-                            </div>
-
-                            {/* Footer actions */}
-                            <div className="p-6 md:p-8 border-t border-white/[0.08] flex items-center justify-between bg-slate-950/20 relative z-10">
-                                <button
-                                    onClick={() => handleSelectPet(null)}
-                                    className="text-xs font-bold text-slate-400 hover:text-white hover:underline transition-all cursor-pointer"
-                                >
-                                    Continuar sin mascota (Diseño en blanco)
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setIsPetModalOpen(false);
-                                        setPendingTemplate(null);
-                                    }}
-                                    className="px-5 py-2.5 rounded-xl border border-white/10 bg-transparent text-xs font-bold text-slate-300 hover:text-white hover:bg-white/[0.02] transition-all cursor-pointer"
-                                >
-                                    Cancelar
-                                </button>
-                            </div>
+                                {/* Footer actions */}
+                                <div className="p-6 md:p-8 border-t border-white/[0.08] flex items-center justify-between bg-slate-950/20 relative z-10">
+                                    <button
+                                        onClick={() => handleSelectPet(null)}
+                                        className="text-xs font-bold text-slate-400 hover:text-white hover:underline transition-all cursor-pointer"
+                                    >
+                                        Continuar sin mascota (Diseño en blanco)
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setIsPetModalOpen(false);
+                                            setPendingTemplate(null);
+                                        }}
+                                        className="px-5 py-2.5 rounded-xl border border-white/10 bg-transparent text-xs font-bold text-slate-300 hover:text-white hover:bg-white/[0.02] transition-all cursor-pointer"
+                                    >
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </motion.div>
                         </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
         </div>
     );
 }

@@ -8,6 +8,8 @@ import {
     FileCheck2,
     Boxes,
     CheckCircle2,
+    Check,
+    Sparkles,
     X,
 } from 'lucide-react';
 
@@ -17,11 +19,6 @@ interface VinzerFeaturesProps {
 
 /**
  * Cuatro pilares operativos.
- *
- * Reemplaza a los antiguos bloques `#modulos` (tabs) y `#capacidades` (12
- * tarjetas). Todo el copy describe capacidades que existen en el sistema:
- * no se menciona QR, geolocalización ni app de choferes, porque nada de eso
- * está construido.
  */
 const pillars = [
     {
@@ -48,19 +45,49 @@ const pillars = [
 ];
 
 const traditional = [
-    'Coordinación por WhatsApp, llamadas y correos sueltos, sin registro centralizado.',
-    'Etiquetas de papel escritas a mano que se pueden extraviar o dañar en el proceso.',
-    'Certificados impresos en Word, con riesgo de alteración o desorganización.',
-    'La familia llama para preguntar y nadie puede darle una respuesta verificable.',
-    'Falta de visibilidad y transparencia para la familia durante el proceso.',
+    {
+        bold: 'WhatsApp saturado:',
+        desc: 'Fotos de fichas y datos dispersos entre traslados, recepción y planta.',
+    },
+    {
+        bold: 'Planillas y papel:',
+        desc: 'Información duplicada en Excel y riesgo de confundir precintos, fichas o urnas.',
+    },
+    {
+        bold: 'Familias con incertidumbre:',
+        desc: 'Llamadas constantes al crematorio preguntando: «¿Dónde está mi mascota y a qué hora termina?».',
+    },
+    {
+        bold: 'Certificados en Word:',
+        desc: 'Horas perdidas tipeando actas a mano y ajustando plantillas al final del turno.',
+    },
+    {
+        bold: 'Cero auditoría:',
+        desc: 'Imposible reconstruir con certeza qué operador hizo cada tarea ante el reclamo de una familia.',
+    },
 ];
 
 const modern = [
-    'Código de verificación único e irrepetible por cada servicio.',
-    'Flujo de trabajo configurable con evidencia fotográfica obligatoria por fase.',
-    'Certificados PDF automáticos con firma digital y marca de agua personalizable.',
-    'Seguimiento público y transparente en tiempo real para la familia.',
-    'Historial completo: cada acción queda registrada con responsable, fecha y detalle.',
+    {
+        bold: 'Historial digital único:',
+        desc: 'Trazabilidad inmutable con código único de verificación desde el retiro hasta la entrega.',
+    },
+    {
+        bold: 'Operación 100% en la nube:',
+        desc: 'Tu equipo actualiza y consulta el estado de cada mascota en segundos desde cualquier computador o celular.',
+    },
+    {
+        bold: 'Tranquilidad familiar automática:',
+        desc: 'Los tutores consultan el avance en vivo ingresando su código en la web, sin necesidad de llamarte.',
+    },
+    {
+        bold: 'Certificados en 1 clic:',
+        desc: 'Emisión automática en PDF con firma digital, numeración correlativa y diseño personalizable.',
+    },
+    {
+        bold: 'Auditoría blindada:',
+        desc: 'Registro de evidencia fotográfica, operador responsable, fecha y hora exacta de cada fase.',
+    },
 ];
 
 export function VinzerFeatures({ theme = 'dark' }: VinzerFeaturesProps) {
@@ -70,11 +97,12 @@ export function VinzerFeatures({ theme = 'dark' }: VinzerFeaturesProps) {
         <>
             {/* Pilares operativos */}
             <section
-                id="modulos"
+                id="producto"
                 className={`py-28 border-y relative z-10 transition-colors duration-500 ${
                     isLight ? 'bg-slate-100/70 border-slate-200' : 'bg-[#0b0a24]/30 border-white/5'
                 }`}
             >
+                <div id="modulos" className="sr-only" />
                 <div className="max-w-7xl mx-auto px-6">
                     <div className="text-center max-w-3xl mx-auto mb-14 space-y-4">
                         <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border ${
@@ -87,7 +115,7 @@ export function VinzerFeatures({ theme = 'dark' }: VinzerFeaturesProps) {
                         </div>
 
                         <h2 className={`text-3xl md:text-5xl font-black leading-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                            Un solo software para la gestión operativa, trazabilidad y control de tu crematorio
+                            Todo el proceso en un solo lugar
                         </h2>
 
                         <p className={`font-medium ${isLight ? 'text-slate-600' : 'text-[#C0C0C0]'}`}>
@@ -140,54 +168,161 @@ export function VinzerFeatures({ theme = 'dark' }: VinzerFeaturesProps) {
             {/* Comparativa: método tradicional vs Vinzer.
                 Se conserva a propósito: es el bloque que rompe la objeción real
                 de este mercado ("lo hago con Excel y WhatsApp"). */}
-            <section id="comparativa" className="py-28 px-6 max-w-7xl mx-auto relative z-10">
-                <div className="text-center max-w-3xl mx-auto mb-14 space-y-4">
-                    <h2 className={`text-3xl md:text-5xl font-black leading-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                        ¿Por qué los crematorios de mascotas eligen Vinzer?
+            {/* Comparativa: El cuello de botella operativo (Método tradicional vs Vinzer) */}
+            <section id="comparativa" className="py-24 lg:py-32 px-4 sm:px-6 max-w-7xl mx-auto relative z-10">
+                {/* Header con Badge y Título de Alto Impacto */}
+                <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
+                    {/* Badge con paleta oficial de Vinzer */}
+                    <div
+                        className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border shadow-xs ${
+                            isLight
+                                ? 'bg-sky-50 border-sky-200 text-[#0284C7]'
+                                : 'bg-[#19B5FE]/10 border-[#19B5FE]/30 text-[#19B5FE]'
+                        }`}
+                    >
+                        <span className={`w-1.5 h-1.5 rounded-full ${isLight ? 'bg-[#0284C7]' : 'bg-[#19B5FE]'} animate-pulse`} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">
+                            El cuello de botella operativo
+                        </span>
+                    </div>
+
+                    <h2
+                        className={`text-3xl sm:text-4xl md:text-5xl lg:text-[50px] font-black tracking-tight leading-[1.12] ${
+                            isLight ? 'text-slate-900' : 'text-white'
+                        }`}
+                    >
+                        Crecer es una gran noticia.{' '}
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-400 to-sky-500 drop-shadow-[0_0_24px_rgba(56,189,248,0.25)] block sm:inline">
+                            Perder el control del día a día, no.
+                        </span>
                     </h2>
-                    <p className={`font-medium ${isLight ? 'text-slate-600' : 'text-[#C0C0C0]'}`}>
-                        La diferencia entre operar con métodos manuales y centralizar tu negocio en una
-                        plataforma con trazabilidad verificable.
+
+                    <p
+                        className={`text-sm sm:text-base font-normal max-w-2xl mx-auto leading-relaxed ${
+                            isLight ? 'text-slate-600' : 'text-slate-300'
+                        }`}
+                    >
+                        A medida que aumentan los servicios y retiros diarios, la administración de un crematorio colapsa si depende de libretas de papel y mensajes de WhatsApp.
                     </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
-                    <div className={`p-7 lg:p-8 rounded-3xl space-y-6 border ${
-                        isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#0b0a24]/10 border-white/5'
-                    }`}>
-                        <h3 className={`text-lg font-bold flex items-center gap-2 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                            <span className="w-2 h-2 rounded-full bg-red-500" /> Método tradicional / manual
-                        </h3>
-                        <ul className="space-y-4">
-                            {traditional.map((item) => (
-                                <li key={item} className={`flex gap-3 text-xs leading-relaxed ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                                    <X size={16} className="text-red-500 shrink-0 mt-0.5" />
-                                    <span>{item}</span>
-                                </li>
-                            ))}
-                        </ul>
+                {/* Grid 2 Columnas: Tradicional vs Vinzer */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10 items-stretch">
+                    {/* Columna Izquierda: Método Tradicional */}
+                    <div
+                        className={`p-7 sm:p-9 rounded-[2rem] flex flex-col justify-between border transition-all ${
+                            isLight
+                                ? 'bg-white border-slate-200 shadow-lg shadow-slate-200/50'
+                                : 'bg-[#050B14]/80 backdrop-blur-xl border-white/10 shadow-2xl'
+                        }`}
+                    >
+                        <div className="space-y-6">
+                            <h3
+                                className={`text-xs font-black uppercase tracking-wider flex items-center gap-2.5 ${
+                                    isLight ? 'text-slate-700' : 'text-slate-300'
+                                }`}
+                            >
+                                <span className="w-2 h-2 rounded-full bg-red-500" />
+                                Método tradicional / manual
+                            </h3>
+
+                            <ul className="space-y-4">
+                                {traditional.map((item, idx) => (
+                                    <li key={idx} className="flex items-start gap-3 text-xs sm:text-sm leading-relaxed">
+                                        <X size={17} className="text-red-500 shrink-0 mt-0.5" />
+                                        <span className={isLight ? 'text-slate-600' : 'text-slate-300'}>
+                                            <strong className={`font-bold ${isLight ? 'text-slate-800' : 'text-slate-100'}`}>
+                                                {item.bold}{' '}
+                                            </strong>
+                                            {item.desc}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+
+                        <div
+                            className={`pt-6 mt-6 border-t text-[11px] italic ${
+                                isLight ? 'border-slate-200 text-slate-400' : 'border-white/5 text-slate-500'
+                            }`}
+                        >
+                            Operación frágil, dependiente de la memoria y propensa al error humano.
+                        </div>
                     </div>
 
-                    <div className={`p-7 lg:p-8 rounded-3xl space-y-6 relative overflow-hidden border transition-all duration-500 ${
-                        isLight
-                            ? 'bg-white border-[#0284C7] shadow-xl shadow-sky-500/10'
-                            : 'bg-[#0b0a24] border-[#19B5FE]/30 shadow-lg shadow-[#19B5FE]/5'
-                    }`}>
-                        <div className={`absolute top-0 right-0 w-32 h-32 blur-2xl rounded-full ${
-                            isLight ? 'bg-sky-500/10' : 'bg-[#19B5FE]/5'
-                        }`} />
-                        <h3 className={`text-lg font-bold flex items-center gap-2 relative ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                            <span className={`w-2 h-2 rounded-full ${isLight ? 'bg-[#0284C7]' : 'bg-[#19B5FE]'}`} />
-                            Gestión moderna con Vinzer
-                        </h3>
-                        <ul className="space-y-4 relative">
-                            {modern.map((item) => (
-                                <li key={item} className={`flex gap-3 text-xs leading-relaxed ${isLight ? 'text-slate-700' : 'text-[#C0C0C0]'}`}>
-                                    <CheckCircle2 size={16} className={`shrink-0 mt-0.5 ${isLight ? 'text-[#0284C7]' : 'text-[#19B5FE]'}`} />
-                                    <span>{item}</span>
-                                </li>
-                            ))}
-                        </ul>
+                    {/* Columna Derecha: Vinzer SaaS (Recomendado) */}
+                    <div
+                        className={`p-7 sm:p-9 rounded-[2rem] flex flex-col justify-between relative overflow-visible border-2 transition-all duration-300 ${
+                            isLight
+                                ? 'bg-white border-[#0284C7] shadow-xl shadow-sky-500/15'
+                                : 'bg-[#071022]/90 backdrop-blur-2xl border-[#19B5FE]/50 shadow-[0_0_40px_rgba(25,181,254,0.12)]'
+                        }`}
+                    >
+                        {/* Pill Badge flotante RECOMENDADO */}
+                        <div className="absolute -top-3.5 right-6 sm:right-8 z-20">
+                            <span
+                                className={`px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg ${
+                                    isLight
+                                        ? 'bg-[#0284C7] text-white shadow-sky-600/30'
+                                        : 'bg-[#19B5FE] text-[#020210] shadow-[0_0_20px_rgba(25,181,254,0.5)]'
+                                }`}
+                            >
+                                Recomendado
+                            </span>
+                        </div>
+
+                        {/* Glow interior decorativo */}
+                        <div
+                            className={`absolute top-0 right-0 w-56 h-56 blur-3xl rounded-full pointer-events-none -z-10 ${
+                                isLight ? 'bg-sky-500/10' : 'bg-[#19B5FE]/10'
+                            }`}
+                        />
+
+                        <div className="space-y-6">
+                            <h3
+                                className={`text-xs font-black uppercase tracking-wider flex items-center gap-2.5 ${
+                                    isLight ? 'text-[#0284C7]' : 'text-[#19B5FE]'
+                                }`}
+                            >
+                                <span className={`w-2 h-2 rounded-full ${isLight ? 'bg-[#0284C7]' : 'bg-[#19B5FE]'}`} />
+                                Gestión moderna con Vinzer
+                            </h3>
+
+                            <ul className="space-y-4">
+                                {modern.map((item, idx) => (
+                                    <li key={idx} className="flex items-start gap-3 text-xs sm:text-sm leading-relaxed">
+                                        <Check
+                                            size={17}
+                                            className={`shrink-0 mt-0.5 stroke-[2.5] ${
+                                                isLight ? 'text-[#0284C7]' : 'text-cyan-400'
+                                            }`}
+                                        />
+                                        <span className={isLight ? 'text-slate-700' : 'text-slate-200'}>
+                                            <strong className={`font-bold ${isLight ? 'text-slate-950' : 'text-white'}`}>
+                                                {item.bold}{' '}
+                                            </strong>
+                                            {item.desc}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+
+                        {/* Footer de la tarjeta con Control Total */}
+                        <div
+                            className={`pt-6 mt-6 border-t flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs font-semibold ${
+                                isLight ? 'border-slate-200 text-slate-600' : 'border-white/10 text-slate-300'
+                            }`}
+                        >
+                            <span>Software para crematorios 100% en la nube</span>
+                            <span
+                                className={`inline-flex items-center gap-1.5 font-bold ${
+                                    isLight ? 'text-[#0284C7]' : 'text-[#19B5FE]'
+                                }`}
+                            >
+                                Control total <Sparkles size={13} />
+                            </span>
+                        </div>
                     </div>
                 </div>
             </section>

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAdminVets, useAdminMetadata, useAdminSaasConfig } from '@/hooks/useAdminBootstrap';
+import { getImageUrl } from '@/lib/admin/api';
 
 interface SidebarProps {
     onLogout: () => void;
@@ -195,12 +196,12 @@ export default function Sidebar({ onLogout, isCollapsed: isCollapsedProp, setIsC
             {/* Header / Logo */}
             <div className={`p-6 border-b border-white/5 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
                 <div className="flex items-center gap-3">
-                    <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden ${saasConfig?.logo ? '' : 'bg-primary shadow-lg shadow-primary/20'}`}>
+                    <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden ${saasConfig?.logo ? 'bg-white/5 border border-white/10' : 'bg-primary shadow-lg shadow-primary/20'}`}>
                         {saasConfig?.logo ? (
                             <img
-                                src={`/${saasConfig.logo}`}
+                                src={getImageUrl(saasConfig.logo)}
                                 alt="SaaS Logo"
-                                className="w-full h-full object-contain"
+                                className="w-full h-full object-contain p-1"
                             />
                         ) : (
                             <Shield className="text-white" size={24} />

@@ -19,19 +19,22 @@ export async function generateMetadata(): Promise<Metadata> {
 
         return {
             metadataBase: new URL('https://vinzer.app'),
-            title: seo.title || "Software para Crematorios de Mascotas y Funerarias | Vinzer",
-            description: seo.description || "Optimiza la gestión de tu crematorio de mascotas con Vinzer: código de verificación único, evidencia fotográfica por fase y seguimiento público para las familias. Pruébalo gratis.",
-            keywords: seo.keywords || [
+            title: (seo.title && seo.title !== 'App - Crematorio de Mascotas') ? seo.title : "Vinzer | Software para crematorios de mascotas en Chile",
+            description: (seo.description && seo.description !== 'Gestión integral para crematorios') ? seo.description : "Software para crematorios de mascotas. Gestiona servicios, trazabilidad, evidencias, certificados y seguimiento familiar con Vinzer.",
+            keywords: [
                 'software para crematorios de mascotas',
-                'gestión funeraria mascotas',
-                'trazabilidad de cremaciones',
-                'vinzer software chile',
-                'sistema de gestion de cementerios de mascotas',
+                'software para crematorios de mascotas en Chile',
+                'sistema para crematorios de mascotas',
+                'software crematorio mascotas',
+                'gestión crematorio mascotas',
+                'trazabilidad cremación mascotas',
+                'seguimiento cremación mascota',
+                'certificado cremación mascota',
             ],
             robots: seo.robots || "index, follow",
             openGraph: {
-                title: seo.ogTitle || "Software de Gestión y Trazabilidad para Crematorios de Mascotas | Vinzer",
-                description: seo.ogDescription || "Vinzer te ayuda a profesionalizar tu crematorio o cementerio de mascotas con trazabilidad verificable e informes transparentes.",
+                title: seo.ogTitle || "Vinzer | Software para crematorios de mascotas en Chile",
+                description: seo.ogDescription || "Software para crematorios de mascotas. Gestiona servicios, trazabilidad, evidencias, certificados y seguimiento familiar con Vinzer.",
                 images: seo.ogImage
                     ? [{ url: seo.ogImage }]
                     : [{ url: '/images/og-image-vinzer.jpg', width: 1200, height: 630, alt: 'Panel de gestión de Vinzer' }],
@@ -42,8 +45,8 @@ export async function generateMetadata(): Promise<Metadata> {
             },
             twitter: {
                 card: 'summary_large_image',
-                title: seo.ogTitle || "Software de Gestión y Trazabilidad para Crematorios de Mascotas | Vinzer",
-                description: seo.ogDescription || "Vinzer te ayuda a profesionalizar tu crematorio o cementerio de mascotas con trazabilidad verificable e informes transparentes.",
+                title: seo.ogTitle || "Vinzer | Software para crematorios de mascotas en Chile",
+                description: seo.ogDescription || "Software para crematorios de mascotas. Gestiona servicios, trazabilidad, evidencias, certificados y seguimiento familiar con Vinzer.",
                 images: seo.ogImage ? [seo.ogImage] : ['/images/og-image-vinzer.jpg'],
             },
             alternates: {
@@ -54,8 +57,8 @@ export async function generateMetadata(): Promise<Metadata> {
         console.error('SEO metadata fetch error on root domain:', error);
         return {
             metadataBase: new URL('https://vinzer.app'),
-            title: "Software para Crematorios de Mascotas y Funerarias | Vinzer",
-            description: "Optimiza la gestión de tu crematorio de mascotas con Vinzer: código de verificación único, evidencia fotográfica por fase y seguimiento público para las familias. Pruébalo gratis.",
+            title: "Vinzer | Software para crematorios de mascotas en Chile",
+            description: "Software para crematorios de mascotas. Gestiona servicios, trazabilidad, evidencias, certificados y seguimiento familiar con Vinzer.",
         };
     }
 }
@@ -98,7 +101,7 @@ function VinzerLandingPageSchema() {
         'name': 'Vinzer',
         'operatingSystem': 'All',
         'applicationCategory': 'BusinessApplication',
-        'description': 'Plataforma SaaS multi-tenant para la gestión de crematorios de mascotas y funerarias. Código de verificación único por servicio, evidencia fotográfica por fase, seguimiento público en tiempo real para las familias y certificados digitales verificables.',
+        'description': 'Plataforma SaaS multi-tenant para la gestión de crematorios de mascotas. Código de verificación único por servicio, evidencia fotográfica por fase, seguimiento público en tiempo real para las familias y certificados digitales verificables.',
         'offers': {
             '@type': 'Offer',
             'price': '29900',

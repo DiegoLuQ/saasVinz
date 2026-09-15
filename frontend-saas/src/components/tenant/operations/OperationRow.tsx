@@ -73,6 +73,9 @@ export default function OperationRow({
     const customerName = item.pet?.customer?.name?.split(' ')[0] || 'Desconocido';
     const petImg = item.pet?.image_url;
 
+    const normalizedStatus = item.status ? item.status.trim().toLowerCase() : '';
+    const canDelete = ['processing', 'en_proceso', 'pendiente', 'pending', 'received', 'cancelado', 'canceled'].includes(normalizedStatus);
+
     return (
         <article
             className={`
@@ -144,34 +147,40 @@ export default function OperationRow({
                 </p>
             </div>
 
-            {/* Estado y Acciones (Alineados horizontalmente) */}
-            <div className="col-span-12 lg:col-span-3 flex items-center justify-between lg:justify-end gap-3 mt-3 lg:mt-0 pt-3 lg:pt-0 border-t border-white/5 lg:border-none">
+            {/* Estado y Acciones: Orden estricto [Estado] -> [Gestionar] -> [Eliminar] */}
+            <div className="col-span-12 lg:col-span-3 flex items-center justify-between lg:justify-end gap-2 sm:gap-2.5 mt-3 lg:mt-0 pt-3 lg:pt-0 border-t border-white/5 lg:border-none">
+                {/* 1. Estado (ancho fijo para no desfasar las demás columnas) */}
                 <StatusPillMenu
                     value={item.status}
                     isLoading={isUpdatingStatus}
                     onChange={(next) => onChangeStatus(item.id, next)}
                 />
                 
-                <div className="flex items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={() => onOpen(item.id)}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary/15 border border-primary/25 hover:bg-primary/25 text-primary text-[11px] font-black uppercase tracking-wider transition-all active:scale-95 whitespace-nowrap"
-                        aria-label={`Gestionar orden SVC #${item.id}`}
-                    >
-                        <ArrowUpRight size={13} aria-hidden="true" />
-                        Gestionar
-                    </button>
-                    {(['processing', 'en_proceso', 'pendiente', 'pending', 'received'].includes(item.status.trim().toLowerCase())) && (
+                {/* 2. Gestionar */}
+                <button
+                    type="button"
+                    onClick={() => onOpen(item.id)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary/15 border border-primary/25 hover:bg-primary/25 text-primary text-[11px] font-black uppercase tracking-wider transition-all active:scale-95 whitespace-nowrap shrink-0"
+                    aria-label={`Gestionar orden SVC #${item.id}`}
+                >
+                    <ArrowUpRight size={13} aria-hidden="true" />
+                    Gestionar
+                </button>
+
+                {/* 3. Botón Eliminar con slot fijo reservado (w-8 h-8) para mantener la columna alineada */}
+                <div className="w-8 h-8 flex items-center justify-center shrink-0">
+                    {canDelete ? (
                         <button
                             type="button"
                             onClick={() => onDelete(item.id)}
-                            className="p-2 rounded-xl text-red-400/40 hover:text-red-400 hover:bg-red-500/10 transition-all active:scale-90 shrink-0"
+                            className="p-1.5 rounded-xl text-red-400/40 hover:text-red-400 hover:bg-red-500/10 transition-all active:scale-90"
                             aria-label={`Eliminar orden SVC #${item.id}`}
-                            title="Eliminar"
+                            title="Eliminar orden"
                         >
                             <Trash2 size={15} aria-hidden="true" />
                         </button>
+                    ) : (
+                        <div className="w-8 h-8" aria-hidden="true" />
                     )}
                 </div>
             </div>

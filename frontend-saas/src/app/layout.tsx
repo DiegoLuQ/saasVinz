@@ -3,8 +3,8 @@ import "./globals.css";
 import ReCaptchaProvider from "@/components/captcha/ReCaptchaProvider";
 
 export const metadata: Metadata = {
-    title: "Vinzer - Aliado en tu negocio",
-    description: "Sistema integral de gestión para crematorios y servicios funerarios.",
+    title: "Vinzer | Plataforma de Confianza y Trazabilidad para Crematorios",
+    description: "La trazabilidad digital que garantiza la tranquilidad de cada familia y el control total de tu crematorio de mascotas.",
     icons: {
         icon: "/minilogo.webp",
     }

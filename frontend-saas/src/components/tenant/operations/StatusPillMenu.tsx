@@ -8,7 +8,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 const statusColors: Record<string, string> = {
     'pendiente': 'bg-orange-500/15 text-orange-300 border-orange-500/25',
     'en_proceso': 'bg-blue-500/15 text-blue-300 border-blue-500/25',
-    'coordinado': 'bg-indigo-500/15 text-indigo-300 border-indigo-500/25',
     'entregado': 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25',
     'cancelado': 'bg-red-500/15 text-red-300 border-red-500/25',
 };
@@ -16,7 +15,6 @@ const statusColors: Record<string, string> = {
 const statusLabels: Record<string, string> = {
     'pendiente': 'Pendiente',
     'en_proceso': 'En Proceso',
-    'coordinado': 'Coordinado',
     'entregado': 'Entregado',
     'cancelado': 'Cancelado',
 };
@@ -24,7 +22,6 @@ const statusLabels: Record<string, string> = {
 const statusDots: Record<string, string> = {
     'pendiente': 'bg-orange-400',
     'en_proceso': 'bg-blue-400',
-    'coordinado': 'bg-indigo-400',
     'entregado': 'bg-emerald-400',
     'cancelado': 'bg-red-400',
 };
@@ -33,7 +30,7 @@ const statusDots: Record<string, string> = {
 // Estado final único = entregado ('completado'/'ready' quedan retirados).
 const normalize = (raw: string): string => {
     const v = raw.trim().toLowerCase();
-    if (['pending', 'received'].includes(v)) return 'pendiente';
+    if (['pending', 'received', 'coordinado'].includes(v)) return 'pendiente';
     if (['processing', 'ready'].includes(v)) return 'en_proceso';
     if (['delivered', 'completed', 'completado'].includes(v)) return 'entregado';
     if (['canceled'].includes(v)) return 'cancelado';
@@ -106,18 +103,21 @@ export default function StatusPillMenu({ value, isLoading = false, onChange }: S
                 aria-expanded={open}
                 aria-label={`Estado: ${label}. Click para cambiar`}
                 className={`
-                    inline-flex items-center gap-2 px-3 py-1.5 rounded-full border
+                    inline-flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-full border
+                    w-[125px] shrink-0
                     text-[10px] font-black uppercase tracking-[0.14em] transition-all
                     ${colorClass}
                     ${isLoading ? 'opacity-60 cursor-wait' : 'hover:brightness-125 active:scale-95 cursor-pointer'}
                 `}
             >
-                <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} aria-hidden="true" />
-                <span>{label}</span>
+                <span className="flex items-center gap-1.5 min-w-0">
+                    <span className={`w-1.5 h-1.5 rounded-full ${dotClass} shrink-0`} aria-hidden="true" />
+                    <span className="truncate">{label}</span>
+                </span>
                 {isLoading ? (
-                    <Loader2 size={11} className="animate-spin" aria-hidden="true" />
+                    <Loader2 size={11} className="animate-spin shrink-0" aria-hidden="true" />
                 ) : (
-                    <ChevronDown size={11} className={`transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+                    <ChevronDown size={11} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
                 )}
             </button>
 

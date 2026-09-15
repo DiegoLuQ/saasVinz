@@ -457,7 +457,10 @@ class CremationService:
             if var in core_fields_keys:
                 setattr(db_obj, var, value)
             elif var in partition_fields["logistics"]:
-                if db_obj.logistics: setattr(db_obj.logistics, var, value)
+                if not db_obj.logistics:
+                    db_obj.logistics = models.CremationLogistics(cremation_id=cremation_id, tenant_id=tenant_id)
+                    self.db.add(db_obj.logistics)
+                setattr(db_obj.logistics, var, value)
             elif var in partition_fields["financial"]:
                 if db_obj.financial: setattr(db_obj.financial, var, value)
             elif var in partition_fields["details"]:

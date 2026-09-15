@@ -98,10 +98,10 @@ export default function VinzerCarousel({ config, theme = 'dark' }: VinzerCarouse
                         <span>Recorrido Visual</span>
                     </div>
                     <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-                        La experiencia <span className="bg-gradient-to-r from-cyan-400 to-sky-400 bg-clip-text text-transparent">Vinzer</span> en acción
+                        Conoce Vinzer por dentro
                     </h2>
                     <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
-                        Explora la interfaz moderna, limpia y diseñada específicamente para acelerar la operativa diaria de tu centro crematorio y funerario.
+                        Explora la interfaz moderna, limpia y diseñada específicamente para acelerar la operativa diaria de tu centro crematorio de mascotas.
                     </p>
                 </div>
 

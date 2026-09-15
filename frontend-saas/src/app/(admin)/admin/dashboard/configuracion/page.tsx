@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
-import { apiRequest } from '@/lib/admin/api';
+import { apiRequest, getImageUrl } from '@/lib/admin/api';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Save, Plus, Trash2, Layout, Type, Search, CreditCard, Palette, ArrowUp, ArrowDown, HelpCircle, Building2, Globe, Mail, Phone, MapPin, Instagram, Facebook, Twitter, Youtube, Upload, ImageIcon, Database, ExternalLink } from 'lucide-react';
 import ImageCropper from '@/components/tenant/ImageCropper';
@@ -11,6 +12,7 @@ import HeroAssetSelector from '@/components/admin/landing/HeroAssetSelector';
 import MediaSelector from '@/components/admin/media/MediaSelector';
 
 export default function LandingConfigPage() {
+    const queryClient = useQueryClient();
     const [config, setConfig] = useState<any>({
         seo: { title: '', description: '' },
         hero: { h1: '', h2: '', subtitle: '' },
@@ -253,6 +255,8 @@ export default function LandingConfigPage() {
 
             if (response && response.logo_url) {
                 setSaasConfig((prev: any) => ({ ...prev, logo: response.logo_url }));
+                queryClient.invalidateQueries({ queryKey: ['admin-bootstrap'] });
+                queryClient.invalidateQueries({ queryKey: ['admin-saas-config'] });
                 setFeedbackModal({
                     isOpen: true,
                     title: 'Éxito',
@@ -899,7 +903,7 @@ export default function LandingConfigPage() {
                                     <div className="relative group w-32 h-32 bg-black/40 rounded-full border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
                                         {saasConfig.logo ? (
                                             <img
-                                                src={`/${saasConfig.logo}`}
+                                                src={getImageUrl(saasConfig.logo)}
                                                 alt="Logo SaaS"
                                                 className="w-full h-full object-contain p-4"
                                             />

@@ -18,7 +18,7 @@ export function VinzerFaqs({ theme = 'dark' }: VinzerFaqsProps) {
                 <h2 className={`text-3xl md:text-5xl font-black ${
                     theme === 'light' ? 'text-slate-900' : 'text-[#FFFFFF]'
                 }`}>
-                    Preguntas Frecuentes
+                    Preguntas frecuentes
                 </h2>
                 <p className={`font-medium ${
                     theme === 'light' ? 'text-slate-600' : 'text-slate-400'

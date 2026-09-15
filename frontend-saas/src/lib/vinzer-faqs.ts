@@ -1,13 +1,11 @@
 /**
- * Preguntas frecuentes de la landing.
+ * Preguntas frecuentes de la landing Vinzer.
  *
- * Fuente única: el acordeón (`VinzerFaqs`) y el JSON-LD `FAQPage` de
- * `app/(public)/vinzer/page.tsx` leen ambos de aquí. Antes estaban duplicadas
- * en los dos archivos y podían desincronizarse, lo que produce rich snippets
- * que no existen en la página.
+ * Fuente única: alimenta simultáneamente el componente interactivo (VinzerFaqs)
+ * y el esquema JSON-LD FAQPage para indexación en Google (app/(public)/vinzer/page.tsx).
  *
- * Regla: no publicar respuestas con cifras o promesas que no estén verificadas
- * contra el sistema o confirmadas por el equipo comercial.
+ * Estrategia: resolución de objeciones comerciales reales y SEO semántico con
+ * distribución natural de términos sin incurrir en sobreoptimización.
  */
 export interface VinzerFaq {
     q: string;
@@ -16,31 +14,31 @@ export interface VinzerFaq {
 
 export const VINZER_FAQS: VinzerFaq[] = [
     {
-        q: '¿Qué incluye el sitio web del Plan Ultra?',
-        a: 'Diseñamos e implementamos una página web institucional con tu logotipo, tus colores y tu propio dominio, que se registra a tu nombre. Incluye el catálogo de servicios y productos que ya administras en Vinzer y el buscador de seguimiento conectado a tu panel. El hosting está incluido mientras mantengas tu suscripción al Plan Ultra.',
+        q: '¿Qué es Vinzer y para qué sirve?',
+        a: 'Vinzer es un software diseñado para la gestión de crematorios de mascotas. Permite centralizar clientes, mascotas, servicios y operaciones, manteniendo la información organizada y facilitando el seguimiento de cada cremación desde la recepción hasta la entrega.',
     },
     {
-        q: '¿Cómo garantiza Vinzer la trazabilidad y evita errores en las cenizas?',
-        a: 'Cada servicio genera un código de verificación único y un enlace de seguimiento privado para la familia. El flujo de trabajo es configurable por crematorio y cada fase requiere evidencia fotográfica, notas y firma del operador. El sistema registra usuario, hora y cambios en cada acción crítica, dejando un historial de auditoría completo.',
+        q: '¿Vinzer está diseñado específicamente para crematorios de mascotas?',
+        a: 'Sí. Vinzer está pensado específicamente para las necesidades de los crematorios de mascotas, incluyendo la gestión de servicios, operaciones, seguimiento de cremaciones, certificados y comunicación con las familias.',
     },
     {
-        q: '¿Qué es el seguimiento público para la familia?',
-        a: 'Es un enlace único por servicio que la familia abre sin iniciar sesión. Muestra una línea de tiempo con cada fase completada, foto de evidencia, descripción y hora exacta. La familia acompaña el proceso en tiempo real, lo que reduce las llamadas de seguimiento al crematorio. Está disponible en todos los planes, incluido el gratuito.',
+        q: '¿Cómo funciona la trazabilidad de una cremación?',
+        a: 'Vinzer permite registrar las distintas etapas del proceso de cremación, dejando un historial asociado al servicio. De esta forma, el crematorio puede mantener organizada la información del proceso y consultar su evolución cuando sea necesario.',
     },
     {
-        q: '¿Cómo funcionan los certificados de cremación?',
-        a: 'El sistema genera certificados PDF automáticos con los datos de la mascota, el tutor, el tipo de servicio, firma digital, marca de agua del crematorio y numeración correlativa. Las plantillas son editables en secciones, colores, orden y tipografías. Disponibles desde el plan Normal.',
+        q: '¿La familia puede seguir el proceso de cremación de su mascota?',
+        a: 'Sí. Vinzer permite entregar un enlace de seguimiento público asociado al servicio. La familia puede consultar el estado del proceso sin necesidad de crear una cuenta o iniciar sesión, facilitando una comunicación más transparente con el crematorio.',
     },
     {
-        q: '¿Mi equipo necesita computadores o equipamiento costoso?',
-        a: 'No. Vinzer funciona desde cualquier navegador web en computador, tablet o smartphone. El operador de planta puede registrar la evidencia de cada fase desde su propio teléfono.',
+        q: '¿Puedo registrar fotografías y evidencias durante el proceso?',
+        a: 'Sí. Vinzer permite incorporar evidencias asociadas a las etapas del servicio, como fotografías y notas. Esto ayuda al equipo del crematorio a mantener un registro organizado del proceso y disponer de información verificable.',
     },
     {
-        q: '¿Qué roles y permisos puedo asignar al equipo?',
-        a: 'El sistema cuenta con roles para administrador, recepción y operador de cremación, entre otros. Defines qué puede ver y hacer cada persona en cada área del sistema. La cantidad de cuentas disponibles depende del plan contratado.',
+        q: '¿Puedo generar certificados de cremación con Vinzer?',
+        a: 'Sí. Vinzer permite generar certificados de cremación en formato PDF y configurar diferentes elementos del documento, como información de la mascota, tutor, servicio y elementos visuales de la marca, según las funcionalidades disponibles en el plan contratado.',
     },
     {
-        q: '¿El software permite gestionar múltiples sedes de manera segura e independiente?',
-        a: 'Sí. Cada crematorio opera en su propio espacio privado dentro de la plataforma: tu información es visible únicamente para las cuentas de tu equipo y ningún otro cliente puede acceder a ella. Cada sede se administra por separado, con sus propios usuarios y permisos.',
+        q: '¿Necesito instalar un programa o comprar equipos especiales?',
+        a: 'No. Vinzer funciona desde un navegador web, por lo que puede utilizarse desde computadores, tablets o smartphones con conexión a Internet. No requiere instalar un programa específico ni adquirir equipamiento especializado.',
     },
 ];

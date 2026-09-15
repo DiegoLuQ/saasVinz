@@ -43,7 +43,7 @@ export function getChangedFields(
 ): string[] {
     const fields: (keyof Cremation)[] = [
         'pet_id', 'status', 'scheduled_at', 'weight', 'weight_price',
-        'region', 'city', 'address', 'notes', 'discount',
+        'region', 'city', 'address', 'pickup_region', 'pickup_city', 'pickup_address', 'notes', 'discount',
     ];
 
     return fields.filter(field => {

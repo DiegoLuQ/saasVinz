@@ -5,16 +5,16 @@ import VinzerTourClient from '@/components/vinzer/VinzerTourClient';
 export const metadata: Metadata = {
     metadataBase: new URL('https://vinzer.app'),
     title: "Tour del Software y Capturas de Módulos | Vinzer Crematorios",
-    description: "Recorrido visual completo por el software Vinzer para crematorios y funerarias de mascotas. Conoce la recepción con código único, bitácora de cremación con fotos, portal familiar y certificados digitales con QR.",
+    description: "Recorrido visual completo por el software Vinzer para crematorios de mascotas. Conoce la recepción con código único, bitácora de cremación con fotos, portal familiar y certificados digitales con QR.",
     keywords: [
         'tour software crematorio de mascotas',
-        'capturas de pantalla software funerario',
+        'capturas de pantalla software crematorio',
         'modulo de recepcion crematorio',
         'bitacora de incineracion digital',
         'portal seguimiento familias cremacion',
         'certificados cremacion codigo QR',
         'demo vinzer chile',
-        'software de gestion de cementerios de mascotas'
+        'software para crematorios de mascotas'
     ],
     robots: "index, follow",
     alternates: {

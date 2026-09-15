@@ -465,6 +465,8 @@ async def get_creator_bootstrap(
             models.Notification.is_read == False
         ).count()
 
+        saas_config = db.query(models.SaaSConfig).first()
+
         return schemas.CreatorBootstrapResponse(
             user=schemas.BootstrapUserData.model_validate(current_creator),
             stats=schemas.CreatorBootstrapStats(
@@ -483,6 +485,7 @@ async def get_creator_bootstrap(
             billing_transactions=[schemas.BillingTransactionResponse.model_validate(b) for b in billing_txns],
             subscription_plans=[schemas.SubscriptionPlanInDB.model_validate(p) for p in plans],
             announcements=[schemas.AnnouncementInDB.model_validate(a) for a in announcements],
+            saas_config=schemas.SaaSConfigInDB.model_validate(saas_config) if saas_config else None,
             metadata=schemas.BootstrapMetadata(
                 unread_notifications=unread_count,
                 pending_submissions=pending_count # Real pending count

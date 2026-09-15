@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const config = {
     matcher: [
-        '/((?!api/|_next/|_static/|static/|storage/|widget/|_vercel|[\\w-]+\\.\\w+).*)',
+        '/((?!api/|_next/|_static/|static/|storage/|widget/|images/|_vercel|.*\\.[\\w]+$).*)',
     ],
 };
 

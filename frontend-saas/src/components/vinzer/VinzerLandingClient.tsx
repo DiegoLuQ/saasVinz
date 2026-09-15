@@ -57,11 +57,12 @@ const resolveMediaUrl = (url?: string | null) => {
 };
 
 export default function VinzerLandingClient({ initialConfig = null, initialPlans = null }: VinzerLandingClientProps) {
-    // Hero Background & Media Config
     const heroConfig = initialConfig?.hero || {};
     const heroBgUrl = heroConfig.backgroundImage || 'https://i.postimg.cc/mD9jZNX2/portada-1.webp';
     const isHeroVideo = heroConfig.mediaType === 'video' || /\.(mp4|webm|mov)(\?.*)?$/i.test(heroBgUrl);
     const heroOpacity = typeof heroConfig.bgOpacity === 'number' ? heroConfig.bgOpacity : 1;
+    // Estado de carga para transición suave del media del Hero
+    const [isMediaLoaded, setIsMediaLoaded] = useState(false);
 
     // Estado para el menú móvil
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -85,7 +86,7 @@ export default function VinzerLandingClient({ initialConfig = null, initialPlans
 
     useEffect(() => {
         const handleScroll = () => {
-            const sections = ['inicio', 'seguimiento', 'modulos', 'trazabilidad', 'sitio-web', 'precios', 'faqs'];
+            const sections = ['inicio', 'producto', 'trazabilidad', 'como-funciona', 'planes', 'faqs'];
             const scrollPosition = window.scrollY + 250; // offset
 
             for (const section of sections) {
@@ -131,13 +132,13 @@ export default function VinzerLandingClient({ initialConfig = null, initialPlans
             ? 'bg-[#f8fafc] text-[#0F172A] selection:bg-[#0284C7]/20 selection:text-[#0F172A] [data-theme="light"]'
             : 'bg-[#020210] text-[#FFFFFF] selection:bg-[#19B5FE]/30 selection:text-[#FFFFFF]'
             }`}>
-            {/* Luces de Fondo (Glows) */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-screen pointer-events-none z-0 overflow-hidden">
-                <div className={`absolute top-[-10%] left-[-10%] w-[500px] h-[500px] blur-[150px] rounded-full ${theme === 'light' ? 'bg-[#0284C7]/10' : 'bg-[#19B5FE]/10'
-                    }`} />
-                <div className={`absolute top-[20%] right-[-10%] w-[600px] h-[600px] blur-[170px] rounded-full ${theme === 'light' ? 'bg-[#D97706]/10' : 'bg-[#E0B84D]/5'
-                    }`} />
-            </div>
+            {/* Luces de Fondo (Glows solo en dark mode) */}
+            {theme === 'dark' && (
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-screen pointer-events-none z-0 overflow-hidden">
+                    <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] blur-[150px] rounded-full bg-[#19B5FE]/10" />
+                    <div className="absolute top-[20%] right-[-10%] w-[600px] h-[600px] blur-[170px] rounded-full bg-[#E0B84D]/5" />
+                </div>
+            )}
 
             {/* Header / Barra Superior Flotante Ovalada (15% más ancha: max-w-[1180px]) */}
             <header className="fixed top-4 inset-x-0 z-50 max-w-[1180px] mx-auto px-4 pointer-events-none">
@@ -153,30 +154,14 @@ export default function VinzerLandingClient({ initialConfig = null, initialPlans
                     </div>
 
                     {/* Links de navegación */}
-                    <div className="hidden xl:flex items-center gap-7">
+                    <div className="hidden lg:flex items-center gap-7">
                         {[
-                            { href: '#modulos', label: 'Módulos' },
-                            { href: '#trazabilidad', label: 'Cómo Funciona' },
-                            { href: '/tour', label: 'Tour App', isExternalRoute: true, hidden: true },
-                            { href: '#sitio-web', label: 'Sitio Web' },
-                            { href: '#precios', label: 'Precios' },
+                            { href: '#producto', label: 'Producto' },
+                            { href: '#trazabilidad', label: 'Trazabilidad' },
+                            { href: '#como-funciona', label: 'Cómo funciona' },
+                            { href: '#planes', label: 'Planes' },
                             { href: '#faqs', label: 'FAQ' },
-                            { href: '#seguimiento', label: 'Seguimiento' },
                         ].map((link) => {
-                            if (link.isExternalRoute) {
-                                return (
-                                    <Link
-                                        key={link.href + '-' + link.label}
-                                        href={link.href}
-                                        className={`${link.hidden ? 'hidden' : 'flex'} relative text-[11px] font-bold tracking-widest uppercase transition-all duration-300 focus:outline-none py-1 items-center gap-1.5 ${theme === 'light' ? 'text-cyan-600 hover:text-cyan-700' : 'text-cyan-400 hover:text-cyan-300'
-                                            }`}
-                                    >
-                                        <span>{link.label}</span>
-                                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                                    </Link>
-                                );
-                            }
-
                             const sectionId = link.href.replace('#', '');
                             const active = activeSection === sectionId;
                             return (
@@ -209,7 +194,7 @@ export default function VinzerLandingClient({ initialConfig = null, initialPlans
                     </div>
 
                     {/* Lado Derecho: Acciones Desktop */}
-                    <div className="hidden xl:flex items-center gap-3 shrink-0">
+                    <div className="hidden lg:flex items-center gap-3 shrink-0">
                         {/* Switcher Tema Claro / Oscuro */}
                         <button
                             onClick={toggleTheme}
@@ -226,18 +211,18 @@ export default function VinzerLandingClient({ initialConfig = null, initialPlans
                         <a
                             href="#demo"
                             onClick={(e) => handleNavLinkClick(e, '#demo')}
-                            className={`flex items-center justify-center gap-2 font-bold text-xs tracking-wide px-5 py-2.5 rounded-full transition-all duration-300 ${theme === 'light'
-                                ? 'bg-[#0284C7] hover:bg-[#0369A1] text-white shadow-[0_4px_14px_rgba(2,132,199,0.2)] hover:shadow-[0_6px_20px_rgba(2,132,199,0.3)] hover:scale-[1.02] active:scale-[0.98]'
-                                : 'bg-[#19B5FE] hover:bg-[#0e9ce0] text-[#020210] shadow-[0_4px_14px_rgba(25,181,254,0.25)] hover:shadow-[0_6px_20px_rgba(25,181,254,0.35)] hover:scale-[1.02] active:scale-[0.98]'
+                            className={`flex items-center justify-center gap-2 font-black text-xs tracking-wider uppercase px-6 py-2.5 rounded-full transition-all duration-300 shadow-md ${theme === 'light'
+                                ? 'bg-[#0284C7] hover:bg-[#0369A1] text-white shadow-sky-600/25 hover:shadow-sky-600/40 hover:scale-[1.03] active:scale-[0.98]'
+                                : 'bg-[#19B5FE] hover:bg-[#0e9ce0] text-[#020210] shadow-[#19B5FE]/25 hover:shadow-[#19B5FE]/40 hover:scale-[1.03] active:scale-[0.98]'
                                 }`}
                         >
-                            Solicitar Demo
+                            Solicitar demostración
                             <ArrowRight size={14} className="shrink-0" />
                         </a>
                     </div>
 
                     {/* Botón Menú Móvil & Theme Toggle */}
-                    <div className="flex xl:hidden items-center gap-2">
+                    <div className="flex lg:hidden items-center gap-2">
                         <button
                             onClick={toggleTheme}
                             className={`p-2 rounded-full border transition-all duration-300 flex items-center justify-center ${theme === 'light'
@@ -264,9 +249,8 @@ export default function VinzerLandingClient({ initialConfig = null, initialPlans
 
             {/* Hero Section */}
             <section id="inicio" className="relative pt-28 pb-20 px-4 sm:px-6 z-10 overflow-hidden">
-                {/* Background Media (Light & Dark modes) */}
-                <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-                    {/* Media de fondo (siempre presente en modo claro y modo oscuro) */}
+                {/* Background Media (Light & Dark modes) con transición suave */}
+                <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none bg-[#020210]">
                     {isHeroVideo ? (
                         <video
                             src={resolveMediaUrl(heroBgUrl)}
@@ -275,21 +259,34 @@ export default function VinzerLandingClient({ initialConfig = null, initialPlans
                             loop
                             muted
                             playsInline
-                            className="w-full h-full object-cover object-center"
-                            style={{ opacity: heroOpacity }}
+                            onLoadedData={() => setIsMediaLoaded(true)}
+                            className={`w-full h-full object-cover object-center transition-all duration-1000 ease-out ${isMediaLoaded ? 'scale-100 blur-0' : 'scale-105 blur-sm'
+                                }`}
+                            style={{
+                                opacity: isMediaLoaded ? (theme === 'light' ? 1 : heroOpacity) : 0,
+                                transition: 'opacity 1000ms ease-out, filter 1000ms ease-out, transform 1000ms ease-out'
+                            }}
                             aria-hidden="true"
                         />
                     ) : (
                         <img
+                            ref={(imgNode) => {
+                                if (imgNode && imgNode.complete && !isMediaLoaded) {
+                                    setIsMediaLoaded(true);
+                                }
+                            }}
                             src={resolveMediaUrl(heroBgUrl)}
                             alt="Hero Background"
-                            className="w-full h-full object-cover object-center"
-                            style={{ opacity: heroOpacity }}
+                            onLoad={() => setIsMediaLoaded(true)}
+                            className={`w-full h-full object-cover object-center ${isMediaLoaded ? 'scale-100 blur-0' : 'scale-105 blur-sm'
+                                }`}
+                            style={{
+                                opacity: isMediaLoaded ? (theme === 'light' ? 1 : heroOpacity) : 0,
+                                transition: 'opacity 1000ms ease-out, filter 1000ms ease-out, transform 1000ms ease-out'
+                            }}
                             aria-hidden="true"
                         />
                     )}
-
-
                 </div>
 
                 <div className="relative z-10 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
@@ -298,17 +295,17 @@ export default function VinzerLandingClient({ initialConfig = null, initialPlans
                         {/* Tag Badge */}
                         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border shadow-xs transition-all bg-[#19B5FE]/10 border-[#19B5FE]/30 text-[#19B5FE]">
                             <Zap size={14} className="text-[#19B5FE]" />
-                            <span className="text-[10px] font-black uppercase tracking-widest">Software integral para la industria funeraria de mascotas</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest">Plataforma de confianza y trazabilidad digital</span>
                         </div>
 
                         {/* Título Principal H1 (SEO) */}
-                        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[62px] font-black tracking-tight leading-[1.08] text-white">
-                            Software de control operativo y <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-400 to-sky-500 drop-shadow-[0_0_24px_rgba(56,189,248,0.3)]">trazabilidad total</span> para tu crematorio de mascotas.
+                        <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-[72px] font-black tracking-tight leading-[1.04] text-white">
+                            Cada cremación debería poder ser comprobada.
                         </h1>
 
                         {/* Subtítulo descriptivo */}
                         <p className="text-base sm:text-lg md:text-xl max-w-2xl mx-auto lg:mx-0 font-normal leading-relaxed text-slate-200">
-                            Automatiza el registro de servicios, el flujo de trabajo de planta, la emisión de certificados y el seguimiento público para las familias, en un solo sistema en la nube.
+                            Software para crematorios de mascotas: trazabilidad digital inmutable, evidencia fotográfica por fase y seguimiento transparente en tiempo real para las familias.
                         </p>
 
                         {/* Botones de acción */}
@@ -319,13 +316,13 @@ export default function VinzerLandingClient({ initialConfig = null, initialPlans
                                 className="group w-full sm:w-auto text-center px-8 py-4 rounded-xl font-bold uppercase tracking-wider text-xs hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-3 bg-[#0284C7] hover:bg-[#0369A1] text-white shadow-lg shadow-sky-600/30"
                                 id="hero-primary-cta"
                             >
-                                <span className="font-extrabold">Agendar demostración gratis</span>
+                                <span className="font-extrabold">Solicitar demostración</span>
                                 <ArrowRight size={16} className="shrink-0 transition-transform duration-200 group-hover:translate-x-1" />
                             </a>
 
                             <a
-                                href="#precios"
-                                onClick={(e) => handleNavLinkClick(e, '#precios')}
+                                href="#planes"
+                                onClick={(e) => handleNavLinkClick(e, '#planes')}
                                 className="group w-full sm:w-auto text-center border border-white/20 bg-white/10 backdrop-blur-md text-white hover:bg-white/20 px-8 py-4 rounded-xl font-bold uppercase tracking-wider text-xs hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-3 shadow-xs"
                                 id="hero-secondary-cta"
                             >
@@ -442,11 +439,10 @@ export default function VinzerLandingClient({ initialConfig = null, initialPlans
                                 }`}>Software</h5>
                             <ul className={`space-y-2 text-xs ${theme === 'light' ? 'text-slate-600' : 'text-slate-400'
                                 }`}>
-                                <li className="hidden"><Link href="/tour" className="text-cyan-400 font-semibold hover:underline flex items-center gap-1.5">Tour de la App (Capturas) <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded">Nuevo</span></Link></li>
-                                <li><a href="#trazabilidad" className="hover:text-[#0284C7] transition-colors">Cómo Funciona</a></li>
-                                <li><a href="#modulos" className="hover:text-[#0284C7] transition-colors">Módulos del Sistema</a></li>
-                                <li><a href="#seguimiento" className="hover:text-[#0284C7] transition-colors">Estado del Servicio</a></li>
-                                <li><a href="#precios" className="hover:text-[#0284C7] transition-colors">Planes de Precios</a></li>
+                                <li><a href="#producto" className="hover:text-[#0284C7] transition-colors">Producto</a></li>
+                                <li><a href="#trazabilidad" className="hover:text-[#0284C7] transition-colors">Trazabilidad</a></li>
+                                <li><a href="#como-funciona" className="hover:text-[#0284C7] transition-colors">Cómo Funciona</a></li>
+                                <li><a href="#planes" className="hover:text-[#0284C7] transition-colors">Planes</a></li>
                             </ul>
                         </div>
                         <div className="space-y-4">
@@ -527,33 +523,12 @@ export default function VinzerLandingClient({ initialConfig = null, initialPlans
                             <nav className="flex flex-col gap-6 items-center text-center w-full max-w-xs mx-auto">
                                 {/* Secciones de Navegación */}
                                 {[
-                                    { href: '#seguimiento', label: 'Estado del Servicio' },
-                                    { href: '#modulos', label: 'Módulos' },
-                                    { href: '#trazabilidad', label: 'Cómo Funciona' },
-                                    { href: '/tour', label: 'Tour App (Capturas)', isExternalRoute: true, hidden: true },
-                                    { href: '#sitio-web', label: 'Sitio Web' },
-                                    { href: '#precios', label: 'Precios' },
+                                    { href: '#producto', label: 'Producto' },
+                                    { href: '#trazabilidad', label: 'Trazabilidad' },
+                                    { href: '#como-funciona', label: 'Cómo funciona' },
+                                    { href: '#planes', label: 'Planes' },
                                     { href: '#faqs', label: 'FAQ' },
                                 ].map((link, index) => {
-                                    if (link.isExternalRoute) {
-                                        return (
-                                            <div key={link.href} className={`w-full ${link.hidden ? 'hidden' : ''}`}>
-                                                <Link
-                                                    href={link.href}
-                                                    onClick={() => setIsMobileMenuOpen(false)}
-                                                    className="group block py-2 relative cursor-pointer select-none"
-                                                >
-                                                    <span className="text-xs font-mono mr-2 text-cyan-400">
-                                                        0{index + 1}.
-                                                    </span>
-                                                    <span className="text-2xl font-sans tracking-wide font-bold text-cyan-400 group-hover:text-cyan-300">
-                                                        {link.label}
-                                                    </span>
-                                                </Link>
-                                            </div>
-                                        );
-                                    }
-
                                     const sectionId = link.href.replace('#', '');
                                     const active = activeSection === sectionId;
 
@@ -600,7 +575,22 @@ export default function VinzerLandingClient({ initialConfig = null, initialPlans
 
                                 {/* Botones de Acción */}
                                 <div className="flex flex-col gap-3.5 w-full mt-2">
-                                    {/* Contáctanos - Diseño Premium Interactivo */}
+                                    {/* CTA Principal Móvil */}
+                                    <motion.a
+                                        href="#demo"
+                                        onClick={(e) => {
+                                            setIsMobileMenuOpen(false);
+                                            handleNavLinkClick(e, '#demo');
+                                        }}
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        className="w-full py-3.5 px-6 rounded-full flex items-center justify-center gap-2.5 bg-[#19B5FE] text-[#020210] font-black uppercase tracking-wider text-xs transition-all shadow-lg shadow-[#19B5FE]/25"
+                                    >
+                                        <span>Solicitar demostración</span>
+                                        <ArrowRight size={15} className="shrink-0" />
+                                    </motion.a>
+
+                                    {/* Contáctanos WhatsApp */}
                                     <motion.a
                                         href="https://wa.me/56982395940?text=Hola%2C%20quiero%20obtener%20una%20cuenta%20GRATIS%20en%20Vinzer"
                                         target="_blank"
@@ -608,14 +598,13 @@ export default function VinzerLandingClient({ initialConfig = null, initialPlans
                                         onClick={() => setIsMobileMenuOpen(false)}
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
-                                        className="group relative w-full py-4 px-8 rounded-full overflow-hidden flex items-center justify-center border border-[#25d366]/30 bg-[#25d366]/5 text-[#25d366] hover:text-[#020210] font-black uppercase tracking-widest text-xs transition-colors duration-300 shadow-[0_0_15px_rgba(37,211,102,0.03)] hover:shadow-[0_0_25px_rgba(37,211,102,0.2)]"
+                                        className="group relative w-full py-3.5 px-8 rounded-full overflow-hidden flex items-center justify-center border border-[#25d366]/30 bg-[#25d366]/5 text-[#25d366] hover:text-[#020210] font-bold uppercase tracking-widest text-xs transition-colors duration-300"
                                     >
                                         {/* Fondo deslizante (Efecto Slide-Fill) */}
                                         <span className="absolute inset-0 w-full h-full bg-[#25d366] transform scale-x-0 origin-left transition-transform duration-300 ease-out group-hover:scale-x-100 z-0" />
 
                                         {/* Contenido superior (Icono y Texto) */}
                                         <span className="relative z-10 flex items-center justify-center gap-2.5">
-                                            {/* Nuevo Ícono: Avión de papel / Enviar mensaje */}
                                             <svg
                                                 xmlns="http://www.w3.org/2000/svg"
                                                 fill="none"
@@ -631,7 +620,7 @@ export default function VinzerLandingClient({ initialConfig = null, initialPlans
                                                     d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379L10.3 21.18c-.305.21-.69-.114-.51-.448l1.41-2.61a48.59 48.59 0 01-6.19-2.006c-1.584-.233-2.707-1.626-2.707-3.228V6.741c0-1.602 1.123-2.995 2.707-3.228A48.394 48.394 0 0112 3c2.78 0 5.44.347 8.003 1.013 1.584.233 2.707 1.626 2.707 3.228v4.032c0 1.602-1.123 2.995-2.707 3.228a48.394 48.394 0 01-1.343.185"
                                                 />
                                             </svg>
-                                            <span>Contáctanos</span>
+                                            <span>WhatsApp</span>
                                         </span>
                                     </motion.a>
                                 </div>

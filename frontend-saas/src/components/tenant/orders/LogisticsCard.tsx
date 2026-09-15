@@ -101,8 +101,43 @@ export default function LogisticsCard({
                             Igual a Entrega
                         </button>
                     </div>
-                    {/* Sólo dirección: la región/comuna del retiro se hereda de la
-                        dirección de entrega (botón "Igual a Entrega"). */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+                        <div className="space-y-3">
+                            <label htmlFor="select-pickup-region" className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-[0.18em] ml-1">
+                                Región
+                            </label>
+                            <SearchableSelect
+                                options={regions.map(r => ({ value: r.label, label: r.label }))}
+                                value={currentCremation?.pickup_region || ''}
+                                onChange={(val) => {
+                                    setCurrentCremation(prev => ({
+                                        ...prev,
+                                        pickup_region: String(val),
+                                        pickup_city: '',
+                                    }));
+                                }}
+                                placeholder="Región..."
+                            />
+                        </div>
+                        <div className="space-y-3">
+                            <label htmlFor="select-pickup-city" className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-[0.18em] ml-1">
+                                Comuna / Ciudad
+                            </label>
+                            <SearchableSelect
+                                options={
+                                    regions.find(r => r.label === currentCremation?.pickup_region)?.communes.map(c => ({ value: c, label: c })) || []
+                                }
+                                value={currentCremation?.pickup_city || ''}
+                                onChange={(val) => {
+                                    setCurrentCremation(prev => ({
+                                        ...prev,
+                                        pickup_city: String(val),
+                                    }));
+                                }}
+                                placeholder={currentCremation?.pickup_region ? 'Comuna...' : 'Sin selección'}
+                            />
+                        </div>
+                    </div>
                     <div className="space-y-3">
                         <label htmlFor="input-pickup-address" className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-[0.18em] ml-1">
                             Dirección Exacta
