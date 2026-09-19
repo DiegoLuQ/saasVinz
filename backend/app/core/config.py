@@ -19,6 +19,7 @@ _DEFAULT_CORS_ORIGINS = [
     "http://huellas.lvh.me:3000",
     "http://app.lvh.me:3000",
     "http://track.lvh.me:3000",
+    "http://catalogo.lvh.me:3000",
     "http://memorial.lvh.me:3000",
     # Producción (vinzer.app - legacy)
     "https://vinzer.app",
@@ -34,6 +35,8 @@ _DEFAULT_CORS_ORIGINS = [
     "https://app.vinzer.cl",
     "https://admin.vinzer.cl",
     "https://memorial.vinzer.cl",
+    "https://track.vinzer.cl",
+    "https://catalogo.vinzer.cl",
     "https://api-saas-keys.vinzer.cl",
 ]
 
