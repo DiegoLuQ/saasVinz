@@ -34,6 +34,8 @@ interface TenantData {
     demo_plan_name?: string | null;
     demo_expires_at?: string | null;
     contracted_plan_name?: string | null;
+    // Plantilla de certificado elegida en Configuración (null = automática)
+    default_certificate_template_id?: number | null;
 }
 
 interface TenantContextType {

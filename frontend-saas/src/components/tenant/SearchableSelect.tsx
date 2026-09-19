@@ -209,12 +209,12 @@ export default function SearchableSelect({
                                             key={option.value}
                                             onClick={() => handleSelect(option.value)}
                                             className={`px-4 py-3 rounded-xl text-sm cursor-pointer transition-all flex items-center justify-between ${isSelected
-                                                ? 'bg-primary text-white font-bold shadow-lg'
+                                                ? 'bg-primary text-primary-foreground font-bold shadow-lg'
                                                 : 'hover:bg-gray-100 text-gray-700 hover:text-gray-900 font-medium'
                                                 }`}
                                         >
                                             <span>{option.label}</span>
-                                            {isSelected && <Check size={16} className="text-white" />}
+                                            {isSelected && <Check size={16} className="text-primary-foreground" />}
                                         </div>
                                     );
                                 })}

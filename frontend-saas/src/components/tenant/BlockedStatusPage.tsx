@@ -5,6 +5,7 @@ import { Lock, AlertTriangle, LogOut, MessageCircle, RefreshCcw, CreditCard } fr
 import { motion } from 'framer-motion';
 import { usePolar } from '@/hooks/usePolar';
 import { clearToken } from '@/lib/auth/token';
+import { useIsOwner } from '@/hooks/useSessionBootstrap';
 
 interface BlockedStatusPageProps {
     status: 'inactive' | 'suspended';
@@ -14,6 +15,8 @@ interface BlockedStatusPageProps {
 
 export default function BlockedStatusPage({ status, reason, tenant }: BlockedStatusPageProps) {
     const { openPortal, loading } = usePolar();
+    // Rol desconocido (bootstrap bloqueado) => vista del dueño
+    const isTeamMember = useIsOwner() === false;
 
     const handleReactivate = async () => {
         if (tenant?.polar_customer_id) {
@@ -68,7 +71,12 @@ export default function BlockedStatusPage({ status, reason, tenant }: BlockedSta
 
                 <div className="flex flex-col gap-4">
                     {/* Botón de Reactivación Destacado */}
-                    {isSuspended && (
+                    {isSuspended && isTeamMember && (
+                        <p className="text-sm text-white/60 text-center">
+                            Avisa al administrador del crematorio para reactivar la cuenta.
+                        </p>
+                    )}
+                    {isSuspended && !isTeamMember && (
                         <button
                             onClick={handleReactivate}
                             disabled={loading}

@@ -155,8 +155,11 @@ export default function RolesBlueprintPage() {
                 <Info size={16} className="shrink-0 mt-0.5 text-sky-400" />
                 <p>
                     El blueprint es la capa global de roles. El <strong>plan de suscripción de cada tenant sigue siendo el techo</strong>:
-                    un módulo marcado como obligatorio aquí solo aparece si el plan del tenant lo incluye. Los módulos estructurales
-                    (<code className="text-white/70">dashboard</code>, <code className="text-white/70">perfil</code>) están siempre activos y no son editables.
+                    un módulo marcado como obligatorio aquí solo aparece si el plan del tenant lo incluye. Solo{' '}
+                    <code className="text-white/70">perfil</code> es estructural (siempre activo, no editable).{' '}
+                    <code className="text-white/70">dashboard</code> se controla por rol como cualquier otro módulo: si un rol no lo
+                    tiene, sus usuarios entran directo a su primer módulo activo (p. ej. el operador, al Panel de Trabajo). Un rol
+                    sin ninguna fila en esta matriz no tiene techo de rol y ve todo lo que permite el plan.
                 </p>
             </div>
 

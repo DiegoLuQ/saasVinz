@@ -3,6 +3,7 @@
 import React from 'react';
 import { Zap } from 'lucide-react';
 import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
+import { useIsOwner } from '@/hooks/useSessionBootstrap';
 
 /**
  * Banner que avisa al tenant que está usando un plan superior en modo
@@ -10,8 +11,9 @@ import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
  */
 export function DemoBanner() {
     const { tenantData } = useTenant();
+    const isOwner = useIsOwner();
 
-    if (!tenantData?.demo_active || !tenantData.demo_plan_name) return null;
+    if (isOwner !== true || !tenantData?.demo_active || !tenantData.demo_plan_name) return null;
 
     const until = tenantData.demo_expires_at
         ? new Date(tenantData.demo_expires_at).toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' })

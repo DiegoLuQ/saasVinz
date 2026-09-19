@@ -23,7 +23,7 @@ export default async function middleware(req: NextRequest) {
     const rootDomainEnv = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000';
     const memorialDomain = process.env.NEXT_PUBLIC_MEMORIAL_DOMAIN;
 
-    let currentHost: 'admin' | 'app' | 'veterinary' | 'memorial' | 'track' | 'invalid' | undefined;
+    let currentHost: 'admin' | 'app' | 'veterinary' | 'memorial' | 'track' | 'catalogo' | 'invalid' | undefined;
     const isLocal = hostname?.includes('lvh.me') || hostname?.includes('localhost');
     let effectiveRoot = isLocal
         ? (hostname?.includes('lvh.me') ? 'lvh.me:3000' : 'localhost:3000')
@@ -36,6 +36,8 @@ export default async function middleware(req: NextRequest) {
             currentHost = 'memorial';
         } else if (hostname.startsWith('track.')) {
             currentHost = 'track';
+        } else if (hostname.startsWith('catalogo.')) {
+            currentHost = 'catalogo';
         } else {
             if (hostname === effectiveRoot || hostname === `www.${effectiveRoot}`) {
                 currentHost = undefined;
@@ -98,6 +100,10 @@ export default async function middleware(req: NextRequest) {
             url.pathname = `/public${url.pathname}`;
             return NextResponse.rewrite(url);
         }
+        if (url.pathname.includes('/catalogo/')) {
+            url.pathname = `/public${url.pathname}`;
+            return NextResponse.rewrite(url);
+        }
         url.pathname = `/tenant${url.pathname}`;
         return NextResponse.rewrite(url);
     }
@@ -123,8 +129,26 @@ export default async function middleware(req: NextRequest) {
         return NextResponse.rewrite(url);
     }
 
-    // Memoriales, seguimiento o páginas públicas del tenant (form, track) -> /public
-    const isPublicTenantPath = url.pathname.includes('/track/') || url.pathname.includes('/form');
+    // Subdominio exclusivo de catálogo online (catalogo.)
+    if (currentHost === 'catalogo') {
+        const segments = url.pathname.split('/').filter(Boolean);
+        // Formato limpio: /slug/token -> reescribe internamente a /public/slug/catalogo/token
+        if (segments.length === 2) {
+            const [tenantSlug, catalogToken] = segments;
+            url.pathname = `/public/${tenantSlug}/catalogo/${catalogToken}`;
+            return NextResponse.rewrite(url);
+        }
+        // Formato con prefijo: /slug/catalogo/token -> /public/slug/catalogo/token
+        if (segments.length >= 3 && segments[1] === 'catalogo') {
+            url.pathname = `/public${url.pathname}`;
+            return NextResponse.rewrite(url);
+        }
+        url.pathname = `/public${url.pathname}`;
+        return NextResponse.rewrite(url);
+    }
+
+    // Memoriales, seguimiento o páginas públicas del tenant (form, track, catalogo) -> /public
+    const isPublicTenantPath = url.pathname.includes('/track/') || url.pathname.includes('/form') || url.pathname.includes('/catalogo/');
     if (currentHost === 'memorial' || currentHost === 'track' || isPublicTenantPath) {
         url.pathname = `/public${url.pathname}`;
         return NextResponse.rewrite(url);

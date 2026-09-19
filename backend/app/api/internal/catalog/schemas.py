@@ -166,3 +166,47 @@ class WeightPricingInDB(WeightPricingBase):
     tenant_id: int
     created_at: datetime
     model_config = {"from_attributes": True}
+
+# Tokens de Compartir Catálogo Online
+class CatalogShareTokenCreate(BaseModel):
+    name: Optional[str] = None
+    expires_in_hours: Optional[int] = None # None o 0 = permanente
+
+class CatalogShareTokenInDB(BaseModel):
+    id: int
+    tenant_id: int
+    token: str
+    name: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    is_active: bool
+    views_count: int = 0
+    last_viewed_at: Optional[datetime] = None
+    created_at: datetime
+    is_expired: bool = False
+    full_url: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+class PublicCatalogProduct(BaseModel):
+    id: int
+    code: str
+    name: str
+    sale_price: float
+    discount_percentage: Optional[float] = 0
+    stock: int
+    availability_status: str
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    images: Optional[List[str]] = []
+    category_name: Optional[str] = None
+
+class PublicCatalogResponse(BaseModel):
+    is_expired: bool = False
+    tenant_name: str
+    tenant_slug: str
+    tenant_logo: Optional[str] = None
+    tenant_phone: Optional[str] = None
+    whatsapp: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    products: List[PublicCatalogProduct] = []
+

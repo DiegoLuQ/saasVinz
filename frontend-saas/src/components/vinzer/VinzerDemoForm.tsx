@@ -105,7 +105,8 @@ export function VinzerDemoForm({ theme = 'dark' }: VinzerDemoFormProps) {
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4 text-left">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Fila 1: Nombre y Crematorio en 2 columnas */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                     <label htmlFor="demo-nombre" className={`block text-[10px] font-bold uppercase tracking-widest ml-1 ${labelCls}`}>
                         Nombre y apellido
@@ -135,22 +136,23 @@ export function VinzerDemoForm({ theme = 'dark' }: VinzerDemoFormProps) {
                         className={`w-full h-12 px-4 rounded-xl border text-sm focus:outline-none focus:ring-4 transition-all ${inputCls}`}
                     />
                 </div>
+            </div>
 
-                <div className="space-y-1.5">
-                    <label htmlFor="demo-telefono" className={`block text-[10px] font-bold uppercase tracking-widest ml-1 ${labelCls}`}>
-                        WhatsApp o teléfono
-                    </label>
-                    <input
-                        id="demo-telefono"
-                        type="tel"
-                        inputMode="tel"
-                        autoComplete="tel"
-                        value={telefono}
-                        onChange={(e) => { setTelefono(e.target.value); if (error) setError(''); }}
-                        placeholder="+56 9 1234 5678"
-                        className={`w-full h-12 px-4 rounded-xl border text-sm focus:outline-none focus:ring-4 transition-all ${inputCls}`}
-                    />
-                </div>
+            {/* Fila 2: Teléfono ancho completo */}
+            <div className="space-y-1.5">
+                <label htmlFor="demo-telefono" className={`block text-[10px] font-bold uppercase tracking-widest ml-1 ${labelCls}`}>
+                    WhatsApp o teléfono
+                </label>
+                <input
+                    id="demo-telefono"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    value={telefono}
+                    onChange={(e) => { setTelefono(e.target.value); if (error) setError(''); }}
+                    placeholder="+56 9 1234 5678"
+                    className={`w-full h-12 px-4 rounded-xl border text-sm focus:outline-none focus:ring-4 transition-all ${inputCls}`}
+                />
             </div>
 
             {error && (
@@ -160,25 +162,32 @@ export function VinzerDemoForm({ theme = 'dark' }: VinzerDemoFormProps) {
                 </div>
             )}
 
-            <button
-                type="submit"
-                disabled={status === 'sending'}
-                className={`w-full sm:w-auto min-h-[48px] px-8 rounded-xl font-black uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2.5 disabled:opacity-60 disabled:cursor-not-allowed ${
-                    isLight
-                        ? 'bg-[#0284C7] hover:bg-[#0369A1] text-white shadow-lg shadow-sky-500/20'
-                        : 'bg-[#19B5FE] hover:brightness-110 text-[#020210] shadow-lg shadow-[#19B5FE]/20'
-                }`}
-            >
-                {status === 'sending' ? (
-                    <><Loader2 size={16} className="animate-spin" /> Enviando…</>
-                ) : (
-                    <>Solicitar demostración <ArrowRight size={16} /></>
-                )}
-            </button>
+            {/* Fila 3: Botón de envío alineado con glow celeste */}
+            <div className="pt-1">
+                <button
+                    type="submit"
+                    disabled={status === 'sending'}
+                    className={`w-full sm:w-auto min-h-[48px] px-8 rounded-xl font-black uppercase tracking-wider text-xs transition-all flex items-center justify-center gap-2.5 disabled:opacity-60 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98] ${
+                        isLight
+                            ? 'bg-[#0284C7] hover:bg-[#0369A1] text-white shadow-lg shadow-sky-500/25'
+                            : 'bg-[#19B5FE] hover:bg-[#0ea5e9] text-[#020210] shadow-[0_0_30px_rgba(25,181,254,0.35)]'
+                    }`}
+                >
+                    {status === 'sending' ? (
+                        <><Loader2 size={16} className="animate-spin" /> Enviando…</>
+                    ) : (
+                        <>Solicitar demostración <ArrowRight size={16} /></>
+                    )}
+                </button>
+            </div>
 
-            <p className={`text-[10px] leading-relaxed ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                Solo usamos estos datos para contactarte por la demostración.
-            </p>
+            {/* Microcopy de privacidad con ícono de validación */}
+            <div className="flex items-center gap-2 pt-1 text-[11px]">
+                <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>
+                    Solo usamos estos datos para contactarte por la demostración.
+                </span>
+            </div>
         </form>
     );
 }

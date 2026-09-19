@@ -27,7 +27,8 @@ import {
     FilterX,
     RotateCcw,
     Trash2,
-    AlertCircle
+    AlertCircle,
+    SlidersHorizontal
 } from 'lucide-react';
 import { apiRequest, getImageUrl } from '@/lib/tenant/api';
 import { motion } from 'framer-motion';
@@ -40,6 +41,7 @@ import { useFeatures } from '@/hooks/useFeatures';
 import CancellationModal from '@/components/tenant/CancellationModal';
 import { useFarewellTemplates, useDocumentTemplates, useDashboardSummary } from '@/hooks/useSessionBootstrap';
 import { useQuery } from '@tanstack/react-query';
+import { formatChileDateTime } from '@/lib/dates';
 
 interface Cremation {
     id: number;
@@ -194,6 +196,25 @@ const getFormatLabel = (format?: string) => {
     return `Formato (${format})`;
 };
 
+/** Campos de la orden que usan la tabla y las tarjetas móviles */
+type OrderRow = {
+    id: number;
+    oc_number?: number | null;
+    status: string;
+    pet_id?: number;
+    pet_name?: string;
+    pet_image_url?: string | null;
+    customer_name?: string;
+    cremation_type?: string;
+    total_price?: number | null;
+    scheduled_at?: string | null;
+    created_at?: string | null;
+};
+
+const formatCLP = (value: number | null | undefined) => `$${Math.round(value || 0).toLocaleString('es-CL')}`;
+const orderDate = (c: { scheduled_at?: string | null; created_at?: string | null }) =>
+    formatChileDateTime(c.scheduled_at || c.created_at) || 'Sin fecha';
+
 export default function OrdersPage() {
     const router = useRouter();
     const { showToast } = useToast();
@@ -229,6 +250,62 @@ export default function OrdersPage() {
     const [showInProcess, setShowInProcess] = useState(false);
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
+    // Período (toggle por mes, todo el año actual, o select de año 2024 al 2029)
+    const YEARS_AVAILABLE = [2024, 2025, 2026, 2027, 2028, 2029];
+    const MONTHS_LIST = [
+        { value: 0, label: 'Enero' },
+        { value: 1, label: 'Febrero' },
+        { value: 2, label: 'Marzo' },
+        { value: 3, label: 'Abril' },
+        { value: 4, label: 'Mayo' },
+        { value: 5, label: 'Junio' },
+        { value: 6, label: 'Julio' },
+        { value: 7, label: 'Agosto' },
+        { value: 8, label: 'Septiembre' },
+        { value: 9, label: 'Octubre' },
+        { value: 10, label: 'Noviembre' },
+        { value: 11, label: 'Diciembre' },
+    ];
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth();
+    const [periodMode, setPeriodMode] = useState<'month' | 'year' | 'select_year' | 'all' | 'custom'>('all');
+    const [selectedYear, setSelectedYear] = useState<number>(
+        currentYear >= 2024 && currentYear <= 2029 ? currentYear : 2026
+    );
+    const [selectedMonth, setSelectedMonth] = useState<number>(currentMonth);
+
+    const applyPeriod = (
+        mode: 'month' | 'year' | 'select_year' | 'all',
+        yearVal?: number,
+        monthVal?: number
+    ) => {
+        const yr = yearVal ?? (mode === 'select_year' ? selectedYear : new Date().getFullYear());
+        const mo = monthVal ?? selectedMonth;
+
+        if (mode === 'month') {
+            const lastDay = new Date(yr, mo + 1, 0).getDate();
+            const startStr = `${yr}-${String(mo + 1).padStart(2, '0')}-01`;
+            const endStr = `${yr}-${String(mo + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+            setStartDate(startStr);
+            setEndDate(endStr);
+            setPeriodMode('month');
+        } else if (mode === 'year') {
+            const nowYear = new Date().getFullYear();
+            setStartDate(`${nowYear}-01-01`);
+            setEndDate(`${nowYear}-12-31`);
+            setPeriodMode('year');
+        } else if (mode === 'select_year') {
+            setStartDate(`${yr}-01-01`);
+            setEndDate(`${yr}-12-31`);
+            setPeriodMode('select_year');
+            setSelectedYear(yr);
+        } else if (mode === 'all') {
+            setStartDate('');
+            setEndDate('');
+            setPeriodMode('all');
+        }
+    };
+
     // Cancellation State
     const [cancelModalOpen, setCancelModalOpen] = useState(false);
     const [idToCancel, setIdToCancel] = useState<number | null>(null);
@@ -263,13 +340,17 @@ export default function OrdersPage() {
         setLoading(isLoadingCremations);
     }, [isLoadingCremations]);
 
-    // Seleccionar plantilla por defecto desde bootstrap
+    // Preseleccionar la plantilla predeterminada del crematorio (la elegida en
+    // Configuración) y, si no hay, la marcada como predeterminada — igual que el backend
     useEffect(() => {
         if (bootstrapCertTemplates.length > 0) {
-            const defTemplate = bootstrapCertTemplates.find((t: any) => t.is_default);
+            const preferredId = tenantData?.default_certificate_template_id;
+            const defTemplate =
+                (preferredId && bootstrapCertTemplates.find((t: any) => t.id === preferredId)) ||
+                bootstrapCertTemplates.find((t: any) => t.is_default);
             if (defTemplate) setSelectedTemplateId(defTemplate.id);
         }
-    }, [bootstrapCertTemplates]);
+    }, [bootstrapCertTemplates, tenantData?.default_certificate_template_id]);
 
     const fetchData = async () => {
         refetchCremations();
@@ -278,6 +359,7 @@ export default function OrdersPage() {
     const resetFilters = () => {
         setStartDate('');
         setEndDate('');
+        setPeriodMode('all');
         setSpecificStatus('all');
         setShowInProcess(false);
         setSortOrder('desc');
@@ -404,7 +486,7 @@ export default function OrdersPage() {
         fetchData();
     }, [startDate, endDate, specificStatus, sortOrder]);
 
-    // Cálculos para cards de resumen (Ingresos desde bootstrap = misma fuente que dashboard)
+    // Cálculos para cards de resumen (calculados dinámicamente según el período filtrado)
     const completedStatuses = ['completado', 'completed', 'entregado', 'delivered'];
     const cancelledStatuses = ['cancelado', 'canceled'];
 
@@ -415,7 +497,12 @@ export default function OrdersPage() {
         return isNaN(price) ? 0 : price;
     };
 
-    const totalCompletado = dashboardSummary?.stats.monthly_revenue || 0;
+    const totalCompletado = (cremations as any[])
+        .filter((c: any) => {
+            const s = c.status?.toLowerCase();
+            return completedStatuses.includes(s);
+        })
+        .reduce((acc: number, c: any) => acc + getPrice(c), 0);
 
     const pedidosPendientes = (cremations as any[])
         .filter((c: any) => {
@@ -470,8 +557,169 @@ export default function OrdersPage() {
 
     // Note: Date, Type, Status and Sort are handled in the backend now.
 
+    // Móvil: la búsqueda queda visible y el resto de filtros tras un botón
+    const [showFilters, setShowFilters] = useState(false);
+    const activeFilterCount = (startDate || endDate ? 1 : 0) + (specificStatus !== 'all' ? 1 : 0) + (showInProcess ? 1 : 0);
+
+    // Piezas compartidas entre la tabla (escritorio) y las tarjetas (móvil)
+    const renderPetThumb = (cremation: OrderRow, extraClass = '') => (
+        <div className={`w-12 h-12 rounded-2xl bg-white/5 overflow-hidden ${extraClass} border border-white/10 shadow-inner group-hover:border-primary/30 transition-colors shrink-0`}>
+            {cremation.pet_image_url ? (
+                <img
+                    src={getImageUrl(cremation.pet_image_url)}
+                    alt={cremation.pet_name}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://ui-avatars.com/api/?name=' + cremation.pet_name + '&background=random';
+                    }}
+                />
+            ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                    <Layout size={20} className="text-muted-foreground/30" />
+                </div>
+            )}
+        </div>
+    );
+
+    const renderStatusSelect = (cremation: OrderRow) => (
+        <SearchableSelect
+            options={[
+                { value: "pendiente", label: "Pendiente" },
+                { value: "en_proceso", label: "En proceso" },
+                { value: "entregado", label: "Entregado" },
+                { value: "cancelado", label: "Cancelado" }
+            ]}
+            value={cremation.status}
+            onChange={(val) => handleStatusChange(cremation.id, val)}
+            placeholder="Estado..."
+            renderTrigger={(selectedOpt, isOpen) => {
+                const st = statusMap[cremation.status?.trim().toLowerCase()] || {
+                    label: selectedOpt?.label || cremation.status || 'Estado...',
+                    bg: 'bg-white/5 hover:bg-white/10',
+                    border: 'border-white/10',
+                    text: 'text-foreground',
+                    dot: 'bg-muted-foreground',
+                    glow: ''
+                };
+                return (
+                    <div
+                        className={`group/badge flex items-center justify-between px-3 py-1.5 rounded-full border transition-all duration-200 backdrop-blur-md ${st.bg} ${st.border} ${st.glow} hover:scale-[1.02] active:scale-[0.98] ${
+                            isOpen ? 'ring-2 ring-primary/40' : ''
+                        }`}
+                    >
+                        <div className="flex items-center gap-2 min-w-0">
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${st.dot}`} />
+                            <span className={`text-xs font-black tracking-tight truncate ${st.text}`}>
+                                {st.label}
+                            </span>
+                        </div>
+                        <ChevronDown
+                            size={14}
+                            className={`shrink-0 ml-1.5 transition-transform duration-200 ${st.text} opacity-60 group-hover/badge:opacity-100 ${
+                                isOpen ? 'rotate-180' : ''
+                            }`}
+                        />
+                    </div>
+                );
+            }}
+            renderOption={(opt, isSelected) => {
+                const st = statusMap[String(opt.value).toLowerCase()] || {
+                    dot: 'bg-gray-400',
+                    text: 'text-gray-700'
+                };
+                return (
+                    <div
+                        className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
+                            isSelected
+                                ? 'bg-primary text-primary-foreground shadow-md'
+                                : 'hover:bg-gray-100 text-gray-700 hover:text-gray-900'
+                        }`}
+                    >
+                        <div className="flex items-center gap-2.5">
+                            <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-primary-foreground' : st.dot}`} />
+                            <span>{opt.label}</span>
+                        </div>
+                        {isSelected && <Check size={14} className="text-primary-foreground" />}
+                    </div>
+                );
+            }}
+        />
+    );
+
+    const renderActions = (cremation: OrderRow, align = 'justify-end') => {
+        const statusKey = cremation.status?.trim().toLowerCase();
+        return (
+            <div className={`flex items-center gap-2 ${align}`}>
+                {/* Acciones principales */}
+                <button
+                    onClick={() => router.push(`/dashboard/recepcion-pedidos?cremation_id=${cremation.id}`)}
+                    title="Modificar"
+                    className="p-2.5 rounded-xl transition-all duration-200 shadow-md border bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white border-blue-500/20 hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/10 active:scale-95"
+                >
+                    <Edit3 size={18} />
+                </button>
+                <button
+                    title="Generar Recibo"
+                    disabled={generatingReceiptId === cremation.id}
+                    onClick={() => handleGenerateReceipt(cremation.id)}
+                    className={`p-2.5 rounded-xl transition-all duration-200 shadow-md border ${generatingReceiptId === cremation.id
+                        ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
+                        : 'bg-purple-500/10 text-purple-400 hover:bg-purple-500 hover:text-white border-purple-500/20 hover:border-purple-500 hover:shadow-lg hover:shadow-purple-500/10 active:scale-95'
+                        }`}
+                >
+                    {generatingReceiptId === cremation.id ? <Loader2 size={18} className="animate-spin" /> : <FileText size={18} />}
+                </button>
+                <button
+                    onClick={() => {
+                        setSelectedCremationId(cremation.id);
+                        handleGenerateCertificate(cremation.id);
+                    }}
+                    disabled={generatingCertId === cremation.id || !canGenerateCert}
+                    title={canGenerateCert ? "Certificado" : "No incluido en tu plan"}
+                    className={`p-2.5 rounded-xl transition-all duration-200 shadow-md border ${canGenerateCert
+                        ? "bg-amber-500/10 text-amber-400 hover:bg-amber-500 hover:text-white border-amber-500/20 hover:border-amber-500 hover:shadow-lg hover:shadow-amber-500/10 active:scale-95"
+                        : "bg-white/5 text-muted-foreground/30 border-white/5 opacity-40 cursor-not-allowed"
+                        } disabled:opacity-50`}
+                >
+                    {generatingCertId === cremation.id ? <Loader2 className="animate-spin" size={18} /> : <Award size={18} />}
+                </button>
+                <button
+                    onClick={() => {
+                        if (canUseDesign) {
+                            setSelectedCremationId(cremation.id);
+                            setIsDesignFolderModalOpen(true);
+                        }
+                    }}
+                    disabled={!canUseDesign}
+                    title={canUseDesign ? "Diseño" : "No incluido en tu plan"}
+                    className={`p-2.5 rounded-xl transition-all duration-200 shadow-md border ${canUseDesign
+                        ? "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground border-primary/20 hover:border-primary hover:shadow-lg hover:shadow-primary/10 active:scale-95"
+                        : "bg-white/5 text-muted-foreground/30 border-white/5 opacity-40 cursor-not-allowed shadow-none"
+                        }`}
+                >
+                    <Palette size={18} />
+                </button>
+                {(['processing', 'en_proceso', 'pendiente', 'pending', 'received'].includes(statusKey)) && (
+                    <button
+                        onClick={() => {
+                            setItemToDelete(cremation.id);
+                            setIsDeleteModalOpen(true);
+                        }}
+                        title="Eliminar Orden"
+                        className="p-2.5 rounded-xl transition-all duration-200 shadow-md border bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border-red-500/20 hover:border-red-500 hover:shadow-lg hover:shadow-red-500/10 active:scale-95"
+                    >
+                        <Trash2 size={18} />
+                    </button>
+                )}
+            </div>
+        );
+    };
+
+    // El orden de la tabla se invertía con .reverse() sobre las filas; se conserva
+    const visibleCremations = [...paginatedCremations].reverse();
+
     return (
-        <div className="space-y-8">
+        <div className="space-y-6 sm:space-y-8">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -483,63 +731,162 @@ export default function OrdersPage() {
                 </div>
             </div>
 
+            {/* Selector / Toggle de Período */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2.5 sm:p-3 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-md">
+                <div className="flex items-center gap-2 px-1 text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    <Calendar size={15} className="text-primary" />
+                    <span>Período:</span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                    {/* Toggle Por Mes */}
+                    <div className="flex items-center">
+                        <button
+                            type="button"
+                            onClick={() => applyPeriod('month', undefined, selectedMonth)}
+                            className={`px-3.5 py-2 text-xs font-bold transition-all ${
+                                periodMode === 'month'
+                                    ? 'bg-primary text-primary-foreground shadow-md rounded-l-xl'
+                                    : 'bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground rounded-xl'
+                            }`}
+                        >
+                            Por Mes
+                        </button>
+                        {periodMode === 'month' && (
+                            <select
+                                value={selectedMonth}
+                                onChange={(e) => {
+                                    const m = parseInt(e.target.value, 10);
+                                    setSelectedMonth(m);
+                                    applyPeriod('month', undefined, m);
+                                }}
+                                className="bg-primary text-primary-foreground text-xs font-bold px-2 py-2 rounded-r-xl border-l border-white/20 outline-none cursor-pointer"
+                            >
+                                {MONTHS_LIST.map((m) => (
+                                    <option key={m.value} value={m.value} className="bg-neutral-900 text-white">
+                                        {m.label}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+                    </div>
+
+                    {/* Toggle Todo el año actual */}
+                    <button
+                        type="button"
+                        onClick={() => applyPeriod('year')}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                            periodMode === 'year'
+                                ? 'bg-primary text-primary-foreground shadow-md'
+                                : 'bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground'
+                        }`}
+                    >
+                        Todo el año actual
+                    </button>
+
+                    {/* Select Año (2024 al 2029) */}
+                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition-all border ${
+                        periodMode === 'select_year'
+                            ? 'bg-primary text-primary-foreground border-primary shadow-md'
+                            : 'bg-white/5 border-white/10 text-muted-foreground hover:border-white/20'
+                    }`}>
+                        <span className="font-bold">Año:</span>
+                        <select
+                            value={selectedYear}
+                            onChange={(e) => {
+                                const yr = parseInt(e.target.value, 10);
+                                setSelectedYear(yr);
+                                applyPeriod('select_year', yr);
+                            }}
+                            className={`bg-transparent text-xs font-bold border-none outline-none cursor-pointer pr-1 py-0.5 ${
+                                periodMode === 'select_year' ? 'text-primary-foreground font-extrabold' : 'text-foreground'
+                            }`}
+                        >
+                            {YEARS_AVAILABLE.map((yr) => (
+                                <option key={yr} value={yr} className="bg-neutral-900 text-white">
+                                    {yr}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Histórico Completo */}
+                    <button
+                        type="button"
+                        onClick={() => applyPeriod('all')}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                            periodMode === 'all'
+                                ? 'bg-primary text-primary-foreground shadow-md'
+                                : 'bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground'
+                        }`}
+                    >
+                        Histórico
+                    </button>
+                </div>
+            </div>
+
             {/* Summary Cards — desde los datos de la tabla */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-                <div className="glass-card p-4 sm:p-6 lg:p-8 rounded-2xl sm:rounded-3xl relative overflow-hidden group">
+                <div className="glass-card p-3 sm:p-6 lg:p-8 rounded-2xl sm:rounded-3xl relative overflow-hidden group">
                     <div className="flex items-center justify-between">
-                        <div className="p-3 rounded-2xl bg-primary/10 text-primary">
-                            <TrendingUp size={24} />
+                        <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-primary/10 text-primary">
+                            <TrendingUp size={20} />
                         </div>
-                        <span className="text-xs font-bold text-emerald-400">Completados</span>
+                        <span className="hidden sm:inline text-xs font-bold text-emerald-400">
+                            {periodMode === 'month' ? `${MONTHS_LIST[selectedMonth]?.label || 'Del Mes'}` : periodMode === 'year' ? `Año ${new Date().getFullYear()}` : periodMode === 'select_year' ? `Año ${selectedYear}` : 'Completados'}
+                        </span>
                     </div>
-                    <p className="mt-4 text-muted-foreground text-sm font-medium">Ingresos</p>
-                    <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold mt-1 tabular-nums break-all">${totalCompletado.toLocaleString()}</h3>
+                    <p className="mt-2 sm:mt-4 text-muted-foreground text-xs sm:text-sm font-medium">Ingresos</p>
+                    <h3 className="text-lg sm:text-2xl lg:text-3xl font-bold mt-1 tabular-nums break-all">{formatCLP(totalCompletado)}</h3>
                     <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-primary/5 rounded-full blur-2xl" />
                 </div>
 
-                <div className="glass-card p-4 sm:p-6 lg:p-8 rounded-2xl sm:rounded-3xl relative overflow-hidden group">
+                <div className="glass-card p-3 sm:p-6 lg:p-8 rounded-2xl sm:rounded-3xl relative overflow-hidden group">
                     <div className="flex items-center justify-between">
-                        <div className="p-3 rounded-2xl bg-yellow-500/10 text-yellow-500">
-                            <Clock size={24} />
+                        <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-yellow-500/10 text-yellow-500">
+                            <Clock size={20} />
                         </div>
-                        <span className="text-xs font-bold text-yellow-500">Por Cobrar</span>
+                        <span className="hidden sm:inline text-xs font-bold text-yellow-500">Por Cobrar</span>
                     </div>
-                    <p className="mt-4 text-muted-foreground text-sm font-medium">Pendientes</p>
-                    <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold mt-1 tabular-nums break-all">${pedidosPendientes.toLocaleString()}</h3>
+                    <p className="mt-2 sm:mt-4 text-muted-foreground text-xs sm:text-sm font-medium">Pendientes</p>
+                    <h3 className="text-lg sm:text-2xl lg:text-3xl font-bold mt-1 tabular-nums break-all">{formatCLP(pedidosPendientes)}</h3>
                 </div>
 
-                <div className="glass-card p-4 sm:p-6 lg:p-8 rounded-2xl sm:rounded-3xl relative overflow-hidden group">
+                <div className="glass-card p-3 sm:p-6 lg:p-8 rounded-2xl sm:rounded-3xl relative overflow-hidden group">
                     <div className="flex items-center justify-between">
-                        <div className="p-3 rounded-2xl bg-white/5" style={{ color: 'lab(54.1736% 13.3368 -74.6839)', backgroundColor: 'lab(54.1736% 13.3368 -74.6839 / 0.1)' }}>
-                            <Clock size={24} />
+                        <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-white/5" style={{ color: 'lab(54.1736% 13.3368 -74.6839)', backgroundColor: 'lab(54.1736% 13.3368 -74.6839 / 0.1)' }}>
+                            <Clock size={20} />
                         </div>
-                        <span className="text-xs font-bold" style={{ color: 'lab(54.1736% 13.3368 -74.6839)' }}>Acción Requerida</span>
+                        <span className="hidden sm:inline text-xs font-bold" style={{ color: 'lab(54.1736% 13.3368 -74.6839)' }}>Acción Requerida</span>
                     </div>
-                    <p className="mt-4 text-muted-foreground text-sm font-medium">Órdenes en Proceso</p>
-                    <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold mt-1 tabular-nums">{pedidosEnProceso}</h3>
+                    <p className="mt-2 sm:mt-4 text-muted-foreground text-xs sm:text-sm font-medium">Órdenes en Proceso</p>
+                    <h3 className="text-lg sm:text-2xl lg:text-3xl font-bold mt-1 tabular-nums">{pedidosEnProceso}</h3>
                 </div>
 
-                <div className="glass-card p-4 sm:p-6 lg:p-8 rounded-2xl sm:rounded-3xl relative overflow-hidden group">
+                <div className="glass-card p-3 sm:p-6 lg:p-8 rounded-2xl sm:rounded-3xl relative overflow-hidden group">
                     <div className="flex items-center justify-between">
-                        <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-400">
-                            <CheckCircle2 size={24} />
+                        <div className="p-2 sm:p-3 rounded-xl sm:rounded-2xl bg-emerald-500/10 text-emerald-400">
+                            <CheckCircle2 size={20} />
                         </div>
-                        <span className="text-xs font-bold text-emerald-400">Histórico</span>
+                        <span className="hidden sm:inline text-xs font-bold text-emerald-400">
+                            {periodMode === 'month' ? `${MONTHS_LIST[selectedMonth]?.label || 'Del Mes'}` : periodMode === 'year' ? `Año ${new Date().getFullYear()}` : periodMode === 'select_year' ? `Año ${selectedYear}` : 'Histórico'}
+                        </span>
                     </div>
-                    <p className="mt-4 text-muted-foreground text-sm font-medium">Total Completados</p>
-                    <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold mt-1 tabular-nums">{totalCompletadosCount}</h3>
+                    <p className="mt-2 sm:mt-4 text-muted-foreground text-xs sm:text-sm font-medium">Total Completados</p>
+                    <h3 className="text-lg sm:text-2xl lg:text-3xl font-bold mt-1 tabular-nums">{totalCompletadosCount}</h3>
                 </div>
             </div>
 
             {/* Main Content */}
             <div className="glass-card rounded-[2.5rem] overflow-hidden">
-                <div className="p-6 lg:p-8 border-b border-white/5 bg-white/5 space-y-6">
+                <div className="p-4 sm:p-6 lg:p-8 border-b border-white/5 bg-white/5 space-y-6">
                     {/* Simplified Filters Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-12 gap-4 items-end">
-                        {/* Search Bar */}
+                        {/* Search Bar (+ botón de filtros en móvil) */}
                         <div className="xl:col-span-4 space-y-2">
                             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Búsqueda rápida</label>
-                            <div className="relative">
+                            <div className="flex gap-2">
+                            <div className="relative flex-1 min-w-0">
                                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
                                 <input
                                     type="text"
@@ -549,30 +896,49 @@ export default function OrdersPage() {
                                     className="w-full bg-background/50 border border-white/10 rounded-2xl py-3 pl-12 pr-4 text-sm outline-none focus:border-primary/50 transition-all font-medium h-[50px]"
                                 />
                             </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowFilters(v => !v)}
+                                className={`md:hidden relative h-[50px] px-4 rounded-2xl border flex items-center gap-2 text-sm font-bold shrink-0 ${showFilters ? 'bg-primary/10 border-primary/40 text-primary' : 'bg-white/5 border-white/10 text-foreground'}`}
+                                aria-expanded={showFilters}
+                            >
+                                <SlidersHorizontal size={18} />
+                                Filtros
+                                {activeFilterCount > 0 && (
+                                    <span className="min-w-5 h-5 px-1 rounded-full bg-primary text-primary-foreground text-[11px] flex items-center justify-center">{activeFilterCount}</span>
+                                )}
+                            </button>
+                            </div>
                         </div>
 
                         {/* Date Range */}
-                        <div className="space-y-2 xl:col-span-3">
+                        <div className={`${showFilters ? 'block' : 'hidden'} md:block space-y-2 xl:col-span-3`}>
                             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Rango de Fechas</label>
                             <div className="flex items-center gap-2 h-[50px] bg-background border border-white/10 rounded-2xl px-3 group overflow-hidden">
                                 <input
                                     type="date"
                                     value={startDate}
-                                    onChange={e => setStartDate(e.target.value)}
+                                    onChange={e => {
+                                        setStartDate(e.target.value);
+                                        setPeriodMode('custom');
+                                    }}
                                     className="bg-transparent border-none text-xs text-foreground outline-none w-full cursor-pointer min-w-0"
                                 />
                                 <span className="text-muted-foreground/30">-</span>
                                 <input
                                     type="date"
                                     value={endDate}
-                                    onChange={e => setEndDate(e.target.value)}
+                                    onChange={e => {
+                                        setEndDate(e.target.value);
+                                        setPeriodMode('custom');
+                                    }}
                                     className="bg-transparent border-none text-xs text-foreground outline-none w-full cursor-pointer min-w-0"
                                 />
                             </div>
                         </div>
 
                         {/* Status Filter */}
-                        <div className="space-y-2 xl:col-span-2">
+                        <div className={`${showFilters ? 'block' : 'hidden'} md:block space-y-2 xl:col-span-2`}>
                             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Estado</label>
                             <SearchableSelect
                                 options={[
@@ -594,19 +960,19 @@ export default function OrdersPage() {
                                         <div
                                             className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
                                                 isSelected
-                                                    ? 'bg-primary text-white shadow-md'
+                                                    ? 'bg-primary text-primary-foreground shadow-md'
                                                     : 'hover:bg-gray-100 text-gray-700 hover:text-gray-900'
                                             }`}
                                         >
                                             <div className="flex items-center gap-2.5">
                                                 {opt.value !== 'all' ? (
-                                                    <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-white' : st.dot}`} />
+                                                    <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-primary-foreground' : st.dot}`} />
                                                 ) : (
-                                                    <span className={`w-2.5 h-2.5 rounded-full border border-gray-400 ${isSelected ? 'border-white' : ''}`} />
+                                                    <span className={`w-2.5 h-2.5 rounded-full border border-gray-400 ${isSelected ? 'border-primary-foreground' : ''}`} />
                                                 )}
                                                 <span>{opt.label}</span>
                                             </div>
-                                            {isSelected && <Check size={14} className="text-white" />}
+                                            {isSelected && <Check size={14} className="text-primary-foreground" />}
                                         </div>
                                     );
                                 }}
@@ -614,7 +980,7 @@ export default function OrdersPage() {
                         </div>
 
                         {/* Actions, Sort & "Ver en proceso" Checkbox */}
-                        <div className="flex items-center gap-2 h-[50px] xl:col-span-3">
+                        <div className={`${showFilters ? 'flex' : 'hidden'} md:flex items-center gap-2 h-[50px] xl:col-span-3`}>
                             <button
                                 onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
                                 className="flex items-center justify-center gap-2 px-3.5 bg-white/5 border border-white/10 text-foreground rounded-2xl hover:bg-white/10 transition-all h-[50px] shrink-0"
@@ -643,7 +1009,7 @@ export default function OrdersPage() {
                                 </div>
                                 {pedidosEnProceso > 0 && (
                                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold shrink-0 ${
-                                        showInProcess ? 'bg-primary text-white' : 'bg-white/10 text-muted-foreground'
+                                        showInProcess ? 'bg-primary text-primary-foreground' : 'bg-white/10 text-muted-foreground'
                                     }`}>
                                         {pedidosEnProceso}
                                     </span>
@@ -659,8 +1025,40 @@ export default function OrdersPage() {
                         <p className="text-muted-foreground font-medium">Obteniendo servicios...</p>
                     </div>
                 ) : (
-                    <div className="relative">
-                        {/* Swipe indicator gradient — only visible on touch / narrow screens */}
+                    <>
+                    {/* Móvil: tarjetas */}
+                    <div className="md:hidden divide-y divide-white/5">
+                        {visibleCremations.length > 0 ? visibleCremations.map((cremation: OrderRow) => (
+                            <div key={cremation.id} className="p-4 space-y-3">
+                                <div className="flex items-center gap-3">
+                                    {renderPetThumb(cremation)}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-bold truncate">{cremation.pet_name || 'Sin nombre'}</p>
+                                        <p className="text-xs text-muted-foreground truncate">{cremation.customer_name || `Cliente #${cremation.pet_id || '...'}`}</p>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                        <p className="text-sm font-bold tabular-nums">{formatCLP(cremation.total_price)}</p>
+                                        <p className="text-[11px] text-muted-foreground font-mono">#OC-{cremation.oc_number || cremation.id}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                                    <span>{orderDate(cremation)}</span>
+                                    <span className="truncate">{cremation.cremation_type || 'Servicio'}</span>
+                                </div>
+                                {renderStatusSelect(cremation)}
+                                {renderActions(cremation, 'justify-between')}
+                            </div>
+                        )) : (
+                            <div className="px-6 py-16 text-center">
+                                <Layout size={40} className="mx-auto mb-3 text-muted-foreground/20" />
+                                <p className="text-muted-foreground text-sm font-medium">No se han registrado servicios en este periodo.</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Escritorio: tabla */}
+                    <div className="relative hidden md:block">
+                        {/* Swipe indicator gradient — tablets */}
                         <div className="pointer-events-none absolute top-0 right-0 bottom-0 w-8 bg-gradient-to-l from-card/80 to-transparent lg:hidden z-10" />
                         <div className="lg:hidden absolute top-1.5 right-2 z-20 text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 bg-card/70 px-2 py-1 rounded-md border border-white/5 pointer-events-none">
                             Deslizar →
@@ -678,42 +1076,20 @@ export default function OrdersPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5">
-                                {paginatedCremations.length > 0 ? paginatedCremations.map((cremation: any) => {
-                                    const statusKey = cremation.status?.trim().toLowerCase();
-                                    const status = statusMap[statusKey] || { label: cremation.status, color: 'text-gray-400 bg-gray-400/10' };
-
+                                {visibleCremations.length > 0 ? visibleCremations.map((cremation: any) => {
                                     return (
                                         <tr key={cremation.id} className="hover:bg-white/[0.02] transition-colors group">
                                             <td className="px-8 py-6">
                                                 <div>
                                                     <p className="font-bold text-sm">#OC-{cremation.oc_number || cremation.id}</p>
                                                     <p className="text-[10px] text-muted-foreground font-medium mt-1">
-                                                        {cremation.scheduled_at 
-                                                            ? new Date(cremation.scheduled_at).toLocaleString() 
-                                                            : cremation.created_at 
-                                                                ? new Date(cremation.created_at).toLocaleString() 
-                                                                : 'Sin fecha'}
+                                                        {orderDate(cremation)}
                                                     </p>
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6">
                                                 <div className="flex items-center">
-                                                    <div className="w-12 h-12 rounded-2xl bg-white/5 overflow-hidden mr-3 border border-white/10 shadow-inner group-hover:border-primary/30 transition-colors">
-                                                        {cremation.pet_image_url ? (
-                                                            <img
-                                                                src={getImageUrl(cremation.pet_image_url)}
-                                                                alt={cremation.pet_name}
-                                                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                                                onError={(e) => {
-                                                                    (e.target as HTMLImageElement).src = 'https://ui-avatars.com/api/?name=' + cremation.pet_name + '&background=random';
-                                                                }}
-                                                            />
-                                                        ) : (
-                                                            <div className="w-full h-full flex items-center justify-center">
-                                                                <Layout size={20} className="text-muted-foreground/30" />
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                    {renderPetThumb(cremation, "mr-3")}
                                                     <div>
                                                         <span className="text-sm font-bold block">{cremation.pet_name || 'Cargando...'}</span>
                                                         <span className="text-[10px] text-muted-foreground">{cremation.cremation_type || 'Servicio'}</span>
@@ -726,142 +1102,19 @@ export default function OrdersPage() {
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6">
-                                                <span className="font-bold text-sm">${(cremation.total_price || 0).toLocaleString()}</span>
+                                                <span className="font-bold text-sm">{formatCLP(cremation.total_price)}</span>
                                             </td>
                                             <td className="px-8 py-6">
                                                 <div className="w-40">
-                                                    <SearchableSelect
-                                                        options={[
-                                                            { value: "pendiente", label: "Pendiente" },
-                                                            { value: "en_proceso", label: "En proceso" },
-                                                            { value: "entregado", label: "Entregado" },
-                                                            { value: "cancelado", label: "Cancelado" }
-                                                        ]}
-                                                        value={cremation.status}
-                                                        onChange={(val) => handleStatusChange(cremation.id, val)}
-                                                        placeholder="Estado..."
-                                                        renderTrigger={(selectedOpt, isOpen) => {
-                                                            const st = statusMap[cremation.status?.trim().toLowerCase()] || {
-                                                                label: selectedOpt?.label || cremation.status || 'Estado...',
-                                                                bg: 'bg-white/5 hover:bg-white/10',
-                                                                border: 'border-white/10',
-                                                                text: 'text-foreground',
-                                                                dot: 'bg-muted-foreground',
-                                                                glow: ''
-                                                            };
-                                                            return (
-                                                                <div
-                                                                    className={`group/badge flex items-center justify-between px-3 py-1.5 rounded-full border transition-all duration-200 backdrop-blur-md ${st.bg} ${st.border} ${st.glow} hover:scale-[1.02] active:scale-[0.98] ${
-                                                                        isOpen ? 'ring-2 ring-primary/40' : ''
-                                                                    }`}
-                                                                >
-                                                                    <div className="flex items-center gap-2 min-w-0">
-                                                                        <span className={`w-2 h-2 rounded-full shrink-0 ${st.dot}`} />
-                                                                        <span className={`text-xs font-black tracking-tight truncate ${st.text}`}>
-                                                                            {st.label}
-                                                                        </span>
-                                                                    </div>
-                                                                    <ChevronDown
-                                                                        size={14}
-                                                                        className={`shrink-0 ml-1.5 transition-transform duration-200 ${st.text} opacity-60 group-hover/badge:opacity-100 ${
-                                                                            isOpen ? 'rotate-180' : ''
-                                                                        }`}
-                                                                    />
-                                                                </div>
-                                                            );
-                                                        }}
-                                                        renderOption={(opt, isSelected) => {
-                                                            const st = statusMap[String(opt.value).toLowerCase()] || {
-                                                                dot: 'bg-gray-400',
-                                                                text: 'text-gray-700'
-                                                            };
-                                                            return (
-                                                                <div
-                                                                    className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${
-                                                                        isSelected
-                                                                            ? 'bg-primary text-white shadow-md'
-                                                                            : 'hover:bg-gray-100 text-gray-700 hover:text-gray-900'
-                                                                    }`}
-                                                                >
-                                                                    <div className="flex items-center gap-2.5">
-                                                                        <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-white' : st.dot}`} />
-                                                                        <span>{opt.label}</span>
-                                                                    </div>
-                                                                    {isSelected && <Check size={14} className="text-white" />}
-                                                                </div>
-                                                            );
-                                                        }}
-                                                    />
+                                                    {renderStatusSelect(cremation)}
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6 text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    {/* Acciones principales */}
-                                                    <button
-                                                        onClick={() => router.push(`/dashboard/recepcion-pedidos?cremation_id=${cremation.id}`)}
-                                                        title="Modificar"
-                                                        className="p-2.5 rounded-xl transition-all duration-200 shadow-md border bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white border-blue-500/20 hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/10 active:scale-95"
-                                                    >
-                                                        <Edit3 size={18} />
-                                                    </button>
-                                                    <button
-                                                        title="Generar Recibo"
-                                                        disabled={generatingReceiptId === cremation.id}
-                                                        onClick={() => handleGenerateReceipt(cremation.id)}
-                                                        className={`p-2.5 rounded-xl transition-all duration-200 shadow-md border ${generatingReceiptId === cremation.id
-                                                            ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
-                                                            : 'bg-purple-500/10 text-purple-400 hover:bg-purple-500 hover:text-white border-purple-500/20 hover:border-purple-500 hover:shadow-lg hover:shadow-purple-500/10 active:scale-95'
-                                                            }`}
-                                                    >
-                                                        {generatingReceiptId === cremation.id ? <Loader2 size={18} className="animate-spin" /> : <FileText size={18} />}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            setSelectedCremationId(cremation.id);
-                                                            handleGenerateCertificate(cremation.id);
-                                                        }}
-                                                        disabled={generatingCertId === cremation.id || !canGenerateCert}
-                                                        title={canGenerateCert ? "Certificado" : "No incluido en tu plan"}
-                                                        className={`p-2.5 rounded-xl transition-all duration-200 shadow-md border ${canGenerateCert
-                                                            ? "bg-amber-500/10 text-amber-400 hover:bg-amber-500 hover:text-white border-amber-500/20 hover:border-amber-500 hover:shadow-lg hover:shadow-amber-500/10 active:scale-95"
-                                                            : "bg-white/5 text-muted-foreground/30 border-white/5 opacity-40 cursor-not-allowed"
-                                                            } disabled:opacity-50`}
-                                                    >
-                                                        {generatingCertId === cremation.id ? <Loader2 className="animate-spin" size={18} /> : <Award size={18} />}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            if (canUseDesign) {
-                                                                setSelectedCremationId(cremation.id);
-                                                                setIsDesignFolderModalOpen(true);
-                                                            }
-                                                        }}
-                                                        disabled={!canUseDesign}
-                                                        title={canUseDesign ? "Diseño" : "No incluido en tu plan"}
-                                                        className={`p-2.5 rounded-xl transition-all duration-200 shadow-md border ${canUseDesign
-                                                            ? "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground border-primary/20 hover:border-primary hover:shadow-lg hover:shadow-primary/10 active:scale-95"
-                                                            : "bg-white/5 text-muted-foreground/30 border-white/5 opacity-40 cursor-not-allowed shadow-none"
-                                                            }`}
-                                                    >
-                                                        <Palette size={18} />
-                                                    </button>
-                                                    {(['processing', 'en_proceso', 'pendiente', 'pending', 'received'].includes(statusKey)) && (
-                                                        <button
-                                                            onClick={() => {
-                                                                setItemToDelete(cremation.id);
-                                                                setIsDeleteModalOpen(true);
-                                                            }}
-                                                            title="Eliminar Orden"
-                                                            className="p-2.5 rounded-xl transition-all duration-200 shadow-md border bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border-red-500/20 hover:border-red-500 hover:shadow-lg hover:shadow-red-500/10 active:scale-95"
-                                                        >
-                                                            <Trash2 size={18} />
-                                                        </button>
-                                                    )}
-                                                </div>
+                                                {renderActions(cremation, "justify-end")}
                                             </td>
                                         </tr>
                                     );
-                                }).reverse() : (
+                                }) : (
                                     <tr>
                                         <td colSpan={6} className="px-8 py-20 text-center">
                                             <Layout size={48} className="mx-auto mb-4 text-muted-foreground/20" />
@@ -873,6 +1126,7 @@ export default function OrdersPage() {
                         </table>
                         </div>
                     </div>
+                    </>
                 )}
 
                 {/* Pagination Controls */}

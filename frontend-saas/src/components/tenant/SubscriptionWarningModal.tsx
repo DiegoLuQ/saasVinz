@@ -6,9 +6,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, Clock, X, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useIsOwner } from "@/hooks/useSessionBootstrap";
 
 export function SubscriptionWarningModal() {
     const { tenantData } = useTenant();
+    const isOwner = useIsOwner();
     const [showModal, setShowModal] = useState(false);
     const [status, setStatus] = useState<"warning" | "grace" | null>(null);
     const [daysRemaining, setDaysRemaining] = useState<number>(0);
@@ -74,7 +76,7 @@ export function SubscriptionWarningModal() {
         setShowModal(false);
     };
 
-    if (!showModal || !status) return null;
+    if (isOwner !== true || !showModal || !status) return null;
 
     const isGrace = status === "grace";
 

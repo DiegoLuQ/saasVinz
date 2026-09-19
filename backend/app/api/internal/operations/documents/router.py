@@ -5,6 +5,7 @@ from app.database import get_db
 from app import models
 from app import schemas
 from app.api.deps import get_tenant_id
+from app.api.internal.admin.rbac.router import check_permission
 from app.api.deps_features import check_feature
 from typing import List, Optional
 import shutil
@@ -18,11 +19,133 @@ from app.api.internal.common.media_service import MediaService
 
 router = APIRouter()
 
+
+# Plantillas que NO son certificados (no deben elegirse al emitir uno)
+RECEIPT_TEMPLATE_CATEGORIES = ("recibo_suscripcion",)
+
+# Origen de la plantilla resuelta (para explicarlo en la UI)
+SOURCE_LABELS = {
+    "elegida": "Seleccionada (aún sin guardar)",
+    "configuracion": "Predeterminada del crematorio (Configuración)",
+    "propia": "Plantilla propia marcada como predeterminada",
+    "sistema": "Predeterminada del sistema",
+    "basica": "Formato básico del sistema",
+}
+
+
+def _certificate_templates(db: Session, tenant_id: int):
+    """Plantillas de certificado visibles para el tenant (propias + globales), sin recibos."""
+    return db.query(models.CertificateTemplate).filter(
+        or_(models.CertificateTemplate.tenant_id == tenant_id, models.CertificateTemplate.tenant_id.is_(None)),
+        or_(models.CertificateTemplate.category.is_(None),
+            models.CertificateTemplate.category.notin_(RECEIPT_TEMPLATE_CATEGORIES)),
+    )
+
+
+def resolve_certificate_template(db: Session, tenant: Optional[models.Tenant], template_id: Optional[int] = None):
+    """(plantilla, origen) que se usa al emitir un certificado.
+
+    Orden: la indicada > la elegida en Configuración (tenant.default_certificate_template_id)
+    > la propia marcada is_default > la global is_default > None (formato básico).
+    Antes se ignoraba la elección de Configuración y el fallback global podía
+    caer en la plantilla de recibo de suscripción.
+    """
+    tenant_id = tenant.id if tenant else None
+    q = _certificate_templates(db, tenant_id)
+    if template_id:
+        t = q.filter(models.CertificateTemplate.id == template_id).first()
+        if t:
+            is_saved_default = bool(tenant and tenant.default_certificate_template_id == t.id)
+            return t, "configuracion" if is_saved_default else "elegida"
+    if tenant and tenant.default_certificate_template_id:
+        t = q.filter(models.CertificateTemplate.id == tenant.default_certificate_template_id).first()
+        if t:
+            return t, "configuracion"
+    t = q.filter(models.CertificateTemplate.tenant_id == tenant_id, models.CertificateTemplate.is_default == True).first()  # noqa: E712
+    if t:
+        return t, "propia"
+    t = q.filter(models.CertificateTemplate.tenant_id.is_(None), models.CertificateTemplate.is_default == True).first()  # noqa: E712
+    if t:
+        return t, "sistema"
+    return None, "basica"
+
+
+def _render_preview(request: Request, tenant: models.Tenant, template: Optional[models.CertificateTemplate], tenant_overrides: Optional[dict] = None) -> dict:
+    """Renderiza la plantilla con una mascota de ejemplo y los datos reales de la
+    empresa (o los aún no guardados que llegan en tenant_overrides)."""
+    ov = {k: v for k, v in (tenant_overrides or {}).items() if v is not None}
+    tenant_name = ov.get("name", tenant.name if tenant else "Crematorio")
+    now = tz.get_now()
+    logo_url = tenant.logo_url if tenant and tenant.logo_url else "https://saascrematorio.com/logo-default.png"
+    base_url = str(request.base_url).rstrip('/')
+
+    if template and template.category == "certificadoImg":
+        sc = template.sections_config or {}
+        return generate_image_certificate_html(
+            background_url=template.background_logo_url,
+            aspect_ratio=sc.get("aspect_ratio", "16:9"),
+            fields=sc.get("fields", []),
+            elements=sc.get("elements", []),
+            pet_name="Mascota de Prueba",
+            birth_date=datetime(now.year - 12, 3, 15),
+            death_date=datetime(now.year, now.month, 1),
+            current_date=now,
+            pet_images=[],
+            tenant_logo_url=logo_url,
+            tenant_name=tenant_name or "",
+            tenant_rut=ov.get("rut", tenant.rut if tenant else "") or "",
+            tenant_manager=ov.get("legal_rep_name", tenant.legal_rep_name if tenant else "") or "",
+            tenant_manager_rut=ov.get("legal_rep_rut", tenant.legal_rep_rut if tenant else "") or "",
+            tenant_phone=(tenant.phone if tenant else "") or "",
+            tenant_address=(tenant.address if tenant else "") or "",
+            certificate_type="Certificado",
+            cert_number="PREVIEW-001",
+            tenant_id=tenant.id if tenant else 0,
+            base_url=base_url,
+        )
+
+    t = template
+    data = {
+        "certificate_type": "Certificado",
+        "theme": (t.theme if t else None) or "Clásico",
+        "tenant_id": tenant.id if tenant else 0,
+        "logo_url": logo_url,
+        "cert_number": "PREVIEW-001",
+        "pet_name": "Mascota de Prueba",
+        "pet_desc": "Especie, Raza",
+        "owner_name": "Propietario de Prueba",
+        "owner_contact": "correo@prueba.com +00 000 000 000",
+        "process_details": f"Servicio realizado el día {now.strftime('%d/%m/%Y')}.",
+        "auth_declaration": (t.declaration_text if t else None) or "Se certifica la autenticidad y el respeto absoluto.",
+        "signature_text": (t.signature_text if t else None) or f"Administración {tenant_name}",
+        "memorial_message": (t.memorial_message if t else None) or "",
+        "memorial_title": (t.memorial_title if t else None) or "In Memoriam",
+        "header_logo_url": t.header_logo_url if t else None,
+        "header_logo_x": (t.header_logo_x if t else None) or "center",
+        "header_logo_y": (t.header_logo_y if t else None) or "0",
+        "background_logo_url": t.background_logo_url if t else None,
+        "background_logo_x": (t.background_logo_x if t else None) or "50%",
+        "background_logo_y": (t.background_logo_y if t else None) or "50%",
+        "background_logo_opacity": t.background_logo_opacity if t and t.background_logo_opacity is not None else 0.05,
+        "background_logo_rotation": t.background_logo_rotation if t and t.background_logo_rotation is not None else -15.0,
+        "paper_format": (t.paper_format if t else None) or "Carta",
+        "title": t.title if t else None,
+        "subtitle": t.subtitle if t else None,
+        "farewell_text": t.farewell_text if t else None,
+        "sections_config": t.sections_config if t else None,
+        "sections_order": t.sections_order if t else None,
+        "header_logo_shape": (t.header_logo_shape if t else None) or "square",
+        "background_logo_shape": (t.background_logo_shape if t else None) or "square",
+    }
+    return generate_certificate_json(**data, base_url=base_url)
+
+
 @router.get("/")
 @router.get("")  # Handle both with and without trailing slash
 def obtener_todos_los_documentos(
     db: Session = Depends(get_db),
-    tenant_id: int = Depends(get_tenant_id)
+    tenant_id: int = Depends(get_tenant_id),
+    _perm: bool = Depends(check_permission("certificados", "view"))
 ):
     """Obtiene todos los certificados emitidos con datos de mascota y cremación + estadísticas."""
     import traceback
@@ -97,7 +220,7 @@ def obtener_todos_los_documentos(
 
 
 @router.delete("/certificates/{cert_id}")
-def eliminar_certificado(cert_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+def eliminar_certificado(cert_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id), _perm: bool = Depends(check_permission("certificados", "delete"))):
     cert = db.query(models.Certificate).filter(
         models.Certificate.id == cert_id,
         models.Certificate.tenant_id == tenant_id
@@ -109,7 +232,7 @@ def eliminar_certificado(cert_id: int, db: Session = Depends(get_db), tenant_id:
     return {"message": "Certificado eliminado"}
 
 @router.get("/certificates/{cert_id}/content")
-def obtener_contenido_certificado(cert_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+def obtener_contenido_certificado(cert_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id), _perm: bool = Depends(check_permission("certificados", "view"))):
     cert = db.query(models.Certificate.html_content).filter(
         models.Certificate.id == cert_id,
         models.Certificate.tenant_id == tenant_id
@@ -121,7 +244,7 @@ def obtener_contenido_certificado(cert_id: int, db: Session = Depends(get_db), t
     return {"html_content": cert.html_content}
 
 @router.delete("/files/{doc_id}")
-def eliminar_documento_subido(doc_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+def eliminar_documento_subido(doc_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id), _perm: bool = Depends(check_permission("certificados", "delete"))):
     doc = db.query(models.Document).filter(
         models.Document.id == doc_id,
         models.Document.tenant_id == tenant_id
@@ -138,7 +261,8 @@ def generar_certificado(
     request: Request,
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
-    _feat: bool = Depends(check_feature("certificados:generar_pdf"))
+    _feat: bool = Depends(check_feature("certificados:generar_pdf")),
+    _perm: bool = Depends(check_permission("certificados", "create"))
 ):
     """Genera un certificado basado en datos de la DB, manuales y plantillas."""
     try:
@@ -153,17 +277,9 @@ def generar_certificado(
                 )
             ).first()
         else:
-            # Buscar plantilla por defecto del tenant
-            template = db.query(models.CertificateTemplate).filter(
-                models.CertificateTemplate.tenant_id == tenant_id,
-                models.CertificateTemplate.is_default == True
-            ).first()
-            # Si no tiene por defecto, buscar plantilla global por defecto
-            if not template:
-                template = db.query(models.CertificateTemplate).filter(
-                    models.CertificateTemplate.tenant_id.is_(None),
-                    models.CertificateTemplate.is_default == True
-                ).first()
+            # Predeterminada del crematorio (Configuración) > propia > global; nunca un recibo
+            tenant_row = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+            template, _ = resolve_certificate_template(db, tenant_row)
 
         # 2. Obtener datos básicos del Tenant
         tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
@@ -218,6 +334,7 @@ def generar_certificado(
                 current_date=now,
                 pet_images=pet_images,
                 tenant_logo_url=logo_url,
+                tenant_name=(tenant.name if tenant else "") or "",
                 tenant_rut=(tenant.rut if tenant else "") or "",
                 tenant_manager=(tenant.legal_rep_name if tenant else "") or "",
                 tenant_manager_rut=(tenant.legal_rep_rut if tenant else "") or "",
@@ -338,7 +455,8 @@ def generar_recibo(
     req: schemas.CertificateGenerateRequest, # Reutilizamos el esquema para el cremation_id
     request: Request,
     db: Session = Depends(get_db),
-    tenant_id: int = Depends(get_tenant_id)
+    tenant_id: int = Depends(get_tenant_id),
+    _perm: bool = Depends(check_permission("pagos", "view"))
 ):
     """Genera un recibo/boleta detallada para una cremación."""
     try:
@@ -488,55 +606,47 @@ def preview_plantilla(
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id)
 ):
-    """Genera una vista previa de la plantilla con datos de prueba."""
+    """Vista previa de una plantilla (propia o global) con datos de prueba."""
     template = db.query(models.CertificateTemplate).filter(
         models.CertificateTemplate.id == template_id,
-        models.CertificateTemplate.tenant_id == tenant_id
+        or_(models.CertificateTemplate.tenant_id == tenant_id, models.CertificateTemplate.tenant_id.is_(None))
     ).first()
-    
+
     if not template:
         raise HTTPException(status_code=404, detail="Plantilla no encontrada")
-        
+
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
-    logo_url = tenant.logo_url if tenant and tenant.logo_url else "https://saascrematorio.com/logo-default.png"
-    
-    now = datetime.now()
-    data = {
-        "certificate_type": "Certificado",
-        "theme": template.theme or "Clásico",
-        "tenant_id": tenant_id,
-        "logo_url": logo_url,
-        "cert_number": "PREVIEW-001",
-        "pet_name": "Mascota de Prueba",
-        "pet_desc": "Especie, Raza",
-        "owner_name": "Propietario de Prueba",
-        "owner_contact": "correo@prueba.com +00 000 000 000",
-        "process_details": f"Servicio realizado el día {now.strftime('%d/%m/%Y')}.",
-        "auth_declaration": template.declaration_text or "Se certifica la autenticidad y el respeto absoluto.",
-        "signature_text": template.signature_text or f"Administración {tenant.name if tenant else 'Crematorio'}",
-        "memorial_message": template.memorial_message or "",
-        "memorial_title": template.memorial_title or "In Memoriam",
-        "header_logo_url": template.header_logo_url,
-        "header_logo_x": template.header_logo_x,
-        "header_logo_y": template.header_logo_y,
-        "background_logo_url": template.background_logo_url,
-        "background_logo_x": template.background_logo_x,
-        "background_logo_y": template.background_logo_y,
-        "background_logo_opacity": template.background_logo_opacity,
-        "background_logo_rotation": template.background_logo_rotation,
-        "paper_format": template.paper_format or "Carta",
-        "title": template.title,
-        "subtitle": template.subtitle,
-        "farewell_text": template.farewell_text,
-        "sections_config": template.sections_config,
-        "sections_order": template.sections_order,
-        "header_logo_shape": template.header_logo_shape or "square",
-        "background_logo_shape": template.background_logo_shape or "square"
+    return _render_preview(request, tenant, template)
+
+
+@router.get("/templates/preview")
+def preview_plantilla_certificado(
+    request: Request,
+    template_id: Optional[int] = None,
+    name: Optional[str] = None,
+    rut: Optional[str] = None,
+    legal_rep_name: Optional[str] = None,
+    legal_rep_rut: Optional[str] = None,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    _perm: bool = Depends(check_permission("certificados", "view"))
+):
+    """Vista previa del certificado tal como se emitiría: sin template_id usa la
+    plantilla predeterminada del crematorio. Los datos de empresa pueden venir
+    sin guardar (formulario de Configuración) para verlos al instante."""
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    template, source = resolve_certificate_template(db, tenant, template_id)
+    result = _render_preview(request, tenant, template, {
+        "name": name, "rut": rut, "legal_rep_name": legal_rep_name, "legal_rep_rut": legal_rep_rut,
+    })
+    return {
+        "html_content": result.get("html_content"),
+        "template_id": template.id if template else None,
+        "template_name": template.name if template else "Formato básico",
+        "is_global": bool(template and template.tenant_id is None),
+        "source": source,
+        "source_label": SOURCE_LABELS[source],
     }
-    
-    base_url = str(request.base_url).rstrip('/')
-    result = generate_certificate_json(**data, base_url=base_url)
-    return result
 
 # Endpoints CRUD para Plantillas
 @router.get("/templates", response_model=List[schemas.CertificateTemplateInDB])
@@ -544,7 +654,7 @@ def obtener_plantillas(db: Session = Depends(get_db), tenant_id: int = Depends(g
     return db.query(models.CertificateTemplate).filter(models.CertificateTemplate.tenant_id == tenant_id).all()
 
 @router.post("/templates", response_model=schemas.CertificateTemplateInDB)
-def crear_plantilla(template: schemas.CertificateTemplateCreate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+def crear_plantilla(template: schemas.CertificateTemplateCreate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id), _perm: bool = Depends(check_permission("certificados", "create"))):
     if template.is_default:
         # Desactivar otras plantillas por defecto
         db.query(models.CertificateTemplate).filter(
@@ -559,13 +669,15 @@ def crear_plantilla(template: schemas.CertificateTemplateCreate, db: Session = D
     return db_template
 
 @router.put("/templates/{template_id}", response_model=schemas.CertificateTemplateInDB)
-def actualizar_plantilla(template_id: int, template: schemas.CertificateTemplateUpdate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+def actualizar_plantilla(template_id: int, template: schemas.CertificateTemplateUpdate, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id), _perm: bool = Depends(check_permission("certificados", "edit"))):
     db_template = db.query(models.CertificateTemplate).filter(
         models.CertificateTemplate.id == template_id,
         models.CertificateTemplate.tenant_id == tenant_id
     ).first()
     if not db_template:
         raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    if db_template.is_locked:
+        raise HTTPException(status_code=403, detail="Plantilla exclusiva: solo el administrador de Vinzer puede modificarla")
     
     if template.is_default:
         db.query(models.CertificateTemplate).filter(
@@ -581,13 +693,15 @@ def actualizar_plantilla(template_id: int, template: schemas.CertificateTemplate
     return db_template
 
 @router.delete("/templates/{template_id}")
-def eliminar_plantilla(template_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id)):
+def eliminar_plantilla(template_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id), _perm: bool = Depends(check_permission("certificados", "delete"))):
     db_template = db.query(models.CertificateTemplate).filter(
         models.CertificateTemplate.id == template_id,
         models.CertificateTemplate.tenant_id == tenant_id
     ).first()
     if not db_template:
         raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    if db_template.is_locked:
+        raise HTTPException(status_code=403, detail="Plantilla exclusiva: solo el administrador de Vinzer puede modificarla")
     db.delete(db_template)
     db.commit()
     return {"message": "Plantilla eliminada"}
@@ -599,14 +713,33 @@ def obtener_plantillas_globales(db: Session = Depends(get_db), tenant_id: int = 
     Estas plantillas están disponibles en modo solo lectura para todos los tenants.
     """
     return db.query(models.CertificateTemplate).filter(
-        models.CertificateTemplate.tenant_id == None
+        models.CertificateTemplate.tenant_id == None,
+        or_(models.CertificateTemplate.category.is_(None),
+            models.CertificateTemplate.category.notin_(RECEIPT_TEMPLATE_CATEGORIES)),
     ).all()
+
+@router.get("/templates/{template_id}", response_model=schemas.CertificateTemplateInDB)
+def obtener_plantilla(
+    template_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    _perm: bool = Depends(check_permission("certificados", "view"))
+):
+    """Plantilla propia del tenant (la usa el editor). Las exclusivas vienen con is_locked=True."""
+    template = db.query(models.CertificateTemplate).filter(
+        models.CertificateTemplate.id == template_id,
+        models.CertificateTemplate.tenant_id == tenant_id
+    ).first()
+    if not template:
+        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    return template
 
 @router.post("/templates/copy/{template_id}", response_model=schemas.CertificateTemplateInDB)
 def copiar_plantilla_global(
     template_id: int, 
     db: Session = Depends(get_db), 
-    tenant_id: int = Depends(get_tenant_id)
+    tenant_id: int = Depends(get_tenant_id),
+    _perm: bool = Depends(check_permission("certificados", "create"))
 ):
     """
     Copia una plantilla global al repositorio del tenant.
@@ -674,7 +807,8 @@ def copiar_plantilla_global(
 async def upload_template_asset(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    tenant_id: int = Depends(get_tenant_id)
+    tenant_id: int = Depends(get_tenant_id),
+    _perm: bool = Depends(check_permission("certificados", "edit"))
 ):
     """Sube un recurso (logo o fondo) para una plantilla de certificado usando el MediaService unificado."""
     # Temporales para el MediaService

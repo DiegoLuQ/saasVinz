@@ -285,7 +285,8 @@ export default function BillingPage() {
                     <h3 className="text-xl font-bold">Historial de Transacciones</h3>
                 </div>
                 {transactions.length > 0 ? (
-                    <table className="w-full text-left">
+                    <div className="overflow-x-auto">
+                    <table className="w-full text-left min-w-[640px]">
                         <thead className="bg-white/5 text-[10px] uppercase font-black text-white/30 tracking-widest">
                             <tr>
                                 <th className="px-8 py-5">Fecha</th>
@@ -340,6 +341,7 @@ export default function BillingPage() {
                             ))}
                         </tbody>
                     </table>
+                    </div>
                 ) : (
                     <div className="p-20 text-center space-y-4">
                         <History className="mx-auto text-white/5" size={64} />

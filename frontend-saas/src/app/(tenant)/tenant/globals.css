@@ -161,6 +161,16 @@
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+
+  /* Filas deslizables (pestañas): difumina el borde derecho en móvil para
+     indicar que hay más contenido. Desde md suelen caber y no se aplica. */
+  @media (max-width: 767px) {
+    .scroll-fade-x {
+      -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+      mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+      padding-right: 28px;
+    }
+  }
 }
 
 /* ==========================================================================

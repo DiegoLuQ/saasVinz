@@ -160,6 +160,11 @@ function CertificateEditorContent() {
 
             try {
                 const template: Template = await apiRequest(`/api/internal/ops-records/templates/${templateId}`);
+                if ((template as Template & { is_locked?: boolean }).is_locked) {
+                    showToast('Esta plantilla es exclusiva de tu crematorio: solo Vinzer puede modificarla', 'info');
+                    router.push('/dashboard/documentos/certificados');
+                    return;
+                }
 
                 // Merge with default config for compatibility
                 const mergedConfig = { ...defaultSectionsConfig } as any;

@@ -153,8 +153,8 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
         [customersMap, selectedPet]
     );
     const selectedPartner = useMemo(
-        () => partners.find(p => p.id_partner === currentCremation.partner_id),
-        [partners, currentCremation.partner_id]
+        () => partners.find((p: any) => (p.id || p.id_partner) === (currentCremation.partner_link_id || currentCremation.partner_id)),
+        [partners, currentCremation.partner_link_id, currentCremation.partner_id]
     );
 
     const petOptions = useMemo(
@@ -322,7 +322,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
                 apiRequest('/api/internal/customers/'),
                 apiRequest('/api/internal/maintenance/weight-pricing'),
                 apiRequest('/api/internal/products/'),
-                apiRequest('/api/internal/partners/'),
+                apiRequest('/api/internal/partners/active-options'),
             ]);
             const settled = (i: number): any[] =>
                 results[i].status === 'fulfilled' ? (results[i] as PromiseFulfilledResult<any>).value ?? [] : [];
@@ -1056,7 +1056,8 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
                 })),
                 total_price: grandTotal,
                 total_cost: grandTotalCost,
-                partner_id: currentCremation.partner_id || null,
+                partner_id: currentCremation.partner_link_id || currentCremation.partner_id || null,
+                partner_link_id: currentCremation.partner_link_id || currentCremation.partner_id || null,
             };
 
             const result = await apiRequest(endpoint, {

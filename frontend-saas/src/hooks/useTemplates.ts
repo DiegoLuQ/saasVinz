@@ -31,6 +31,8 @@ export interface Template {
     sections_config: Record<string, { show: boolean, label?: string }>;
     sections_order: string[] | null;
     is_default: boolean;
+    /** Exclusiva diseñada por Vinzer para este crematorio: se usa pero no se edita */
+    is_locked?: boolean;
     created_at: string;
 }
 

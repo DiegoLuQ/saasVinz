@@ -21,6 +21,11 @@ export interface Cremation {
     total_price?: number;
     weight?: number;
     verification_code?: string;
+    partner_id?: number;
+    partner_link_id?: number;
+    partner_name?: string;
+    partner_link?: any;
+    partner?: any;
     pet?: {
         id: number;
         name: string;

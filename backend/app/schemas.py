@@ -19,7 +19,9 @@ from app.api.internal.catalog.schemas import (
     ServiceBase, ServiceCreate, ServiceUpdate, ServiceInDB,
     ProductBase, ProductCreate, ProductUpdate, ProductInDB,
     PlanBase, PlanCreate, PlanUpdate, PlanInDB,
-    WeightPricingBase, WeightPricingCreate, WeightPricingInDB
+    WeightPricingBase, WeightPricingCreate, WeightPricingInDB,
+    CatalogShareTokenCreate, CatalogShareTokenInDB,
+    PublicCatalogProduct, PublicCatalogResponse
 )
 
 # 3. Operations Module (Cremations, Orders, Logistics)
@@ -40,7 +42,7 @@ from app.api.internal.operations.schemas import (
     DashboardStatData, DashboardLimitItem, DashboardLimitsData, DashboardRecentActivity, DashboardSummarySchema,
     DocumentBase, DocumentCreate, DocumentInDB,
     CertificateGenerateRequest, CertificateGenerateMetadata, CertificateGenerateResponse,
-    DailyOrderSchema
+    DailyOrderSchema, OpsBoardCounts, OpsBoardResponse
 )
 
 # 4. Admin/Auth/Common Module (Users, Tenants, Config, Notifications)
@@ -68,6 +70,7 @@ from app.api.internal.admin.schemas import (
     BootstrapUserData, BootstrapTenantData, BootstrapModulePermission, BootstrapRBACData, BootstrapMetadata,
     VeterinaryBootstrapResponse, SubmissionListItem,
     CertificateTemplateBase, CertificateTemplateCreate, CertificateTemplateUpdate, CertificateTemplateInDB,
+    AdminTemplateDestination, AdminCertificateTemplateCreate, AdminCertificateTemplateUpdate, AdminCertificateTemplateOut,
     BootstrapResponse, GrowthDataPoint, CreatorBootstrapStats, CreatorBootstrapTenant,
     CreatorBootstrapVeterinary, CreatorBootstrapResponse, DueSoonTenant
 )

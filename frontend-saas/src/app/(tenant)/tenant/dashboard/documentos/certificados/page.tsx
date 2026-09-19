@@ -10,7 +10,8 @@ import {
     Settings2,
     Sparkles,
     Globe,
-    CheckCircle2
+    CheckCircle2,
+    Lock
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -152,11 +153,20 @@ export default function DocumentConfigPage() {
                                         let cardTheme = "border-white/5 bg-white/[0.02] hover:border-primary/30";
                                         let iconTheme = "bg-white/5 text-muted-foreground";
                                         let tagBadge = null;
+                                        const isLocked = item.type === 'document' && !!(item as Template).is_locked;
+                                        const lockedBadge = isLocked && (
+                                            <span className="text-[9px] bg-amber-500/20 text-amber-400 px-2.5 py-1 rounded-md font-black uppercase tracking-widest flex items-center gap-1" title="Diseñada exclusivamente para tu crematorio. Solo Vinzer puede modificarla.">
+                                                <Lock size={10}/> Exclusiva
+                                            </span>
+                                        );
 
                                         if (isCurrentDefault) {
                                             cardTheme = "border-primary/40 bg-primary/5 ring-1 ring-primary/20 shadow-xl shadow-primary/5";
                                             iconTheme = "bg-primary text-white";
                                             tagBadge = <span className="text-[9px] bg-primary text-white px-2.5 py-1 rounded-md font-black uppercase tracking-widest flex items-center gap-1 shadow-sm"><CheckCircle2 size={10}/> Default</span>;
+                                        } else if (isLocked) {
+                                            cardTheme = "border-amber-500/30 bg-amber-500/5 hover:border-amber-500/50";
+                                            iconTheme = "bg-amber-500/20 text-amber-400";
                                         } else if (item.isGlobal) {
                                             cardTheme = "border-amber-500/20 bg-amber-500/5 hover:border-amber-500/40";
                                             iconTheme = "bg-amber-500/20 text-amber-500";
@@ -186,6 +196,7 @@ export default function DocumentConfigPage() {
                                                         </div>
                                                         <div className="flex flex-col items-end gap-1.5">
                                                             {tagBadge}
+                                                            {lockedBadge}
                                                         </div>
                                                     </div>
                                                     <div className="mt-5">
@@ -219,13 +230,14 @@ export default function DocumentConfigPage() {
                                                         </button>
                                                         <button
                                                             onClick={() => handleConfigure(item)}
-                                                            className={`flex-1 ${item.isGlobal ? 'opacity-50 cursor-not-allowed bg-black/20 text-muted-foreground/50' : 'bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20'} py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-wider`}
-                                                            disabled={!!item.isGlobal}
+                                                            className={`flex-1 ${item.isGlobal || isLocked ? 'opacity-50 cursor-not-allowed bg-black/20 text-muted-foreground/50' : 'bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20'} py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 text-[11px] font-bold uppercase tracking-wider`}
+                                                            disabled={!!item.isGlobal || isLocked}
+                                                            title={isLocked ? 'Plantilla exclusiva: solo Vinzer puede modificarla' : undefined}
                                                         >
                                                             <Settings2 size={14} />
                                                             Editar
                                                         </button>
-                                                        {!item.isGlobal && (
+                                                        {!item.isGlobal && !isLocked && (
                                                             <button
                                                                 onClick={() => handleDeleteItem(item)}
                                                                 disabled={deleteMutation.isPending}

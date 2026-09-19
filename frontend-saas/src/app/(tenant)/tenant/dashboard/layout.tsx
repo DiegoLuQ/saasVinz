@@ -4,6 +4,7 @@ import React from 'react';
 import Sidebar from '@/components/tenant/Sidebar';
 import Navbar from '@/components/tenant/Navbar';
 import StatusGuard from '@/components/tenant/StatusGuard';
+import ModuleRouteGuard from '@/components/tenant/ModuleRouteGuard';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { SidebarProvider, useSidebar } from '../context/SidebarContext';
@@ -31,7 +32,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4 }}
                     >
-                        {children}
+                        <ModuleRouteGuard>{children}</ModuleRouteGuard>
                     </motion.div>
                 </main>
             </div>

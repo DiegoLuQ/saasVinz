@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app import models
@@ -14,88 +15,154 @@ from app.api.internal.common.media_service import MediaService
 
 router = APIRouter()
 
-# CRUD for Certificate Templates (Global/Creator level, tenant_id=0)
-@router.get("/templates", response_model=List[schemas.CertificateTemplateInDB])
-def get_admin_templates(
-    current_creator: models.User = Depends(get_current_creator),
-    db: Session = Depends(get_db)
-):
-    """List all global templates managed by the SaaS Creator."""
-    return db.query(models.CertificateTemplate).filter(models.CertificateTemplate.tenant_id == None).all()
+# CRUD de plantillas del admin: GLOBALES (tenant_id NULL, para todos) y
+# EXCLUSIVAS (tenant_id fijado + is_locked, solo ese tenant; solo el admin edita).
+# Las plantillas que crea cada tenant por su cuenta no se gestionan desde aquí.
 
-@router.post("/templates", response_model=schemas.CertificateTemplateInDB)
-def create_admin_template(
-    template: schemas.CertificateTemplateCreate,
-    current_creator: models.User = Depends(get_current_creator),
-    db: Session = Depends(get_db)
-):
-    """Create a new global template."""
-    # Logic to store advantages_list in sections_config instead of own column
-    data = template.model_dump()
+def _admin_owned():
+    return or_(models.CertificateTemplate.tenant_id.is_(None), models.CertificateTemplate.is_locked == True)  # noqa: E712
+
+
+def _get_admin_template(db: Session, template_id: int) -> models.CertificateTemplate:
+    tpl = db.query(models.CertificateTemplate).filter(
+        models.CertificateTemplate.id == template_id, _admin_owned()
+    ).first()
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return tpl
+
+
+def _store_advantages(data: dict, current_config: Optional[dict] = None) -> dict:
+    """advantages_list vive dentro de sections_config (no tiene columna propia)."""
     adv_list = data.pop('advantages_list', None)
-    
     if adv_list is not None:
-        if not data.get('sections_config'):
-            data['sections_config'] = {}
-        # Ensure sections_config is a dict copy to avoid mutation issues
-        if isinstance(data['sections_config'], dict):
-            config = data['sections_config'].copy()
-            config['advantages_list'] = adv_list
-            data['sections_config'] = config
+        config = dict(data.get('sections_config') or current_config or {})
+        config['advantages_list'] = adv_list
+        data['sections_config'] = config
+    return data
 
-    db_template = models.CertificateTemplate(**data, tenant_id=None)
+
+def _clear_tenant_default(db: Session, tenant_id: Optional[int], template_id: int):
+    if not tenant_id:
+        return
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if tenant and tenant.default_certificate_template_id == template_id:
+        tenant.default_certificate_template_id = None
+
+
+def _apply_destination(db: Session, tpl: models.CertificateTemplate, dest: schemas.AdminTemplateDestination):
+    """Global <-> exclusiva de un tenant. Al mover o quitar una exclusiva se limpia
+    la predeterminada del tenant que la usaba."""
+    if dest.scope == "global":
+        _clear_tenant_default(db, tpl.tenant_id, tpl.id)
+        tpl.tenant_id = None
+        tpl.is_locked = False
+    elif dest.scope == "exclusive":
+        if not dest.target_tenant_id:
+            raise HTTPException(status_code=400, detail="Elige el tenant para la plantilla exclusiva")
+        if tpl.category == "recibo_suscripcion":
+            raise HTTPException(status_code=400, detail="El recibo de suscripción solo puede ser global")
+        tenant = db.query(models.Tenant).filter(models.Tenant.id == dest.target_tenant_id).first()
+        if not tenant:
+            raise HTTPException(status_code=404, detail="Tenant no encontrado")
+        if tpl.tenant_id and tpl.tenant_id != tenant.id:
+            _clear_tenant_default(db, tpl.tenant_id, tpl.id)
+        tpl.tenant_id = tenant.id
+        tpl.is_locked = True
+        tpl.is_default = False  # 'is_default' es la global del sistema; no aplica a exclusivas
+
+    if dest.set_as_tenant_default and tpl.tenant_id:
+        db.flush()  # asegura tpl.id en altas
+        tenant = db.query(models.Tenant).filter(models.Tenant.id == tpl.tenant_id).first()
+        tenant.default_certificate_template_id = tpl.id
+
+
+def _to_out(db: Session, templates) -> List[schemas.AdminCertificateTemplateOut]:
+    tenant_ids = {t.tenant_id for t in templates if t.tenant_id}
+    tenants = {
+        t.id: t for t in db.query(models.Tenant).filter(models.Tenant.id.in_(tenant_ids)).all()
+    } if tenant_ids else {}
+    out = []
+    for t in templates:
+        tenant = tenants.get(t.tenant_id)
+        out.append(schemas.AdminCertificateTemplateOut.model_validate(t).model_copy(update={
+            "tenant_name": tenant.name if tenant else None,
+            "is_tenant_default": bool(tenant and tenant.default_certificate_template_id == t.id),
+        }))
+    return out
+
+
+@router.get("/templates", response_model=List[schemas.AdminCertificateTemplateOut])
+def get_admin_templates(
+    tenant_id: Optional[int] = None,
+    current_creator: models.User = Depends(get_current_creator),
+    db: Session = Depends(get_db)
+):
+    """Plantillas globales + exclusivas. `tenant_id` filtra las exclusivas de ese tenant."""
+    query = db.query(models.CertificateTemplate).filter(_admin_owned())
+    if tenant_id:
+        query = query.filter(models.CertificateTemplate.tenant_id == tenant_id)
+    return _to_out(db, query.order_by(models.CertificateTemplate.id.desc()).all())
+
+
+@router.post("/templates", response_model=schemas.AdminCertificateTemplateOut)
+def create_admin_template(
+    template: schemas.AdminCertificateTemplateCreate,
+    current_creator: models.User = Depends(get_current_creator),
+    db: Session = Depends(get_db)
+):
+    """Crea una plantilla global (por defecto) o exclusiva para un tenant."""
+    dest = schemas.AdminTemplateDestination(
+        scope=template.scope or "global",
+        target_tenant_id=template.target_tenant_id,
+        set_as_tenant_default=template.set_as_tenant_default,
+    )
+    data = _store_advantages(template.model_dump(exclude=set(schemas.AdminTemplateDestination.model_fields)))
+
+    db_template = models.CertificateTemplate(**data, tenant_id=None, is_locked=False)
     db.add(db_template)
+    _apply_destination(db, db_template, dest)
     db.commit()
     db.refresh(db_template)
-    return db_template
+    return _to_out(db, [db_template])[0]
 
-@router.get("/templates/{template_id}", response_model=schemas.CertificateTemplateInDB)
+
+@router.get("/templates/{template_id}", response_model=schemas.AdminCertificateTemplateOut)
 def get_admin_template(
     template_id: int,
     current_creator: models.User = Depends(get_current_creator),
     db: Session = Depends(get_db)
 ):
-    """Get details of a specific global template."""
-    db_template = db.query(models.CertificateTemplate).filter(
-        models.CertificateTemplate.id == template_id,
-        models.CertificateTemplate.tenant_id == None
-    ).first()
-    if not db_template:
-        raise HTTPException(status_code=404, detail="Template not found")
-    return db_template
+    return _to_out(db, [_get_admin_template(db, template_id)])[0]
 
-@router.put("/templates/{template_id}", response_model=schemas.CertificateTemplateInDB)
+
+@router.put("/templates/{template_id}", response_model=schemas.AdminCertificateTemplateOut)
 def update_admin_template(
     template_id: int,
-    template: schemas.CertificateTemplateUpdate,
+    template: schemas.AdminCertificateTemplateUpdate,
     current_creator: models.User = Depends(get_current_creator),
     db: Session = Depends(get_db)
 ):
-    """Update a specific global template."""
-    db_template = db.query(models.CertificateTemplate).filter(
-        models.CertificateTemplate.id == template_id,
-        models.CertificateTemplate.tenant_id == None
-    ).first()
-    if not db_template:
-        raise HTTPException(status_code=404, detail="Template not found")
-    
-    update_data = template.model_dump(exclude_unset=True)
-    adv_list = update_data.pop('advantages_list', None)
-    
-    # Handle normal fields
+    """Edita una plantilla global o exclusiva (y opcionalmente cambia su destino)."""
+    db_template = _get_admin_template(db, template_id)
+
+    dest_fields = set(schemas.AdminTemplateDestination.model_fields)
+    update_data = _store_advantages(
+        template.model_dump(exclude_unset=True, exclude=dest_fields),
+        current_config=db_template.sections_config,
+    )
     for key, value in update_data.items():
         setattr(db_template, key, value)
-        
-    # Handle advantages_list -> sections_config
-    if adv_list is not None:
-        current_config = dict(db_template.sections_config or {})
-        current_config['advantages_list'] = adv_list
-        # Re-assign to trigger SQLAlchemy detection of change
-        db_template.sections_config = current_config
-    
+
+    _apply_destination(db, db_template, schemas.AdminTemplateDestination(
+        scope=template.scope,
+        target_tenant_id=template.target_tenant_id,
+        set_as_tenant_default=template.set_as_tenant_default,
+    ))
     db.commit()
     db.refresh(db_template)
-    return db_template
+    return _to_out(db, [db_template])[0]
+
 
 @router.delete("/templates/{template_id}")
 def delete_admin_template(
@@ -103,17 +170,12 @@ def delete_admin_template(
     current_creator: models.User = Depends(get_current_creator),
     db: Session = Depends(get_db)
 ):
-    """Delete a specific global template."""
-    db_template = db.query(models.CertificateTemplate).filter(
-        models.CertificateTemplate.id == template_id,
-        models.CertificateTemplate.tenant_id == None
-    ).first()
-    if not db_template:
-        raise HTTPException(status_code=404, detail="Template not found")
-    
+    db_template = _get_admin_template(db, template_id)
+    _clear_tenant_default(db, db_template.tenant_id, db_template.id)
     db.delete(db_template)
     db.commit()
     return {"message": "Template deleted"}
+
 
 @router.post("/templates/preview-test")
 def preview_test_admin_template(
@@ -147,6 +209,7 @@ def preview_test_admin_template(
             current_date=now,
             pet_images=[demo_photo, demo_photo, demo_photo],
             tenant_logo_url="https://placehold.co/300x120/png?text=LOGO+EMPRESA",
+            tenant_name="Crematorio Ejemplo SpA",
             tenant_rut="76.543.210-K",
             tenant_manager="María González",
             tenant_manager_rut="12.345.678-9",
@@ -246,14 +309,8 @@ def preview_admin_template(
     db: Session = Depends(get_db)
 ):
     """Generate a preview of the global template with test data."""
-    template = db.query(models.CertificateTemplate).filter(
-        models.CertificateTemplate.id == template_id,
-        models.CertificateTemplate.tenant_id == None
-    ).first()
-    
-    if not template:
-        raise HTTPException(status_code=404, detail="Template not found")
-        
+    template = _get_admin_template(db, template_id)
+
     now = datetime.now()
     if template.category == 'recibo_suscripcion':
         # Mock data for Subscription Receipt preview

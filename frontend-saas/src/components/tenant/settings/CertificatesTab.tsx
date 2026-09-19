@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Award, Building2, Fingerprint, User, FileCheck, Save, Eye } from 'lucide-react';
+import { Award, Building2, Fingerprint, User, FileCheck, Save } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { apiRequest } from '@/lib/tenant/api';
 import { FormInput } from './FormField';
+import { CertificatePreview } from './CertificatePreview';
 
 interface CertificatesTabProps {
     bootstrapTenant: any;
@@ -43,7 +44,7 @@ export function CertificatesTab({ bootstrapTenant }: CertificatesTabProps) {
                     apiRequest('/api/internal/ops-records/templates'),
                 ]);
                 const global = (globalRes || []).map((t: any) => ({ id: t.id, name: t.name, isGlobal: true }));
-                const local = (localRes || []).map((t: any) => ({ id: t.id, name: t.name, isGlobal: false }));
+                const local = (localRes || []).map((t: any) => ({ id: t.id, name: t.is_locked ? `🔒 ${t.name} (exclusiva)` : t.name, isGlobal: false }));
                 setTemplates([...local, ...global]);
             } catch (err) {
                 console.error('Error fetching templates:', err);
@@ -176,7 +177,7 @@ export function CertificatesTab({ bootstrapTenant }: CertificatesTabProps) {
                             onChange={(e) => setSelectedTemplateId(e.target.value ? Number(e.target.value) : null)}
                             className="w-full px-4 py-3 bg-black/30 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all appearance-none cursor-pointer"
                         >
-                            <option value="" className="bg-[#0d1b2a] text-white/60">— Automático (por defecto del sistema) —</option>
+                            <option value="" className="bg-[#0d1b2a] text-white/60">— Automática (predeterminada del sistema) —</option>
                             {templates.filter((t) => !t.isGlobal).length > 0 && (
                                 <optgroup label="Mis Plantillas" className="bg-[#0d1b2a]">
                                     {templates.filter((t) => !t.isGlobal).map((t) => (
@@ -202,31 +203,9 @@ export function CertificatesTab({ bootstrapTenant }: CertificatesTabProps) {
                 </div>
             </div>
 
-            {/* Vista previa de los datos */}
+            {/* Vista previa real (misma plantilla que se usa al emitir) */}
             <div className="pt-10 border-t border-white/5">
-                <div className="flex items-center gap-2 mb-5">
-                    <Eye className="text-primary" size={20} />
-                    <h4 className="text-lg font-bold">Vista Previa</h4>
-                    <span className="text-[10px] text-white/40">Cómo aparecerán los datos en el certificado</span>
-                </div>
-
-                <div className="relative overflow-hidden rounded-3xl border border-amber-500/20 bg-gradient-to-br from-[#0a192f] to-[#0d1b2a] p-8 sm:p-10 shadow-2xl">
-                    <div className="absolute inset-0 pointer-events-none opacity-[0.04]" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '22px 22px' }} />
-                    <div className="relative text-center space-y-1">
-                        <p className="text-[10px] uppercase tracking-[0.35em] text-amber-400/70 font-black">Certificado de Cremación</p>
-                        <p className="text-2xl font-black text-white pt-2">{info.name || 'Nombre de la Empresa'}</p>
-                        <p className="text-xs text-white/50">RUT: {info.rut || '—'}</p>
-                    </div>
-                    <div className="relative mt-10 pt-6 border-t border-white/10 flex flex-col items-center gap-1">
-                        <div className="w-40 border-b border-white/30 mb-1" />
-                        <p className="text-sm font-bold text-white">{info.legal_rep_name || 'Representante Legal'}</p>
-                        <p className="text-[11px] text-white/50">RUT: {info.legal_rep_rut || '—'}</p>
-                        <p className="text-[9px] uppercase tracking-widest text-white/30 mt-1">Representante Legal</p>
-                    </div>
-                </div>
-                <p className="text-[10px] text-white/30 mt-3 ml-1">
-                    Esta es una vista referencial. La posición exacta de cada dato depende de la plantilla seleccionada y se ajusta en el diseñador de documentos.
-                </p>
+                <CertificatePreview templateId={selectedTemplateId} company={info} />
             </div>
         </div>
     );

@@ -163,3 +163,37 @@ export const getMyPartners = async (): Promise<PartnerLink[]> => {
     return apiRequest('/api/internal/partners');
 };
 
+export interface QuickPartnerCreateData {
+    name: string;
+    rut?: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    city?: string;
+    region?: string;
+    tipo_comision?: string;
+    porcentaje_comision?: number;
+    monto_comision?: number;
+}
+
+export const quickCreatePartner = async (data: QuickPartnerCreateData): Promise<PartnerLink> => {
+    return apiRequest('/api/internal/partners/quick-create', {
+        method: 'POST',
+        body: data
+    });
+};
+
+export interface ActivePartnerOption {
+    id: number;
+    veterinary_id: number;
+    name: string;
+    rut?: string;
+    tipo_comision: string;
+    porcentaje_comision: number;
+    monto_comision: number;
+}
+
+export const getActivePartnerOptions = async (): Promise<ActivePartnerOption[]> => {
+    return apiRequest('/api/internal/partners/active-options');
+};
+

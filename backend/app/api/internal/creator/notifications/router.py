@@ -223,6 +223,7 @@ def broadcast_notification(
                     notif = models.Notification(
                         recipient_type=models.RecipientType.tenant,
                         tenant_id=tenant.id,
+                        audience=broadcast.audience,
                         veterinary_id=None,
                         type=broadcast.type,
                         title=broadcast.title,
@@ -272,6 +273,7 @@ def broadcast_notification(
                         notif = models.Notification(
                             recipient_type=models.RecipientType.tenant,
                             tenant_id=tenant.id,
+                            audience=broadcast.audience,
                             veterinary_id=None,
                             type=broadcast.type,
                             title=broadcast.title,

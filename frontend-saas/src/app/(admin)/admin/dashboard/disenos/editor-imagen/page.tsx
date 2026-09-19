@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef, Suspense } from 'react';
+import { TemplateDestinationPicker, DEFAULT_DESTINATION, destinationFromTemplate, destinationError, type TemplateDestination } from '@/components/admin/templates/TemplateDestinationPicker';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
     ArrowLeft,
@@ -28,6 +29,13 @@ import {
     Phone,
     MapPin,
     Fingerprint,
+    ChevronDown,
+    Settings2,
+    SlidersHorizontal,
+    Globe,
+    ArrowLeftRight,
+    ArrowUpDown,
+    Crosshair
 } from 'lucide-react';
 import { apiRequest, getImageUrl } from '@/lib/admin/api';
 import ImageCropper from '@/components/tenant/ImageCropper';
@@ -54,6 +62,7 @@ type FieldType =
     | 'fecha_actual'
     | 'imagen_mascota'
     | 'logo_tenant'
+    | 'nombre_empresa'
     | 'rut_tenant'
     | 'encargado_tenant'
     | 'rut_encargado'
@@ -126,6 +135,7 @@ const FIELD_META: Record<FieldType, { label: string; icon: any; isImage?: boolea
     fecha_actual: { label: 'Fecha Actual', icon: Calendar, isDate: true },
     imagen_mascota: { label: 'Foto Mascota', icon: ImageIcon, isImage: true },
     logo_tenant: { label: 'Logo Empresa', icon: Building2, isImage: true },
+    nombre_empresa: { label: 'Nombre Empresa', icon: Building2 },
     rut_tenant: { label: 'RUT Empresa', icon: Fingerprint },
     encargado_tenant: { label: 'Encargado', icon: User },
     rut_encargado: { label: 'RUT Encargado', icon: Fingerprint },
@@ -160,6 +170,7 @@ function fieldDemoValue(f: DesignField): string {
     if (f.type === 'fecha_nacimiento') return formatDemoDate(DEMO.fecha_nacimiento, f.format);
     if (f.type === 'fecha_fallecimiento') return formatDemoDate(DEMO.fecha_fallecimiento, f.format);
     if (f.type === 'fecha_actual') return formatDemoDate(DEMO.fecha_actual, f.format);
+    if (f.type === 'nombre_empresa') return 'Crematorio Ejemplo SpA';
     if (f.type === 'rut_tenant') return '76.543.210-K';
     if (f.type === 'encargado_tenant') return 'María González';
     if (f.type === 'rut_encargado') return '12.345.678-9';
@@ -170,6 +181,132 @@ function fieldDemoValue(f: DesignField): string {
 }
 
 // --- Componente ------------------------------------------------------------
+// Colores rápidos para el fondo del texto (además del selector libre)
+const BG_COLOR_PRESETS = ['#ffffff', '#000000', '#f5efe3', '#d4af37', '#1e3a5f', '#0f766e', '#7f1d1d', '#6b21a8'];
+
+/** '#abc' | 'abc' | '#aabbcc' | 'aabbcc' -> '#aabbcc' (null si no es un hex válido). */
+function normalizeHex(raw: string): string | null {
+    let h = raw.trim().replace(/^#/, '');
+    if (/^[0-9a-fA-F]{3}$/.test(h)) h = h.split('').map((c) => c + c).join('');
+    return /^[0-9a-fA-F]{6}$/.test(h) ? `#${h.toLowerCase()}` : null;
+}
+
+/** Cualquier color: selector nativo, código hex escrito a mano y colores rápidos. */
+function ColorInput({ value, onChange }: { value: string; onChange: (hex: string) => void }) {
+    const commit = (input: HTMLInputElement) => {
+        const hex = normalizeHex(input.value);
+        if (hex) onChange(hex);
+        else input.value = value; // inválido: vuelve al color actual
+    };
+    return (
+        <div className="space-y-2">
+            <div className="flex gap-2">
+                <input
+                    type="color"
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    className="w-12 h-9 shrink-0 bg-black/40 border border-white/5 rounded-xl cursor-pointer"
+                    aria-label="Elegir color"
+                />
+                <input
+                    key={value}
+                    type="text"
+                    defaultValue={value.toUpperCase()}
+                    onBlur={(e) => commit(e.currentTarget)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') commit(e.currentTarget); }}
+                    maxLength={7}
+                    spellCheck={false}
+                    className="flex-1 min-w-0 bg-black/40 border border-white/5 rounded-xl py-2 px-3 text-xs font-mono font-bold text-white uppercase outline-none focus:border-primary/50"
+                    aria-label="Código de color hexadecimal"
+                    placeholder="#FFFFFF"
+                />
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+                {BG_COLOR_PRESETS.map((c) => (
+                    <button
+                        key={c}
+                        type="button"
+                        onClick={() => onChange(c)}
+                        title={c}
+                        className={`w-6 h-6 rounded-full border-2 transition-all ${value.toLowerCase() === c ? 'border-primary scale-110' : 'border-white/15'}`}
+                        style={{ backgroundColor: c }}
+                    />
+                ))}
+            </div>
+        </div>
+    );
+}
+
+/** Sección plegable del panel de propiedades (acordeón). `actions` no pliega. */
+function PanelSection({
+    title,
+    icon,
+    open,
+    onToggle,
+    actions,
+    tone = 'primary',
+    children,
+}: {
+    title: React.ReactNode;
+    icon?: React.ReactNode;
+    open: boolean;
+    onToggle: () => void;
+    actions?: React.ReactNode;
+    tone?: 'primary' | 'purple';
+    children: React.ReactNode;
+}) {
+    const border = tone === 'purple' ? 'border-purple-500/20' : 'border-white/5';
+    const color = tone === 'purple' ? 'text-purple-300' : 'text-primary';
+    return (
+        <div className={`bg-white/[0.02] rounded-[2rem] border ${border} overflow-hidden`}>
+            <div className="flex items-center gap-2 px-6 py-4">
+                <button
+                    type="button"
+                    onClick={onToggle}
+                    aria-expanded={open}
+                    className="flex-1 min-w-0 flex items-center justify-between gap-2 text-left"
+                >
+                    <h3 className={`text-xs font-black uppercase tracking-[0.2em] ${color} flex items-center gap-2 truncate`}>
+                        {icon}
+                        {title}
+                    </h3>
+                    <ChevronDown size={16} className={`shrink-0 text-white/40 transition-transform ${open ? 'rotate-180' : ''}`} />
+                </button>
+                {actions}
+            </div>
+            {open && <div className="px-6 pb-6 space-y-5">{children}</div>}
+        </div>
+    );
+}
+
+/** Sub-sección plegable dentro de un panel. `extra` (p. ej. un interruptor) no pliega. */
+function SubSection({
+    title,
+    open,
+    onToggle,
+    extra,
+    children,
+}: {
+    title: string;
+    open: boolean;
+    onToggle: () => void;
+    extra?: React.ReactNode;
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="pt-3 mt-1 border-t border-white/5">
+            <div className="flex items-center gap-2">
+                <button type="button" onClick={onToggle} aria-expanded={open} className="flex-1 flex items-center justify-between text-left py-1">
+                    <span className="text-[9px] font-black uppercase text-white/40">{title}</span>
+                    <ChevronDown size={14} className={`text-white/30 transition-transform ${open ? 'rotate-180' : ''}`} />
+                </button>
+                {extra}
+            </div>
+            {open && <div className="space-y-3 mt-3">{children}</div>}
+        </div>
+    );
+}
+
 function EditorImagenContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -177,6 +314,8 @@ function EditorImagenContent() {
 
     const [name, setName] = useState('');
     const [isDefault, setIsDefault] = useState(false);
+    // Global (todos) o exclusiva de un crematorio (solo el admin la edita)
+    const [destination, setDestination] = useState<TemplateDestination>(DEFAULT_DESTINATION);
     const [aspectRatio, setAspectRatio] = useState<'16:9' | '4:3' | '3:4'>('16:9');
     const [fields, setFields] = useState<DesignField[]>([]);
     const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -206,6 +345,17 @@ function EditorImagenContent() {
 
     const selectedField = fields.find((f) => f.id === selectedId) || null;
     const selectedElement = elements.find((e) => e.id === selectedElementId) || null;
+
+    // Acordeones del panel: se guarda qué secciones cambió el usuario respecto de su
+    // estado inicial. Las secciones de un campo/elemento usan su id, así al
+    // seleccionar otro se muestra con su estado inicial (paneles abiertos, sub-secciones cerradas).
+    const [toggledPanels, setToggledPanels] = useState<Set<string>>(() => new Set());
+    const isPanelOpen = (key: string, defaultOpen = true) => (defaultOpen ? !toggledPanels.has(key) : toggledPanels.has(key));
+    const togglePanel = (key: string) => setToggledPanels((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key); else next.add(key);
+        return next;
+    });
     const bgUrlToShow = bgPreview || (savedBgUrl ? getImageUrl(savedBgUrl) : null);
 
     // --- Carga de plantilla existente -------------------------------------
@@ -216,6 +366,7 @@ function EditorImagenContent() {
                 const t = await apiRequest(`/api/internal/creator/document-templates/templates/${templateId}`);
                 setName(t.name || '');
                 setIsDefault(!!t.is_default);
+                setDestination(destinationFromTemplate(t));
                 setSavedBgUrl(t.background_logo_url || null);
                 const sc = t.sections_config || {};
                 setAspectRatio((sc.aspect_ratio as any) || '16:9');
@@ -385,13 +536,13 @@ function EditorImagenContent() {
             type,
             x: 50,
             y: 50,
-            fontSize: 32,
+            fontSize: type === 'texto_fijo' ? 20 : 32,
             fontFamily: 'Georgia, serif',
             color: '#1a1a1a',
             align: 'center',
             bold: false,
             ...(meta.isDate ? { format: 'short' as const } : {}),
-            ...(type === 'texto_fijo' ? { value: 'Texto libre' } : {}),
+            ...(type === 'texto_fijo' ? { value: 'Texto libre', w: 80 } : {}),
         };
         setFields((prev) => [...prev, nf]);
         setSelectedId(nf.id);
@@ -443,6 +594,11 @@ function EditorImagenContent() {
             showToast('Ponle un nombre al diseño', 'error');
             return;
         }
+        const destErr = destinationError(destination);
+        if (destErr) {
+            showToast(destErr, 'error');
+            return;
+        }
         setSaving(true);
         try {
             let bgUrl = savedBgUrl;
@@ -463,6 +619,7 @@ function EditorImagenContent() {
                 background_logo_url: bgUrl,
                 sections_config: { aspect_ratio: aspectRatio, fields, elements },
                 is_default: isDefault,
+                ...destination,
             };
 
             const method = templateId ? 'PUT' : 'POST';
@@ -566,6 +723,71 @@ function EditorImagenContent() {
                         </button>
                     </div>
 
+                    {/* Barra de acción rápida para centrado del objeto seleccionado */}
+                    {(selectedField || selectedElement) && (
+                        <div className="bg-white/[0.04] border border-white/10 rounded-2xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-lg backdrop-blur-sm">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-white/40">Seleccionado:</span>
+                                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                                    {selectedField ? (
+                                        <>
+                                            <span className="w-2 h-2 rounded-full bg-primary" />
+                                            {FIELD_META[selectedField.type].label}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="w-2 h-2 rounded-full bg-purple-400" />
+                                            Elemento Decorativo
+                                        </>
+                                    )}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-white/40 mr-1 hidden sm:inline">Centrar:</span>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (selectedField) updateField(selectedField.id, { x: 50 });
+                                        if (selectedElement) updateElement(selectedElement.id, { x: 50 });
+                                    }}
+                                    className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/90 hover:text-white border border-white/10 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all active:scale-95"
+                                    title="Centrar horizontalmente (X = 50%)"
+                                >
+                                    <ArrowLeftRight size={12} className={selectedField ? 'text-primary' : 'text-purple-400'} />
+                                    <span>Horizontal</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (selectedField) updateField(selectedField.id, { y: 50 });
+                                        if (selectedElement) updateElement(selectedElement.id, { y: 50 });
+                                    }}
+                                    className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/90 hover:text-white border border-white/10 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all active:scale-95"
+                                    title="Centrar verticalmente (Y = 50%)"
+                                >
+                                    <ArrowUpDown size={12} className={selectedField ? 'text-primary' : 'text-purple-400'} />
+                                    <span>Vertical</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (selectedField) updateField(selectedField.id, { x: 50, y: 50 });
+                                        if (selectedElement) updateElement(selectedElement.id, { x: 50, y: 50 });
+                                    }}
+                                    className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all active:scale-95 ${
+                                        selectedField
+                                            ? 'bg-primary/15 hover:bg-primary/25 text-primary border border-primary/30'
+                                            : 'bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30'
+                                    }`}
+                                    title="Centrar al medio exacto del lienzo (X = 50%, Y = 50%)"
+                                >
+                                    <Crosshair size={12} />
+                                    <span>Centro Total</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Canvas */}
                     <div className="bg-[#0a0f18] rounded-[2rem] border border-white/10 p-6 overflow-hidden">
                         {bgUrlToShow ? (
@@ -647,19 +869,25 @@ function EditorImagenContent() {
                                             </div>
                                         );
                                     }
+                                    const isFreeText = f.type === 'texto_fijo';
+                                    const textWidth = f.w ? `${f.w}%` : (isFreeText ? '80%' : undefined);
                                     return (
                                         <div
                                             key={f.id}
                                             onPointerDown={(e) => startDrag(e, f.id)}
                                             style={{
                                                 ...common,
+                                                width: textWidth,
+                                                maxWidth: isFreeText ? (f.w ? `${f.w}%` : '90%') : undefined,
                                                 fontSize: `${f.fontSize}px`,
                                                 fontFamily: f.fontFamily,
                                                 color: f.color,
                                                 textAlign: f.align,
                                                 fontWeight: f.bold ? 700 : 400,
-                                                whiteSpace: 'nowrap',
-                                                lineHeight: 1.1,
+                                                whiteSpace: isFreeText ? 'pre-wrap' : 'nowrap',
+                                                wordBreak: 'break-word',
+                                                overflowWrap: 'break-word',
+                                                lineHeight: isFreeText ? 1.4 : 1.1,
                                                 ...textBgStyle(f, '2px 6px'),
                                                 outline: isSel ? '2px solid #6366f1' : '1px dashed rgba(0,0,0,0.25)',
                                             }}
@@ -689,8 +917,12 @@ function EditorImagenContent() {
                 {/* Properties Column */}
                 <div className="w-full lg:w-[400px] shrink-0 space-y-6">
                     {/* Configuración base */}
-                    <div className="bg-white/[0.02] rounded-[2rem] border border-white/5 p-6 space-y-5">
-                        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-primary">Configuración</h3>
+                    <PanelSection
+                        title="Configuración"
+                        icon={<Settings2 size={14} />}
+                        open={isPanelOpen('config')}
+                        onToggle={() => togglePanel('config')}
+                    >
                         <div className="space-y-2">
                             <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-white/30">Nombre del diseño</label>
                             <input
@@ -733,20 +965,36 @@ function EditorImagenContent() {
                                 <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-all ${isDefault ? 'translate-x-5' : 'translate-x-0'}`} />
                             </div>
                         </div>
-                    </div>
+                    </PanelSection>
+
+                    {/* Destino: global o exclusiva de un crematorio */}
+                    <PanelSection
+                        title={destination.scope === 'exclusive' ? 'Destino · Exclusiva' : 'Destino · Global'}
+                        icon={<Globe size={14} />}
+                        open={isPanelOpen('destination')}
+                        onToggle={() => togglePanel('destination')}
+                    >
+                        <TemplateDestinationPicker value={destination} onChange={setDestination} category="certificadoImg" />
+                    </PanelSection>
 
                     {/* Propiedades del elemento seleccionado */}
                     {selectedElement && (
-                        <div className="bg-white/[0.02] rounded-[2rem] border border-purple-500/20 p-6 space-y-5">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-purple-300 flex items-center gap-2"><Sticker size={14} /> Elemento</h3>
+                        <PanelSection
+                            title="Elemento"
+                            icon={<Sticker size={14} />}
+                            tone="purple"
+                            open={isPanelOpen(`element:${selectedElement.id}`)}
+                            onToggle={() => togglePanel(`element:${selectedElement.id}`)}
+                            actions={
                                 <button
                                     onClick={() => deleteElement(selectedElement.id)}
                                     className="p-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-all"
+                                    title="Eliminar elemento"
                                 >
                                     <Trash2 size={16} />
                                 </button>
-                            </div>
+                            }
+                        >
                             <div className="w-full h-24 bg-black/40 rounded-xl border border-white/5 flex items-center justify-center overflow-hidden">
                                 <img src={getImageUrl(selectedElement.url)} alt="" className="max-h-full max-w-full object-contain" />
                             </div>
@@ -758,6 +1006,35 @@ function EditorImagenContent() {
                                 <div className="space-y-1.5">
                                     <label className="text-[9px] font-black uppercase text-white/30">Posición Y (%)</label>
                                     <input type="number" min={0} max={100} value={Math.round(selectedElement.y)} onChange={(e) => updateElement(selectedElement.id, { y: Number(e.target.value) })} className="w-full bg-black/40 border border-white/5 rounded-xl py-2 px-3 text-xs font-bold text-white outline-none focus:border-purple-500/50" />
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[9px] font-black uppercase text-white/30">Centrar elemento</label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => updateElement(selectedElement.id, { x: 50 })}
+                                        className="py-1.5 px-2 bg-black/40 hover:bg-white/10 border border-white/5 rounded-lg text-[10px] font-bold text-white/70 hover:text-white flex items-center justify-center gap-1 transition-all"
+                                        title="Centrar horizontalmente (X = 50%)"
+                                    >
+                                        <ArrowLeftRight size={11} className="text-purple-400" /> Horiz.
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => updateElement(selectedElement.id, { y: 50 })}
+                                        className="py-1.5 px-2 bg-black/40 hover:bg-white/10 border border-white/5 rounded-lg text-[10px] font-bold text-white/70 hover:text-white flex items-center justify-center gap-1 transition-all"
+                                        title="Centrar verticalmente (Y = 50%)"
+                                    >
+                                        <ArrowUpDown size={11} className="text-purple-400" /> Vert.
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => updateElement(selectedElement.id, { x: 50, y: 50 })}
+                                        className="py-1.5 px-2 bg-black/40 hover:bg-purple-500/20 border border-purple-500/30 rounded-lg text-[10px] font-bold text-purple-300 hover:text-white flex items-center justify-center gap-1 transition-all"
+                                        title="Centrar en el lienzo (50%, 50%)"
+                                    >
+                                        <Crosshair size={11} /> Centro
+                                    </button>
                                 </div>
                             </div>
                             <div className="space-y-1.5">
@@ -797,26 +1074,29 @@ function EditorImagenContent() {
                                     </div>
                                 </div>
                             )}
-                        </div>
+                        </PanelSection>
                     )}
 
                     {/* Propiedades del campo seleccionado */}
-                    <div className="bg-white/[0.02] rounded-[2rem] border border-white/5 p-6 space-y-5">
-                        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-primary">Propiedades del campo</h3>
+                    <PanelSection
+                        title={selectedField ? `Campo · ${FIELD_META[selectedField.type].label}` : 'Propiedades del campo'}
+                        icon={<SlidersHorizontal size={14} />}
+                        open={isPanelOpen(selectedField ? `field:${selectedField.id}` : 'field')}
+                        onToggle={() => togglePanel(selectedField ? `field:${selectedField.id}` : 'field')}
+                        actions={selectedField && (
+                            <button
+                                onClick={() => deleteField(selectedField.id)}
+                                className="p-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-all"
+                                title="Eliminar campo"
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        )}
+                    >
                         {!selectedField ? (
                             <p className="text-white/30 text-sm italic py-6 text-center">Selecciona un campo en el lienzo para editarlo, o agrega uno desde la barra superior.</p>
                         ) : (
                             <div className="space-y-5">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[11px] font-black uppercase tracking-wider text-white">{FIELD_META[selectedField.type].label}</span>
-                                    <button
-                                        onClick={() => deleteField(selectedField.id)}
-                                        className="p-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-all"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
-
                                 {/* Posición */}
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1.5">
@@ -826,6 +1106,35 @@ function EditorImagenContent() {
                                     <div className="space-y-1.5">
                                         <label className="text-[9px] font-black uppercase text-white/30">Posición Y (%)</label>
                                         <input type="number" min={0} max={100} value={Math.round(selectedField.y)} onChange={(e) => updateField(selectedField.id, { y: Number(e.target.value) })} className="w-full bg-black/40 border border-white/5 rounded-xl py-2 px-3 text-xs font-bold text-white outline-none focus:border-primary/50" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[9px] font-black uppercase text-white/30">Centrar objeto</label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => updateField(selectedField.id, { x: 50 })}
+                                            className="py-1.5 px-2 bg-black/40 hover:bg-white/10 border border-white/5 rounded-lg text-[10px] font-bold text-white/70 hover:text-white flex items-center justify-center gap-1 transition-all"
+                                            title="Centrar horizontalmente (X = 50%)"
+                                        >
+                                            <ArrowLeftRight size={11} className="text-primary" /> Horiz.
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => updateField(selectedField.id, { y: 50 })}
+                                            className="py-1.5 px-2 bg-black/40 hover:bg-white/10 border border-white/5 rounded-lg text-[10px] font-bold text-white/70 hover:text-white flex items-center justify-center gap-1 transition-all"
+                                            title="Centrar verticalmente (Y = 50%)"
+                                        >
+                                            <ArrowUpDown size={11} className="text-primary" /> Vert.
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => updateField(selectedField.id, { x: 50, y: 50 })}
+                                            className="py-1.5 px-2 bg-black/40 hover:bg-primary/20 border border-primary/30 rounded-lg text-[10px] font-bold text-primary hover:text-white flex items-center justify-center gap-1 transition-all"
+                                            title="Centrar en el lienzo (50%, 50%)"
+                                        >
+                                            <Crosshair size={11} /> Centro
+                                        </button>
                                     </div>
                                 </div>
 
@@ -853,8 +1162,11 @@ function EditorImagenContent() {
                                             const fr: CertFrame = selectedField.frame || { color: 'gold' };
                                             const setFrame = (patch: Partial<CertFrame>) => updateField(selectedField.id, { frame: { ...fr, ...patch } });
                                             return (
-                                                <div className="space-y-3 pt-3 mt-1 border-t border-white/5">
-                                                    <label className="text-[9px] font-black uppercase text-white/30">Marco de la foto</label>
+                                                <SubSection
+                                                    title="Marco de la foto"
+                                                    open={isPanelOpen(`frame:${selectedField.id}`, false)}
+                                                    onToggle={() => togglePanel(`frame:${selectedField.id}`)}
+                                                >
                                                     <div className="flex gap-2">
                                                         {FRAME_COLOR_LIST.map((c) => (
                                                             <button
@@ -877,24 +1189,41 @@ function EditorImagenContent() {
                                                         <p className="text-[10px] text-white/20 font-medium italic">El difuminado de borde solo aplica a fotos circulares.</p>
                                                     )}
                                                     <p className="text-[10px] text-white/20 font-medium">El tenant podrá cambiar el marco al emitir.</p>
-                                                </div>
+                                                </SubSection>
                                             );
                                         })()}
                                     </>
                                 ) : (
                                     <>
                                         {selectedField.type === 'texto_fijo' && (
-                                            <div className="space-y-1.5">
-                                                <label className="text-[9px] font-black uppercase text-white/30">Texto</label>
-                                                <textarea
-                                                    value={selectedField.value ?? ''}
-                                                    onChange={(e) => updateField(selectedField.id, { value: e.target.value })}
-                                                    rows={2}
-                                                    placeholder="Escribe el texto que aparecerá en el certificado"
-                                                    className="w-full bg-black/40 border border-white/5 rounded-xl py-2 px-3 text-xs font-bold text-white outline-none focus:border-primary/50 resize-y"
-                                                />
-                                                <p className="text-[10px] text-white/20 font-medium">Texto fijo: se imprime igual en todos los certificados que usen este diseño.</p>
-                                            </div>
+                                            <>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[9px] font-black uppercase text-white/30">Texto libre (soporta saltos de línea con Enter)</label>
+                                                    <textarea
+                                                        value={selectedField.value ?? ''}
+                                                        onChange={(e) => updateField(selectedField.id, { value: e.target.value })}
+                                                        rows={4}
+                                                        placeholder="Escribe el texto aquí. Puedes presionar Enter para saltar de línea..."
+                                                        className="w-full bg-black/40 border border-white/5 rounded-xl py-2 px-3 text-xs font-medium text-white outline-none focus:border-primary/50 resize-y leading-relaxed"
+                                                    />
+                                                    <p className="text-[10px] text-white/20 font-medium">Texto fijo con soporte de múltiples líneas y saltos automáticos.</p>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <div className="flex justify-between">
+                                                        <label className="text-[9px] font-black uppercase text-white/30">Ancho del párrafo</label>
+                                                        <span className="text-[9px] font-black text-primary">{selectedField.w || 80}%</span>
+                                                    </div>
+                                                    <input
+                                                        type="range"
+                                                        min={20}
+                                                        max={100}
+                                                        value={selectedField.w || 80}
+                                                        onChange={(e) => updateField(selectedField.id, { w: Number(e.target.value) })}
+                                                        className="w-full accent-primary"
+                                                    />
+                                                    <p className="text-[10px] text-white/20 font-medium">Ancho máximo dentro del certificado antes de ajustar la línea.</p>
+                                                </div>
+                                            </>
                                         )}
                                         <div className="space-y-1.5">
                                             <div className="flex justify-between"><label className="text-[9px] font-black uppercase text-white/30">Tamaño de fuente</label><span className="text-[9px] font-black text-primary">{selectedField.fontSize}px</span></div>
@@ -942,9 +1271,11 @@ function EditorImagenContent() {
                                             const bg = resolveTextBg(selectedField);
                                             const on = textBgActive(selectedField);
                                             return (
-                                                <div className="space-y-3 pt-3 mt-1 border-t border-white/5">
-                                                    <div className="flex items-center justify-between">
-                                                        <label className="text-[9px] font-black uppercase text-white/30">Fondo del texto</label>
+                                                <SubSection
+                                                    title="Fondo del texto"
+                                                    open={isPanelOpen(`textbg:${selectedField.id}`, false)}
+                                                    onToggle={() => togglePanel(`textbg:${selectedField.id}`)}
+                                                    extra={
                                                         <button
                                                             onClick={() => updateField(selectedField.id, on
                                                                 ? { bgOpacity: 0 }
@@ -961,19 +1292,17 @@ function EditorImagenContent() {
                                                         >
                                                             <span className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-all ${on ? 'translate-x-5' : 'translate-x-0'}`} />
                                                         </button>
-                                                    </div>
-
+                                                    }
+                                                >
                                                     {on ? (
                                                         <>
-                                                            <div className="grid grid-cols-2 gap-3">
-                                                                <div className="space-y-1.5">
-                                                                    <label className="text-[9px] font-black uppercase text-white/30">Color</label>
-                                                                    <input type="color" value={bg.color} onChange={(e) => updateField(selectedField.id, { bgColor: e.target.value })} className="w-full h-9 bg-black/40 border border-white/5 rounded-xl cursor-pointer" />
-                                                                </div>
-                                                                <div className="space-y-1.5">
-                                                                    <div className="flex justify-between"><label className="text-[9px] font-black uppercase text-white/30">Opacidad</label><span className="text-[9px] font-black text-primary">{bg.opacity}%</span></div>
-                                                                    <input type="range" min={5} max={100} value={bg.opacity} onChange={(e) => updateField(selectedField.id, { bgOpacity: Number(e.target.value) })} className="w-full accent-primary mt-2.5" />
-                                                                </div>
+                                                            <div className="space-y-1.5">
+                                                                <label className="text-[9px] font-black uppercase text-white/30">Color</label>
+                                                                <ColorInput value={bg.color} onChange={(c) => updateField(selectedField.id, { bgColor: c })} />
+                                                            </div>
+                                                            <div className="space-y-1.5">
+                                                                <div className="flex justify-between"><label className="text-[9px] font-black uppercase text-white/30">Opacidad</label><span className="text-[9px] font-black text-primary">{bg.opacity}%</span></div>
+                                                                <input type="range" min={5} max={100} value={bg.opacity} onChange={(e) => updateField(selectedField.id, { bgOpacity: Number(e.target.value) })} className="w-full accent-primary" />
                                                             </div>
                                                             <div className="grid grid-cols-3 gap-3">
                                                                 <div className="space-y-1.5">
@@ -993,14 +1322,14 @@ function EditorImagenContent() {
                                                     ) : (
                                                         <p className="text-[10px] text-white/20 font-medium italic">Sin fondo. Actívalo para destacar el texto sobre imágenes con mucho detalle.</p>
                                                     )}
-                                                </div>
+                                                </SubSection>
                                             );
                                         })()}
                                     </>
                                 )}
                             </div>
                         )}
-                    </div>
+                    </PanelSection>
                 </div>
             </div>
 

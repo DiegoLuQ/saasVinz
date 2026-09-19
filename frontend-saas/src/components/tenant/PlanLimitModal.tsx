@@ -11,6 +11,7 @@ import {
     AlertCircle
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useIsOwner } from '@/hooks/useSessionBootstrap';
 
 interface PlanLimitModalProps {
     isOpen?: boolean;
@@ -29,6 +30,7 @@ export const PlanLimitModal = ({
     const [resourceName, setResourceName] = useState('');
     const [limitDetail, setLimitDetail] = useState<{ limit?: number; usage?: number; message?: string } | null>(null);
     const router = useRouter();
+    const isOwner = useIsOwner();
 
     // Support both prop-based and event-based opening
     useEffect(() => {
@@ -115,9 +117,19 @@ export const PlanLimitModal = ({
                             {limitDetail?.limit ? `Has usado ${limitDetail.usage} de ${limitDetail.limit} ${resourceName}` : 'Es hora de subir al siguiente nivel'}
                         </h2>
                         <p className="text-muted-foreground text-sm leading-relaxed mb-8 max-w-sm mx-auto">
-                            {limitDetail?.message || `Has alcanzado el límite de ${resourceName || 'recursos'} en tu plan actual. Sigue creciendo sin límites actualizando tu cuenta.`}
+                            {isOwner === false
+                                ? `Se alcanzó el límite de ${resourceName || 'recursos'} del plan del crematorio. Avisa al administrador para que lo amplíe.`
+                                : limitDetail?.message || `Has alcanzado el límite de ${resourceName || 'recursos'} en tu plan actual. Sigue creciendo sin límites actualizando tu cuenta.`}
                         </p>
 
+                        {isOwner === false ? (
+                            <button
+                                onClick={handleClose}
+                                className="w-full py-4 bg-primary text-primary-foreground font-black text-sm rounded-2xl uppercase tracking-wider"
+                            >
+                                Entendido
+                            </button>
+                        ) : (
                         <div className="space-y-3">
                             <button
                                 onClick={() => {
@@ -141,6 +153,7 @@ export const PlanLimitModal = ({
                                 </button>
                             )}
                         </div>
+                        )}
 
                         <p className="text-[10px] text-primary mt-8 uppercase tracking-widest font-black italic drop-shadow-[0_0_10px_rgba(var(--primary-rgb),0.3)]">
                             Vinzer | Cuando el vínculo importa, todo cambia

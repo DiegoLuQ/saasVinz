@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { getMyPartners, getAvailablePartners, PartnerLink, VeterinaryBase } from '@/lib/tenant/api';
 import LinkVeterinaryModal from './LinkVeterinaryModal';
-import { Plus, RefreshCw, Mail, Phone, MapPin, Search } from 'lucide-react';
+import QuickCreatePartnerModal from './QuickCreatePartnerModal';
+import { Plus, RefreshCw, Mail, Phone, MapPin, Search, Building2, Percent } from 'lucide-react';
 import { useCurrentTenant } from '@/hooks/useSessionBootstrap';
 
 export default function PartnerList() {
@@ -12,6 +13,7 @@ export default function PartnerList() {
 
     const [loading, setLoading] = useState(true);
     const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+    const [isQuickCreateModalOpen, setIsQuickCreateModalOpen] = useState(false);
     const [selectedVetToInvite, setSelectedVetToInvite] = useState<VeterinaryBase | null>(null);
 
     // Auto-filter by Tenant Location
@@ -38,26 +40,15 @@ export default function PartnerList() {
         loadLinks();
     }, []);
 
-    // Apply Auto-Filter Logic (Tenant Region/Country)
+    // Sincronizar los partners vinculados al tenant
     useEffect(() => {
-        if (!tenant) return;
-
-        // Filter: Must match tenant Country AND Region (if set)
-        const result = links.filter(link => {
-            const countryMatch = !tenant.country || link.veterinary.country === tenant.country;
-            const regionMatch = !tenant.region || link.veterinary.region === tenant.region;
-            return countryMatch && regionMatch;
-        });
-
-        setFilteredLinks(result);
-
-        // Note: availableVets are already filtered by the backend based on tenant session
-    }, [links, tenant]);
+        setFilteredLinks(links);
+    }, [links]);
 
     const getStatusBadge = (status: string) => {
         switch (status) {
             case 'active':
-                return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Activo</span>;
+                return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-emerald-100 text-emerald-800">Activo</span>;
             case 'pending':
                 return <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pendiente</span>;
             case 'rejected':
@@ -80,16 +71,24 @@ export default function PartnerList() {
                         <RefreshCw className="h-5 w-5" />
                     </button>
                     {activeTab === 'my_partners' && (
-                        <button
-                            onClick={() => {
-                                setSelectedVetToInvite(null);
-                                setIsLinkModalOpen(true);
-                            }}
-                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-xl shadow-lg text-white bg-indigo-600 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all hover:scale-[1.02]"
-                        >
-                            <Plus className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-                            Vincular Manualmente
-                        </button>
+                        <>
+                            <button
+                                onClick={() => setIsQuickCreateModalOpen(true)}
+                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-bold rounded-xl shadow-lg text-white bg-emerald-600 hover:bg-emerald-500 focus:outline-none transition-all hover:scale-[1.02]"
+                            >
+                                <Plus className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+                                Registrar Veterinaria
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setSelectedVetToInvite(null);
+                                    setIsLinkModalOpen(true);
+                                }}
+                                className="inline-flex items-center px-3.5 py-2 border border-white/10 text-xs font-bold rounded-xl text-gray-300 bg-white/5 hover:bg-white/10 transition-all"
+                            >
+                                Vincular del Catálogo
+                            </button>
+                        </>
                     )}
                 </div>
             </div>
@@ -111,24 +110,23 @@ export default function PartnerList() {
                     <button
                         onClick={() => setActiveTab('explore')}
                         className={`
-                            whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center
+                            whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
                             ${activeTab === 'explore'
                                 ? 'border-indigo-500 text-indigo-400'
                                 : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'}
                         `}
                     >
-                        <Search className="w-4 h-4 mr-2" />
-                        Explorar en mi Zona ({availableVets.length})
+                        Explorar Catálogo Global ({availableVets.length})
                     </button>
                 </nav>
             </div>
 
             {/* Content Area */}
-            <div className="glass-card rounded-3xl overflow-hidden border border-white/10 bg-white/[0.02] min-h-[400px]">
+            <div className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-x-auto shadow-2xl backdrop-blur-sm">
                 {loading ? (
-                    <div className="p-20 flex flex-col items-center justify-center text-gray-500">
-                        <RefreshCw className="w-8 h-8 animate-spin mb-4 text-sky-500" />
-                        <p>Cargando información...</p>
+                    <div className="p-12 text-center">
+                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-r-transparent"></div>
+                        <p className="mt-2 text-sm text-gray-400">Cargando veterinarias...</p>
                     </div>
                 ) : (
                     <>
@@ -139,7 +137,7 @@ export default function PartnerList() {
                                     <tr>
                                         <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Veterinaria</th>
                                         <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Contacto</th>
-                                        <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Dirección</th>
+                                        <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Comisión</th>
                                         <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Ubicación</th>
                                         <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Estado</th>
                                     </tr>
@@ -148,18 +146,14 @@ export default function PartnerList() {
                                     {filteredLinks.length === 0 ? (
                                         <tr>
                                             <td colSpan={5} className="px-6 py-12 text-center text-gray-500 italic">
-                                                {tenant ? (
-                                                    <>
-                                                        No tienes partners activos en {tenant.region || 'tu zona'}.
-                                                        <br />
-                                                        <button
-                                                            onClick={() => setActiveTab('explore')}
-                                                            className="text-indigo-400 hover:text-indigo-300 font-medium mt-2 underline"
-                                                        >
-                                                            ¡Explora nuevas veterinarias aquí!
-                                                        </button>
-                                                    </>
-                                                ) : "Cargando..."}
+                                                No tienes convenios con veterinarias registrados todavía.
+                                                <br />
+                                                <button
+                                                    onClick={() => setIsQuickCreateModalOpen(true)}
+                                                    className="text-emerald-400 hover:text-emerald-300 font-medium mt-2 underline"
+                                                >
+                                                    ¡Registra tu primera veterinaria aliada aquí!
+                                                </button>
                                             </td>
                                         </tr>
                                     ) : (
@@ -185,11 +179,11 @@ export default function PartnerList() {
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-5 whitespace-nowrap text-sm text-gray-400 font-medium max-w-xs truncate" title={link.veterinary.address}>
-                                                    <div className="flex items-center">
-                                                        <MapPin className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-gray-600" />
-                                                        {link.veterinary.address || '-'}
-                                                    </div>
+                                                <td className="px-6 py-5 whitespace-nowrap text-sm">
+                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-black bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                                                        <Percent size={12} className="mr-1" />
+                                                        {link.porcentaje_comision || 0}%
+                                                    </span>
                                                 </td>
                                                 <td className="px-6 py-5 whitespace-nowrap text-sm">
                                                     <div className="font-medium text-gray-300">{link.veterinary.city || '-'}</div>
@@ -257,6 +251,14 @@ export default function PartnerList() {
                     </>
                 )}
             </div>
+
+            <QuickCreatePartnerModal
+                isOpen={isQuickCreateModalOpen}
+                onClose={() => setIsQuickCreateModalOpen(false)}
+                onSuccess={() => {
+                    loadLinks();
+                }}
+            />
 
             <LinkVeterinaryModal
                 isOpen={isLinkModalOpen}

@@ -40,7 +40,7 @@ from app.api.internal.partners.models import (
 
 # 6. Common (Notifications, Submissions, Theme, Landing, Announcements)
 from app.api.internal.common.models import (
-    Notification, RecipientType, NotificationPriority,
+    Notification, NotificationUserState, RecipientType, NotificationPriority,
     FormSubmission, ThemeConfig, LandingConfig, FarewellTemplate,
     TenantAnnouncement, AnnouncementType, AnnouncementDisplayType, UserAnnouncementView,
     MediaLibrary, MediaCategory

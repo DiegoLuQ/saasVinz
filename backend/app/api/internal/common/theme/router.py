@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_tenant_id
 from app import models
 from app import schemas
+from app import auth
+from app.api.internal.common.notifications import audience as notif_audience
 from datetime import datetime
 from app.utils import tz
 
@@ -46,9 +48,13 @@ async def get_theme_config(
 async def update_theme_config(
     config_update: schemas.ThemeConfigUpdate,
     db: Session = Depends(get_db),
-    tenant_id: int = Depends(get_tenant_id)
+    tenant_id: int = Depends(get_tenant_id),
+    current_user: models.User = Depends(auth.get_current_user)
 ):
-    """Update theme configuration for the current tenant"""
+    """Tema del crematorio completo: solo el dueño (admin) lo cambia.
+    El resto del equipo ajusta su preferencia localmente en el navegador."""
+    if not notif_audience.is_owner(current_user):
+        raise HTTPException(status_code=403, detail="Solo el administrador puede cambiar el tema del crematorio")
     config = db.query(models.ThemeConfig).filter(
         models.ThemeConfig.tenant_id == tenant_id
     ).first()

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     Plus,
     AlertCircle,
@@ -21,7 +21,8 @@ import {
     ExternalLink,
     Eye,
     Share2,
-    MessageCircle
+    MessageCircle,
+    Building2
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -43,15 +44,21 @@ import { PlanLimitModal } from '@/components/tenant/PlanLimitModal';
 // ==========================================
 // Status normalization
 // ==========================================
-const normalizeStatus = (raw: string): string => {
-    const v = raw.trim().toLowerCase();
-    if (['pending', 'received', 'coordinado'].includes(v)) return 'pendiente';
-    // 'ready' (técnica terminada en Operaciones) se considera aún en proceso hasta la entrega
+const normalizeStatus = (v: string): string => {
+    if (!v) return 'pendiente';
+    v = v.toLowerCase();
+    if (['draft', 'pending'].includes(v)) return 'pendiente';
     if (['processing', 'ready'].includes(v)) return 'en_proceso';
     // Estado final único = entregado. 'completado'/'completed' quedan retirados → entregado
     if (['delivered', 'completed', 'completado'].includes(v)) return 'entregado';
     if (['canceled'].includes(v)) return 'cancelado';
     return v;
+};
+
+const getPartnerShortName = (name?: string): string => {
+    if (!name) return '';
+    const clean = name.replace(/^(cl[ií]nica\s+veterinaria|hospital\s+veterinario|centro\s+veterinario)\s+/i, 'Vet. ').trim();
+    return clean.length > 18 ? clean.substring(0, 17) + '…' : clean;
 };
 
 const isToday = (dateStr?: string): boolean => {
@@ -79,7 +86,6 @@ export default function CremationsPage() {
     // Local state
     // ==========================================
     const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
-    const [mobileTab, setMobileTab] = useState<'all' | 'pendiente' | 'en_proceso' | 'completado' | 'cancelado'>('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null);
     const [opsFilter, setOpsFilter] = useState<OpsFilter>('all');
@@ -89,6 +95,23 @@ export default function CremationsPage() {
     // SlideOver Detail State
     const [slideOverCremation, setSlideOverCremation] = useState<Cremation | null>(null);
     const [isSlideOverOpen, setIsSlideOverOpen] = useState(false);
+
+    // Enlace directo ?orden=<id> (p. ej. desde el dashboard): abre el detalle de esa orden
+    const deepLinkHandled = useRef(false);
+    useEffect(() => {
+        if (deepLinkHandled.current || loadingCremations) return;
+        const id = Number(new URLSearchParams(window.location.search).get('orden'));
+        const found = id ? cremations.find(c => c.id === id) : undefined;
+        if (!found) return;
+        // El flag se marca dentro del timeout: con StrictMode el efecto corre dos veces
+        // y el primer timeout se cancela en el cleanup.
+        const t = setTimeout(() => {
+            deepLinkHandled.current = true;
+            setSlideOverCremation(found);
+            setIsSlideOverOpen(true);
+        }, 0);
+        return () => clearTimeout(t);
+    }, [cremations, loadingCremations]);
 
     // Deletion + cancellation modals
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -250,6 +273,11 @@ export default function CremationsPage() {
 
     const isFilterActive = opsFilter !== 'all' || statusFilter !== 'all' || searchTerm.trim() !== '';
 
+    // Con un filtro de estado activo, en móvil solo se muestra su columna (las demás
+    // quedarían vacías); en escritorio el tablero conserva las tres columnas.
+    const columnVisibility = (key: StatusPillFilter) =>
+        statusFilter === 'all' || statusFilter === key ? 'flex' : 'hidden md:flex';
+
     const clearAllFilters = () => {
         setOpsFilter('all');
         setStatusFilter('all');
@@ -260,6 +288,7 @@ export default function CremationsPage() {
     const KanbanCard = ({ item, nextStatus, nextLabel, icon: Icon, colorClass, glowColor, isSelected, onSelect }: any) => {
         const isCompleted = ['delivered', 'completed', 'completado', 'entregado'].includes(normalizeStatus(item.status));
         const isCancelled = normalizeStatus(item.status) === 'cancelado';
+        const partnerName = item.partner_name || item.partner_link?.veterinary?.name || item.partner?.veterinary?.name || item.partner?.nombre_clinica;
 
         const handleCopyCode = async (e: React.MouseEvent) => {
             e.stopPropagation();
@@ -361,6 +390,15 @@ export default function CremationsPage() {
                         {item.cremation_type && (
                             <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-md bg-white/5 text-muted-foreground border border-white/5">
                                 {item.cremation_type}
+                            </span>
+                        )}
+                        {partnerName && (
+                            <span
+                                className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 flex items-center gap-1"
+                                title={`Convenio: ${partnerName}`}
+                            >
+                                <Building2 size={10} className="shrink-0 text-emerald-400" />
+                                <span className="max-w-[130px] truncate">{getPartnerShortName(partnerName)}</span>
                             </span>
                         )}
                     </div>
@@ -542,49 +580,8 @@ export default function CremationsPage() {
                 </div>
             ) : viewMode === 'kanban' ? (
                 <div className="space-y-4">
-                    {/* Mobile Column Tabs (Visible on small screens) */}
-                    <div className="flex md:hidden bg-white/5 p-1 rounded-2xl border border-white/10 gap-1 overflow-x-auto text-xs font-bold">
-                        <button
-                            type="button"
-                            onClick={() => setMobileTab('all')}
-                            className={`flex-1 py-2 px-3 rounded-xl transition ${mobileTab === 'all' ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-white'}`}
-                        >
-                            Todos ({filteredCremations.length})
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setMobileTab('pendiente')}
-                            className={`flex-1 py-2 px-3 rounded-xl transition ${mobileTab === 'pendiente' ? 'bg-orange-500 text-white shadow' : 'text-muted-foreground hover:text-white'}`}
-                        >
-                            Recibidos ({kanbanColumns.pendiente.length})
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setMobileTab('en_proceso')}
-                            className={`flex-1 py-2 px-3 rounded-xl transition ${mobileTab === 'en_proceso' ? 'bg-blue-500 text-white shadow' : 'text-muted-foreground hover:text-white'}`}
-                        >
-                            En Proceso ({kanbanColumns.en_proceso.length})
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setMobileTab('completado')}
-                            className={`flex-1 py-2 px-3 rounded-xl transition ${mobileTab === 'completado' ? 'bg-emerald-500 text-white shadow' : 'text-muted-foreground hover:text-white'}`}
-                        >
-                            Entregados ({kanbanColumns.completado.length})
-                        </button>
-                        {kanbanColumns.cancelado.length > 0 && (
-                            <button
-                                type="button"
-                                onClick={() => setMobileTab('cancelado')}
-                                className={`flex-1 py-2 px-3 rounded-xl transition ${mobileTab === 'cancelado' ? 'bg-red-500 text-white shadow' : 'text-muted-foreground hover:text-white'}`}
-                            >
-                                Cancelados ({kanbanColumns.cancelado.length})
-                            </button>
-                        )}
-                    </div>
-
                     {/* VISTA KANBAN: Si se filtra específicamente por Cancelados, se muestra su vista dedicada */}
-                    {statusFilter === 'cancelado' || mobileTab === 'cancelado' ? (
+                    {statusFilter === 'cancelado' ? (
                         <div className="bg-white/[0.01] border border-red-500/20 rounded-3xl p-6">
                             <div className="flex items-center justify-between mb-6">
                                 <h3 className="font-bold text-white flex items-center gap-2.5 text-base">
@@ -621,8 +618,7 @@ export default function CremationsPage() {
                         <>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 items-start">
                                 {/* Columna Pendientes */}
-                                {(mobileTab === 'all' || mobileTab === 'pendiente') && (
-                                    <div className="bg-white/[0.01] border border-white/5 rounded-3xl p-4 flex flex-col gap-4">
+                                    <div className={`${columnVisibility('pendiente')} bg-white/[0.01] border border-white/5 rounded-3xl p-4 flex-col gap-4`}>
                                         <div className="flex items-center justify-between px-2">
                                             <h3 className="font-bold text-white flex items-center gap-2">
                                                 <span className="w-2.5 h-2.5 rounded-full bg-orange-400 shadow-[0_0_8px_rgba(251,146,60,0.5)]" />
@@ -648,11 +644,9 @@ export default function CremationsPage() {
                                             )}
                                         </div>
                                     </div>
-                                )}
 
                                 {/* Columna En Proceso */}
-                                {(mobileTab === 'all' || mobileTab === 'en_proceso') && (
-                                    <div className="bg-white/[0.01] border border-white/5 rounded-3xl p-4 flex flex-col gap-4 relative overflow-hidden">
+                                    <div className={`${columnVisibility('en_proceso')} bg-white/[0.01] border border-white/5 rounded-3xl p-4 flex-col gap-4 relative overflow-hidden`}>
                                         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-3xl pointer-events-none rounded-full" />
                                         <div className="flex items-center justify-between px-2 relative z-10">
                                             <h3 className="font-bold text-white flex items-center gap-2">
@@ -679,11 +673,9 @@ export default function CremationsPage() {
                                             )}
                                         </div>
                                     </div>
-                                )}
 
                                 {/* Columna Entregados (Tope máximo de 7) */}
-                                {(mobileTab === 'all' || mobileTab === 'completado') && (
-                                    <div className="bg-white/[0.01] border border-white/5 rounded-3xl p-4 flex flex-col gap-4">
+                                    <div className={`${columnVisibility('completado')} bg-white/[0.01] border border-white/5 rounded-3xl p-4 flex-col gap-4`}>
                                         <div className="flex items-center justify-between px-2">
                                             <h3 className="font-bold text-white flex items-center gap-2">
                                                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
@@ -728,7 +720,6 @@ export default function CremationsPage() {
                                             )}
                                         </div>
                                     </div>
-                                )}
                             </div>
 
                             {/* Banner discreto si existen canceladas en la vista general */}

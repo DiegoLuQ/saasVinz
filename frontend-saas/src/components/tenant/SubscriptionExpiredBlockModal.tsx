@@ -4,6 +4,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Lock, LogOut, RefreshCcw, Mail, ShieldAlert } from 'lucide-react';
 import { clearToken } from '@/lib/auth/token';
+import { useIsOwner } from '@/hooks/useSessionBootstrap';
 
 export interface SubscriptionExpiredDetail {
     code?: string;
@@ -60,6 +61,8 @@ export default function SubscriptionExpiredBlockModal({ detail }: Props) {
         saas_name = 'SaaS Crematorio',
     } = detail || {};
 
+    // Si el rol no se conoce (bootstrap bloqueado) se muestra la vista del dueño
+    const isTeamMember = useIsOwner() === false;
     const phoneDigits = sanitizePhone(support_whatsapp);
     const cycleLabel = billing_cycle === 'annual' ? 'Anual' : 'Mensual';
 
@@ -117,12 +120,14 @@ export default function SubscriptionExpiredBlockModal({ detail }: Props) {
                         Acceso Bloqueado
                     </h1>
                     <p className="text-white/60 font-medium leading-relaxed text-sm sm:text-base">
-                        Tu periodo de gracia ha finalizado. Para reactivar el acceso al panel, regulariza el pago contactándonos por los siguientes medios.
+                        {isTeamMember
+                            ? 'La suscripción del crematorio venció. El administrador debe regularizar el pago para reactivar el sistema; avísale para retomar el trabajo.'
+                            : 'Tu periodo de gracia ha finalizado. Para reactivar el acceso al panel, regulariza el pago contactándonos por los siguientes medios.'}
                     </p>
                 </div>
 
-                {/* Bloque resumen del pago */}
-                <div className="bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 rounded-2xl p-5 mb-6">
+                {/* Bloque resumen del pago (solo el dueño) */}
+                <div className={`${isTeamMember ? 'hidden' : ''} bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 rounded-2xl p-5 mb-6`}>
                     <div className="flex items-start justify-between gap-4 mb-4">
                         <div>
                             <div className="text-[10px] uppercase font-black text-white/30 tracking-widest mb-1">Plan</div>
@@ -145,7 +150,7 @@ export default function SubscriptionExpiredBlockModal({ detail }: Props) {
 
                 {/* Botones de acción */}
                 <div className="flex flex-col gap-3">
-                    {phoneDigits && (
+                    {!isTeamMember && phoneDigits && (
                         <button
                             onClick={handleWhatsApp}
                             className="group relative w-full py-4 rounded-2xl font-black text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 shadow-xl shadow-emerald-500/30 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3 overflow-hidden"
@@ -158,6 +163,7 @@ export default function SubscriptionExpiredBlockModal({ detail }: Props) {
                         </button>
                     )}
 
+                    {!isTeamMember && (
                     <button
                         onClick={handleEmail}
                         className="w-full py-3.5 rounded-2xl font-bold text-white bg-white/10 border border-white/10 hover:bg-white/15 hover:border-white/20 transition-all flex items-center justify-center gap-3"
@@ -165,6 +171,7 @@ export default function SubscriptionExpiredBlockModal({ detail }: Props) {
                         <Mail size={18} />
                         ENVIAR CORREO A SOPORTE
                     </button>
+                    )}
 
                     <div className="grid grid-cols-2 gap-3 mt-1">
                         <button
@@ -172,7 +179,7 @@ export default function SubscriptionExpiredBlockModal({ detail }: Props) {
                             className="py-3 rounded-2xl font-bold text-white/80 bg-transparent border border-white/15 hover:bg-white/5 hover:text-white transition-all flex items-center justify-center gap-2 text-sm"
                         >
                             <RefreshCcw size={16} />
-                            VERIFICAR PAGO
+                            {isTeamMember ? 'REINTENTAR' : 'VERIFICAR PAGO'}
                         </button>
                         <button
                             onClick={handleLogout}
@@ -184,8 +191,8 @@ export default function SubscriptionExpiredBlockModal({ detail }: Props) {
                     </div>
                 </div>
 
-                {/* Pie de contacto */}
-                <div className="mt-7 pt-5 border-t border-white/10 text-center">
+                {/* Pie de contacto (solo el dueño) */}
+                <div className={`${isTeamMember ? 'hidden' : ''} mt-7 pt-5 border-t border-white/10 text-center`}>
                     <div className="text-[10px] uppercase font-black text-white/30 tracking-widest mb-1">Soporte</div>
                     <div className="text-sm text-white/70 font-medium break-words">{support_email}</div>
                     {support_whatsapp && (

@@ -974,6 +974,7 @@ def generate_image_certificate_html(
     current_date=None,
     pet_images: list = None,
     tenant_logo_url: str = None,
+    tenant_name: str = "",
     tenant_rut: str = "",
     tenant_manager: str = "",
     tenant_manager_rut: str = "",
@@ -1170,6 +1171,8 @@ def generate_image_certificate_html(
             # usa el que definio el admin en el diseno.
             ov_value = ov.get("value")
             value = ov_value if ov_value is not None else field.get("value", "")
+        elif ftype == "nombre_empresa":
+            value = tenant_name or ""
         elif ftype == "rut_tenant":
             value = tenant_rut or ""
         elif ftype == "encargado_tenant":
@@ -1194,17 +1197,22 @@ def generate_image_certificate_html(
         color = field.get("color", "#1a1a1a")
         align = field.get("align", "center")
         weight = "700" if field.get("bold") else "400"
+        is_free_text = (ftype == "texto_fijo")
+        text_w_val = field.get("w", 80) if is_free_text else field.get("w")
+        text_w_css = f"width:{text_w_val}%; max-width:{text_w_val}%; " if text_w_val else ""
+        ws_css = "white-space:pre-wrap; word-break:break-word; line-height:1.4;" if (is_free_text or "\n" in str(value)) else "white-space:nowrap;"
         bg_css = _img_text_bg_css(field)
         layers.append((FIELD_Z,
-            f'<div class="cert-field" style="{base_pos} '
+            f'<div class="cert-field" style="{base_pos} {text_w_css}'
             f'font-size:{font_size}px; font-family:{font_family}; '
             f'color:{color}; text-align:{align}; font-weight:{weight}; '
-            f'white-space:nowrap; {bg_css}">{esc(value)}</div>'
+            f'{ws_css} {bg_css}">{esc(value)}</div>'
         ))
         spec_items.append({
             "kind": "text", "value": value, "x": x, "y": y, "z": FIELD_Z,
             "fontSize": font_size, "fontFamily": font_family, "color": color,
             "align": align, "bold": bool(field.get("bold")),
+            "w": text_w_val, "is_free_text": is_free_text,
             "bgColor": field.get("bgColor"), "bgOpacity": field.get("bgOpacity"),
             "bgPadX": field.get("bgPadX"), "bgPadY": field.get("bgPadY"),
             "bgRadius": field.get("bgRadius"),

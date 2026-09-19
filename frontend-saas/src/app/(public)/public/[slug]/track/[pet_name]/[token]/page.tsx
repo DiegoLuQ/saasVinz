@@ -22,6 +22,11 @@ import {
     Sparkles,
     Download,
     Loader2,
+    ShieldCheck,
+    ChevronDown,
+    ChevronUp,
+    Share2,
+    Check,
 } from 'lucide-react';
 import EvidenceModal from '@/components/public/EvidenceModal';
 import html2canvas from 'html2canvas';
@@ -108,6 +113,29 @@ export default function TrackingPage() {
             console.error('Error al exportar homenaje:', err);
         } finally {
             setIsDownloadingCard(false);
+        }
+    };
+
+    const [isTimelineExpanded, setIsTimelineExpanded] = useState(false);
+    const [copiedLink, setCopiedLink] = useState(false);
+
+    const handleShare = async () => {
+        if (typeof navigator !== 'undefined' && navigator.share) {
+            try {
+                await navigator.share({
+                    title: `Homenaje en Memoria de ${data?.pet_name || 'nuestro compañero'}`,
+                    text: `En memoria y recuerdo eterno de ${data?.pet_name || 'nuestro compañero'}.`,
+                    url: window.location.href,
+                });
+                return;
+            } catch (err) {
+                // Ignore share cancellation
+            }
+        }
+        if (typeof navigator !== 'undefined' && navigator.clipboard) {
+            navigator.clipboard.writeText(window.location.href);
+            setCopiedLink(true);
+            setTimeout(() => setCopiedLink(false), 2500);
         }
     };
 
@@ -263,6 +291,9 @@ export default function TrackingPage() {
     const activeEvents = timeline.filter((e: any) => e.status === 'completed' || e.status === 'current');
     const latestEventWithTime = [...activeEvents].reverse().find((e: any) => e.completed_at);
     const lastUpdateDate = latestEventWithTime ? new Date(latestEventWithTime.completed_at) : null;
+
+    const isDelivered = data?.service_status === 'delivered' || data?.service_status === 'entregado';
+    const isUltraDelivered = Boolean(data?.is_ultra_plan && isDelivered);
 
     return (
         <div className={`min-h-screen font-sans transition-colors duration-500 selection:bg-emerald-500/30 relative overflow-hidden ${theme.bg} ${theme.text}`}>
@@ -435,12 +466,24 @@ export default function TrackingPage() {
                     </div>
 
                     <div className="space-y-3">
-                        <div className="flex items-center justify-center gap-2 text-emerald-500 mb-1">
-                            <Heart size={14} fill="currentColor" />
-                            <p className="font-black text-[11px] tracking-[0.25em] uppercase">
-                                {data.service_status === 'delivered' || data.service_status === 'entregado' ? 'Servicio Finalizado' : 'Acompañando el proceso'}
-                            </p>
-                            <Heart size={14} fill="currentColor" />
+                        <div className="flex items-center justify-center gap-2 mb-1">
+                            {isUltraDelivered ? (
+                                <>
+                                    <Sparkles size={14} className="text-amber-500 animate-pulse" />
+                                    <p className="font-black text-[11px] tracking-[0.25em] uppercase text-amber-600 dark:text-amber-400">
+                                        Servicio Finalizado · Homenaje Eterno
+                                    </p>
+                                    <Sparkles size={14} className="text-amber-500 animate-pulse" />
+                                </>
+                            ) : (
+                                <>
+                                    <Heart size={14} fill="currentColor" className="text-emerald-500" />
+                                    <p className="font-black text-[11px] tracking-[0.25em] uppercase text-emerald-500">
+                                        {isDelivered ? 'Servicio Finalizado' : 'Acompañando el proceso'}
+                                    </p>
+                                    <Heart size={14} fill="currentColor" className="text-emerald-500" />
+                                </>
+                            )}
                         </div>
                         <div className="flex items-center justify-center gap-3">
                             <AngelWings className="w-6 h-6 text-emerald-500/30 -scale-x-100" />
@@ -476,173 +519,23 @@ export default function TrackingPage() {
                     </div>
                 </motion.div>
 
-                {/* Selector de Pestañas en Móvil */}
-                {farewellConfig && (
-                    <div className="lg:hidden flex p-1 rounded-2xl bg-black/5 dark:bg-neutral-900/80 border border-emerald-500/20 backdrop-blur-md mb-6 shadow-sm sticky top-4 z-20">
-                        <button
-                            type="button"
-                            onClick={() => setMobileTab('tracking')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                                mobileTab === 'tracking'
-                                    ? 'bg-white dark:bg-neutral-800 text-emerald-700 dark:text-emerald-400 shadow-md scale-[1.01]'
-                                    : 'text-gray-500 dark:text-neutral-400 hover:text-gray-900'
-                            }`}
-                        >
-                            <PawPrint size={15} />
-                            <span>Seguimiento</span>
-                            <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-650 dark:text-emerald-400 font-bold">
-                                {progressPercentage}%
-                            </span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setMobileTab('tribute')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                                mobileTab === 'tribute'
-                                    ? 'bg-white dark:bg-neutral-800 text-amber-700 dark:text-amber-300 shadow-md scale-[1.01]'
-                                    : 'text-gray-500 dark:text-neutral-400 hover:text-gray-900'
-                            }`}
-                        >
-                            <Sparkles size={15} className="text-amber-500" />
-                            <span>Homenaje</span>
-                        </button>
-                    </div>
-                )}
-
-                {/* Banner compacto de estado para móvil cuando está en pestaña de Seguimiento */}
-                <div className={`lg:hidden mb-6 p-4 rounded-2xl border backdrop-blur-md ${
-                    isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white/90 border-emerald-100/80 shadow-md shadow-emerald-500/5'
-                } ${mobileTab === 'tracking' ? 'block' : 'hidden'}`}>
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                            <h4 className="text-xs font-black text-emerald-650 dark:text-emerald-400 truncate">
-                                {currentStepName}
-                            </h4>
-                        </div>
-                        <span className="text-xs font-black text-emerald-650 dark:text-emerald-400 shrink-0">
-                            {progressPercentage}%
-                        </span>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="flex gap-1 my-2">
-                        {Array.from({ length: totalSteps || 5 }).map((_, idx) => {
-                            const isStepCompleted = idx < completedCount;
-                            const isStepCurrent = idx === completedCount;
-                            return (
-                                <div 
-                                    key={idx} 
-                                    className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
-                                        isStepCompleted 
-                                            ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' 
-                                            : isStepCurrent 
-                                                ? 'bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.4)] animate-pulse'
-                                                : (isDarkMode ? 'bg-neutral-800' : 'bg-gray-200')
-                                    }`} 
-                                />
-                            );
-                        })}
-                    </div>
-                    <p className={`text-[10px] font-bold ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>
-                        {completedCount} de {totalSteps} etapas completadas
-                    </p>
-                </div>
-
-                {/* Layout Principal Grid 2 Columnas */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                    
-                    {/* Panel Izquierdo: Tarjetas Informativas en Desktop / Vista Homenaje en Móvil */}
-                    <div className={`lg:col-span-4 space-y-4 lg:sticky lg:top-24 ${
-                        mobileTab === 'tribute' ? 'block' : 'hidden lg:block'
-                    }`}>
-                        {/* Tarjeta 1: Estado Actual (Desktop) */}
-                        <div className={`hidden lg:block p-6 rounded-[2rem] border backdrop-blur-md transition-all duration-300 ${
-                            isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white/90 border-emerald-100/80 shadow-md shadow-emerald-500/5'
-                        }`}>
-                            <div className="flex items-center gap-3 mb-3">
-                                <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-650 shrink-0">
-                                    <PawPrint size={20} />
-                                </div>
-                                <div className="min-w-0">
-                                    <span className={`text-[10px] font-bold uppercase tracking-widest block ${
-                                        isDarkMode ? 'text-slate-500' : 'text-gray-400'
-                                    }`}>Estado actual</span>
-                                    <h4 className="text-sm font-black text-emerald-650 dark:text-emerald-400 truncate leading-tight">{currentStepName}</h4>
-                                </div>
-                            </div>
-                            <p className={`text-xs leading-relaxed mt-1 ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>
-                                {currentEvent?.status === 'current' 
-                                    ? `Tu mascota se encuentra actualmente en esta etapa.` 
-                                    : `El proceso se encuentra en marcha.`}
-                            </p>
-                        </div>
-
-                        {/* Tarjeta 2: Progreso del Proceso (Desktop) */}
-                        <div className={`hidden lg:block p-6 rounded-[2rem] border backdrop-blur-md transition-all duration-300 ${
-                            isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white/90 border-emerald-100/80 shadow-md shadow-emerald-500/5'
-                        }`}>
-                            <div className="flex justify-between items-center mb-3">
-                                <span className={`text-[10px] font-bold uppercase tracking-widest ${
-                                    isDarkMode ? 'text-slate-500' : 'text-gray-400'
-                                }}`}>Progreso del proceso</span>
-                                <span className="text-lg font-black text-emerald-650 dark:text-emerald-400">{progressPercentage}%</span>
-                            </div>
-                            
-                            {/* Visual Progress Blocks */}
-                            <div className="flex gap-1.5 my-3">
-                                {Array.from({ length: totalSteps || 5 }).map((_, idx) => {
-                                    const isStepCompleted = idx < completedCount;
-                                    const isStepCurrent = idx === completedCount;
-                                    return (
-                                        <div 
-                                            key={idx} 
-                                            className={`h-2 flex-1 rounded-full transition-all duration-500 ${
-                                                isStepCompleted 
-                                                    ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' 
-                                                    : isStepCurrent 
-                                                        ? 'bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.4)] animate-pulse'
-                                                        : (isDarkMode ? 'bg-neutral-805' : 'bg-gray-200')
-                                            }`} 
-                                        />
-                                    );
-                                })}
-                            </div>
-                            
-                            <p className={`text-[11px] font-bold ${isDarkMode ? 'text-slate-400' : 'text-gray-700'}`}>
-                                {completedCount} de {totalSteps} etapas completadas
-                            </p>
-                        </div>
-
-                        {/* Tarjeta 3: Última actualización (Desktop) */}
-                        <div className={`hidden lg:block p-6 rounded-[2rem] border backdrop-blur-md transition-all duration-300 ${
-                            isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white/90 border-emerald-100/80 shadow-md shadow-emerald-500/5'
-                        }`}>
-                            <span className={`text-[10px] font-bold uppercase tracking-widest block mb-2 ${
-                                isDarkMode ? 'text-slate-500' : 'text-gray-400'
-                            }`}>Última actualización</span>
-                            {lastUpdateDate ? (
-                                <div className="space-y-1">
-                                    <p className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-                                        {lastUpdateDate.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                                    </p>
-                                    <p className="text-xs text-emerald-650 dark:text-emerald-400 font-bold">
-                                        {lastUpdateDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })} hrs
-                                    </p>
-                                </div>
-                            ) : (
-                                <p className="text-xs text-slate-400 italic">No hay actualizaciones registradas aún.</p>
-                            )}
-                        </div>
-
-                        {/* Tarjeta 4: Homenaje Conmemorativo (Permanente con Descarga HD) */}
+                {isUltraDelivered ? (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5 }}
+                        className="max-w-2xl mx-auto space-y-7"
+                    >
+                        {/* 1. Tarjeta de Homenaje Central (Protagonista) */}
                         {farewellConfig && (
-                            <div className={`p-5 rounded-[2rem] border backdrop-blur-md transition-all duration-300 flex flex-col items-center text-center overflow-hidden ${
-                                isDarkMode ? 'bg-neutral-900/60 border-amber-500/30' : 'bg-gradient-to-br from-amber-50/70 to-white border-amber-200/80 shadow-md shadow-amber-500/5'
+                            <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-md transition-all duration-300 flex flex-col items-center text-center shadow-xl ${
+                                isDarkMode 
+                                    ? 'bg-neutral-900/70 border-amber-500/30 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.7)]' 
+                                    : 'bg-gradient-to-b from-white/95 via-amber-50/40 to-white/95 border-amber-200/90 shadow-[0_20px_50px_-15px_rgba(217,119,6,0.1)]'
                             }`}>
-                                <div className="flex items-center gap-2 mb-3">
-                                    <Sparkles size={16} className="text-amber-500" />
-                                    <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 mb-5">
+                                    <Sparkles size={14} className="text-amber-500" />
+                                    <span className="text-[11px] font-black uppercase tracking-wider">
                                         Homenaje Conmemorativo
                                     </span>
                                 </div>
@@ -656,32 +549,33 @@ export default function TrackingPage() {
                                     else if (fmt === '4:3') dims = { width: baseHeight, height: baseHeight * (3 / 4) };
                                     else if (fmt === '1:1') dims = { width: baseHeight, height: baseHeight };
 
-                                    const targetWidth = 260;
-                                    const scale = Math.min(0.58, targetWidth / dims.width);
+                                    const targetWidth = 340;
+                                    const scale = Math.min(0.76, targetWidth / dims.width);
+
                                     return (
                                         <>
-                                            {/* Off-screen HD Target */}
+                                            {/* Off-screen HD Target para exportación limpia */}
                                             <div 
                                                 style={{ 
                                                     position: 'fixed', 
                                                     left: '-9999px', 
                                                     top: '-9999px', 
                                                     width: `${dims.width}px`, 
-                                                    height: `${dims.height}px`,
-                                                    pointerEvents: 'none',
-                                                    zIndex: -999,
+                                                    height: `${dims.height}px`, 
+                                                    pointerEvents: 'none', 
+                                                    zIndex: -999 
                                                 }}
                                             >
                                                 <FarewellPreview ref={cardExportRef} config={farewellConfig} />
                                             </div>
 
-                                            {/* Visual Scaled Card */}
+                                            {/* Tarjeta Visual Escalada */}
                                             <div 
                                                 style={{ 
                                                     width: `${dims.width * scale}px`, 
-                                                    height: `${dims.height * scale}px`,
+                                                    height: `${dims.height * scale}px` 
                                                 }}
-                                                className="rounded-2xl overflow-hidden shadow-2xl border border-amber-500/30 relative flex-shrink-0 my-1 bg-black/40"
+                                                className="rounded-2xl overflow-hidden shadow-2xl border border-amber-500/30 relative flex-shrink-0 my-2 bg-black/40"
                                             >
                                                 <div 
                                                     style={{
@@ -699,191 +593,663 @@ export default function TrackingPage() {
                                     );
                                 })()}
 
-                                <p className="text-[11px] text-slate-500 dark:text-slate-400 italic mt-2.5">
-                                    Inmortalizando la memoria de {data.pet_name}.
+                                <p className="text-xs text-slate-500 dark:text-neutral-400 italic mt-3 max-w-md">
+                                    Inmortalizando con amor la memoria y el legado de {data.pet_name}.
                                 </p>
 
+                                {/* Botones de Acción */}
+                                <div className="flex flex-col sm:flex-row items-center gap-3 w-full mt-6 pt-5 border-t border-amber-500/15">
+                                    <button
+                                        type="button"
+                                        onClick={handleDownloadCard}
+                                        disabled={isDownloadingCard}
+                                        className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 py-3.5 px-5 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 cursor-pointer"
+                                    >
+                                        {isDownloadingCard ? (
+                                            <>
+                                                <Loader2 size={16} className="animate-spin" />
+                                                <span>Generando en HD...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Download size={16} />
+                                                <span>Descargar Recuerdo (HD)</span>
+                                            </>
+                                        )}
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={handleShare}
+                                        className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all border cursor-pointer ${
+                                            copiedLink
+                                                ? 'bg-emerald-500 text-white border-emerald-500'
+                                                : isDarkMode
+                                                    ? 'bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border-neutral-700'
+                                                    : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200 shadow-sm'
+                                        }`}
+                                    >
+                                        {copiedLink ? (
+                                            <>
+                                                <Check size={16} />
+                                                <span>¡Enlace Copiado!</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Share2 size={16} />
+                                                <span>Compartir</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 2. Dedicatoria Familiar Destacada (si existe) */}
+                        {data.pet_dedication && (
+                            <div className={`p-6 sm:p-7 rounded-[2rem] border backdrop-blur-md relative overflow-hidden transition-all ${
+                                isDarkMode 
+                                    ? 'bg-neutral-900/60 border-neutral-800' 
+                                    : 'bg-white/90 border-emerald-100/80 shadow-md shadow-emerald-500/5'
+                            }`}>
+                                <div className="flex items-start gap-4">
+                                    <span className="text-4xl text-amber-500/40 font-serif leading-none select-none">“</span>
+                                    <div className="flex-1">
+                                        <p className={`text-sm sm:text-base italic leading-relaxed ${isDarkMode ? 'text-neutral-200' : 'text-gray-700'}`}>
+                                            {data.pet_dedication}
+                                        </p>
+                                        <p className="text-[11px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400 mt-2.5">
+                                            — Dedicatoria familiar en memoria de {data.pet_name}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 3. Acordeón Colapsable de Constancia de Custodia y Trazabilidad */}
+                        <div className={`rounded-[2.5rem] border backdrop-blur-md transition-all overflow-hidden ${
+                            isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white/90 border-emerald-100/80 shadow-md shadow-emerald-500/5'
+                        }`}>
+                            {/* Header del Acordeón Clickeable */}
+                            <button
+                                type="button"
+                                onClick={() => setIsTimelineExpanded(!isTimelineExpanded)}
+                                className="w-full p-6 sm:p-7 flex items-center justify-between gap-4 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                            >
+                                <div className="flex items-center gap-4 min-w-0">
+                                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 shrink-0">
+                                        <ShieldCheck size={24} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <h3 className={`text-base font-black tracking-tight truncate ${theme.title}`}>
+                                                Constancia de Custodia y Trazabilidad
+                                            </h3>
+                                            <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
+                                                100% Verificado
+                                            </span>
+                                        </div>
+                                        <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-neutral-400' : 'text-gray-500'}`}>
+                                            {timeline.length} etapas registradas con respaldo de custodia
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hidden sm:inline">
+                                        {isTimelineExpanded ? 'Ocultar' : 'Ver detalle'}
+                                    </span>
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform duration-300 ${
+                                        isDarkMode ? 'bg-neutral-800 text-neutral-300' : 'bg-gray-100 text-gray-600'
+                                    } ${isTimelineExpanded ? 'rotate-180' : ''}`}>
+                                        <ChevronDown size={18} />
+                                    </div>
+                                </div>
+                            </button>
+
+                            {/* Contenido Desplegable */}
+                            <AnimatePresence initial={false}>
+                                {isTimelineExpanded && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: 'auto', opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.35, ease: 'easeInOut' }}
+                                        className="overflow-hidden border-t border-gray-100 dark:border-neutral-800"
+                                    >
+                                        <div className="p-6 sm:p-7 space-y-4">
+                                            <p className={`text-xs font-medium ${isDarkMode ? 'text-neutral-400' : 'text-gray-500'}`}>
+                                                Registro cronológico de cada fase del servicio de cremación completado para {data.pet_name}:
+                                            </p>
+
+                                            <div className="space-y-3 pt-1">
+                                                {timeline.map((event: any, idx: number) => {
+                                                    const hasEvidence = event.evidence && (
+                                                        event.evidence.photo_url || 
+                                                        (Array.isArray(event.evidence.comments) && event.evidence.comments.some((c: string) => c.trim())) || 
+                                                        (typeof event.evidence.comments === 'string' && event.evidence.comments.trim())
+                                                    );
+
+                                                    return (
+                                                        <div
+                                                            key={idx}
+                                                            className={`p-4 rounded-2xl border flex items-center justify-between gap-3 transition-all ${
+                                                                isDarkMode 
+                                                                    ? 'bg-neutral-950/50 border-neutral-800/80 hover:border-neutral-700' 
+                                                                    : 'bg-gray-50/80 border-gray-100 hover:border-emerald-200'
+                                                            }`}
+                                                        >
+                                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                                <div className="w-9 h-9 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                                                                    {getStepIcon(idx)}
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <h4 className={`text-xs sm:text-sm font-bold truncate ${isDarkMode ? 'text-neutral-200' : 'text-gray-800'}`}>
+                                                                            {event.step_name}
+                                                                        </h4>
+                                                                        <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                                                                    </div>
+                                                                    <p className={`text-[11px] ${isDarkMode ? 'text-neutral-400' : 'text-gray-500'}`}>
+                                                                        {event.completed_at ? (
+                                                                            <>
+                                                                                {new Date(event.completed_at).toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric' })} · {new Date(event.completed_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })} hrs
+                                                                            </>
+                                                                        ) : (
+                                                                            'Etapa completada'
+                                                                        )}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+
+                                                            {hasEvidence && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setSelectedEvidence(event.evidence)}
+                                                                    className="p-2.5 rounded-full bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/20 transition-all shrink-0 cursor-pointer"
+                                                                    title="Ver registro visual"
+                                                                >
+                                                                    <Camera size={16} />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+
+                        {/* 4. Ficha de Certificación Digital */}
+                        <div className={`p-6 sm:p-7 rounded-[2.5rem] border backdrop-blur-md transition-all ${
+                            isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white/90 border-emerald-100/80 shadow-md shadow-emerald-500/5'
+                        }`}>
+                            <div className="flex items-center gap-3 mb-4">
+                                <Building2 size={20} className="text-emerald-500 shrink-0" />
+                                <h4 className={`text-sm font-black uppercase tracking-wider ${theme.title}`}>
+                                    Certificación de Custodia y Entrega
+                                </h4>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1">
+                                <div className={`p-3.5 rounded-2xl border ${isDarkMode ? 'bg-neutral-950/40 border-neutral-800' : 'bg-gray-50/80 border-gray-100'}`}>
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block mb-1">
+                                        Código de Validación
+                                    </span>
+                                    <span className="text-xs font-mono font-black text-emerald-600 dark:text-emerald-400">
+                                        {token}
+                                    </span>
+                                </div>
+
+                                <div className={`p-3.5 rounded-2xl border ${isDarkMode ? 'bg-neutral-950/40 border-neutral-800' : 'bg-gray-50/80 border-gray-100'}`}>
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block mb-1">
+                                        Crematorio Oficial
+                                    </span>
+                                    <span className={`text-xs font-bold truncate block ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                                        {data.tenant_name}
+                                    </span>
+                                </div>
+
+                                <div className={`p-3.5 rounded-2xl border ${isDarkMode ? 'bg-neutral-950/40 border-neutral-800' : 'bg-gray-50/80 border-gray-100'}`}>
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 block mb-1">
+                                        Estado del Servicio
+                                    </span>
+                                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                        <CheckCircle2 size={13} />
+                                        Entregado
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 5. Mensaje de Cierre y Agradecimiento */}
+                        <div className={`p-6 sm:p-7 rounded-[2.5rem] border backdrop-blur-md text-center transition-all ${
+                            isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white/90 border-emerald-100/80 shadow-md shadow-emerald-500/5'
+                        }`}>
+                            <Heart size={22} className="text-emerald-500 mx-auto mb-3 animate-pulse" fill="currentColor" />
+                            <h4 className={`text-sm sm:text-base font-bold mb-1.5 ${theme.title}`}>
+                                Gracias por confiar en {data.tenant_name}
+                            </h4>
+                            <p className={`text-xs leading-relaxed max-w-md mx-auto ${isDarkMode ? 'text-neutral-400' : 'text-gray-600'}`}>
+                                Nos sentimos profundamente agradecidos de haber acompañado a {data.pet_name} y a su familia en este digno y respetuoso viaje. Su amor incondicional vivirá por siempre en sus corazones.
+                            </p>
+                        </div>
+                    </motion.div>
+                ) : (
+                    <>
+                        {/* Selector de Pestañas en Móvil */}
+                        {farewellConfig && (
+                            <div className="lg:hidden flex p-1 rounded-2xl bg-black/5 dark:bg-neutral-900/80 border border-emerald-500/20 backdrop-blur-md mb-6 shadow-sm sticky top-4 z-20">
                                 <button
                                     type="button"
-                                    onClick={handleDownloadCard}
-                                    disabled={isDownloadingCard}
-                                    className="mt-4 w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 cursor-pointer"
+                                    onClick={() => setMobileTab('tracking')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                        mobileTab === 'tracking'
+                                            ? 'bg-white dark:bg-neutral-800 text-emerald-700 dark:text-emerald-400 shadow-md scale-[1.01]'
+                                            : 'text-gray-500 dark:text-neutral-400 hover:text-gray-900'
+                                    }`}
                                 >
-                                    {isDownloadingCard ? (
-                                        <>
-                                            <Loader2 size={15} className="animate-spin" />
-                                            <span>Generando en HD...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Download size={15} />
-                                            <span>Guardar / Descargar (HD)</span>
-                                        </>
-                                    )}
+                                    <PawPrint size={15} />
+                                    <span>Seguimiento</span>
+                                    <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-650 dark:text-emerald-400 font-bold">
+                                        {progressPercentage}%
+                                    </span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setMobileTab('tribute')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                        mobileTab === 'tribute'
+                                            ? 'bg-white dark:bg-neutral-800 text-amber-700 dark:text-amber-300 shadow-md scale-[1.01]'
+                                            : 'text-gray-500 dark:text-neutral-400 hover:text-gray-900'
+                                    }`}
+                                >
+                                    <Sparkles size={15} className="text-amber-500" />
+                                    <span>Homenaje</span>
                                 </button>
                             </div>
                         )}
 
-                        {/* Tarjeta 5: Mensaje Emocional */}
-                        <div className={`p-6 rounded-[2rem] border backdrop-blur-md transition-all duration-300 ${
+                        {/* Banner compacto de estado para móvil cuando está en pestaña de Seguimiento */}
+                        <div className={`lg:hidden mb-6 p-4 rounded-2xl border backdrop-blur-md ${
                             isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white/90 border-emerald-100/80 shadow-md shadow-emerald-500/5'
-                        }`}>
-                            <div className="flex items-center gap-3">
-                                <Heart size={18} className="text-emerald-500 animate-pulse shrink-0" fill="currentColor" />
-                                <p className={`text-xs font-medium leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>
-                                    Gracias por confiar en <span className={`font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>{data.tenant_name}</span>.
-                                </p>
+                        } ${mobileTab === 'tracking' ? 'block' : 'hidden'}`}>
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                                    <h4 className="text-xs font-black text-emerald-650 dark:text-emerald-400 truncate">
+                                        {currentStepName}
+                                    </h4>
+                                </div>
+                                <span className="text-xs font-black text-emerald-650 dark:text-emerald-400 shrink-0">
+                                    {progressPercentage}%
+                                </span>
+                            </div>
+
+                            {/* Progress Bar */}
+                            <div className="flex gap-1 my-2">
+                                {Array.from({ length: totalSteps || 5 }).map((_, idx) => {
+                                    const isStepCompleted = idx < completedCount;
+                                    const isStepCurrent = idx === completedCount;
+                                    return (
+                                        <div 
+                                            key={idx} 
+                                            className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${
+                                                isStepCompleted 
+                                                    ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' 
+                                                    : isStepCurrent 
+                                                        ? 'bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.4)] animate-pulse'
+                                                        : (isDarkMode ? 'bg-neutral-800' : 'bg-gray-200')
+                                            }`} 
+                                        />
+                                    );
+                                })}
+                            </div>
+                            <p className={`text-[10px] font-bold ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>
+                                {completedCount} de {totalSteps} etapas completadas
+                            </p>
+                        </div>
+
+                        {/* Layout Principal Grid 2 Columnas */}
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                            
+                            {/* Panel Izquierdo: Tarjetas Informativas en Desktop / Vista Homenaje en Móvil */}
+                            <div className={`lg:col-span-4 space-y-4 lg:sticky lg:top-24 ${
+                                mobileTab === 'tribute' ? 'block' : 'hidden lg:block'
+                            }`}>
+                                {/* Tarjeta 1: Estado Actual (Desktop) */}
+                                <div className={`hidden lg:block p-6 rounded-[2rem] border backdrop-blur-md transition-all duration-300 ${
+                                    isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white/90 border-emerald-100/80 shadow-md shadow-emerald-500/5'
+                                }`}>
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-650 shrink-0">
+                                            <PawPrint size={20} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <span className={`text-[10px] font-bold uppercase tracking-widest block ${
+                                                isDarkMode ? 'text-slate-500' : 'text-gray-400'
+                                            }`}>Estado actual</span>
+                                            <h4 className="text-sm font-black text-emerald-650 dark:text-emerald-400 truncate leading-tight">{currentStepName}</h4>
+                                        </div>
+                                    </div>
+                                    <p className={`text-xs leading-relaxed mt-1 ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>
+                                        {currentEvent?.status === 'current' 
+                                            ? `Tu mascota se encuentra actualmente en esta etapa.` 
+                                            : `El proceso se encuentra en marcha.`}
+                                    </p>
+                                </div>
+
+                                {/* Tarjeta 2: Progreso del Proceso (Desktop) */}
+                                <div className={`hidden lg:block p-6 rounded-[2rem] border backdrop-blur-md transition-all duration-300 ${
+                                    isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white/90 border-emerald-100/80 shadow-md shadow-emerald-500/5'
+                                }`}>
+                                    <div className="flex justify-between items-center mb-3">
+                                        <span className={`text-[10px] font-bold uppercase tracking-widest ${
+                                            isDarkMode ? 'text-slate-500' : 'text-gray-400'
+                                        }}`}>Progreso del proceso</span>
+                                        <span className="text-lg font-black text-emerald-650 dark:text-emerald-400">{progressPercentage}%</span>
+                                    </div>
+                                    
+                                    {/* Visual Progress Blocks */}
+                                    <div className="flex gap-1.5 my-3">
+                                        {Array.from({ length: totalSteps || 5 }).map((_, idx) => {
+                                            const isStepCompleted = idx < completedCount;
+                                            const isStepCurrent = idx === completedCount;
+                                            return (
+                                                <div 
+                                                    key={idx} 
+                                                    className={`h-2 flex-1 rounded-full transition-all duration-500 ${
+                                                        isStepCompleted 
+                                                            ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' 
+                                                            : isStepCurrent 
+                                                                ? 'bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.4)] animate-pulse'
+                                                                : (isDarkMode ? 'bg-neutral-805' : 'bg-gray-200')
+                                                    }`} 
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                    
+                                    <p className={`text-[11px] font-bold ${isDarkMode ? 'text-slate-400' : 'text-gray-700'}`}>
+                                        {completedCount} de {totalSteps} etapas completadas
+                                    </p>
+                                </div>
+
+                                {/* Tarjeta 3: Última actualización (Desktop) */}
+                                <div className={`hidden lg:block p-6 rounded-[2rem] border backdrop-blur-md transition-all duration-300 ${
+                                    isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white/90 border-emerald-100/80 shadow-md shadow-emerald-500/5'
+                                }`}>
+                                    <span className={`text-[10px] font-bold uppercase tracking-widest block mb-2 ${
+                                        isDarkMode ? 'text-slate-500' : 'text-gray-400'
+                                    }`}>Última actualización</span>
+                                    {lastUpdateDate ? (
+                                        <div className="space-y-1">
+                                            <p className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                                                {lastUpdateDate.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                            </p>
+                                            <p className="text-xs text-emerald-650 dark:text-emerald-400 font-bold">
+                                                {lastUpdateDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })} hrs
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-slate-400 italic">No hay actualizaciones registradas aún.</p>
+                                    )}
+                                </div>
+
+                                {/* Tarjeta 4: Homenaje Conmemorativo (Permanente con Descarga HD) */}
+                                {farewellConfig && (
+                                    <div className={`p-5 rounded-[2rem] border backdrop-blur-md transition-all duration-300 flex flex-col items-center text-center overflow-hidden ${
+                                        isDarkMode ? 'bg-neutral-900/60 border-amber-500/30' : 'bg-gradient-to-br from-amber-50/70 to-white border-amber-200/80 shadow-md shadow-amber-500/5'
+                                    }`}>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <Sparkles size={16} className="text-amber-500" />
+                                            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                                                Homenaje Conmemorativo
+                                            </span>
+                                        </div>
+
+                                        {(() => {
+                                            const baseHeight = 550;
+                                            const fmt = farewellConfig.format || '3:4';
+                                            let dims = { width: baseHeight * (3 / 4), height: baseHeight };
+                                            if (fmt === '9:16') dims = { width: baseHeight * (9 / 16), height: baseHeight };
+                                            else if (fmt === '3:4') dims = { width: baseHeight * (3 / 4), height: baseHeight };
+                                            else if (fmt === '4:3') dims = { width: baseHeight, height: baseHeight * (3 / 4) };
+                                            else if (fmt === '1:1') dims = { width: baseHeight, height: baseHeight };
+
+                                            const targetWidth = 260;
+                                            const scale = Math.min(0.58, targetWidth / dims.width);
+                                            return (
+                                                <>
+                                                    {/* Off-screen HD Target */}
+                                                    <div 
+                                                        style={{ 
+                                                            position: 'fixed', 
+                                                            left: '-9999px', 
+                                                            top: '-9999px', 
+                                                            width: `${dims.width}px`, 
+                                                            height: `${dims.height}px`, 
+                                                            pointerEvents: 'none', 
+                                                            zIndex: -999, 
+                                                        }}
+                                                    >
+                                                        <FarewellPreview ref={cardExportRef} config={farewellConfig} />
+                                                    </div>
+
+                                                    {/* Visual Scaled Card */}
+                                                    <div 
+                                                        style={{ 
+                                                            width: `${dims.width * scale}px`, 
+                                                            height: `${dims.height * scale}px`, 
+                                                        }}
+                                                        className="rounded-2xl overflow-hidden shadow-2xl border border-amber-500/30 relative flex-shrink-0 my-1 bg-black/40"
+                                                    >
+                                                        <div 
+                                                            style={{
+                                                                transform: `scale(${scale})`,
+                                                                transformOrigin: 'top left',
+                                                                width: `${dims.width}px`,
+                                                                height: `${dims.height}px`,
+                                                            }}
+                                                            className="absolute inset-0"
+                                                        >
+                                                            <FarewellPreview config={farewellConfig} />
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            );
+                                        })()}
+
+                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 italic mt-2.5">
+                                            Inmortalizando la memoria de {data.pet_name}.
+                                        </p>
+
+                                        <button
+                                            type="button"
+                                            onClick={handleDownloadCard}
+                                            disabled={isDownloadingCard}
+                                            className="mt-4 w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 cursor-pointer"
+                                        >
+                                            {isDownloadingCard ? (
+                                                <>
+                                                    <Loader2 size={15} className="animate-spin" />
+                                                    <span>Generando en HD...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Download size={15} />
+                                                    <span>Guardar / Descargar (HD)</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Tarjeta 5: Mensaje Emocional */}
+                                <div className={`p-6 rounded-[2rem] border backdrop-blur-md transition-all duration-300 ${
+                                    isDarkMode ? 'bg-neutral-900/60 border-neutral-800' : 'bg-white/90 border-emerald-100/80 shadow-md shadow-emerald-500/5'
+                                }`}>
+                                    <div className="flex items-center gap-3">
+                                        <Heart size={18} className="text-emerald-500 animate-pulse shrink-0" fill="currentColor" />
+                                        <p className={`text-xs font-medium leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-gray-600'}`}>
+                                            Gracias por confiar en <span className={`font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>{data.tenant_name}</span>.
+                                        </p>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            {/* Panel Derecho: Timeline (Visible en Desktop y en Móvil si la pestaña es Seguimiento) */}
+                            <div className={`lg:col-span-8 ${
+                                mobileTab === 'tracking' ? 'block' : 'hidden lg:block'
+                            }`}>
+                                <div className={`relative space-y-0 pl-8 sm:pl-10 border-l-4 ml-2 sm:ml-3 pb-12 transition-colors duration-500 ${theme.timelineLine}`}>
+                                    {data.timeline.map((event: any, idx: number) => {
+                                        const isCompleted = event.status === 'completed';
+                                        const isCurrent = event.status === 'current';
+
+                                        return (
+                                            <motion.div
+                                                key={idx}
+                                                initial={{ opacity: 0, x: -10 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: 0.1 + (idx * 0.08) }}
+                                                className={`relative pb-10 sm:pb-12 last:pb-0 ${isCurrent ? 'opacity-100' : isCompleted ? 'opacity-100' : 'opacity-40'}`}
+                                            >
+                                                {/* Indicator */}
+                                                <div className={`absolute -left-[45px] sm:-left-[54px] top-[22px] sm:top-[26px] w-7 h-7 rounded-full border-4 transition-all duration-700 z-10 flex items-center justify-center shadow-sm
+                                                    ${isCompleted ? 'bg-emerald-500 border-emerald-500 text-white shadow-[0_0_12px_rgba(16,185,129,0.3)]' :
+                                                        isCurrent ? `border-sky-400 ${isDarkMode ? 'bg-sky-950/85 text-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.5)]' : 'bg-white text-sky-550 shadow-[0_0_12px_rgba(56,189,248,0.25)]'} scale-110` :
+                                                            isDarkMode ? 'border-neutral-700 bg-neutral-900/40 text-neutral-600' : 'border-gray-250 bg-gray-100 text-gray-400'}`}>
+                                                    {isCompleted && <CheckCircle2 size={14} strokeWidth={4} className="text-white" />}
+                                                    {isCurrent && <Heart size={11} fill="currentColor" className={`${isDarkMode ? 'text-sky-450' : 'text-sky-500'} animate-pulse shrink-0`} />}
+                                                </div>
+
+                                                <div className={`px-6 py-4 sm:px-9 sm:py-5 rounded-[2rem] border transition-all duration-500 ${
+                                                    isCurrent
+                                                        ? (isDarkMode ? 'bg-sky-950/10 border-sky-500 shadow-[0_0_25px_rgba(56,189,248,0.25)]' : 'bg-sky-50/70 border-sky-200 shadow-[0_0_20px_rgba(56,189,248,0.15)]') + ' scale-[1.02] backdrop-blur-md'
+                                                        : isCompleted
+                                                            ? (isDarkMode ? 'bg-emerald-950/10 border-emerald-500/20' : 'bg-emerald-50/20 border-emerald-100') + ' shadow-sm'
+                                                            : isDarkMode ? 'bg-neutral-950/20 border-neutral-900/60' : 'bg-gray-50/60 border-gray-150 shadow-sm'
+                                                    }`}>
+                                                    <div className="flex items-center gap-4 h-full">
+                                                        {/* Circular Icon Container */}
+                                                        <div className={`w-10 h-10 rounded-full shrink-0 flex items-center justify-center border transition-all duration-500 ${
+                                                            isCompleted 
+                                                                ? (isDarkMode ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-emerald-50 border-emerald-100 text-emerald-600')
+                                                                : isCurrent 
+                                                                    ? (isDarkMode ? 'bg-sky-500/15 border-sky-400/30 text-sky-400 shadow-[0_0_12px_rgba(56,189,248,0.2)]' : 'bg-sky-50 border-sky-200 text-sky-500')
+                                                                    : (isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-500' : 'bg-gray-100 border-gray-200 text-gray-400')
+                                                        }`}>
+                                                            {getStepIcon(idx)}
+                                                        </div>
+
+                                                        <div className="flex-1 min-w-0">
+                                                            {/* Top Row: Title + Wings */}
+                                                            <div className="flex items-center justify-between gap-4">
+                                                                <h3 className={`font-semibold text-sm sm:text-base leading-snug transition-colors duration-500 ${
+                                                                    isCurrent 
+                                                                        ? (isDarkMode ? 'text-white' : 'text-sky-900') 
+                                                                        : isCompleted 
+                                                                            ? (isDarkMode ? 'text-slate-200' : 'text-emerald-900') 
+                                                                            : (isDarkMode ? 'text-slate-500' : 'text-gray-500')
+                                                                }`}>
+                                                                    {event.step_name}
+                                                                </h3>
+
+                                                                {/* Minimalist Angel Wing Evidence Icon */}
+                                                                {event.evidence && (event.evidence.photo_url || (Array.isArray(event.evidence.comments) && event.evidence.comments.some((c: string) => c.trim())) || (typeof event.evidence.comments === 'string' && event.evidence.comments.trim())) && (
+                                                                    <motion.button
+                                                                        whileHover={{ scale: 1.2, backdropFilter: "blur(12px)" }}
+                                                                        whileTap={{ scale: 0.9 }}
+                                                                        animate={{
+                                                                            scale: [1, 1.15, 1],
+                                                                            backgroundColor: isDarkMode ? [
+                                                                                "rgba(249, 115, 22, 0.05)",
+                                                                                "rgba(249, 115, 22, 0.15)",
+                                                                                "rgba(249, 115, 22, 0.05)"
+                                                                            ] : [
+                                                                                "rgba(6, 78, 59, 0.05)",
+                                                                                "rgba(6, 78, 59, 0.15)",
+                                                                                "rgba(6, 78, 59, 0.05)"
+                                                                            ],
+                                                                            boxShadow: isDarkMode ? [
+                                                                                "0 0 0px rgba(249, 115, 22, 0)",
+                                                                                "0 0 20px rgba(249, 115, 22, 0.4)",
+                                                                                "0 0 0px rgba(249, 115, 22, 0)"
+                                                                            ] : [
+                                                                                "0 0 0px rgba(6, 78, 59, 0)",
+                                                                                "0 0 20px rgba(6, 78, 59, 0.4)",
+                                                                                "0 0 0px rgba(6, 78, 59, 0)"
+                                                                            ]
+                                                                        }}
+                                                                        transition={{
+                                                                            duration: 2.5,
+                                                                            repeat: Infinity,
+                                                                            ease: "easeInOut"
+                                                                        }}
+                                                                        onClick={() => setSelectedEvidence(event.evidence)}
+                                                                        className={`p-3 sm:p-2.5 rounded-full cursor-pointer transition-all group relative border shrink-0 ${
+                                                                            isDarkMode 
+                                                                                ? 'text-orange-500 border-orange-500/20' 
+                                                                                : 'text-emerald-900 border-emerald-900/25'
+                                                                        }`}
+                                                                        title="Ver registro visual"
+                                                                    >
+                                                                        <Camera className={`w-5 h-5 sm:w-4 sm:h-4 transition-all ${
+                                                                            isDarkMode 
+                                                                                ? 'group-hover:drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]' 
+                                                                                : 'group-hover:drop-shadow-[0_0_8px_rgba(6,78,59,0.5)]'
+                                                                        }`} />
+                                                                        <div className={`absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 blur-md transition-opacity ${
+                                                                            isDarkMode ? 'bg-orange-500/10' : 'bg-emerald-950/10'
+                                                                        }`} />
+                                                                    </motion.button>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Bottom Row: Timestamp and status badge */}
+                                                            <div className="mt-2.5 flex items-center justify-between gap-3">
+                                                                {event.completed_at ? (
+                                                                    <span className={`text-[10px] font-bold ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>
+                                                                        {new Date(event.completed_at).toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric' })} · {new Date(event.completed_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })} hrs
+                                                                    </span>
+                                                                ) : isCompleted ? (
+                                                                    <span className={`text-[10px] font-medium italic ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>Concluido</span>
+                                                                ) : isCurrent ? (
+                                                                    <span className={`text-[10px] font-medium italic ${isDarkMode ? 'text-sky-400' : 'text-sky-600'}`}>En curso</span>
+                                                                ) : (
+                                                                    <span className={`text-[10px] font-medium italic ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>Pendiente</span>
+                                                                )}
+
+                                                                {isCompleted ? (
+                                                                    <span className="px-2.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-full text-[9px] font-bold uppercase tracking-wider">Completado</span>
+                                                                ) : isCurrent ? (
+                                                                    <span className="px-2.5 py-0.5 bg-sky-500/15 border border-sky-500/30 text-sky-600 dark:text-sky-400 rounded-full text-[9px] font-bold uppercase tracking-wider animate-pulse">En proceso</span>
+                                                                ) : (
+                                                                    <span className="px-2.5 py-0.5 bg-neutral-900 border border-neutral-800 text-neutral-500 dark:text-neutral-600 rounded-full text-[9px] font-bold uppercase tracking-wider">Pendiente</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </div>
-
-                    </div>
-
-                    {/* Panel Derecho: Timeline (Visible en Desktop y en Móvil si la pestaña es Seguimiento) */}
-                    <div className={`lg:col-span-8 ${
-                        mobileTab === 'tracking' ? 'block' : 'hidden lg:block'
-                    }`}>
-                        <div className={`relative space-y-0 pl-8 sm:pl-10 border-l-4 ml-2 sm:ml-3 pb-12 transition-colors duration-500 ${theme.timelineLine}`}>
-                            {data.timeline.map((event: any, idx: number) => {
-                                const isCompleted = event.status === 'completed';
-                                const isCurrent = event.status === 'current';
-
-                                return (
-                                    <motion.div
-                                        key={idx}
-                                        initial={{ opacity: 0, x: -10 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        transition={{ delay: 0.1 + (idx * 0.08) }}
-                                        className={`relative pb-10 sm:pb-12 last:pb-0 ${isCurrent ? 'opacity-100' : isCompleted ? 'opacity-100' : 'opacity-40'}`}
-                                    >
-                                        {/* Indicator */}
-                                        <div className={`absolute -left-[45px] sm:-left-[54px] top-[22px] sm:top-[26px] w-7 h-7 rounded-full border-4 transition-all duration-700 z-10 flex items-center justify-center shadow-sm
-                                            ${isCompleted ? 'bg-emerald-500 border-emerald-500 text-white shadow-[0_0_12px_rgba(16,185,129,0.3)]' :
-                                                isCurrent ? `border-sky-400 ${isDarkMode ? 'bg-sky-950/85 text-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.5)]' : 'bg-white text-sky-550 shadow-[0_0_12px_rgba(56,189,248,0.25)]'} scale-110` :
-                                                    isDarkMode ? 'border-neutral-700 bg-neutral-900/40 text-neutral-600' : 'border-gray-250 bg-gray-100 text-gray-400'}`}>
-                                            {isCompleted && <CheckCircle2 size={14} strokeWidth={4} className="text-white" />}
-                                            {isCurrent && <Heart size={11} fill="currentColor" className={`${isDarkMode ? 'text-sky-450' : 'text-sky-500'} animate-pulse shrink-0`} />}
-                                        </div>
-
-                                        <div className={`px-6 py-4 sm:px-9 sm:py-5 rounded-[2rem] border transition-all duration-500 ${
-                                            isCurrent
-                                                ? (isDarkMode ? 'bg-sky-950/10 border-sky-500 shadow-[0_0_25px_rgba(56,189,248,0.25)]' : 'bg-sky-50/70 border-sky-200 shadow-[0_0_20px_rgba(56,189,248,0.15)]') + ' scale-[1.02] backdrop-blur-md'
-                                                : isCompleted
-                                                    ? (isDarkMode ? 'bg-emerald-950/10 border-emerald-500/20' : 'bg-emerald-50/20 border-emerald-100') + ' shadow-sm'
-                                                    : isDarkMode ? 'bg-neutral-950/20 border-neutral-900/60' : 'bg-gray-50/60 border-gray-150 shadow-sm'
-                                            }`}>
-                                            <div className="flex items-center gap-4 h-full">
-                                                {/* Circular Icon Container */}
-                                                <div className={`w-10 h-10 rounded-full shrink-0 flex items-center justify-center border transition-all duration-500 ${
-                                                    isCompleted 
-                                                        ? (isDarkMode ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-emerald-50 border-emerald-100 text-emerald-600')
-                                                        : isCurrent 
-                                                            ? (isDarkMode ? 'bg-sky-500/15 border-sky-400/30 text-sky-400 shadow-[0_0_12px_rgba(56,189,248,0.2)]' : 'bg-sky-50 border-sky-200 text-sky-500')
-                                                            : (isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-500' : 'bg-gray-100 border-gray-200 text-gray-400')
-                                                }`}>
-                                                    {getStepIcon(idx)}
-                                                </div>
-
-                                                <div className="flex-1 min-w-0">
-                                                    {/* Top Row: Title + Wings */}
-                                                    <div className="flex items-center justify-between gap-4">
-                                                        <h3 className={`font-semibold text-sm sm:text-base leading-snug transition-colors duration-500 ${
-                                                            isCurrent 
-                                                                ? (isDarkMode ? 'text-white' : 'text-sky-900') 
-                                                                : isCompleted 
-                                                                    ? (isDarkMode ? 'text-slate-200' : 'text-emerald-900') 
-                                                                    : (isDarkMode ? 'text-slate-500' : 'text-gray-500')
-                                                        }`}>
-                                                            {event.step_name}
-                                                        </h3>
-
-                                                        {/* Minimalist Angel Wing Evidence Icon */}
-                                                        {event.evidence && (event.evidence.photo_url || (Array.isArray(event.evidence.comments) && event.evidence.comments.some((c: string) => c.trim())) || (typeof event.evidence.comments === 'string' && event.evidence.comments.trim())) && (
-                                                            <motion.button
-                                                                whileHover={{ scale: 1.2, backdropFilter: "blur(12px)" }}
-                                                                whileTap={{ scale: 0.9 }}
-                                                                animate={{
-                                                                    scale: [1, 1.15, 1],
-                                                                    backgroundColor: isDarkMode ? [
-                                                                        "rgba(249, 115, 22, 0.05)",
-                                                                        "rgba(249, 115, 22, 0.15)",
-                                                                        "rgba(249, 115, 22, 0.05)"
-                                                                    ] : [
-                                                                        "rgba(6, 78, 59, 0.05)",
-                                                                        "rgba(6, 78, 59, 0.15)",
-                                                                        "rgba(6, 78, 59, 0.05)"
-                                                                    ],
-                                                                    boxShadow: isDarkMode ? [
-                                                                        "0 0 0px rgba(249, 115, 22, 0)",
-                                                                        "0 0 20px rgba(249, 115, 22, 0.4)",
-                                                                        "0 0 0px rgba(249, 115, 22, 0)"
-                                                                    ] : [
-                                                                        "0 0 0px rgba(6, 78, 59, 0)",
-                                                                        "0 0 20px rgba(6, 78, 59, 0.4)",
-                                                                        "0 0 0px rgba(6, 78, 59, 0)"
-                                                                    ]
-                                                                }}
-                                                                transition={{
-                                                                    duration: 2.5,
-                                                                    repeat: Infinity,
-                                                                    ease: "easeInOut"
-                                                                }}
-                                                                onClick={() => setSelectedEvidence(event.evidence)}
-                                                                className={`p-3 sm:p-2.5 rounded-full cursor-pointer transition-all group relative border shrink-0 ${
-                                                                    isDarkMode 
-                                                                        ? 'text-orange-500 border-orange-500/20' 
-                                                                        : 'text-emerald-900 border-emerald-900/25'
-                                                                }`}
-                                                                title="Ver registro visual"
-                                                            >
-                                                                <Camera className={`w-5 h-5 sm:w-4 sm:h-4 transition-all ${
-                                                                    isDarkMode 
-                                                                        ? 'group-hover:drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]' 
-                                                                        : 'group-hover:drop-shadow-[0_0_8px_rgba(6,78,59,0.5)]'
-                                                                }`} />
-                                                                <div className={`absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 blur-md transition-opacity ${
-                                                                    isDarkMode ? 'bg-orange-500/10' : 'bg-emerald-950/10'
-                                                                }`} />
-                                                            </motion.button>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Bottom Row: Timestamp and status badge */}
-                                                    <div className="mt-2.5 flex items-center justify-between gap-3">
-                                                        {event.completed_at ? (
-                                                            <span className={`text-[10px] font-bold ${isDarkMode ? 'text-slate-400' : 'text-gray-500'}`}>
-                                                                {new Date(event.completed_at).toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric' })} · {new Date(event.completed_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false })} hrs
-                                                            </span>
-                                                        ) : isCompleted ? (
-                                                            <span className={`text-[10px] font-medium italic ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>Concluido</span>
-                                                        ) : isCurrent ? (
-                                                            <span className={`text-[10px] font-medium italic ${isDarkMode ? 'text-sky-400' : 'text-sky-600'}`}>En curso</span>
-                                                        ) : (
-                                                            <span className={`text-[10px] font-medium italic ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>Pendiente</span>
-                                                        )}
-
-                                                        {isCompleted ? (
-                                                            <span className="px-2.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-full text-[9px] font-bold uppercase tracking-wider">Completado</span>
-                                                        ) : isCurrent ? (
-                                                            <span className="px-2.5 py-0.5 bg-sky-500/15 border border-sky-500/30 text-sky-600 dark:text-sky-400 rounded-full text-[9px] font-bold uppercase tracking-wider animate-pulse">En proceso</span>
-                                                        ) : (
-                                                            <span className="px-2.5 py-0.5 bg-neutral-900 border border-neutral-800 text-neutral-500 dark:text-neutral-600 rounded-full text-[9px] font-bold uppercase tracking-wider">Pendiente</span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
+                    </>
+                )}
 
                 {/* Footer */}
                 <div className="mt-20 text-center space-y-5">
                     <div className={`inline-flex items-center gap-2 px-5 py-2 rounded-full border shadow-sm transition-colors duration-500 ${theme.footerTag}`}>
                         <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[11px] font-black uppercase tracking-widest">Seguimiento en Vivo</span>
+                        <span className="text-[11px] font-black uppercase tracking-widest">
+                            {isUltraDelivered ? 'Homenaje y Custodia' : 'Seguimiento en Vivo'}
+                        </span>
                     </div>
                     <div className="flex flex-col items-center gap-1.5">
                         <p className={`text-[10px] uppercase font-bold tracking-[0.25em] transition-colors duration-500 ${isDarkMode ? 'text-neutral-600' : 'text-gray-400'}`}>

@@ -343,6 +343,7 @@ class NotificationInDB(NotificationBase):
     tenant_id: Optional[int] = None
     veterinary_id: Optional[int] = None
     is_read: bool
+    audience: str = "owner"
     created_at: datetime
     model_config = {"from_attributes": True}
 
@@ -356,6 +357,8 @@ class PaginatedNotifications(BaseModel):
 class NotificationBroadcast(BaseModel):
     """Schema for broadcasting notifications to multiple recipients"""
     target: Literal["all_tenants", "all_veterinaries", "specific_tenants", "specific_veterinaries"]
+    # Para tenants: 'owner' (solo el dueño), 'ordenes' (roles de órdenes) o 'all' (todo el equipo)
+    audience: Literal["owner", "ordenes", "all"] = "owner"
     tenant_ids: Optional[List[int]] = None
     veterinary_ids: Optional[List[int]] = None
     type: str
@@ -761,6 +764,8 @@ class CertificateTemplateUpdate(BaseModel):
 class CertificateTemplateInDB(CertificateTemplateBase):
     id: int
     tenant_id: Optional[int] = None
+    # True = exclusiva diseñada por el admin: el tenant no puede editarla ni borrarla
+    is_locked: bool = False
     created_at: datetime
     
     @property
@@ -773,6 +778,24 @@ class CertificateTemplateInDB(CertificateTemplateBase):
     @classmethod
     def set_tenant_id_zero(cls, v: Any) -> int:
         return v if v is not None else 0
+
+class AdminTemplateDestination(BaseModel):
+    """Destino de una plantilla creada/editada por el admin."""
+    # 'global' = todos los tenants | 'exclusive' = solo target_tenant_id (bloqueada)
+    scope: Optional[Literal["global", "exclusive"]] = None
+    target_tenant_id: Optional[int] = None
+    # Deja la plantilla exclusiva como predeterminada del tenant al guardar
+    set_as_tenant_default: Optional[bool] = None
+
+class AdminCertificateTemplateCreate(CertificateTemplateCreate, AdminTemplateDestination):
+    pass
+
+class AdminCertificateTemplateUpdate(CertificateTemplateUpdate, AdminTemplateDestination):
+    pass
+
+class AdminCertificateTemplateOut(CertificateTemplateInDB):
+    tenant_name: Optional[str] = None
+    is_tenant_default: bool = False
 
 class BootstrapResponse(BaseModel):
     """

@@ -1,205 +1,32 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 from app.database import get_db
 from app import models
 from app.api.deps import get_tenant_id
-from datetime import datetime, timedelta
-from app.utils import tz
+from app.api.internal.admin.rbac.router import check_permission
+from app.api.internal.common.dashboard import services
+from app.api.internal.operations.schemas import DashboardSummarySchema
 
 router = APIRouter()
 
 @router.get("/trend")
 def get_dashboard_trend(
     db: Session = Depends(get_db),
-    tenant_id: int = Depends(get_tenant_id)
+    tenant_id: int = Depends(get_tenant_id),
+    _perm: bool = Depends(check_permission("dashboard", "view"))
 ):
-    today = tz.get_now().date()
-    trend_data = []
-    months_spanish = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
-    
-    for i in range(5, -1, -1):
-        current_year = today.year
-        current_month = today.month - i
-        while current_month <= 0:
-            current_month += 12
-            current_year -= 1
-            
-        month_start = datetime(current_year, current_month, 1).date()
-        if current_month == 12:
-            next_month_start = datetime(current_year + 1, 1, 1).date()
-        else:
-            next_month_start = datetime(current_year, current_month + 1, 1).date()
-            
-        month_label = months_spanish[current_month - 1]
-        
-        cremations_query = db.query(models.CremationOC).join(
-            models.CremationScheduling, models.CremationOC.id == models.CremationScheduling.cremation_id
-        ).options(
-            joinedload(models.CremationOC.financial),
-            joinedload(models.CremationOC.servicios).joinedload(models.ServicioOC.service),
-            joinedload(models.CremationOC.planes).joinedload(models.PlanOC.plan),
-            joinedload(models.CremationOC.productos)
-        ).filter(
-            models.CremationOC.tenant_id == tenant_id,
-            # Estado final único = entregado (se incluyen alias/legacy por compatibilidad)
-            models.CremationOC.status.in_(['entregado', 'delivered', 'completado', 'completed']),
-            models.CremationScheduling.completed_at >= month_start,
-            models.CremationScheduling.completed_at < next_month_start
-        )
-        
-        cremations_count = cremations_query.count()
-        
-        revenue = 0.0
-        for cremation in cremations_query.all():
-            if cremation.financial and cremation.financial.total_price and cremation.financial.total_price > 0:
-                revenue += cremation.financial.total_price
-            else:
-                revenue_from_services = sum(s.precio_venta for s in cremation.servicios) if cremation.servicios else 0
-                revenue_from_plans = sum(p.precio_venta for p in cremation.planes) if cremation.planes else 0
-                revenue_from_products = sum(pr.precio_venta for pr in cremation.productos) if cremation.productos else 0
-                revenue += (revenue_from_services + revenue_from_plans + revenue_from_products)
-                
-        trend_data.append({
-            "month": month_label,
-            "cremations": cremations_count,
-            "revenue": revenue
-        })
-        
-    return trend_data
+    return services.build_trend(db, tenant_id)
 
-@router.get("/summary")
+@router.get("/summary", response_model=DashboardSummarySchema)
 def get_dashboard_summary(
     db: Session = Depends(get_db),
-    tenant_id: int = Depends(get_tenant_id)
+    tenant_id: int = Depends(get_tenant_id),
+    _perm: bool = Depends(check_permission("dashboard", "view"))
 ):
-    # --- NUEVA LÓGICA DE LÍMITES Y USO ---
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
-    plan = db.query(models.SubscriptionPlan).filter(models.SubscriptionPlan.id == tenant.subscription_plan_id).first() if tenant else None
-    
-    today = tz.get_now().date()
-    start_of_month = today.replace(day=1)
-
-    # 1. Uso Mensual (Reinician)
-    monthly_pets = db.query(models.Pet).filter(
-        models.Pet.tenant_id == tenant_id,
-        models.Pet.created_at >= start_of_month
-    ).count()
-
-    monthly_customers = db.query(models.Customer).filter(
-        models.Customer.tenant_id == tenant_id,
-        models.Customer.created_at >= start_of_month
-    ).count()
-
-    # Query for all monthly orders created in the current month
-    monthly_orders = db.query(models.CremationOC).filter(
-        models.CremationOC.tenant_id == tenant_id,
-        models.CremationOC.created_at >= start_of_month
-    ).count()
-
-    # 2. Uso Total (No reinician)
-    total_services = db.query(models.Service).filter(models.Service.tenant_id == tenant_id).count()
-    total_products = db.query(models.Product).filter(models.Product.tenant_id == tenant_id).count()
-    total_plans = db.query(models.Plan).filter(models.Plan.tenant_id == tenant_id).count()
-    total_users_count = db.query(models.User).filter(models.User.tenant_id == tenant_id).count()
-
-    # Conteos para las cards actuales
-    total_customers_total = db.query(models.Customer).filter(models.Customer.tenant_id == tenant_id).count()
-    total_pets_total = db.query(models.Pet).filter(models.Pet.tenant_id == tenant_id).count()
-    total_orders_total = db.query(models.CremationOC).filter(
-        models.CremationOC.tenant_id == tenant_id,
-        models.CremationOC.status == 'completado'
-    ).count()
-    
-    # Filtrar por mes actual y estatus completado para ingresos
-    # Monthly revenue query with partitioning
-    monthly_cremations_query = db.query(models.CremationOC).join(
-        models.CremationScheduling, models.CremationOC.id == models.CremationScheduling.cremation_id
-    ).options(
-        joinedload(models.CremationOC.financial),
-        joinedload(models.CremationOC.servicios).joinedload(models.ServicioOC.service),
-        joinedload(models.CremationOC.planes).joinedload(models.PlanOC.plan),
-        joinedload(models.CremationOC.productos)
-    ).filter(
-        models.CremationOC.tenant_id == tenant_id,
-        # Estado final único = entregado (se incluyen alias/legacy por compatibilidad)
-        models.CremationOC.status.in_(['entregado', 'delivered', 'completado', 'completed']),
-        models.CremationScheduling.completed_at >= start_of_month
-    )
-
-    cremations_this_month = monthly_cremations_query.count()
-
-    # Ingresos Mensuales
-    monthly_revenue = 0
-    completed_cremations = monthly_cremations_query.all()
-    for cremation in completed_cremations:
-        if cremation.financial and cremation.financial.total_price and cremation.financial.total_price > 0:
-            monthly_revenue += cremation.financial.total_price
-        else:
-            # Fallback a suma de items si total_price no está seteado
-            revenue_from_services = sum(s.precio_venta for s in cremation.servicios) if cremation.servicios else 0
-            revenue_from_plans = sum(p.precio_venta for p in cremation.planes) if cremation.planes else 0
-            revenue_from_products = sum(pr.precio_venta for pr in cremation.productos) if cremation.productos else 0
-            monthly_revenue += (revenue_from_services + revenue_from_plans + revenue_from_products)
-
-    # Actividad Reciente (Últimas 5 cremaciones pendientes o en proceso)
-    recent_cremations = db.query(models.CremationOC).options(
-        joinedload(models.CremationOC.scheduling),
-        joinedload(models.CremationOC.financial),
-        joinedload(models.CremationOC.technical).joinedload(models.CremationTechnical.step),
-        joinedload(models.CremationOC.servicios).joinedload(models.ServicioOC.service),
-        joinedload(models.CremationOC.planes).joinedload(models.PlanOC.plan)
-    ).filter(
-        models.CremationOC.tenant_id == tenant_id,
-        models.CremationOC.status.in_(['pendiente', 'en_proceso', 'pending', 'processing'])
-    ).order_by(models.CremationOC.id.desc()).limit(5).all()
-
-    # Formatear cremaciones recientes para el frontend
-    formatted_recent = []
-    for c in recent_cremations:
-        pet = db.query(models.Pet).filter(models.Pet.id == c.pet_id, models.Pet.tenant_id == tenant_id).first()
-        # Tomar el nombre del primer servicio o plan como referencia principal para la lista
-        main_service_name = "Servicio"
-        if c.servicios:
-            main_service_name = c.servicios[0].service.name if c.servicios[0].service else "Servicio"
-        elif c.planes:
-            main_service_name = c.planes[0].plan.name if c.planes[0].plan else "Plan de Cremación"
-            
-        customer = db.query(models.Customer).filter(models.Customer.id == pet.customer_id, models.Customer.tenant_id == tenant_id).first() if pet else None
-        
-        formatted_recent.append({
-            "id": c.id,
-            "pet": pet.name if pet else "Desconocida",
-            "pet_image": (pet.images[0] if pet.images else None) if pet else None,
-            "client": customer.name if customer else "Desconocido",
-            "service_name": main_service_name,
-            "amount": c.financial.total_price if c.financial else 0.0,
-            "status": c.status,
-            "step_name": c.technical.step.name if c.technical and c.technical.step else None,
-            "time": c.scheduling.scheduled_at.strftime("%H:%M") if c.scheduling and c.scheduling.scheduled_at else (c.technical.start_at.strftime("%H:%M") if c.technical and c.technical.start_at else "N/A")
-        })
-
-    return {
-        "stats": {
-            "total_customers": total_customers_total,
-            "total_pets": total_pets_total,
-            "total_orders": total_orders_total,
-            "total_services": total_services,
-            "total_users": total_users_count,
-            "cremations_this_month": cremations_this_month,
-            "monthly_revenue": monthly_revenue
-        },
-        "limits": {
-            "pets": {"usage": total_pets_total, "max": 999999},
-            "customers": {"usage": total_customers_total, "max": 999999},
-            "orders": {"usage": monthly_orders, "max": plan.max_orders if plan else 0},
-            "services": {"usage": total_services, "max": plan.max_services if plan else 0},
-            "products": {"usage": total_products, "max": plan.max_products if plan else 0},
-            "plans": {"usage": total_plans, "max": plan.max_plans if plan else 0},
-            "users": {"usage": total_users_count, "max": plan.max_users if plan else 0}
-        },
-        "recent_cremations": formatted_recent
-    }
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant no encontrado")
+    return services.build_dashboard_summary(db, tenant)
 
 @router.get("/search")
 def search_global(

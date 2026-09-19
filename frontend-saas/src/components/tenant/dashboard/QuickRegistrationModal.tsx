@@ -611,7 +611,7 @@ export default function QuickRegistrationModal({ isOpen, onClose, onSuccess }: Q
 
                 {/* Wizard Steps Indicator (1 to 4) */}
                 {step < 5 && (
-                    <div className="px-6 py-3 bg-foreground/2 border-b border-foreground/5 flex items-center justify-between gap-2 overflow-x-auto">
+                    <div className="px-6 py-3 bg-foreground/2 border-b border-foreground/5 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar scroll-fade-x">
                         {[
                             { id: 1, label: 'Cliente', icon: UserCircle },
                             { id: 2, label: 'Mascota', icon: Dog },

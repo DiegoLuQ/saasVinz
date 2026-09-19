@@ -180,6 +180,8 @@ class CremationOCUpdate(BaseModel):
     discount: Optional[float] = None
     weight: Optional[float] = None
     weight_price: Optional[float] = None
+    partner_id: Optional[int] = None
+    partner_link_id: Optional[int] = None
 
 class CremationOCInDB(CremationOCBase):
     id: int
@@ -190,6 +192,8 @@ class CremationOCInDB(CremationOCBase):
     products: List[ProductoOCInDB] = [] # Override to match properties
     pet: Optional[PetInDB] = None
     partner: Optional[PartnerLinkResponse] = None # Renamed type, field name kept for comp.
+    partner_link: Optional[PartnerLinkResponse] = None
+    partner_name: Optional[str] = None
     
     # Normalized & Partitioned relationships
     technical: Optional[CremationTechnicalInDB] = None
@@ -340,6 +344,8 @@ class PublicTrackingResponse(BaseModel):
     tenant_logo: Optional[str] = None
     pet_dedication: Optional[str] = None
     farewell_template_config: Optional[dict] = None
+    is_ultra_plan: Optional[bool] = False
+    tenant_plan: Optional[str] = None
 
 # Workflow Steps
 class WorkflowStepBase(BaseModel):
@@ -403,6 +409,7 @@ class DashboardSummarySchema(BaseModel):
     limits: DashboardLimitsData
     recent_cremations: List[DashboardRecentActivity]
     today_cremations: List[DashboardRecentActivity] = []
+    active_count: int = 0
     model_config = {"from_attributes": True}
 
 # Document Schemas
@@ -490,8 +497,34 @@ class DailyOrderSchema(BaseModel):
     evidence: List[OrderEvidenceInDB] = []
     technical: Optional[CremationTechnicalInDB] = None
     created_at: datetime
+    scheduled_at: Optional[datetime] = None
+    # Inicio de la fase actual (fin de la anterior o inicio de la orden)
+    step_started_at: Optional[datetime] = None
+    current_step_has_evidence: bool = False
     partner_id: Optional[int] = None
     partner_name: Optional[str] = None
     partner_address: Optional[str] = None
     partner_phone: Optional[str] = None
+    pickup_address: Optional[str] = None
+    pickup_city: Optional[str] = None
+    pickup_region: Optional[str] = None
+    delivery_address: Optional[str] = None
+    delivery_city: Optional[str] = None
+    delivery_region: Optional[str] = None
+    cremation_type: Optional[str] = None
+    notes: Optional[str] = None
+    pet_image_url: Optional[str] = None
     model_config = {"from_attributes": True}
+
+class OpsBoardCounts(BaseModel):
+    today: int = 0
+    in_progress: int = 0
+    not_started: int = 0
+    finished: int = 0
+
+class OpsBoardResponse(BaseModel):
+    items: List[DailyOrderSchema]
+    total: int
+    page: int
+    page_size: int
+    counts: OpsBoardCounts

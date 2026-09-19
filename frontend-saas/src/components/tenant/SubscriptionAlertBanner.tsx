@@ -6,9 +6,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, Clock, CreditCard, Lock, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { getSubscriptionInfo, SubscriptionState } from "@/lib/tenant/subscription";
+import { useIsOwner } from "@/hooks/useSessionBootstrap";
 
 export function SubscriptionAlertBanner() {
     const { tenantData } = useTenant();
+    const isOwner = useIsOwner();
     const [status, setStatus] = useState<Exclude<SubscriptionState, "active"> | null>(null);
     const [daysRemaining, setDaysRemaining] = useState<number>(0);
     const [dismissed, setDismissed] = useState(false);
@@ -41,7 +43,8 @@ export function SubscriptionAlertBanner() {
         return () => clearInterval(timer);
     }, [tenantData]);
 
-    if (!status || (dismissed && status === "warning")) return null;
+    // Suscripción y renovación son asunto del dueño; el equipo no las ve
+    if (isOwner !== true || !status || (dismissed && status === "warning")) return null;
 
     const isLocked = status === "locked";
     const isGrace = status === "grace";
@@ -55,11 +58,11 @@ export function SubscriptionAlertBanner() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
-                className="w-full px-4 sm:px-6 lg:px-10 pb-4 relative z-10"
+                className="w-full px-4 sm:px-6 lg:px-10 pb-2 sm:pb-4 relative z-10"
             >
                 <div
                     className={`
-                        w-full rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-center justify-between gap-4 border shadow-2xl relative overflow-hidden backdrop-blur-md transition-all duration-300
+                        w-full rounded-2xl p-3 sm:p-5 flex flex-row items-center justify-between gap-3 sm:gap-4 border shadow-2xl relative overflow-hidden backdrop-blur-md transition-all duration-300
                         ${isRed
                             ? "bg-red-500/10 border-red-500/30 text-red-200 shadow-red-500/5 hover:border-red-500/40"
                             : "bg-amber-500/10 border-amber-500/30 text-amber-200 shadow-amber-500/5 hover:border-amber-500/40"
@@ -74,10 +77,10 @@ export function SubscriptionAlertBanner() {
                         `}
                     />
 
-                    <div className="flex items-center gap-4 relative z-10">
+                    <div className="flex items-center gap-3 sm:gap-4 relative z-10 min-w-0">
                         <div
                             className={`
-                                p-3 rounded-xl shrink-0 flex items-center justify-center
+                                p-3 rounded-xl shrink-0 hidden sm:flex items-center justify-center
                                 ${isRed ? "bg-red-500/20 text-red-400" : "bg-amber-500/20 text-amber-400"}
                             `}
                         >
@@ -90,11 +93,11 @@ export function SubscriptionAlertBanner() {
                             )}
                         </div>
 
-                        <div className="space-y-1">
-                            <h4 className={`text-base font-bold tracking-wide ${isRed ? "text-red-400" : "text-amber-400"}`}>
+                        <div className="space-y-0.5 sm:space-y-1 min-w-0">
+                            <h4 className={`text-sm sm:text-base font-bold tracking-wide ${isRed ? "text-red-400" : "text-amber-400"}`}>
                                 {isLocked ? "Suscripción Vencida — Módulos Bloqueados" : isGrace ? "¡Acceso en Período de Gracia!" : "Renovación de Suscripción Requerida"}
                             </h4>
-                            <p className="text-sm text-slate-300 leading-relaxed font-medium">
+                            <p className="hidden md:block text-sm text-slate-300 leading-relaxed font-medium">
                                 {isLocked ? (
                                     <>
                                         Tu suscripción al plan <span className="font-extrabold uppercase text-white">{planName}</span> venció el{" "}
@@ -122,6 +125,15 @@ export function SubscriptionAlertBanner() {
                                     </>
                                 )}
                             </p>
+                            <p className="md:hidden text-xs text-slate-300 font-medium truncate">
+                                {isLocked
+                                    ? "Módulos bloqueados salvo Configuración"
+                                    : isGrace
+                                        ? `Período de gracia: quedan ${Math.max(0, 3 - Math.abs(daysRemaining))} ${Math.max(0, 3 - Math.abs(daysRemaining)) === 1 ? "día" : "días"}`
+                                        : daysRemaining <= 0
+                                            ? `Plan ${planName} vence hoy`
+                                            : `Plan ${planName} vence en ${daysRemaining} ${daysRemaining === 1 ? "día" : "días"}`}
+                            </p>
                         </div>
                     </div>
 
@@ -129,20 +141,21 @@ export function SubscriptionAlertBanner() {
                         <button
                             onClick={() => router.push("/dashboard/configuracion")}
                             className={`
-                                py-3 px-6 rounded-xl font-bold flex items-center gap-2.5 transition-all active:scale-[0.98] shadow-lg
+                                py-2 px-3 sm:py-3 sm:px-6 text-sm sm:text-base rounded-xl font-bold flex items-center gap-2 sm:gap-2.5 transition-all active:scale-[0.98] shadow-lg whitespace-nowrap
                                 ${isRed
                                     ? "bg-red-500 hover:bg-red-600 text-white shadow-red-500/20"
                                     : "bg-amber-500 hover:bg-amber-600 text-black shadow-amber-500/20"
                                 }
                             `}
                         >
-                            <CreditCard size={18} />
-                            {isRed ? "Regularizar Pago" : "Renovar Ahora"}
+                            <CreditCard size={18} className="hidden sm:block" />
+                            <span className="sm:hidden">{isRed ? "Pagar" : "Renovar"}</span>
+                            <span className="hidden sm:inline">{isRed ? "Regularizar Pago" : "Renovar Ahora"}</span>
                         </button>
                         {!isLocked && (
                             <button
                                 onClick={handleDismiss}
-                                className="p-3 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/5 transition-all cursor-pointer"
+                                className="p-2 sm:p-3 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/5 transition-all cursor-pointer"
                                 aria-label="Cerrar aviso"
                                 title="Cerrar aviso"
                             >

@@ -9,6 +9,8 @@ import {
     Image as ImageIcon,
     Settings2,
     AlertCircle,
+    Globe,
+    Lock,
     CheckCircle,
     X
 } from 'lucide-react';
@@ -27,6 +29,11 @@ interface Template {
     created_at: string;
     background_logo_url?: string | null;
     sections_config?: any;
+    // Destino: global (tenant_id 0) o exclusiva de un crematorio (is_locked)
+    tenant_id?: number;
+    is_locked?: boolean;
+    tenant_name?: string | null;
+    is_tenant_default?: boolean;
 }
 
 export default function DocumentTemplatesPage() {
@@ -59,9 +66,17 @@ export default function DocumentTemplatesPage() {
     const [activeFilter, setActiveFilter] = useState<string>('all');
     const [showTypeModal, setShowTypeModal] = useState(false);
 
+    // Destino: todas / globales / exclusivas de un crematorio concreto
+    const [destFilter, setDestFilter] = useState<string>('all');
+    const exclusiveTenants = Array.from(
+        new Map(templates.filter(t => t.is_locked && t.tenant_id).map(t => [t.tenant_id, t.tenant_name || `Tenant #${t.tenant_id}`])).entries()
+    );
+
     const filteredTemplates = templates.filter(t => {
-        if (activeFilter === 'all') return true;
-        return t.category === activeFilter;
+        if (activeFilter !== 'all' && t.category !== activeFilter) return false;
+        if (destFilter === 'global') return !t.is_locked;
+        if (destFilter !== 'all') return !!t.is_locked && String(t.tenant_id) === destFilter;
+        return true;
     });
 
     const editorRouteFor = (category: string) =>
@@ -141,6 +156,18 @@ export default function DocumentTemplatesPage() {
                         {filter.label}
                     </button>
                 ))}
+                <select
+                    value={destFilter}
+                    onChange={e => setDestFilter(e.target.value)}
+                    className="ml-auto px-4 py-3 rounded-2xl text-xs font-black uppercase tracking-widest bg-white/5 text-white/70 border border-white/5 outline-none"
+                    aria-label="Filtrar por destino"
+                >
+                    <option value="all">Todos los destinos</option>
+                    <option value="global">Solo globales</option>
+                    {exclusiveTenants.map(([id, name]) => (
+                        <option key={id} value={String(id)}>Exclusivas · {name}</option>
+                    ))}
+                </select>
             </div>
 
             {/* Content List */}
@@ -165,9 +192,23 @@ export default function DocumentTemplatesPage() {
                                                 {template.category === 'certificadoImg' ? <ImageIcon size={28} /> : <FileText size={28} />}
                                             </div>
                                         )}
-                                        {template.is_default && (
-                                            <span className="text-[10px] bg-primary/20 text-primary px-3 py-1.5 rounded-full font-black uppercase tracking-[0.2em]">Default</span>
-                                        )}
+                                        <div className="flex flex-col items-end gap-1.5">
+                                            {template.is_locked ? (
+                                                <span className="inline-flex items-center gap-1 text-[10px] bg-amber-500/15 text-amber-400 px-3 py-1.5 rounded-full font-black uppercase tracking-wider" title="Solo este crematorio la ve; solo el admin la edita">
+                                                    <Lock size={11} /> {template.tenant_name || 'Exclusiva'}
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 text-[10px] bg-white/5 text-white/40 px-3 py-1.5 rounded-full font-black uppercase tracking-wider">
+                                                    <Globe size={11} /> Global
+                                                </span>
+                                            )}
+                                            {template.is_locked && template.is_tenant_default && (
+                                                <span className="text-[10px] bg-primary/20 text-primary px-3 py-1.5 rounded-full font-black uppercase tracking-[0.2em]">Predeterminada</span>
+                                            )}
+                                            {!template.is_locked && template.is_default && (
+                                                <span className="text-[10px] bg-primary/20 text-primary px-3 py-1.5 rounded-full font-black uppercase tracking-[0.2em]">Default</span>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="mt-6">
                                         <h4 className="font-black text-xl text-white tracking-tight">{template.name}</h4>

@@ -2,12 +2,13 @@
 
 import React, { useState } from 'react';
 import Modal from '@/components/tenant/Modal';
-import { Search, Loader2, Compass, Copy, Share2, MessageCircle, ExternalLink, AlertCircle, CheckCircle2, Clock, User, Dog } from 'lucide-react';
-import { apiRequest } from '@/lib/tenant/api';
+import { Search, Loader2, Compass, Share2, MessageCircle, ExternalLink, AlertCircle, CheckCircle2, Clock, User } from 'lucide-react';
+import { searchOpsOrders, type OpsOrder } from '@/hooks/useOperations';
 import { copyToClipboard } from '@/lib/clipboard';
 import { buildTrackingUrl } from '@/lib/publicUrls';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
+import { useOperationSteps } from '@/hooks/useSessionBootstrap';
 
 interface QuickTrackingModalProps {
     isOpen: boolean;
@@ -17,10 +18,11 @@ interface QuickTrackingModalProps {
 export default function QuickTrackingModal({ isOpen, onClose }: QuickTrackingModalProps) {
     const { showToast } = useToast();
     const { tenantData } = useTenant();
+    const steps = useOperationSteps() as { id: number; name: string }[];
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
     const [searched, setSearched] = useState(false);
-    const [results, setResults] = useState<any[]>([]);
+    const [results, setResults] = useState<OpsOrder[]>([]);
 
     const handleSearch = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
@@ -30,27 +32,18 @@ export default function QuickTrackingModal({ isOpen, onClose }: QuickTrackingMod
         setLoading(true);
         setSearched(true);
         try {
-            // Buscamos órdenes por término (código, mascota o cliente)
-            const data = await apiRequest(`/api/internal/operations/ops/daily-orders?status=all&scope=all`);
-            const termLower = term.toLowerCase();
-            const filtered = (Array.isArray(data) ? data : []).filter((o: any) => {
-                const code = (o.verification_code || '').toLowerCase();
-                const pet = (o.pet_name || '').toLowerCase();
-                const customer = (o.customer_name || '').toLowerCase();
-                const oc = (o.oc_number || '').toString();
-                const id = (o.id || '').toString();
-                return code.includes(termLower) || pet.includes(termLower) || customer.includes(termLower) || oc.includes(termLower) || id.includes(termLower);
-            });
-            setResults(filtered.slice(0, 6));
-        } catch (err: any) {
-            showToast(err.message || 'Error al buscar seguimiento', 'error');
+            // Búsqueda en servidor (código, mascota, cliente o N° de orden)
+            const data = await searchOpsOrders(term, 6);
+            setResults(data.items);
+        } catch (err: unknown) {
+            showToast(err instanceof Error ? err.message : 'Error al buscar seguimiento', 'error');
             setResults([]);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleCopyUrl = async (order: any) => {
+    const handleCopyUrl = async (order: OpsOrder) => {
         const code = order.verification_code;
         if (!code) {
             showToast('Esta orden no posee código de seguimiento', 'info');
@@ -63,7 +56,7 @@ export default function QuickTrackingModal({ isOpen, onClose }: QuickTrackingMod
         }
     };
 
-    const handleWhatsApp = (order: any) => {
+    const handleWhatsApp = (order: OpsOrder) => {
         const code = order.verification_code;
         if (!code) {
             showToast('Esta orden no posee código de seguimiento', 'info');
@@ -151,7 +144,7 @@ export default function QuickTrackingModal({ isOpen, onClose }: QuickTrackingMod
                                                 </span>
                                                 <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${isConcluded ? 'text-emerald-400' : 'text-blue-400'}`}>
                                                     {isConcluded ? <CheckCircle2 size={11} /> : <Clock size={11} />}
-                                                    {isConcluded ? 'Concluido' : (order.current_step_name || order.status || 'En Proceso')}
+                                                    {isConcluded ? 'Concluido' : (steps.find(st => st.id === order.current_step_id)?.name || order.status || 'En Proceso')}
                                                 </span>
                                             </div>
                                         </div>
@@ -183,7 +176,7 @@ export default function QuickTrackingModal({ isOpen, onClose }: QuickTrackingMod
                                                     type="button"
                                                     onClick={() => {
                                                         const slug = tenantData?.slug || order.tenant_slug || 'crematorio';
-                                                        const url = buildTrackingUrl(slug, order.pet_name || 'mascota', order.verification_code);
+                                                        const url = buildTrackingUrl(slug, order.pet_name || 'mascota', order.verification_code as string);
                                                         window.open(url, '_blank');
                                                     }}
                                                     className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-muted-foreground hover:text-white transition"

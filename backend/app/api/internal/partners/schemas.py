@@ -20,6 +20,27 @@ class VeterinaryBase(BaseModel):
     class Config:
         from_attributes = True
 
+class QuickVeterinaryPartnerCreate(BaseModel):
+    name: str
+    rut: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    region: Optional[str] = None
+    tipo_comision: str = "porcentaje"
+    porcentaje_comision: float = 0.0
+    monto_comision: float = 0.0
+
+class ActivePartnerOption(BaseModel):
+    id: int # PartnerLink ID
+    veterinary_id: int
+    name: str
+    rut: Optional[str] = None
+    tipo_comision: str
+    porcentaje_comision: float
+    monto_comision: float
+
 class PartnerLinkCreate(BaseModel):
     veterinary_id: int
     tipo_comision: str = "porcentaje"
@@ -52,6 +73,8 @@ class PartnerLinkResponse(BaseModel):
 class CommissionStats(BaseModel):
     total_paid: float
     total_pending: float
+    count_pending: int = 0
+    count_paid: int = 0
 
 class CommissionSchema(BaseModel):
     id: int
@@ -64,11 +87,21 @@ class CommissionSchema(BaseModel):
     pet_name: Optional[str] = None
     service_name: Optional[str] = None
     
+    order_total: Optional[float] = 0.0
+    amount_porcentaje: Optional[float] = 0.0
+    paid_at: Optional[datetime] = None
+    notes: Optional[str] = None
+    
     partner_rut: Optional[str] = None
     partner_email: Optional[str] = None
     bank_name: Optional[str] = None
     account_type: Optional[str] = None
     account_number: Optional[str] = None
+    rut_titular: Optional[str] = None
+    nombre_titular: Optional[str] = None
+
+class PayCommissionPayload(BaseModel):
+    notes: Optional[str] = None
 
 class CommissionListResponse(BaseModel):
     stats: CommissionStats

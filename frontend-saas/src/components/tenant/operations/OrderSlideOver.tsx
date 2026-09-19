@@ -15,7 +15,8 @@ import {
     Clock,
     ArrowRight,
     Loader2,
-    Edit
+    Edit,
+    Building2
 } from 'lucide-react';
 import SlideOver from '@/components/tenant/SlideOver';
 import type { Cremation } from '@/hooks/useCremations';
@@ -55,6 +56,7 @@ export default function OrderSlideOver({
     const isCompleted = ['delivered', 'completed', 'completado', 'entregado'].includes(
         (cremation.status || '').toLowerCase()
     );
+    const partnerName = cremation.partner_name || cremation.partner_link?.veterinary?.name || cremation.partner?.veterinary?.name || cremation.partner?.nombre_clinica;
 
     return (
         <SlideOver
@@ -129,6 +131,14 @@ export default function OrderSlideOver({
                             <p className="text-xs text-muted-foreground pl-6 truncate">✉️ {customer.email}</p>
                         )}
                     </div>
+
+                    {partnerName && (
+                        <div className="pt-3 border-t border-white/5 flex items-center text-xs">
+                            <Building2 size={14} className="mr-2 text-emerald-400 shrink-0" />
+                            <span className="font-semibold text-white mr-1">Convenio:</span>
+                            <span className="text-emerald-400 font-bold truncate">{partnerName}</span>
+                        </div>
+                    )}
                 </div>
 
                 {/* Tracking & Certificate Links */}

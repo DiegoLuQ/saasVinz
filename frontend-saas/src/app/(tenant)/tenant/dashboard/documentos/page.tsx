@@ -13,6 +13,8 @@ import {
     FileImage,
     Type,
     Sticker,
+    Lock,
+    Globe,
 } from 'lucide-react';
 import { apiRequest, getImageUrl } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
@@ -21,12 +23,12 @@ import {
     frameWrapperStyle, frameInnerInsetPct, frameImageMaskStyle,
     FRAME_BORDER_PCT, FEATHER_INNER_STOP,
 } from '@/lib/certFrame';
-import { TextBg, textBgStyle, drawTextBackground } from '@/lib/certText';
+import { TextBg, textBgStyle, renderCanvasText } from '@/lib/certText';
 
 // --- Tipos compartidos con el editor admin --------------------------------
 interface DesignField extends TextBg {
     id: string;
-    type: 'nombre_mascota' | 'fecha_nacimiento' | 'fecha_fallecimiento' | 'fecha_actual' | 'imagen_mascota' | 'logo_tenant' | 'rut_tenant' | 'encargado_tenant' | 'rut_encargado' | 'celular_tenant' | 'direccion_tenant' | 'texto_fijo';
+    type: 'nombre_mascota' | 'fecha_nacimiento' | 'fecha_fallecimiento' | 'fecha_actual' | 'imagen_mascota' | 'logo_tenant' | 'nombre_empresa' | 'rut_tenant' | 'encargado_tenant' | 'rut_encargado' | 'celular_tenant' | 'direccion_tenant' | 'texto_fijo';
     x: number;
     y: number;
     fontSize?: number;
@@ -60,6 +62,8 @@ interface ImgTemplate {
     category: string;
     background_logo_url: string | null;
     sections_config: { aspect_ratio?: string; fields?: DesignField[]; elements?: DesignElement[] } | null;
+    is_locked?: boolean;
+    tenant_id?: number | null;
 }
 
 // Nivel z de los campos (debe coincidir con el backend y el editor admin).
@@ -73,6 +77,7 @@ const FIELD_LABELS: Record<DesignField['type'], string> = {
     fecha_actual: 'Fecha actual',
     imagen_mascota: 'Foto mascota',
     logo_tenant: 'Logo empresa',
+    nombre_empresa: 'Nombre empresa',
     rut_tenant: 'RUT empresa',
     encargado_tenant: 'Encargado',
     rut_encargado: 'RUT Encargado',
@@ -106,6 +111,11 @@ interface CremationLite {
 const ASPECT_PADDING: Record<string, number> = { '16:9': 56.25, '4:3': 75, '3:4': 133.333 };
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
+// Ancho de referencia del diseño (A4 a 96dpi). Los tamaños de fuente que
+// configura el admin se asumen relativos a este ancho; la vista previa los
+// escala proporcionalmente al contenedor real.
+const DESIGN_BASE_WIDTH = 816;
+
 function fmtDate(value: string | null | undefined | Date, fmt?: string): string {
     if (!value) return '';
     const d = value instanceof Date ? value : new Date(value);
@@ -125,7 +135,7 @@ export default function EmitirDocumentosPage() {
     const [loading, setLoading] = useState(true);
     const [tenantLogo, setTenantLogo] = useState<string | null>(null);
     // Datos de la empresa para los campos dinámicos del certificado
-    const [tenantInfo, setTenantInfo] = useState<{ rut?: string | null; manager?: string | null; managerRut?: string | null; phone?: string | null; address?: string | null }>({});
+    const [tenantInfo, setTenantInfo] = useState<{ name?: string | null; rut?: string | null; manager?: string | null; managerRut?: string | null; phone?: string | null; address?: string | null }>({});
 
     // Emisión
     const [active, setActive] = useState<ImgTemplate | null>(null);
@@ -148,6 +158,10 @@ export default function EmitirDocumentosPage() {
     const [downloading, setDownloading] = useState(false);
     const [resultHtml, setResultHtml] = useState<string | null>(null);
     const previewRef = useRef<HTMLDivElement>(null);
+    // Factor de escala para que el fontSize de los campos se vea proporcional al
+    // ancho real del contenedor de vista previa (vs. el ancho de referencia
+    // ~816px con que el admin diseña).
+    const [previewScale, setPreviewScale] = useState(1);
 
     // Cargar las Google Fonts que puede usar el diseño (Cinzel, Playfair, etc.)
     // para que el preview y el PDF rendericen la tipografía correcta y no caigan
@@ -163,17 +177,46 @@ export default function EmitirDocumentosPage() {
         }
     }, []);
 
-    // --- Carga de diseños certificadoImg (globales) -----------------------
+    // Observar el ancho real del contenedor de preview para escalar las fuentes.
+    useEffect(() => {
+        const el = previewRef.current;
+        if (!el) return;
+        const ro = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const w = entry.contentRect.width;
+                if (w > 0) setPreviewScale(w / DESIGN_BASE_WIDTH);
+            }
+        });
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [active, selectedCremId]);
+
+    // --- Carga de diseños certificadoImg (globales y exclusivos) ----------
     useEffect(() => {
         (async () => {
             try {
-                const [data, me] = await Promise.all([
+                const [globalData, localData, me] = await Promise.all([
                     apiRequest('/api/internal/ops-records/templates/global'),
+                    apiRequest('/api/internal/ops-records/templates').catch(() => []),
                     apiRequest('/api/internal/tenants/me').catch(() => null),
                 ]);
-                setTemplates((data || []).filter((t: any) => t.category === 'certificadoImg'));
+
+                const localImg = (localData || []).filter((t: any) => t.category === 'certificadoImg');
+                const globalImg = (globalData || []).filter((t: any) => t.category === 'certificadoImg');
+
+                // Mostrar primero los diseños exclusivos/propios del tenant, luego los globales
+                const seenIds = new Set<number>();
+                const merged: ImgTemplate[] = [];
+                for (const t of [...localImg, ...globalImg]) {
+                    if (!seenIds.has(t.id)) {
+                        seenIds.add(t.id);
+                        merged.push(t);
+                    }
+                }
+
+                setTemplates(merged);
                 if (me?.logo_url) setTenantLogo(me.logo_url);
-                if (me) setTenantInfo({ rut: me.rut, manager: me.legal_rep_name, managerRut: me.legal_rep_rut, phone: me.phone, address: me.address });
+                if (me) setTenantInfo({ name: me.name, rut: me.rut, manager: me.legal_rep_name, managerRut: me.legal_rep_rut, phone: me.phone, address: me.address });
             } catch (err: any) {
                 showToast('Error al cargar diseños: ' + (err.message || ''), 'error');
             } finally {
@@ -279,6 +322,7 @@ export default function EmitirDocumentosPage() {
         if (f.type === 'fecha_nacimiento') return fmtDate(pet?.birth_date, fmt);
         if (f.type === 'fecha_fallecimiento') return fmtDate(pet?.death_date, fmt);
         if (f.type === 'fecha_actual') return fmtDate(new Date(), fmt);
+        if (f.type === 'nombre_empresa') return tenantInfo.name || '';
         if (f.type === 'rut_tenant') return tenantInfo.rut || '';
         if (f.type === 'encargado_tenant') return tenantInfo.manager || '';
         if (f.type === 'rut_encargado') return tenantInfo.managerRut || '';
@@ -581,17 +625,26 @@ export default function EmitirDocumentosPage() {
                         const value = fieldValue(f);
                         if (!value) return;
                         const weight = f.bold ? '700' : '400';
-                        const px = (f.fontSize || 32) * q;
+                        // Escalar el fontSize proporcionalmente al ancho del
+                        // canvas respecto al ancho de referencia del diseño.
+                        const fontScale = W / DESIGN_BASE_WIDTH;
+                        const px = (f.fontSize || 32) * fontScale;
                         ctx.font = `${weight} ${px}px ${f.fontFamily || 'Georgia, serif'}`;
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
 
-                        // Fondo del texto: misma caja que el DOM, con el relleno
-                        // escalado por el factor q de exportación.
-                        drawTextBackground(ctx, f, { value, cx, cy, fontPx: px, scale: q });
+                        const isFreeText = f.type === 'texto_fijo';
+                        const maxWPct = f.w || (isFreeText ? 80 : undefined);
+                        const maxW = maxWPct ? (maxWPct / 100) * W : undefined;
 
-                        ctx.fillStyle = f.color || '#1a1a1a';
-                        ctx.fillText(value, cx, cy);
+                        renderCanvasText(ctx, value, f, {
+                            cx,
+                            cy,
+                            fontPx: px,
+                            color: f.color,
+                            align: f.align,
+                            scale: fontScale,
+                            maxW,
+                            lineHeightFactor: isFreeText ? 1.4 : 1.2,
+                        });
                     },
                 });
             }
@@ -645,29 +698,48 @@ export default function EmitirDocumentosPage() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {templates.map((tpl) => (
-                            <div key={tpl.id} className="group rounded-[2rem] border border-white/5 bg-white/[0.02] overflow-hidden hover:border-primary/30 transition-all flex flex-col">
-                                <div className="aspect-video bg-black/40 overflow-hidden">
-                                    {tpl.background_logo_url ? (
-                                        <img src={getImageUrl(tpl.background_logo_url)} alt={tpl.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center"><ImageIcon size={32} className="text-white/10" /></div>
-                                    )}
+                        {templates.map((tpl) => {
+                            const isExclusive = !!(tpl.is_locked || (tpl.tenant_id && tpl.tenant_id > 0));
+                            return (
+                                <div key={tpl.id} className="group rounded-[2rem] border border-white/5 bg-white/[0.02] overflow-hidden hover:border-primary/30 transition-all flex flex-col">
+                                    <div className="aspect-video bg-black/40 overflow-hidden relative">
+                                        {tpl.background_logo_url ? (
+                                            <img src={getImageUrl(tpl.background_logo_url)} alt={tpl.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center"><ImageIcon size={32} className="text-white/10" /></div>
+                                        )}
+                                        <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                                            {isExclusive ? (
+                                                <span className="text-[10px] text-amber-300 bg-black/60 backdrop-blur-md border border-amber-500/40 px-2 py-0.5 rounded-md font-black uppercase tracking-wider flex items-center gap-1 shadow-lg">
+                                                    <Lock size={10} className="text-amber-400" /> Exclusiva
+                                                </span>
+                                            ) : (
+                                                <span className="text-[10px] text-emerald-300 bg-black/60 backdrop-blur-md border border-emerald-500/40 px-2 py-0.5 rounded-md font-black uppercase tracking-wider flex items-center gap-1 shadow-lg">
+                                                    <Globe size={10} className="text-emerald-400" /> Global
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="p-5 flex flex-col flex-1">
+                                        <h4 className="font-bold text-lg text-white tracking-tight">{tpl.name}</h4>
+                                        <div className="flex items-center gap-2 mt-2">
+                                            <span className="text-[10px] text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-md font-black uppercase tracking-wider w-fit">
+                                                {tpl.sections_config?.aspect_ratio || '16:9'}
+                                            </span>
+                                            {isExclusive && (
+                                                <span className="text-[10px] text-amber-400/80 font-bold">Solo para tu crematorio</span>
+                                            )}
+                                        </div>
+                                        <button
+                                            onClick={() => openEmit(tpl)}
+                                            className="mt-5 bg-primary text-primary-foreground font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 text-xs uppercase tracking-wider shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all"
+                                        >
+                                            <Sparkles size={14} /> Emitir
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="p-5 flex flex-col flex-1">
-                                    <h4 className="font-bold text-lg text-white tracking-tight">{tpl.name}</h4>
-                                    <span className="text-[10px] text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-md font-black uppercase tracking-wider w-fit mt-2">
-                                        {tpl.sections_config?.aspect_ratio || '16:9'}
-                                    </span>
-                                    <button
-                                        onClick={() => openEmit(tpl)}
-                                        className="mt-5 bg-primary text-primary-foreground font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 text-xs uppercase tracking-wider shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all"
-                                    >
-                                        <Sparkles size={14} /> Emitir
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>
@@ -682,7 +754,18 @@ export default function EmitirDocumentosPage() {
                             <div className="flex items-center gap-3 min-w-0">
                                 <div className="p-2.5 bg-primary/10 rounded-xl text-primary shrink-0"><Sparkles size={18} /></div>
                                 <div className="min-w-0">
-                                    <h3 className="text-lg font-bold text-white truncate">{active.name}</h3>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-lg font-bold text-white truncate">{active.name}</h3>
+                                        {(active.is_locked || (active.tenant_id && active.tenant_id > 0)) ? (
+                                            <span className="text-[9px] text-amber-300 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded font-black uppercase flex items-center gap-1">
+                                                <Lock size={9} /> Exclusiva
+                                            </span>
+                                        ) : (
+                                            <span className="text-[9px] text-emerald-300 bg-emerald-500/20 border border-emerald-500/30 px-1.5 py-0.5 rounded font-black uppercase flex items-center gap-1">
+                                                <Globe size={9} /> Global
+                                            </span>
+                                        )}
+                                    </div>
                                     <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-bold">Emisión de certificado</p>
                                 </div>
                             </div>
@@ -980,19 +1063,40 @@ export default function EmitirDocumentosPage() {
                                                         </div>
                                                     );
                                                 }
+                                                const isFreeText = f.type === 'texto_fijo';
+                                                const textWidth = f.w ? `${f.w}%` : (isFreeText ? '80%' : undefined);
+                                                const scaledFontSize = (f.fontSize || 32) * previewScale;
+                                                // Escalar padding/radius del fondo de texto proporcionalmente
+                                                const scaledBgStyle = textBgStyle(f);
+                                                if (scaledBgStyle.padding && previewScale !== 1) {
+                                                    const parts = String(scaledBgStyle.padding).match(/(\d+\.?\d*)px/g);
+                                                    if (parts && parts.length >= 2) {
+                                                        const padY = parseFloat(parts[0]) * previewScale;
+                                                        const padX = parseFloat(parts[1]) * previewScale;
+                                                        scaledBgStyle.padding = `${padY}px ${padX}px`;
+                                                    }
+                                                }
+                                                if (scaledBgStyle.borderRadius && previewScale !== 1) {
+                                                    const rMatch = String(scaledBgStyle.borderRadius).match(/(\d+\.?\d*)/);
+                                                    if (rMatch) scaledBgStyle.borderRadius = `${parseFloat(rMatch[1]) * previewScale}px`;
+                                                }
                                                 return (
                                                     <div
                                                         key={f.id}
                                                         style={{
                                                             ...common,
-                                                            fontSize: `${f.fontSize}px`,
+                                                            width: textWidth,
+                                                            maxWidth: isFreeText ? (f.w ? `${f.w}%` : '90%') : undefined,
+                                                            fontSize: `${scaledFontSize}px`,
                                                             fontFamily: f.fontFamily,
                                                             color: f.color,
                                                             textAlign: f.align,
                                                             fontWeight: f.bold ? 700 : 400,
-                                                            whiteSpace: 'nowrap',
-                                                            lineHeight: 1.1,
-                                                            ...textBgStyle(f),
+                                                            whiteSpace: isFreeText ? 'pre-wrap' : 'nowrap',
+                                                            wordBreak: 'break-word',
+                                                            overflowWrap: 'break-word',
+                                                            lineHeight: isFreeText ? 1.4 : 1.1,
+                                                            ...scaledBgStyle,
                                                         }}
                                                     >
                                                         {fieldValue(f)}

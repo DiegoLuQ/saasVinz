@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, Suspense, useRef } from 'react';
+import { TemplateDestinationPicker, DEFAULT_DESTINATION, destinationFromTemplate, destinationError, type TemplateDestination } from '@/components/admin/templates/TemplateDestinationPicker';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
     Plus,
@@ -98,6 +99,8 @@ function AdminDocumentEditorContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const templateId = searchParams.get('id');
+    // Global (todos) o exclusiva de un crematorio (solo el admin la edita)
+    const [destination, setDestination] = useState<TemplateDestination>(DEFAULT_DESTINATION);
 
     const [editingTemplate, setEditingTemplate] = useState<Partial<Template> | null>(null);
     const [loading, setLoading] = useState(!!templateId);
@@ -274,6 +277,7 @@ function AdminDocumentEditorContent() {
                         "Métricas y reportes en tiempo real"
                     ]
                 });
+                setDestination(destinationFromTemplate(template as { tenant_id?: number | null; is_locked?: boolean; is_tenant_default?: boolean }));
             } catch (err: any) {
                 showToast('Error al cargar la plantilla: ' + err.message, 'error');
                 router.push('/dashboard/disenos');
@@ -287,6 +291,11 @@ function AdminDocumentEditorContent() {
 
     const handleSave = async (e: React.FormEvent) => {
         if (e) e.preventDefault();
+        const destErr = destinationError(destination);
+        if (destErr) {
+            showToast(destErr, 'error');
+            return;
+        }
         setIsSaving(true);
         try {
             let finalTemplate = { ...editingTemplate };
@@ -309,7 +318,7 @@ function AdminDocumentEditorContent() {
 
             const response = await apiRequest(endpoint, {
                 method,
-                body: JSON.stringify(finalTemplate)
+                body: JSON.stringify({ ...finalTemplate, ...destination })
             });
 
             console.log('[TEMPLATE SAVE] Response:', response);
@@ -452,6 +461,13 @@ function AdminDocumentEditorContent() {
 
                         {openSections.basics && (
                             <div className="px-8 pb-10 space-y-8 animate-fade-in">
+                                <div className="mb-8">
+                                    <TemplateDestinationPicker
+                                        value={destination}
+                                        onChange={setDestination}
+                                        category={editingTemplate?.category}
+                                    />
+                                </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="space-y-3">
                                         <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-white/30 ml-1">Nombre Descriptivo</label>

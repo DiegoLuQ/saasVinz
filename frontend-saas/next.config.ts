@@ -17,6 +17,7 @@ const nextConfig: NextConfig = {
     'veterinary.lvh.me',
     'partner.lvh.me',
     'track.lvh.me',
+    'catalogo.lvh.me',
     'memorial.lvh.me',
     'crematorio.lvh.me',
     'funeraria.lvh.me',
@@ -31,6 +32,8 @@ const nextConfig: NextConfig = {
         'tenant.lvh.me:3000',
         'partner.lvh.me:3000',
         'www.lvh.me:3000',
+        'track.lvh.me:3000',
+        'catalogo.lvh.me:3000',
         'crematorio.lvh.me:3000',
         'funeraria.lvh.me:3000',
         'huellas.lvh.me:3000'

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Enum, JSON, Float
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Enum, JSON, Float, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.database import Base
 from datetime import datetime
@@ -36,7 +36,12 @@ class Notification(Base):
     # Metadata
     priority = Column(Enum(NotificationPriority, native_enum=False), default=NotificationPriority.normal, index=True)
     action_url = Column(String, nullable=True)  # URL for call-to-action button
+    # Global: la notificación quedó resuelta para todos (p. ej. solicitud procesada).
+    # El leído/descartado de cada usuario vive en NotificationUserState.
     is_read = Column(Boolean, default=False, index=True)
+    # Quién la ve dentro del tenant: 'owner' (admin), 'ordenes' (roles con el
+    # módulo de órdenes, p. ej. recepción) o 'all'. Ver common/notifications/audience.py
+    audience = Column(String(20), nullable=False, default="owner", server_default="owner", index=True)
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
@@ -45,6 +50,19 @@ class Notification(Base):
     # Relationships
     tenant = relationship("Tenant", foreign_keys=[tenant_id])
     veterinary = relationship("Veterinary", foreign_keys=[veterinary_id], back_populates="notifications")
+
+
+class NotificationUserState(Base):
+    """Leído/descartado POR USUARIO: que un operador descarte una notificación
+    no la hace desaparecer para el dueño del tenant."""
+    __tablename__ = "sys_notification_user_states"
+    __table_args__ = (UniqueConstraint("notification_id", "user_id", name="uq_notification_user_state"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    notification_id = Column(Integer, ForeignKey("sys_notifications.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("sys_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    read_at = Column(DateTime(timezone=True), nullable=True)
+    dismissed_at = Column(DateTime(timezone=True), nullable=True)
 
 class TenantStatus(str, enum.Enum):
     active = "active"

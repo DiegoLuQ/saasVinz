@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { isOwnerRole } from '@/lib/tenant/roles';
 import { apiRequest } from '@/lib/tenant/api';
 
 // Types matching backend Bootstrap schemas
@@ -210,6 +211,15 @@ export function useHasPermission(moduleKey: string, action: 'view' | 'create' | 
 export function useCurrentUser() {
     const { data } = useSessionBootstrap();
     return data?.user;
+}
+
+/**
+ * ¿El usuario actual es el dueño del tenant (admin/creator)?
+ * `undefined` mientras el bootstrap no cargó.
+ */
+export function useIsOwner(): boolean | undefined {
+    const user = useCurrentUser();
+    return user ? isOwnerRole(user.role) : undefined;
 }
 
 /**

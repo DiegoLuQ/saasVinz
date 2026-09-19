@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Plus, Trash2, ChevronUp, ChevronDown, Loader2, Receipt, Package, Sparkles, Layers } from 'lucide-react';
+import { Plus, Trash2, ChevronUp, ChevronDown, Loader2, Receipt, Package, Sparkles, Layers, Building2, Percent, Handshake } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import SalesCatalogDrawer from '@/components/tenant/orders/SalesCatalogDrawer';
 import { API_URL } from '@/lib/tenant/api';
@@ -12,6 +12,8 @@ interface FinancialTicketCardProps {
     services: Service[];
     plans: Plan[];
     products: Product[];
+    partners?: any[];
+    onNewPartnerClick?: () => void;
 
     // Selection state
     selectedPlans: SelectedPlan[];
@@ -67,6 +69,8 @@ export default function FinancialTicketCard({
     services,
     plans,
     products,
+    partners = [],
+    onNewPartnerClick,
     selectedPlans,
     selectedServices,
     selectedProducts,
@@ -93,6 +97,20 @@ export default function FinancialTicketCard({
     const productsSubtotal = selectedProducts.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
     const hasItems = selectedPlans.length > 0 || selectedServices.length > 0 || selectedProducts.length > 0;
     const discountValue = currentCremation?.discount || 0;
+
+    const currentPartnerId = currentCremation?.partner_link_id || currentCremation?.partner_id;
+    const selectedPartnerObj = partners.find(p => (p.id || p.id_partner) === currentPartnerId);
+    
+    // Calcular comisión estimada
+    const partnerCommissionAmount = React.useMemo(() => {
+        if (!selectedPartnerObj) return 0;
+        const tipo = selectedPartnerObj.tipo_comision || 'porcentaje';
+        if (tipo === 'fijo') {
+            return selectedPartnerObj.monto_comision || 0;
+        }
+        const pct = selectedPartnerObj.porcentaje_comision || 0;
+        return (grandTotal * pct) / 100;
+    }, [selectedPartnerObj, grandTotal]);
 
     return (
         <div className="lg:sticky lg:top-6 space-y-4">
@@ -369,7 +387,67 @@ export default function FinancialTicketCard({
                         </div>
                     )}
 
-                    <div className="flex justify-between items-center">
+                    {/* === Partner / Convenio Veterinario === */}
+                    <div className="pt-3 border-t border-border/40 space-y-2">
+                        <div className="flex items-center justify-between">
+                            <label htmlFor="select-partner" className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.18em] flex items-center gap-1.5">
+                                <Handshake size={13} className="text-emerald-500" />
+                                Convenio / Partner
+                            </label>
+                            <div className="flex items-center gap-2">
+                                {onNewPartnerClick && (
+                                    <button
+                                        type="button"
+                                        onClick={onNewPartnerClick}
+                                        className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 hover:underline flex items-center gap-0.5 tracking-wider transition-colors"
+                                    >
+                                        + Nueva Veterinaria
+                                    </button>
+                                )}
+                                {selectedPartnerObj && (
+                                    <span className="text-[10px] font-black text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                        {selectedPartnerObj.tipo_comision === 'fijo'
+                                            ? `${CLP.format(selectedPartnerObj.monto_comision || 0)} fijo`
+                                            : `${selectedPartnerObj.porcentaje_comision || 0}% com.`}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        <select
+                            id="select-partner"
+                            value={currentPartnerId || ''}
+                            onChange={(e) => {
+                                const val = e.target.value ? Number(e.target.value) : undefined;
+                                setCurrentCremation(prev => ({
+                                    ...prev,
+                                    partner_id: val,
+                                    partner_link_id: val
+                                }));
+                            }}
+                            className="w-full h-10 bg-background border border-border rounded-xl px-3 text-xs font-semibold text-foreground focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all shadow-sm"
+                        >
+                            <option value="">Sin Convenio (Directo / Particular)</option>
+                            {partners.map((p: any) => (
+                                <option key={p.id || p.id_partner} value={p.id || p.id_partner}>
+                                    {p.name || p.nombre || p.nombre_clinica} ({p.porcentaje_comision || 0}%)
+                                </option>
+                            ))}
+                        </select>
+
+                        {selectedPartnerObj && partnerCommissionAmount > 0 && (
+                            <div className="flex justify-between items-center px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs">
+                                <span className="text-emerald-400 text-[11px] font-medium flex items-center gap-1">
+                                    <Percent size={12} /> Comisión Interna Estimada:
+                                </span>
+                                <span className="font-mono font-black text-emerald-300">
+                                    {CLP.format(partnerCommissionAmount)}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex justify-between items-center pt-2">
                         <label htmlFor="input-discount" className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.18em]">
                             Descuento (%)
                         </label>

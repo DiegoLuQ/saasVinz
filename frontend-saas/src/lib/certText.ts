@@ -83,7 +83,16 @@ export function textBgStyle(f: TextBg, fallbackPadding = '0'): React.CSSProperti
 export function drawTextBackground(
     ctx: CanvasRenderingContext2D,
     f: TextBg,
-    opts: { value: string; cx: number; cy: number; fontPx: number; align?: 'left' | 'center' | 'right'; scale?: number },
+    opts: {
+        value: string;
+        cx: number;
+        cy: number;
+        fontPx: number;
+        align?: 'left' | 'center' | 'right';
+        scale?: number;
+        lines?: string[];
+        maxW?: number;
+    },
 ): void {
     if (!textBgActive(f)) return;
 
@@ -92,15 +101,22 @@ export function drawTextBackground(
     const padX = bg.padX * scale;
     const padY = bg.padY * scale;
 
-    const textW = ctx.measureText(opts.value).width;
-    const boxW = textW + padX * 2;
-    const boxH = opts.fontPx * 1.1 + padY * 2;
+    const lines = opts.lines && opts.lines.length > 0 ? opts.lines : [opts.value];
+    let maxLineWidth = 0;
+    for (const l of lines) {
+        const w = ctx.measureText(l).width;
+        if (w > maxLineWidth) maxLineWidth = w;
+    }
+
+    const boxW = maxLineWidth + padX * 2;
+    const lineH = opts.fontPx * 1.35;
+    const boxH = (lines.length > 1 ? (lines.length - 1) * lineH + opts.fontPx * 1.1 : opts.fontPx * 1.1) + padY * 2;
 
     const align = opts.align || 'center';
     const left = align === 'left'
-        ? opts.cx - padX
+        ? (opts.maxW ? (opts.cx - opts.maxW / 2) - padX : opts.cx - padX)
         : align === 'right'
-            ? opts.cx - textW - padX
+            ? (opts.maxW ? (opts.cx + opts.maxW / 2) - boxW + padX : opts.cx - boxW + padX)
             : opts.cx - boxW / 2;
     const top = opts.cy - boxH / 2;
 
@@ -116,3 +132,107 @@ export function drawTextBackground(
     ctx.fillStyle = hexToRgba(bg.color, bg.opacity);
     ctx.fill();
 }
+
+/**
+ * Divide un texto en líneas respetando saltos de línea explícitos (\n)
+ * y ajustando por palabras si el ancho supera `maxW`.
+ */
+export function getWrappedLines(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    maxW?: number,
+): string[] {
+    const rawParagraphs = String(text ?? '').split('\n');
+    const lines: string[] = [];
+    for (let pIdx = 0; pIdx < rawParagraphs.length; pIdx++) {
+        const paragraph = rawParagraphs[pIdx];
+        if (!paragraph) {
+            lines.push('');
+            continue;
+        }
+        if (!maxW || maxW <= 0) {
+            lines.push(paragraph);
+            continue;
+        }
+        const words = paragraph.split(' ');
+        let currentLine = '';
+        for (let i = 0; i < words.length; i++) {
+            const word = words[i];
+            if (!word) continue;
+            const testLine = currentLine ? `${currentLine} ${word}` : word;
+            if (ctx.measureText(testLine).width <= maxW) {
+                currentLine = testLine;
+            } else {
+                if (currentLine) {
+                    lines.push(currentLine);
+                    currentLine = word;
+                } else {
+                    lines.push(word);
+                    currentLine = '';
+                }
+            }
+        }
+        if (currentLine) {
+            lines.push(currentLine);
+        }
+    }
+    return lines.length > 0 ? lines : [''];
+}
+
+/**
+ * Dibuja texto multilínea y/o ajustado en un canvas con soporte de alineación y fondo.
+ */
+export function renderCanvasText(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    f: TextBg,
+    opts: {
+        cx: number;
+        cy: number;
+        fontPx: number;
+        color?: string;
+        align?: 'left' | 'center' | 'right';
+        scale?: number;
+        maxW?: number;
+        lineHeightFactor?: number;
+    }
+): void {
+    if (!text) return;
+    const align = opts.align || 'center';
+    const lines = getWrappedLines(ctx, text, opts.maxW);
+    const lhFactor = opts.lineHeightFactor ?? 1.35;
+    const lineH = opts.fontPx * lhFactor;
+
+    // Fondo del texto (si tiene activo)
+    drawTextBackground(ctx, f, {
+        value: text,
+        cx: opts.cx,
+        cy: opts.cy,
+        fontPx: opts.fontPx,
+        align,
+        scale: opts.scale,
+        lines,
+        maxW: opts.maxW,
+    });
+
+    ctx.fillStyle = opts.color || '#1a1a1a';
+    ctx.textAlign = align as CanvasTextAlign;
+    ctx.textBaseline = 'middle';
+
+    const drawX = align === 'left'
+        ? (opts.maxW ? (opts.cx - opts.maxW / 2) : opts.cx)
+        : align === 'right'
+            ? (opts.maxW ? (opts.cx + opts.maxW / 2) : opts.cx)
+            : opts.cx;
+
+    if (lines.length === 1) {
+        ctx.fillText(lines[0], drawX, opts.cy);
+    } else {
+        const totalH = (lines.length - 1) * lineH;
+        const startY = opts.cy - totalH / 2;
+        for (let i = 0; i < lines.length; i++) {
+            ctx.fillText(lines[i], drawX, startY + i * lineH);
+        }
+    }
+}
+

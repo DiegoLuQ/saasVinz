@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Query, Form
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from app import models
@@ -6,7 +7,7 @@ from app import schemas
 from app import auth
 from app.api.deps import get_current_user, get_tenant_id
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, time, timedelta
 from app.utils import tz
 import os
 import uuid
@@ -14,6 +15,7 @@ import shutil
 from app.api.internal.common.media_service import MediaService
 from app.utils.time import get_tenant_now, format_tenant_datetime, convert_to_tenant_tz
 import pytz
+from app.api.internal.operations.operations import board
 
 router = APIRouter()
 
@@ -21,86 +23,10 @@ router = APIRouter()
 
 def get_enriched_order(db: Session, cremation_id: int, tenant_id: int):
     """Obtiene una orden con sus joins y metadata convertida (DailyOrderSchema)."""
-    result = db.query(
-        models.Cremation, 
-        models.Pet, 
-        models.Customer,
-        models.Tenant,
-        models.PartnerLink,
-        models.Veterinary
-    ).options(
-        joinedload(models.Cremation.evidence),
-        joinedload(models.Cremation.technical),
-        joinedload(models.Cremation.logistics),
-        joinedload(models.Cremation.financial),
-        joinedload(models.Cremation.details),
-        joinedload(models.Cremation.scheduling)
-    ).join(
-        models.Pet, models.Cremation.pet_id == models.Pet.id
-    ).join(
-        models.Customer, models.Pet.customer_id == models.Customer.id
-    ).join(
-        models.Tenant, models.Cremation.tenant_id == models.Tenant.id
-    ).outerjoin(
-        models.PartnerLink, models.Cremation.partner_link_id == models.PartnerLink.id
-    ).outerjoin(
-        models.Veterinary, models.PartnerLink.veterinary_id == models.Veterinary.id
-    ).filter(
-        models.Cremation.id == cremation_id,
-        models.Cremation.tenant_id == tenant_id
-    ).first()
-    
+    result = board.base_query(db, tenant_id).filter(models.Cremation.id == cremation_id).first()
     if not result:
         return None
-        
-    crem, pet, cust, tenant, partner_link, veterinary = result
-    
-    # Convert timeline_metadata
-    converted_metadata = {}
-    tech = crem.technical
-    timeline = tech.timeline if tech else {}
-    
-    if timeline:
-        for step_id, step_data in timeline.items():
-            if 'completed_at' in step_data:
-                # Convert stored UTC string to localized datetime and format
-                dt_obj = datetime.fromisoformat(step_data['completed_at'].replace('Z', '+00:00'))
-                converted_metadata[step_id] = {
-                    **step_data,
-                    'completed_at_formatted': format_tenant_datetime(dt_obj, db, tenant_id),
-                    'completed_at': step_data['completed_at']
-                }
-            else:
-                converted_metadata[step_id] = step_data
-                
-    display_address = (crem.logistics.address if crem.logistics else None) or cust.address
-    
-    return schemas.DailyOrderSchema(
-        id=crem.id,
-        oc_number=crem.oc_number,
-        pet_id=pet.id,
-        pet_name=pet.name,
-        pet_breed=pet.breed,
-        pet_species=pet.species,
-        customer_id=cust.id,
-        customer_name=cust.name,
-        customer_address=display_address,
-        customer_phone=cust.phone,
-        customer_email=cust.email,
-        tenant_public_token=tenant.public_token,
-        tenant_slug=tenant.slug,
-        tracking_token=crem.details.tracking_token if crem.details else None,
-        timeline_metadata=converted_metadata,
-        current_step_id=tech.step_id if tech else None,
-        status=crem.status,
-        evidence=crem.evidence,
-        technical=tech,
-        created_at=crem.created_at,
-        partner_id=veterinary.id if veterinary else None,
-        partner_name=veterinary.name if veterinary else None,
-        partner_address=veterinary.address if veterinary else None,
-        partner_phone=veterinary.phone if veterinary else None
-    )
+    return board.to_daily_order(result, board.tenant_tz(db, tenant_id))
 
 @router.get("/ops/current-time")
 def get_current_time(
@@ -135,8 +61,8 @@ def get_cremation_queue(
 @router.post("/plant/cremations/{cremation_id}/start", response_model=schemas.CremationInDB)
 async def start_cremation(
     cremation_id: int,
-    furnace_id: str,
-    temperature: float,
+    furnace_id: Optional[str] = None,
+    temperature: Optional[float] = None,
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
     current_user: models.User = Depends(get_current_user)
@@ -425,132 +351,138 @@ def get_daily_orders(
     current_user: models.User = Depends(get_current_user)
 ):
     """
-    Retorna órdenes activas para el panel operativo con filtros granulares.
+    Lista completa (sin paginar) de órdenes del panel operativo.
+    El Panel de Trabajo usa /ops/board; esto queda por compatibilidad.
     """
-    if current_user.role not in [models.UserRole.admin, models.UserRole.driver, models.UserRole.operator, models.UserRole.operador_cremacion, models.UserRole.creator]:
+    if current_user.role not in board.OPS_ROLES:
         raise HTTPException(status_code=403, detail="Acceso denegado")
-        
-    query = db.query(
-        models.Cremation, 
-        models.Pet, 
-        models.Customer,
-        models.Tenant,
-        models.PartnerLink,
-        models.Veterinary
-    ).options(
-        joinedload(models.Cremation.evidence),
-        joinedload(models.Cremation.technical),
-        joinedload(models.Cremation.logistics),
-        joinedload(models.Cremation.financial),
-        joinedload(models.Cremation.details),
-        joinedload(models.Cremation.scheduling)
-    ).join(
-        models.Pet, models.Cremation.pet_id == models.Pet.id
-    ).join(
-        models.Customer, models.Pet.customer_id == models.Customer.id
-    ).join(
-        models.Tenant, models.Cremation.tenant_id == models.Tenant.id
-    ).outerjoin(
-        models.PartnerLink, models.Cremation.partner_link_id == models.PartnerLink.id
-    ).outerjoin(
-        models.Veterinary, models.PartnerLink.veterinary_id == models.Veterinary.id
-    ).filter(
-        models.Cremation.tenant_id == tenant_id
-    )
 
-    # 1. Base Scope Filter
+    query = board.base_query(db, tenant_id)
+
     if scope == "active":
-        status_filter = ["pending", "approved", "received", "processing", "ready", "en_proceso", "pendiente", "recibido", "listo", "coordinado"]
-        query = query.filter(models.Cremation.status.in_(status_filter))
+        query = query.filter(models.Cremation.status.in_(board.ACTIVE_STATUSES))
     elif scope == "completed":
-        status_filter = ["completed", "delivered", "completado", "entregado"]
-        query = query.filter(models.Cremation.status.in_(status_filter))
+        query = query.filter(models.Cremation.status.in_(board.FINAL_STATUSES))
 
-    # 2. Granular Status Filter (Overrides scope if provided)
+    # Filtro granular de estado (sobrescribe el scope)
     if status and status != "all":
         query = query.filter(models.Cremation.status == status)
 
-    # 3. Cremation Type Filter
     if cremation_type and cremation_type != "all":
         query = query.filter(models.Cremation.cremation_type == cremation_type)
 
-    # 4. Date Range Filter (Using created_at)
+    # Rango de fechas sobre la fecha operativa (programada; si no hay, creación)
+    sched = board.scheduled_expr()
     if start_date:
         try:
-            start_dt = datetime.fromisoformat(start_date)
-            query = query.filter(models.Cremation.created_at >= start_dt)
+            query = query.filter(sched >= datetime.fromisoformat(start_date))
         except ValueError:
             pass
     if end_date:
         try:
             end_dt = datetime.fromisoformat(end_date)
-            # Add one day or set to end of day if only date is provided
             if len(end_date) <= 10:
-                from datetime import time
                 end_dt = datetime.combine(end_dt.date(), time(23, 59, 59))
-            query = query.filter(models.Cremation.created_at <= end_dt)
+            query = query.filter(sched <= end_dt)
         except ValueError:
             pass
 
-    # 5. Sorting
     if sort_order == "desc":
-        query = query.order_by(models.Cremation.created_at.desc(), models.Cremation.id.desc())
+        query = query.order_by(sched.desc(), models.Cremation.id.desc())
     else:
-        query = query.order_by(models.Cremation.created_at.asc(), models.Cremation.id.asc())
+        query = query.order_by(sched.asc(), models.Cremation.id.asc())
 
-    results = query.all()
-    
-    output = []
-    for crem, pet, cust, tenant, partner_link, veterinary in results:
-        display_address = (crem.logistics.address if crem.logistics else None) or cust.address
-        
-        # Convert timeline_metadata timestamps to tenant timezone
-        converted_metadata = {}
-        tech = crem.technical
-        timeline = tech.timeline if tech else {}
-        
-        if timeline:
-            for step_id, step_data in timeline.items():
-                if 'completed_at' in step_data:
-                    # Convert the UTC timestamp to tenant timezone
-                    # Convert stored UTC string to localized datetime and format
-                    dt_obj = datetime.fromisoformat(step_data['completed_at'].replace('Z', '+00:00'))
-                    converted_metadata[step_id] = {
-                        **step_data,
-                        'completed_at_formatted': format_tenant_datetime(dt_obj, db, tenant_id),
-                        'completed_at': step_data['completed_at']  # Keep original for editing
-                    }
-                else:
-                    converted_metadata[step_id] = step_data
-        
-        output.append(schemas.DailyOrderSchema(
-            id=crem.id,
-            oc_number=crem.oc_number,
-            pet_id=pet.id,
-            pet_name=pet.name,
-            pet_breed=pet.breed,
-            pet_species=pet.species,
-            customer_id=cust.id,
-            customer_name=cust.name,
-            customer_address=display_address,
-            customer_phone=cust.phone,
-            customer_email=cust.email,
-            tenant_public_token=tenant.public_token,
-            tenant_slug=tenant.slug,
-            tracking_token=crem.details.tracking_token if crem.details else None,
-            timeline_metadata=converted_metadata,
-            current_step_id=tech.step_id if tech else None,
-            status=crem.status,
-            evidence=crem.evidence,
-            technical=tech,
-            created_at=crem.created_at,
-            partner_id=veterinary.id if veterinary else None,
-            partner_name=veterinary.name if veterinary else None,
-            partner_address=veterinary.address if veterinary else None,
-            partner_phone=veterinary.phone if veterinary else None
-        ))
-    
-    return output
+    tzinfo = board.tenant_tz(db, tenant_id)
+    return [board.to_daily_order(row, tzinfo) for row in query.all()]
+
+@router.get("/ops/board", response_model=schemas.OpsBoardResponse)
+def get_ops_board(
+    tab: str = Query("today", enum=["today", "in_progress", "not_started", "finished", "all"]),
+    q: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(12, ge=1, le=100),
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Panel de Trabajo del operador: pestañas, búsqueda y paginación en servidor.
+
+    - today: abiertas programadas para hoy o atrasadas.
+    - in_progress / not_started: abiertas según hayan iniciado o no.
+    - finished: entregadas (más recientes primero).
+    - all: cualquier estado salvo canceladas (búsqueda rápida de tracking).
+    """
+    if current_user.role not in board.OPS_ROLES:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+
+    tzinfo = board.tenant_tz(db, tenant_id)
+    now_local = datetime.now(tzinfo)
+    tomorrow_start = tzinfo.localize(datetime.combine(now_local.date() + timedelta(days=1), time.min))
+    sched = board.scheduled_expr()
+    status_col = models.Cremation.status
+
+    tab_filters = {
+        "today": [status_col.in_(board.ACTIVE_STATUSES), models.CremationScheduling.scheduled_at < tomorrow_start],
+        # La fase es la fuente de verdad: con fase = en proceso, sin fase = por iniciar
+        # (hay órdenes legacy "pendiente" con fases avanzadas; advance las corrige).
+        "in_progress": [status_col.in_(board.ACTIVE_STATUSES), models.CremationTechnical.step_id.isnot(None)],
+        "not_started": [status_col.in_(board.ACTIVE_STATUSES), models.CremationTechnical.step_id.is_(None)],
+        "finished": [status_col.in_(board.FINAL_STATUSES)],
+        "all": [status_col.notin_(board.CANCELED_STATUSES)],
+    }
+
+    search_filter = None
+    term = (q or "").strip()
+    if term:
+        pattern = f"%{term}%"
+        conditions = [
+            models.Pet.name.ilike(pattern),
+            models.Customer.name.ilike(pattern),
+            models.Cremation.verification_code.ilike(pattern),
+        ]
+        digits = term.upper().replace("OC-", "").replace("SVC-", "").strip()
+        if digits.isdigit():
+            conditions += [models.Cremation.oc_number == int(digits), models.Cremation.id == int(digits)]
+        search_filter = or_(*conditions)
+
+    def count_for(key: str) -> int:
+        cq = db.query(func.count(models.Cremation.id)).join(
+            models.Pet, models.Cremation.pet_id == models.Pet.id
+        ).join(
+            models.Customer, models.Pet.customer_id == models.Customer.id
+        ).outerjoin(
+            models.CremationScheduling, models.CremationScheduling.cremation_id == models.Cremation.id
+        ).outerjoin(
+            models.CremationTechnical, models.CremationTechnical.cremation_id == models.Cremation.id
+        ).filter(models.Cremation.tenant_id == tenant_id, *tab_filters[key])
+        if search_filter is not None:
+            cq = cq.filter(search_filter)
+        return cq.scalar() or 0
+
+    counts = schemas.OpsBoardCounts(**{k: count_for(k) for k in ("today", "in_progress", "not_started", "finished")})
+    total = getattr(counts, tab) if tab != "all" else count_for("all")
+
+    query = board.base_query(db, tenant_id).filter(*tab_filters[tab])
+    if search_filter is not None:
+        query = query.filter(search_filter)
+
+    if tab == "finished":
+        closed_at = func.coalesce(models.CremationScheduling.completed_at, models.Cremation.created_at)
+        query = query.order_by(closed_at.desc(), models.Cremation.id.desc())
+    elif tab == "all":
+        query = query.order_by(sched.desc(), models.Cremation.id.desc())
+    else:
+        # Lo más urgente primero (atrasadas arriba)
+        query = query.order_by(sched.asc(), models.Cremation.id.asc())
+
+    rows = query.offset((page - 1) * page_size).limit(page_size).all()
+    return schemas.OpsBoardResponse(
+        items=[board.to_daily_order(row, tzinfo) for row in rows],
+        total=total,
+        page=page,
+        page_size=page_size,
+        counts=counts,
+    )
 
 @router.post("/ops/evidence", response_model=schemas.DailyOrderSchema)
 async def upload_evidence(
@@ -696,16 +628,24 @@ def advance_order_step(
     tenant_id: int = Depends(get_tenant_id),
     current_user: models.User = Depends(get_current_user)
 ):
-    """Avanza la orden al siguiente paso del flujo (Solo Admin/Op)."""
+    """Avanza la orden al siguiente paso del flujo.
+
+    - Sin fase asignada: inicia la orden (primera fase + estado en_proceso).
+    - Con fase: registra la hora de término de la fase actual y pasa a la siguiente
+      (la evidencia es opcional).
+    El estado de la orden queda siempre sincronizado con la fase.
+    """
     cremation = db.query(models.Cremation).filter(
         models.Cremation.id == cremation_id,
         models.Cremation.tenant_id == tenant_id
     ).first()
-    
+
     if not cremation:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
 
-    # Obtener pasos del workflow activo del tenant
+    if cremation.status in board.FINAL_STATUSES + board.CANCELED_STATUSES:
+        raise HTTPException(status_code=400, detail="La orden ya está cerrada")
+
     steps = db.query(models.WorkflowStep).filter(
         models.WorkflowStep.tenant_id == tenant_id,
         models.WorkflowStep.is_active == True
@@ -714,45 +654,38 @@ def advance_order_step(
     if not steps:
         raise HTTPException(status_code=400, detail="Workflow no configurado")
 
-    # Obtener o crear registro técnico
     tech = cremation.technical
     if not tech:
         tech = models.CremationTechnical(cremation_id=cremation.id)
         db.add(tech)
 
-    if not tech.step_id:
-        # Si no tiene paso, asignar el primero
+    current_index = next((i for i, st in enumerate(steps) if st.id == tech.step_id), -1) if tech.step_id else -1
+
+    if current_index == -1:
+        # Inicio (o fase inválida): primera fase
         tech.step_id = steps[0].id
+    elif current_index < len(steps) - 1:
+        meta = dict(tech.timeline or {})
+        meta[str(tech.step_id)] = {
+            "completed_at": get_tenant_now(db, tenant_id).isoformat(),
+            "updated_by": current_user.id
+        }
+        tech.timeline = meta
+        tech.step_id = steps[current_index + 1].id
     else:
-        # Buscar índice actual
-        current_index = next((i for i, s in enumerate(steps) if s.id == tech.step_id), -1)
-        if current_index == -1:
-            # Paso actual no encontrado, resetear al primero
-            tech.step_id = steps[0].id
-        elif current_index < len(steps) - 1:
-            # Registrar fecha de término del paso actual
-            current_step_id = str(tech.step_id)
-            
-            # Get current time in tenant's timezone
-            local_now = get_tenant_now(db, tenant_id)
-            
-            meta = dict(tech.timeline or {})
-            meta[current_step_id] = {
-                "completed_at": local_now.isoformat(),
-                "updated_by": current_user.id
-            }
-            tech.timeline = meta
-            
-            # Avanzar al siguiente
-            tech.step_id = steps[current_index + 1].id
-        else:
-            # Ya está en el último paso
-            raise HTTPException(status_code=400, detail="La orden ya está en el último paso")
+        raise HTTPException(status_code=400, detail="La orden ya está en la última fase: usa «Concluir»")
+
+    # Estado sincronizado con la fase (antes podía quedar "pendiente" con fases avanzadas)
+    if cremation.status not in board.IN_PROGRESS_STATUSES:
+        cremation.status = "en_proceso"
+    if not tech.start_at:
+        tech.start_at = tz.get_now()
+    if not tech.operator_id:
+        tech.operator_id = current_user.id
 
     db.commit()
     db.refresh(cremation)
-    
-    # Return enriched order
+
     return get_enriched_order(db, cremation_id, tenant_id)
 
 @router.patch("/ops/orders/{cremation_id}/revert", response_model=schemas.DailyOrderSchema)
@@ -810,19 +743,49 @@ def finalize_order(
     cremation_id: int,
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
+    current_user: models.User = Depends(get_current_user)
 ):
-    """Marca la orden como finalizada."""
+    """Concluye la orden: exige estar en la última fase y la marca entregada."""
     cremation = db.query(models.Cremation).filter(models.Cremation.id == cremation_id, models.Cremation.tenant_id == tenant_id).first()
     if not cremation:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
-        
+
+    if cremation.status in board.FINAL_STATUSES:
+        return get_enriched_order(db, cremation_id, tenant_id)
+    if cremation.status in board.CANCELED_STATUSES:
+        raise HTTPException(status_code=400, detail="La orden está cancelada")
+
+    steps = db.query(models.WorkflowStep).filter(
+        models.WorkflowStep.tenant_id == tenant_id,
+        models.WorkflowStep.is_active == True
+    ).order_by(models.WorkflowStep.order_index).all()
+
+    tech = cremation.technical
+    now = tz.get_now()
+
+    if steps:
+        last = steps[-1]
+        if not tech or tech.step_id != last.id:
+            raise HTTPException(status_code=400, detail="La orden debe estar en la última fase para concluirla")
+        meta = dict(tech.timeline or {})
+        meta[str(last.id)] = {
+            "completed_at": get_tenant_now(db, tenant_id).isoformat(),
+            "updated_by": current_user.id
+        }
+        tech.timeline = meta
+
+    if tech:
+        tech.end_at = now
+
     cremation.status = "entregado"
     if cremation.scheduling:
-        cremation.scheduling.completed_at = tz.get_now()
-    
+        cremation.scheduling.completed_at = now
+    else:
+        db.add(models.CremationScheduling(cremation_id=cremation.id, completed_at=now))
+
     db.commit()
     db.refresh(cremation)
-    
+
     return get_enriched_order(db, cremation_id, tenant_id)
 
 @router.patch("/ops/orders/{cremation_id}/steps/{step_id}/time", response_model=schemas.DailyOrderSchema)

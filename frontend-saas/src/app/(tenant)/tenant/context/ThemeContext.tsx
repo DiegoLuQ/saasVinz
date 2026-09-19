@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { apiRequest } from '@/lib/tenant/api';
 import { useTenant } from './TenantContext';
 import { useSessionBootstrap } from '@/hooks/useSessionBootstrap';
+import { isOwnerRole } from '@/lib/tenant/roles';
 import { useQueryClient } from '@tanstack/react-query';
 
 type ThemeMode = 'auto' | 'light' | 'dark';
@@ -202,6 +203,9 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     };
 
     const updateThemeConfig = async (updates: Partial<ThemeConfig>) => {
+        // Solo el dueño guarda el tema del crematorio (el backend lo exige);
+        // para el resto el cambio queda como preferencia local del navegador.
+        if (!isOwnerRole(bootstrapData?.user?.role)) return;
         try {
             const updated = await apiRequest('/api/internal/theme/config', {
                 method: 'PATCH',

@@ -12,7 +12,8 @@ import {
     X,
     Camera,
     BookOpen,
-    Lock
+    Lock,
+    Share2
 } from 'lucide-react';
 import { apiRequest, API_URL } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
@@ -30,6 +31,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { PlanLimitModal } from '@/components/tenant/PlanLimitModal';
 import { useFeatures } from '@/hooks/useFeatures';
 import dynamic from 'next/dynamic';
+import ShareCatalogModal from '@/components/tenant/catalog/ShareCatalogModal';
 
 const DownloadLink = dynamic(() => import('@/components/tenant/catalog/PDFDownloadButton'), { ssr: false });
 
@@ -108,6 +110,7 @@ export default function ProductsPage() {
 
     const [showLimitModal, setShowLimitModal] = useState(false);
     const [showCatalogModal, setShowCatalogModal] = useState(false);
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [catalogOnlyAvailable, setCatalogOnlyAvailable] = useState(false);
     const [catalogShowPrices, setCatalogShowPrices] = useState(true);
 
@@ -358,6 +361,22 @@ export default function ProductsPage() {
                             <BookOpen className="mr-2" size={18} />
                         )}
                         Ver Catálogo
+                    </button>
+                    <button
+                        onClick={() => canViewCatalog ? setIsShareModalOpen(true) : setShowLimitModal(true)}
+                        className={`border font-bold py-3 px-6 rounded-2xl flex items-center justify-center transition-all text-sm ${
+                            canViewCatalog 
+                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20 active:scale-95 shadow-lg shadow-amber-500/10' 
+                            : 'border-white/10 bg-white/5 text-white/50 hover:bg-white/10 cursor-pointer'
+                        }`}
+                        title={!canViewCatalog ? "Característica Premium" : "Compartir Catálogo Online con Enlace Temporal"}
+                    >
+                        {!canViewCatalog ? (
+                            <Lock className="mr-2 text-amber-500/80" size={18} />
+                        ) : (
+                            <Share2 className="mr-2 text-amber-400" size={18} />
+                        )}
+                        Compartir Online
                     </button>
                     {canCreate('inventario') && (
                         <button
@@ -820,7 +839,15 @@ export default function ProductsPage() {
                                 <span className="group-hover:text-amber-400 transition-colors">Mostrar Precios</span>
                             </label>
                         </div>
-                        <div className="shrink-0">
+                        <div className="shrink-0 flex items-center gap-3">
+                            <button
+                                onClick={() => setIsShareModalOpen(true)}
+                                className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 font-bold py-2.5 px-4 rounded-2xl flex items-center transition-all text-sm active:scale-95 shadow-lg shadow-amber-500/10"
+                                title="Generar enlace público temporal"
+                            >
+                                <Share2 className="mr-2" size={16} />
+                                Compartir Online
+                            </button>
                             {hasFeature('inventario:productos:descargar_pdf') ? (
                                 <DownloadLink
                                     products={catalogProducts}
@@ -979,6 +1006,13 @@ export default function ProductsPage() {
                     </div>
                 </div>
             </Modal>
+            {/* Modal Compartir Catálogo Online con Token */}
+            <ShareCatalogModal
+                isOpen={isShareModalOpen}
+                onClose={() => setIsShareModalOpen(false)}
+                tenantSlug={tenantData?.slug || ''}
+                tenantName={tenantData?.name || ''}
+            />
         </div>
     );
 }

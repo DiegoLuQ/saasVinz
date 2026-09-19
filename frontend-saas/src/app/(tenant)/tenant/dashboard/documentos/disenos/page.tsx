@@ -672,7 +672,7 @@ export default function FarewellPickerPage() {
                         <button
                             onClick={handleExport}
                             disabled={exporting || !petName.trim()}
-                            className="inline-flex items-center justify-center gap-2.5 px-7 py-3.5 bg-gradient-to-r from-primary to-emerald-500 text-white font-black uppercase text-[11px] tracking-[0.2em] rounded-2xl shadow-xl shadow-primary/10 hover:shadow-primary/30 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                            className="inline-flex items-center justify-center gap-2.5 px-7 py-3.5 bg-gradient-to-r from-primary to-emerald-500 text-primary-foreground font-black uppercase text-[11px] tracking-[0.2em] rounded-2xl shadow-xl shadow-primary/10 hover:shadow-primary/30 hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
                         >
                             {exporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
                             {exporting ? 'Generando diseño…' : 'Descargar Diseño'}
@@ -732,7 +732,7 @@ export default function FarewellPickerPage() {
                                                     disabled={disabled}
                                                     className={`py-2.5 px-3 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all duration-300 ${
                                                         subtitleMode === opt.value
-                                                            ? 'bg-primary text-white shadow-md shadow-primary/20 border border-primary/20'
+                                                            ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20 border border-primary/20'
                                                             : disabled
                                                                 ? 'bg-transparent text-slate-600/40 cursor-not-allowed'
                                                                 : 'bg-transparent text-slate-400 hover:text-white hover:bg-white/[0.02]'
@@ -855,7 +855,7 @@ export default function FarewellPickerPage() {
                                                 onClick={() => setCanvasRatio(r)}
                                                 className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 cursor-pointer ${
                                                     canvasRatio === r
-                                                        ? 'bg-primary text-white shadow-lg shadow-primary/20 border border-primary/20'
+                                                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 border border-primary/20'
                                                         : 'text-slate-400 hover:text-white hover:bg-white/[0.03]'
                                                 }`}
                                             >

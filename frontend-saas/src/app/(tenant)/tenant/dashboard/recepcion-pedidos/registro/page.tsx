@@ -14,6 +14,7 @@ import DraftRecoveryBanner from '@/components/tenant/orders/DraftRecoveryBanner'
 import QuickTemplates from '@/components/tenant/orders/QuickTemplates';
 import ChangeDiffBadge, { getChangedFields } from '@/components/tenant/orders/ChangeDiffBadge';
 import QuickPetModal from '@/components/tenant/crm/QuickPetModal';
+import QuickCreatePartnerModal from '@/components/tenant/partners/QuickCreatePartnerModal';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { statusLabels, statusColors } from '@/lib/tenant/orders/types';
 import { ArrowLeft, PawPrint, Truck, Camera, Receipt, Loader2, ChevronRight, ChevronLeft, Check, Sparkles, Activity, Share2, Copy, ExternalLink, MessageCircle } from 'lucide-react';
@@ -60,6 +61,8 @@ export default function RegisterServicePage() {
         services,
         plans,
         products,
+        partners,
+        refreshData,
 
         // Memoized lookups
         selectedPet,
@@ -150,6 +153,7 @@ export default function RegisterServicePage() {
     // Quick Pet Modal State
     // ==========================================
     const [isQuickPetModalOpen, setIsQuickPetModalOpen] = useState(false);
+    const [isQuickPartnerModalOpen, setIsQuickPartnerModalOpen] = useState(false);
 
     // ==========================================
     // Diff tracking for edit mode
@@ -490,6 +494,8 @@ export default function RegisterServicePage() {
                                     services={services}
                                     plans={plans}
                                     products={products}
+                                    partners={partners}
+                                    onNewPartnerClick={() => setIsQuickPartnerModalOpen(true)}
                                     selectedPlans={selectedPlans}
                                     selectedServices={selectedServices}
                                     selectedProducts={selectedProducts}
@@ -524,6 +530,16 @@ export default function RegisterServicePage() {
                 onClose={() => setIsQuickPetModalOpen(false)}
                 onPetCreated={(newPet) => {
                     handlePetChange(newPet.id);
+                }}
+            />
+
+            {/* Quick Partner Modal */}
+            <QuickCreatePartnerModal
+                isOpen={isQuickPartnerModalOpen}
+                onClose={() => setIsQuickPartnerModalOpen(false)}
+                onSuccess={() => {
+                    refreshData();
+                    showToast('Veterinaria registrada y disponible para convenios', 'success');
                 }}
             />
 

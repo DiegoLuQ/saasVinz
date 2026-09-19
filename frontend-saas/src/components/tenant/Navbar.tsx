@@ -28,6 +28,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { apiRequest } from '@/lib/tenant/api';
+import { isOwnerRole } from '@/lib/tenant/roles';
 import { clearToken } from '@/lib/auth/token';
 import { formatChileDate, formatChileTime } from '@/lib/dates';
 import SubmissionDetailModal from '@/components/tenant/modals/SubmissionDetailModal';
@@ -468,9 +469,11 @@ export default function Navbar() {
                                     {tenantData?.name || 'Cargando...'}
                                 </p>
                                 <div className="flex items-center justify-end gap-2 mt-0.5">
-                                    <span className="text-[9px] px-1.5 py-0.5 rounded border border-primary/20 bg-primary/10 text-primary font-black uppercase tracking-wider">
-                                        Plan {planNames[tenantData?.subscription_plan?.name || 'FREE'] || tenantData?.subscription_plan?.name || '...'}
-                                    </span>
+                                    {isOwnerRole(userData?.role) && (
+                                        <span className="text-[9px] px-1.5 py-0.5 rounded border border-primary/20 bg-primary/10 text-primary font-black uppercase tracking-wider">
+                                            Plan {planNames[tenantData?.subscription_plan?.name || 'FREE'] || tenantData?.subscription_plan?.name || '...'}
+                                        </span>
+                                    )}
                                     <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider opacity-60">
                                         {userData?.role ? (roleNames[userData.role] || userData.role) : '...'}
                                     </span>

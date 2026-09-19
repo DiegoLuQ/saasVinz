@@ -60,6 +60,7 @@ class CremationService:
     ) -> List[models.CremationOC]:
         query = self.db.query(models.CremationOC).options(
             joinedload(models.CremationOC.pet).joinedload(models.Pet.customer),
+            joinedload(models.CremationOC.partner_link).joinedload(PartnerLink.veterinary),
             joinedload(models.CremationOC.technical),
             joinedload(models.CremationOC.logistics),
             joinedload(models.CremationOC.financial),
@@ -102,7 +103,7 @@ class CremationService:
     def get_by_id(self, tenant_id: int, cremation_id: int) -> models.CremationOC:
         db_cremation = self.db.query(models.CremationOC).options(
             joinedload(models.CremationOC.pet).joinedload(models.Pet.customer),
-            joinedload(models.CremationOC.partner_link),
+            joinedload(models.CremationOC.partner_link).joinedload(PartnerLink.veterinary),
             joinedload(models.CremationOC.technical),
             joinedload(models.CremationOC.commission),
             joinedload(models.CremationOC.logistics),
@@ -171,7 +172,9 @@ class CremationService:
             tenant_id=tenant_id,
             verification_code=generate_unique_code()
         )
-        if cremation_in.partner_id:
+        if cremation_in.partner_link_id:
+            db_cremation.partner_link_id = cremation_in.partner_link_id
+        elif cremation_in.partner_id:
             db_cremation.partner_link_id = cremation_in.partner_id
         
         if not cremation_in.oc_number:
@@ -199,7 +202,7 @@ class CremationService:
         calculated_commission = 0.0
         calculated_commission_percent = 0.0
         
-        is_operational_status = cremation_in.status and cremation_in.status.lower() not in ['pendiente', 'pending', 'borrador', 'cotizacion']
+        is_operational_status = (not cremation_in.status) or (cremation_in.status.lower() not in ['borrador', 'cotizacion', 'cancelado', 'canceled'])
         
         if is_operational_status and db_cremation.partner_link_id:
             partner_link = self.db.query(PartnerLink).filter(PartnerLink.id == db_cremation.partner_link_id).first()
@@ -443,7 +446,7 @@ class CremationService:
             db_obj.images = []
             if "images" in update_data: update_data["images"] = []
 
-        core_fields_keys = {"pet_id", "oc_number", "cremation_type", "status", "weight", "cremation_type"}
+        core_fields_keys = {"pet_id", "oc_number", "cremation_type", "status", "weight", "partner_link_id"}
         partition_fields = {
             "logistics": {"region", "city", "address", "pickup_region", "pickup_city", "pickup_address"},
             "financial": {"total_price", "discount", "weight_price"},
@@ -451,8 +454,12 @@ class CremationService:
             "scheduling": {"scheduled_at", "completed_at"}
         }
 
+        # Manejo explícito de cambio o eliminación de convenio/partner
+        if "partner_link_id" in update_data or "partner_id" in update_data:
+            db_obj.partner_link_id = update_data.get("partner_link_id") or update_data.get("partner_id") or None
+
         for var, value in update_data.items():
-            if var in ["id", "tenant_id"]:
+            if var in ["id", "tenant_id", "partner_id", "partner_link_id"]:
                 continue
             if var in core_fields_keys:
                 setattr(db_obj, var, value)
@@ -489,7 +496,7 @@ class CremationService:
             if "temperature" in update_data: db_obj.technical.temperature = update_data["temperature"]
         
         current_status = db_obj.status.lower() if db_obj.status else "pending"
-        is_operational_status = current_status not in ['pendiente', 'pending', 'borrador', 'cotizacion']
+        is_operational_status = current_status not in ['borrador', 'cotizacion', 'cancelado', 'canceled']
 
         if db_obj.partner_link_id and is_operational_status:
             partner_link = self.db.query(PartnerLink).filter(PartnerLink.id == db_obj.partner_link_id).first()
@@ -511,12 +518,12 @@ class CremationService:
                     db_obj.financial.commission = comm_amount
                 
                 p_comm = self.db.query(PartnerCommission).filter(
-                    PartnerCommission.cremation_id == db_obj.id,
-                    PartnerCommission.partner_link_id == db_obj.partner_link_id
+                    PartnerCommission.cremation_id == db_obj.id
                 ).first()
                 
                 if p_comm:
                     if p_comm.status == PartnerCommissionStatus.pendiente:
+                        p_comm.partner_link_id = db_obj.partner_link_id
                         p_comm.amount = comm_amount
                         p_comm.amount_porcentaje = comm_percent
                 else:
@@ -527,6 +534,13 @@ class CremationService:
                         amount_porcentaje=comm_percent,
                         status=PartnerCommissionStatus.pendiente
                     ))
+        elif not db_obj.partner_link_id:
+            if db_obj.financial:
+                db_obj.financial.commission = 0.0
+            self.db.query(PartnerCommission).filter(
+                PartnerCommission.cremation_id == db_obj.id,
+                PartnerCommission.status == PartnerCommissionStatus.pendiente
+            ).delete()
 
         self.db.flush()
         self._sync_cremation_type(db_obj)

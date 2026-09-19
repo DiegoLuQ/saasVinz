@@ -15,7 +15,7 @@ function rootFromHost(): string {
     if (typeof window === 'undefined') {
         return process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'lvh.me:3000';
     }
-    return window.location.host.replace(/^app\./, '').replace(/^www\./, '');
+    return window.location.host.replace(/^(app|track|catalogo|memorial|admin|veterinary|www)\./, '');
 }
 
 function currentProtocol(): string {
@@ -28,6 +28,14 @@ export function getTrackingBaseUrl(): string {
         return process.env.NEXT_PUBLIC_TRACKING_BASE_URL;
     }
     return `${currentProtocol()}//track.${rootFromHost()}`;
+}
+
+/** Base del subdominio de catálogo online (catalogo.). */
+export function getCatalogBaseUrl(): string {
+    if (process.env.NEXT_PUBLIC_CATALOG_BASE_URL) {
+        return process.env.NEXT_PUBLIC_CATALOG_BASE_URL;
+    }
+    return `${currentProtocol()}//catalogo.${rootFromHost()}`;
 }
 
 /** Base del subdominio de memoriales (memorial.). */
@@ -54,3 +62,9 @@ export function buildMemorialUrl(tenantSlug: string, petName: string, idRecuerdo
     const petSlug = (petName || 'memorial').toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
     return `${getMemorialBaseUrl()}/memorials/v/${tenantSlug}/${petSlug}/${idRecuerdo}`;
 }
+
+/** Enlace público al catálogo online con token bajo el subdominio catalogo. */
+export function buildCatalogUrl(tenantSlug: string, token: string): string {
+    return `${getCatalogBaseUrl()}/${tenantSlug}/${token}`;
+}
+

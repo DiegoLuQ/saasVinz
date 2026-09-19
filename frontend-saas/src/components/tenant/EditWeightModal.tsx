@@ -104,7 +104,7 @@ export default function EditWeightModal({
                 <div className="flex gap-2 pt-2">
                     <button
                         onClick={onClose}
-                        className="flex-1 py-3 px-4 rounded-xl text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                        className="flex-1 py-3 px-4 rounded-xl text-sm font-bold text-foreground border border-white/10 bg-white/5 hover:bg-white/10 transition-colors"
                         disabled={loading}
                     >
                         Cancelar
@@ -112,7 +112,7 @@ export default function EditWeightModal({
                     <button
                         onClick={handleSave}
                         disabled={loading}
-                        className="flex-1 py-3 px-4 rounded-xl text-sm font-bold text-white bg-primary hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+                        className="flex-1 py-3 px-4 rounded-xl text-sm font-bold bg-primary text-primary-foreground hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
                     >
                         {loading && <Loader2 className="animate-spin" size={16} />}
                         Guardar Cambio

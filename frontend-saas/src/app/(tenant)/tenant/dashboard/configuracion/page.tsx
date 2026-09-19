@@ -117,7 +117,7 @@ export default function SettingsPage() {
                 <div className="relative -mx-3 sm:mx-0">
                     <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-background to-transparent z-10 sm:hidden" />
                     <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-background to-transparent z-10 sm:hidden" />
-                    <div className="flex items-center gap-1.5 p-1 bg-black/20 rounded-[2rem] border border-white/5 w-max overflow-x-auto max-w-full mx-3 sm:mx-0 no-scrollbar">
+                    <div className="flex items-center gap-1.5 p-1 bg-black/20 rounded-[2rem] border border-white/5 w-max overflow-x-auto max-w-full mx-3 sm:mx-0 no-scrollbar scroll-fade-x">
                         {tabs.map((tab) => (
                             <button
                                 key={tab.id}

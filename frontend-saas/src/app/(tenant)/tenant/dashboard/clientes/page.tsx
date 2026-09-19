@@ -14,7 +14,8 @@ import {
     Loader2,
     ChevronDown,
     ChevronRight,
-    Dog
+    Dog,
+    X
 } from 'lucide-react';
 import { apiRequest } from '@/lib/tenant/api';
 import { useRouter } from 'next/navigation';
@@ -86,6 +87,8 @@ export default function CustomersPage() {
     // Modal & Form States
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    // Móvil: el formulario de alta queda plegado para que la lista sea lo primero
+    const [showNewForm, setShowNewForm] = useState(false);
     const [currentCustomer, setCurrentCustomer] = useState<Partial<Customer> | null>(null);
     const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
 
@@ -192,6 +195,7 @@ export default function CustomersPage() {
             });
 
             setIsModalOpen(false);
+            setShowNewForm(false);
 
             if (!isEdit && saved?.id) {
                 setNextStepCustomer(saved);
@@ -245,10 +249,18 @@ export default function CustomersPage() {
                     <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Gestión de Clientes (Tutores)</h1>
                     <p className="text-muted-foreground mt-1 text-sm sm:text-base">Inscribe al cliente para iniciar la atención o consulta el historial más abajo.</p>
                 </div>
+                <button
+                    type="button"
+                    onClick={() => setShowNewForm(v => !v)}
+                    className="lg:hidden inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-primary text-primary-foreground font-bold text-sm shadow-lg shadow-primary/20"
+                >
+                    {showNewForm ? <X size={18} /> : <Plus size={18} />}
+                    {showNewForm ? 'Cerrar formulario' : 'Nuevo cliente'}
+                </button>
             </div>
 
-            {/* TOP SECTION: Formulario de Inscripción Directa */}
-            <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 space-y-6">
+            {/* TOP SECTION: Formulario de Inscripción Directa (en móvil, plegado tras "Nuevo cliente") */}
+            <div className={`${showNewForm ? 'block' : 'hidden'} lg:block glass-card rounded-3xl p-5 sm:p-8 border border-white/10 space-y-6`}>
                 <div className="flex items-center justify-between border-b border-white/5 pb-4">
                     <div className="flex items-center gap-3">
                         <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20 text-primary">

@@ -1,694 +1,419 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState } from 'react';
 import {
-    Users,
     Dog,
     TrendingUp,
     TrendingDown,
-    Clock,
     CheckCircle2,
-    Loader2,
-    Check,
     ArrowRight,
-    ShieldCheck,
-    Package,
-    Layers,
-    UserCircle,
-    Sparkles,
-    Briefcase,
     CalendarDays,
-    ChevronDown,
-    ChevronUp,
     Inbox,
-    FileText,
-    Share2,
     Compass,
+    Plus,
+    Wallet,
+    Gauge,
+    AlertTriangle,
+    RefreshCw,
 } from 'lucide-react';
 import { getImageUrl } from '@/lib/tenant/api';
 import { useRouter } from 'next/navigation';
-import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
 import { StatsSkeleton, Skeleton } from '@/components/tenant/ui/Skeleton';
 import { PlanLimitModal } from '@/components/tenant/PlanLimitModal';
 import DashboardTrendChart from '@/components/tenant/DashboardTrendChart';
-import { useDashboardSummary, useCompleteCremation } from '@/hooks/useDashboard';
-import { useCurrentUser, useInitialSubmissions } from '@/hooks/useSessionBootstrap';
+import { useDashboardSummary, type DashboardOrder, type DashboardSummary } from '@/hooks/useDashboard';
+import { useCurrentUser, useInitialSubmissions, type BootstrapSubmissionData } from '@/hooks/useSessionBootstrap';
 import QuickRegistrationModal from '@/components/tenant/dashboard/QuickRegistrationModal';
 import QuickTrackingModal from '@/components/tenant/dashboard/QuickTrackingModal';
 import SubmissionDetailModal from '@/components/tenant/modals/SubmissionDetailModal';
 import { useQueryClient } from '@tanstack/react-query';
 
-interface RecentCremation {
-    id: number;
-    pet: string;
-    pet_image: string | null;
-    client: string;
-    service_name: string;
-    amount: number;
-    status: string;
-    step_name?: string;
-    time: string;
-}
-
 const OWNER_ROLES = ['admin', 'contabilidad', 'creator'];
 const OPERATOR_ROLES = ['operador_cremacion', 'operator', 'driver'];
 
 const DAYS_ES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-const MONTHS_ES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const MONTHS_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
-function CremationRow({ item, onComplete }: { item: RecentCremation; onComplete: (id: number) => void }) {
-    const router = useRouter();
-    const statusLower = item.status.toLowerCase();
-    const isProcessing = ['processing', 'en_proceso'].includes(statusLower);
-    const isPending = ['pending', 'pendiente', 'received', 'recibido'].includes(statusLower);
+const UNLIMITED = 999999;
+
+const formatCLP = (value: number) => `$${Math.round(value).toLocaleString('es-CL')}`;
+
+type StatusTone = { label: string; className: string };
+
+function statusTone(status: string): StatusTone {
+    const s = (status || '').toLowerCase();
+    if (['entregado', 'delivered', 'completado', 'completed'].includes(s)) {
+        return { label: 'Entregado', className: 'bg-emerald-500/15 text-emerald-500' };
+    }
+    if (['en_proceso', 'processing', 'ready'].includes(s)) {
+        return { label: 'En proceso', className: 'bg-blue-500/15 text-blue-500' };
+    }
+    if (s === 'coordinado') {
+        return { label: 'Coordinado', className: 'bg-violet-500/15 text-violet-500' };
+    }
+    return { label: 'Pendiente', className: 'bg-orange-500/15 text-orange-500' };
+}
+
+function OrderRow({ item, onOpen }: { item: DashboardOrder; onOpen: (id: number) => void }) {
+    const tone = statusTone(item.status);
+    const isProcessing = tone.label === 'En proceso';
 
     return (
-        <div 
-            onClick={() => router.push(`/dashboard/recepcion-pedidos`)}
-            className="flex items-center justify-between p-3 rounded-2xl bg-foreground/5 border border-foreground/5 hover:border-foreground/15 hover:bg-foreground/[0.07] transition-all group overflow-hidden cursor-pointer"
+        <button
+            type="button"
+            onClick={() => onOpen(item.id)}
+            className="w-full text-left flex items-center gap-3 p-3 rounded-2xl bg-foreground/[0.03] border border-foreground/5 hover:border-foreground/15 hover:bg-foreground/[0.06] transition-colors group"
         >
-            <div className="flex items-center flex-1 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-foreground/5 flex items-center justify-center font-bold text-xs ring-1 ring-foreground/10 uppercase overflow-hidden flex-shrink-0">
-                    {item.pet_image ? (
-                        <img src={getImageUrl(item.pet_image)} className="w-full h-full object-cover" alt={item.pet} />
-                    ) : (
-                        <Dog size={20} className="text-muted-foreground" />
-                    )}
-                </div>
-                <div className="ml-3 truncate">
-                    <p className="font-bold text-sm text-foreground group-hover:text-primary transition-colors truncate">{item.pet}</p>
-                    <p className="text-xs text-muted-foreground truncate">{item.client}</p>
-                </div>
+            <div className="w-10 h-10 rounded-xl bg-foreground/5 flex items-center justify-center ring-1 ring-foreground/10 overflow-hidden shrink-0">
+                {item.pet_image ? (
+                    <img src={getImageUrl(item.pet_image)} className="w-full h-full object-cover" alt={item.pet} />
+                ) : (
+                    <Dog size={18} className="text-muted-foreground" />
+                )}
             </div>
 
-            <div className="flex-1 hidden sm:block px-3 border-l border-foreground/5 truncate">
-                <p className="text-xs font-bold truncate text-foreground">{item.service_name}</p>
-                <p className="text-[9px] text-emerald-400 font-bold mt-0.5">
-                    {item.amount > 0 ? `$${item.amount.toLocaleString('es-CL')}` : '—'}
+            <div className="flex-1 min-w-0">
+                <p className="font-bold text-sm text-foreground truncate group-hover:text-primary transition-colors">{item.pet}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                    {item.client}
+                    <span className="hidden sm:inline"> · {item.service_name}</span>
                 </p>
             </div>
 
-            <div className="flex-1 px-3 border-l border-foreground/5 text-center min-w-[90px]">
-                {isProcessing ? (
-                    <>
-                        <p className="text-[10px] font-black uppercase tracking-tighter text-blue-400">En Proceso</p>
-                        {item.step_name && (
-                            <p className="text-[9px] text-muted-foreground font-bold mt-0.5 animate-pulse">{item.step_name}</p>
-                        )}
-                    </>
-                ) : isPending ? (
-                    <p className="text-[10px] font-black uppercase tracking-tighter text-orange-400">Pendiente</p>
-                ) : (
-                    <p className="text-[10px] font-black uppercase tracking-tighter text-emerald-400">
-                        {item.status.replace('_', ' ')}
-                    </p>
-                )}
-                {!isProcessing && (
-                    <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-medium">Estado</p>
-                )}
-                {item.time && item.time !== 'N/A' && (
-                    <p className="text-[9px] text-muted-foreground/50 mt-0.5">{item.time}</p>
-                )}
+            <div className="hidden md:block text-right shrink-0 w-24">
+                <p className="text-xs font-bold tabular-nums text-foreground">
+                    {item.amount > 0 ? formatCLP(item.amount) : '—'}
+                </p>
             </div>
 
-            <div className="flex items-center gap-2 ml-3" onClick={(e) => e.stopPropagation()}>
-                {!['entregado', 'delivered', 'completado', 'completed', 'cancelado', 'canceled'].includes((item.status || '').toLowerCase()) && (
-                    <button
-                        onClick={() => onComplete(item.id)}
-                        className="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg hover:bg-emerald-500 hover:text-white transition-all shadow-lg hover:shadow-emerald-500/20 active:scale-95"
-                        title="Marcar como entregada"
-                    >
-                        <Check size={16} />
-                    </button>
-                )}
+            <div className="flex flex-col items-end gap-1 shrink-0 w-28">
+                <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md ${tone.className}`}>
+                    {tone.label}
+                </span>
+                {isProcessing && item.step_name ? (
+                    <span className="text-[10px] text-muted-foreground truncate max-w-full">{item.step_name}</span>
+                ) : item.time && item.time !== 'N/A' ? (
+                    <span className="text-[10px] text-muted-foreground tabular-nums">{item.time}</span>
+                ) : null}
             </div>
+        </button>
+    );
+}
+
+function KpiCard({
+    label,
+    value,
+    hint,
+    icon: Icon,
+    hintClassName = 'text-muted-foreground',
+    progress,
+    onClick,
+}: {
+    label: string;
+    value: string;
+    hint?: React.ReactNode;
+    icon: React.ComponentType<{ size?: number; className?: string }>;
+    hintClassName?: string;
+    progress?: number;
+    onClick?: () => void;
+}) {
+    const progressColor = progress === undefined ? '' : progress >= 90 ? 'bg-red-500' : progress >= 70 ? 'bg-yellow-500' : 'bg-primary';
+    return (
+        <div
+            onClick={onClick}
+            className={`glass-card relative overflow-hidden rounded-2xl border border-foreground/5 px-4 py-3.5 ${onClick ? 'cursor-pointer hover:border-foreground/15 transition-colors' : ''}`}
+        >
+            <div className="flex items-center gap-2 text-muted-foreground">
+                <Icon size={14} />
+                <span className="text-[10px] font-bold uppercase tracking-wider">{label}</span>
+            </div>
+            <div className="mt-1.5 text-xl sm:text-2xl font-black tracking-tight text-foreground tabular-nums truncate">{value}</div>
+            {hint && <div className={`mt-0.5 text-[11px] font-semibold ${hintClassName}`}>{hint}</div>}
+            {progress !== undefined && (
+                <div className="absolute bottom-0 left-0 h-1 w-full bg-foreground/5">
+                    <div className={`h-full ${progressColor}`} style={{ width: `${Math.min(progress, 100)}%` }} />
+                </div>
+            )}
         </div>
     );
 }
 
+function DashboardSkeleton() {
+    return (
+        <div className="space-y-6">
+            <Skeleton className="h-10 w-72" />
+            <div className="glass-card rounded-3xl p-6 border border-foreground/5 space-y-3">
+                <Skeleton className="h-5 w-40" />
+                {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)}
+            </div>
+            <StatsSkeleton />
+        </div>
+    );
+}
+
+function reachedLimits(data: DashboardSummary) {
+    const monthly = [
+        { name: 'Órdenes', item: data.limits.orders },
+        { name: 'Clientes', item: data.limits.customers },
+        { name: 'Mascotas', item: data.limits.pets },
+    ];
+    return monthly.filter(l => l.item && l.item.max > 0 && l.item.max < UNLIMITED && l.item.usage >= l.item.max);
+}
+
 export default function DashboardPage() {
-    const { data, refetch } = useDashboardSummary();
-    const completeCremationMutation = useCompleteCremation();
+    const { data, isError, refetch, isFetching } = useDashboardSummary();
     const router = useRouter();
     const queryClient = useQueryClient();
-    const { tenantData } = useTenant();
     const currentUser = useCurrentUser();
-    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+    const [limitModalResource, setLimitModalResource] = useState<string | null>(null);
     const [showQuickRegistrationModal, setShowQuickRegistrationModal] = useState(false);
     const [showQuickTrackingModal, setShowQuickTrackingModal] = useState(false);
     const [selectedSubmissionId, setSelectedSubmissionId] = useState<number | null>(null);
-    const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState(false);
-    const [exceededResource, setExceededResource] = useState<{ name: string; icon: React.ComponentType } | null>(null);
-    const [catalogExpanded, setCatalogExpanded] = useState(false);
-
-    const isRegistrarBloqueado = false;
 
     const role = currentUser?.role ?? '';
     const isOwner = OWNER_ROLES.includes(role);
     const isOperator = OPERATOR_ROLES.includes(role);
-    const showFinancials = isOwner && !isRegistrarBloqueado;
-    const showTrend = isOwner && !isRegistrarBloqueado;
-    const showCatalogCards = isOwner && !isRegistrarBloqueado;
+    const firstName = (currentUser?.name || '').trim().split(/\s+/)[0];
 
     const now = new Date();
-    const todayLabel = `${DAYS_ES[now.getDay()]} ${now.getDate()} ${MONTHS_ES[now.getMonth()]}`;
+    const todayLabel = `${DAYS_ES[now.getDay()]} ${now.getDate()} de ${MONTHS_ES[now.getMonth()]}`;
 
     const rawSubmissions = useInitialSubmissions();
-    const pendingSubmissions = rawSubmissions.filter((s: any) => s.status === 'pending' || s.status === 'pendiente');
+    const pendingSubmissions = rawSubmissions.filter((s: BootstrapSubmissionData) => s.status === 'pending' || s.status === 'pendiente');
 
-    const monthlyRevenue = data?.stats.monthly_revenue || 0;
-    const previousRevenue = data?.stats.previous_month_revenue || 0;
-    const revenuePct = previousRevenue > 0
-        ? ((monthlyRevenue - previousRevenue) / previousRevenue) * 100
-        : null;
-
-    const todayItems: RecentCremation[] = data?.today_cremations ?? [];
-
-    useEffect(() => {
-        if (!data?.limits) return;
-        const limits = [
-            { name: 'Clientes', usage: data.limits.customers.usage, max: data.limits.customers.max, icon: Users },
-            { name: 'Mascotas', usage: data.limits.pets.usage, max: data.limits.pets.max, icon: Dog },
-            { name: 'Cremaciones', usage: data.limits.orders.usage, max: data.limits.orders.max, icon: CheckCircle2 },
-        ];
-        const exceeded = limits.find(l => l.max > 0 && l.usage >= l.max);
-        if (exceeded) {
-            const t = setTimeout(() => {
-                setExceededResource({ name: exceeded.name, icon: exceeded.icon });
-                setShowUpgradeModal(true);
-            }, 0);
-            return () => clearTimeout(t);
-        }
-    }, [data]);
-
-    const handleComplete = async (id: number) => {
-        await completeCremationMutation.mutateAsync(id);
+    const openOrder = (id: number) => router.push(`/dashboard/recepcion-pedidos?orden=${id}`);
+    const refreshAfterSubmission = () => {
+        queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+        setSelectedSubmissionId(null);
     };
 
-    const formatLimit = (usage: number, max: number) => {
-        const maxDisplay = max >= 999999 ? '∞' : max;
-        return `${usage} / ${maxDisplay}`;
-    };
-
-    const primaryCards = [
-        {
-            name: 'Clientes',
-            value: data?.stats.total_customers || 0,
-            usage: data?.stats.total_customers || 0,
-            max: 0,
-            quota: null,
-            icon: Users,
-            limitInfo: 'Total Registrados',
-            href: '/dashboard/clientes',
-        },
-        {
-            name: 'Mascotas',
-            value: data?.stats.total_pets || 0,
-            usage: data?.stats.total_pets || 0,
-            max: 0,
-            quota: null,
-            icon: Dog,
-            limitInfo: 'Total Registradas',
-            href: '/dashboard/mascotas',
-        },
-        {
-            name: 'Cremaciones',
-            value: data?.stats.cremations_this_month || 0,
-            usage: data?.limits?.orders?.usage || 0,
-            max: data?.limits?.orders?.max || 0,
-            quota: data?.limits?.orders ? formatLimit(data.limits.orders.usage, data.limits.orders.max) : '0 / 0',
-            icon: CheckCircle2,
-            limitInfo: 'Cuota Mensual',
-            href: '/dashboard/recepcion-pedidos',
-        },
-        {
-            name: 'Usuarios',
-            value: data?.stats.total_users || 0,
-            usage: data?.stats.total_users || 0,
-            max: tenantData?.subscription_plan?.max_users || 0,
-            quota: tenantData?.subscription_plan
-                ? `${data?.stats.total_users || 0} / ${tenantData.subscription_plan.max_users}`
-                : null,
-            icon: UserCircle,
-            limitInfo: 'Licencias Staff',
-            href: '/dashboard/configuracion',
-        },
-    ];
-
-    const catalogCards = [
-        {
-            name: 'Socios',
-            value: data?.limits?.partners ? data.limits.partners.usage : 0,
-            usage: data?.limits?.partners?.usage || 0,
-            max: data?.limits?.partners?.max || 0,
-            quota: data?.limits?.partners ? formatLimit(data.limits.partners.usage, data.limits.partners.max) : '0 / 0',
-            icon: Briefcase,
-            limitInfo: 'Cuota Plan',
-            href: '/dashboard/partners',
-        },
-        {
-            name: 'Servicios',
-            value: data?.limits?.services ? data.limits.services.usage : (data?.stats.total_services || 0),
-            usage: data?.limits?.services?.usage || 0,
-            max: data?.limits?.services?.max || 0,
-            quota: data?.limits?.services ? formatLimit(data.limits.services.usage, data.limits.services.max) : 'Catálogo',
-            icon: ShieldCheck,
-            limitInfo: 'Catálogo',
-            href: '/dashboard/gestion-servicios',
-        },
-        {
-            name: 'Productos',
-            value: data?.limits?.products ? data.limits.products.usage : 0,
-            usage: data?.limits?.products?.usage || 0,
-            max: data?.limits?.products?.max || 0,
-            quota: data?.limits?.products ? formatLimit(data.limits.products.usage, data.limits.products.max) : '0 / 0',
-            icon: Package,
-            limitInfo: 'Inventario',
-            href: '/dashboard/inventario',
-        },
-        {
-            name: 'Planes',
-            value: data?.limits?.plans ? data.limits.plans.usage : 0,
-            usage: data?.limits?.plans?.usage || 0,
-            max: data?.limits?.plans?.max || 0,
-            quota: data?.limits?.plans ? formatLimit(data.limits.plans.usage, data.limits.plans.max) : '0 / 0',
-            icon: Layers,
-            limitInfo: 'Planes',
-            href: '/dashboard/gestion-servicios',
-        },
-    ];
-
-    if (!data) {
+    if (isError && !data) {
         return (
-            <div className="space-y-8">
-                {/* Stats Skeleton */}
-                <StatsSkeleton />
-                
-                {/* Chart Skeleton */}
-                <div className="glass-card rounded-3xl p-6 border border-white/5 space-y-4">
-                    <Skeleton className="h-6 w-48" />
-                    <Skeleton className="h-64 w-full rounded-2xl" />
-                </div>
-
-                {/* Recent Activity Skeleton */}
-                <div className="glass-card rounded-3xl p-6 border border-white/5 space-y-4">
-                    <Skeleton className="h-6 w-36" />
-                    <div className="space-y-3">
-                        {[1, 2, 3].map(i => (
-                            <div key={i} className="flex items-center justify-between p-3 rounded-2xl bg-white/2 border border-white/5">
-                                <div className="flex items-center space-x-3">
-                                    <Skeleton className="h-10 w-10 rounded-xl" />
-                                    <div className="space-y-2">
-                                        <Skeleton className="h-4 w-24" />
-                                        <Skeleton className="h-3 w-16" />
-                                    </div>
-                                </div>
-                                <Skeleton className="h-4 w-20 animate-pulse rounded-lg bg-white/5" />
-                            </div>
-                        ))}
-                    </div>
-                </div>
+            <div className="glass-card rounded-3xl border border-red-500/20 p-8 text-center space-y-3">
+                <AlertTriangle className="mx-auto text-red-500" size={28} />
+                <p className="font-bold text-foreground">No se pudo cargar el resumen.</p>
+                <button
+                    onClick={() => refetch()}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 text-sm font-bold"
+                >
+                    <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} /> Reintentar
+                </button>
             </div>
         );
     }
 
-    const renderStatCard = (stat: typeof primaryCards[0]) => {
-        const percentage = stat.max > 0 ? (stat.usage / stat.max) * 100 : 0;
-        const isHigh = percentage >= 75 && stat.max < 999999;
-        const isMid = percentage >= 50 && percentage < 75 && stat.max < 999999;
-        const isLimitReached = percentage >= 100 && stat.max < 999999;
+    if (!data) return <DashboardSkeleton />;
 
-        const colorClass = (isLimitReached || isHigh)
-            ? 'bg-red-500/10 text-red-500'
-            : isMid
-                ? 'bg-yellow-500/10 text-yellow-500'
-                : 'bg-primary/10 text-primary';
+    const { stats, limits } = data;
+    const todayItems = data.today_cremations ?? [];
+    const otherActive = data.recent_cremations ?? [];
+    const hiddenActive = Math.max(data.active_count - otherActive.length - todayItems.filter(i => statusTone(i.status).label !== 'Entregado').length, 0);
 
-        const borderClass = (isLimitReached || isHigh)
-            ? 'border-red-500/30 ring-1 ring-red-500/10 shadow-[0_0_20px_-5px_rgba(239,68,68,0.2)]'
-            : isMid
-                ? 'border-yellow-500/30 shadow-[0_0_20px_-5px_rgba(234,179,8,0.1)]'
-                : 'border-foreground/5';
+    const revenuePct = stats.previous_month_revenue > 0
+        ? ((stats.monthly_revenue - stats.previous_month_revenue) / stats.previous_month_revenue) * 100
+        : null;
 
-        return (
-            <motion.div
-                key={stat.name}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                whileHover={{ scale: 1.01 }}
-                onClick={() => stat.href && router.push(stat.href)}
-                className={`glass-card px-3 sm:px-4 py-3 rounded-2xl relative overflow-hidden group transition-all duration-300 border ${borderClass} flex flex-col justify-between h-24 ${stat.href ? 'cursor-pointer' : ''}`}
-            >
-                <div className="flex items-center justify-between relative z-10 gap-2 min-w-0">
-                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                        <div className={`p-1.5 rounded-lg transition-colors duration-500 shrink-0 ${colorClass}`}>
-                            <stat.icon size={16} />
-                        </div>
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">{stat.name}</span>
-                    </div>
-                    <div className="text-lg sm:text-xl font-black tracking-tight leading-none text-foreground tabular-nums shrink-0">{stat.value}</div>
-                </div>
+    const ordersQuota = limits.orders;
+    const hasOrdersCap = ordersQuota.max > 0 && ordersQuota.max < UNLIMITED;
+    const ordersPct = hasOrdersCap ? (ordersQuota.usage / ordersQuota.max) * 100 : undefined;
 
-                <div className="relative z-10 flex items-center justify-between mt-2 pt-2 border-t border-foreground/5">
-                    <div className="text-[8px] text-muted-foreground/60 font-black uppercase tracking-tighter">{stat.limitInfo}</div>
-                    {stat.quota ? (
-                        <div className={`text-[10px] font-bold uppercase transition-colors ${(isLimitReached || isHigh) ? 'text-red-400' : isMid ? 'text-yellow-400' : 'text-primary'}`}>
-                            {stat.quota}
-                        </div>
-                    ) : (
-                        <div className="text-[10px] font-bold text-emerald-400 uppercase">Activo</div>
-                    )}
-                </div>
-
-                <div className={`absolute -right-2 -bottom-2 opacity-[0.03] group-hover:scale-105 transition-all duration-500 ${(isLimitReached || isHigh) ? 'text-red-500' : isMid ? 'text-yellow-500' : 'text-primary'}`}>
-                    <stat.icon size={50} />
-                </div>
-
-                {stat.max > 0 && stat.max < 999999 && (
-                    <div className="absolute bottom-0 left-0 h-1 bg-foreground/5 w-full overflow-hidden">
-                        <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${Math.min(percentage, 100)}%` }}
-                            transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
-                            className={`h-full ${isLimitReached || isHigh ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : isMid ? 'bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]' : 'bg-primary shadow-[0_0_10px_rgba(var(--primary-rgb),0.5)]'}`}
-                        />
-                    </div>
-                )}
-            </motion.div>
-        );
-    };
+    const limitsHit = isOwner ? reachedLimits(data) : [];
 
     return (
-        <div className="space-y-8">
-            {/* Alerta de Solicitudes Web Pendientes */}
+        <div className="space-y-6">
+            {/* Encabezado + acciones rápidas */}
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+                <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{todayLabel}</p>
+                    <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground leading-tight mt-1">
+                        {firstName ? `Hola, ${firstName}` : 'Hola'}
+                    </h1>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                        onClick={() => setShowQuickTrackingModal(true)}
+                        className="px-4 py-2.5 rounded-xl bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 font-bold text-sm text-foreground transition-colors flex items-center gap-2"
+                        title="Buscar orden en vivo y compartir tracking"
+                    >
+                        <Compass size={16} className="text-primary" />
+                        Buscar tracking
+                    </button>
+                    <button
+                        onClick={() => setShowQuickRegistrationModal(true)}
+                        className="px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm shadow-lg shadow-primary/20 hover:opacity-90 transition-opacity flex items-center gap-2"
+                    >
+                        <Plus size={16} />
+                        Registro rápido
+                    </button>
+                </div>
+            </div>
+
+            {/* Solicitudes web pendientes */}
             {pendingSubmissions.length > 0 && (
-                <motion.div
-                    initial={{ opacity: 0, y: -8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    onClick={() => {
-                        if (pendingSubmissions.length === 1) {
-                            setSelectedSubmissionId(pendingSubmissions[0].id);
-                            setIsSubmissionModalOpen(true);
-                        } else {
-                            // Si hay varias, abrir la primera o el modal
-                            setSelectedSubmissionId(pendingSubmissions[0].id);
-                            setIsSubmissionModalOpen(true);
-                        }
-                    }}
-                    className="p-4 rounded-3xl bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-primary/10 border border-amber-500/30 flex items-center justify-between gap-4 cursor-pointer hover:border-amber-500/50 hover:bg-amber-500/10 transition-all shadow-lg shadow-amber-500/5 group"
-                >
-                    <div className="flex items-center gap-3 min-w-0">
-                        <div className="p-2.5 rounded-2xl bg-amber-500/20 text-amber-400 shrink-0 group-hover:scale-110 transition-transform">
-                            <Inbox size={22} className="animate-bounce" />
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="p-2 rounded-xl bg-amber-500/20 text-amber-500 shrink-0">
+                            <Inbox size={20} />
                         </div>
                         <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-xs font-black uppercase tracking-wider text-amber-400 bg-amber-500/20 px-2.5 py-0.5 rounded-full border border-amber-500/30">
-                                    {pendingSubmissions.length} Solicitud{pendingSubmissions.length !== 1 ? 'es' : ''} Web Pendiente{pendingSubmissions.length !== 1 ? 's' : ''}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                    {pendingSubmissions[0]?.owner_name ? `Cliente: ${pendingSubmissions[0].owner_name}` : ''}
-                                    {pendingSubmissions[0]?.pet_name ? ` · Mascota: ${pendingSubmissions[0].pet_name}` : ''}
-                                </span>
-                            </div>
-                            <p className="text-xs sm:text-sm font-bold text-foreground mt-1 truncate">
-                                Haz clic aquí para ver los datos del formulario y convertirlos en orden de cremación.
+                            <p className="text-sm font-bold text-foreground">
+                                {pendingSubmissions.length} solicitud{pendingSubmissions.length !== 1 ? 'es' : ''} web pendiente{pendingSubmissions.length !== 1 ? 's' : ''}
                             </p>
+                            <p className="text-xs text-muted-foreground">Revísalas y conviértelas en orden de cremación.</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400 group-hover:text-amber-300 shrink-0 bg-amber-500/20 px-3 py-2 rounded-xl border border-amber-500/20">
-                        <span>Revisar Ahora</span>
-                        <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {pendingSubmissions.slice(0, 3).map((s) => (
+                            <button
+                                key={s.id}
+                                onClick={() => setSelectedSubmissionId(s.id)}
+                                className="flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-500/15 hover:bg-amber-500/25 px-3 py-1.5 rounded-lg border border-amber-500/20 transition-colors"
+                            >
+                                {s.pet_name && s.pet_name !== 'N/A' ? s.pet_name : s.owner_name || `#${s.id}`}
+                                <ArrowRight size={12} />
+                            </button>
+                        ))}
+                        {pendingSubmissions.length > 3 && (
+                            <span className="text-xs text-muted-foreground">+{pendingSubmissions.length - 3} en la campana</span>
+                        )}
                     </div>
-                </motion.div>
+                </div>
             )}
 
-            {/* Panel HOY */}
-            <div className={`rounded-3xl border p-5 sm:p-6 ${todayItems.length > 0 ? 'bg-orange-500/5 border-orange-500/20' : 'glass-card border-foreground/5'}`}>
+            {/* Límite del plan alcanzado (antes era un modal que saltaba en cada visita) */}
+            {limitsHit.length > 0 && (
+                <button
+                    onClick={() => setLimitModalResource(limitsHit[0].name)}
+                    className="w-full text-left p-3.5 rounded-2xl bg-red-500/10 border border-red-500/25 flex items-center gap-3 hover:bg-red-500/15 transition-colors"
+                >
+                    <AlertTriangle size={18} className="text-red-500 shrink-0" />
+                    <span className="text-sm text-foreground flex-1">
+                        Alcanzaste el límite mensual de <strong>{limitsHit.map(l => l.name).join(', ')}</strong> de tu plan.
+                    </span>
+                    <span className="text-xs font-bold text-red-500 flex items-center gap-1 shrink-0">
+                        Mejorar plan <ArrowRight size={12} />
+                    </span>
+                </button>
+            )}
+
+            {/* Órdenes: hoy + en curso */}
+            <section className="glass-card rounded-3xl border border-foreground/5 p-5 sm:p-6">
                 <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-base font-bold flex items-center gap-2 text-foreground">
-                        <div className={`p-1.5 rounded-lg ${todayItems.length > 0 ? 'bg-orange-500/15 text-orange-400' : 'bg-primary/10 text-primary'}`}>
-                            <CalendarDays size={16} />
-                        </div>
-                        <span>Hoy — {todayLabel}</span>
-                        {todayItems.length > 0 && (
-                            <span className="ml-1 text-[9px] font-black uppercase tracking-widest bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full">
-                                {todayItems.length} programada{todayItems.length !== 1 ? 's' : ''}
+                    <h2 className="text-base sm:text-lg font-bold text-foreground flex items-center gap-2">
+                        <CalendarDays size={18} className="text-primary" />
+                        Órdenes
+                        {data.active_count > 0 && (
+                            <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                {data.active_count} abierta{data.active_count !== 1 ? 's' : ''}
                             </span>
                         )}
                     </h2>
                     <button
                         onClick={() => router.push('/dashboard/recepcion-pedidos')}
-                        className="text-[10px] font-bold uppercase tracking-widest text-primary hover:underline flex items-center gap-1 underline-offset-4"
+                        className="text-xs font-bold text-primary hover:underline underline-offset-4 flex items-center gap-1"
                     >
                         Ver todas <ArrowRight size={12} />
                     </button>
                 </div>
 
-                {todayItems.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {todayItems.map((item) => {
-                            const statusLower = item.status.toLowerCase();
-                            const isProcessing = ['processing', 'en_proceso'].includes(statusLower);
-                            const isPending = ['pending', 'pendiente', 'received', 'recibido'].includes(statusLower);
-                            return (
-                                <motion.div
-                                    key={item.id}
-                                    initial={{ opacity: 0, y: 6 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="flex items-center gap-3 p-3 rounded-2xl bg-background/50 border border-foreground/8 hover:border-foreground/15 transition-all group"
+                <div className="space-y-5">
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                            Programadas para hoy{todayItems.length > 0 ? ` · ${todayItems.length}` : ''}
+                        </p>
+                        {todayItems.length > 0 ? (
+                            <div className="space-y-2">
+                                {todayItems.map(item => <OrderRow key={item.id} item={item} onOpen={openOrder} />)}
+                            </div>
+                        ) : (
+                            <p className="text-xs text-muted-foreground/70 italic">Sin cremaciones programadas para hoy.</p>
+                        )}
+                    </div>
+
+                    {otherActive.length > 0 && (
+                        <div>
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">En curso</p>
+                            <div className="space-y-2">
+                                {otherActive.map(item => <OrderRow key={item.id} item={item} onOpen={openOrder} />)}
+                            </div>
+                            {hiddenActive > 0 && (
+                                <button
+                                    onClick={() => router.push('/dashboard/recepcion-pedidos')}
+                                    className="mt-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
                                 >
-                                    <div className="w-9 h-9 rounded-xl bg-foreground/5 flex items-center justify-center ring-1 ring-foreground/10 overflow-hidden flex-shrink-0">
-                                        {item.pet_image ? (
-                                            <img src={getImageUrl(item.pet_image)} className="w-full h-full object-cover" alt={item.pet} />
-                                        ) : (
-                                            <Dog size={18} className="text-muted-foreground" />
-                                        )}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center justify-between gap-1">
-                                            <p className="font-bold text-sm text-foreground truncate">{item.pet}</p>
-                                            <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md flex-shrink-0 ${isProcessing ? 'bg-blue-500/15 text-blue-400' : isPending ? 'bg-orange-500/15 text-orange-400' : 'bg-emerald-500/15 text-emerald-400'}`}>
-                                                {isProcessing ? 'En proceso' : isPending ? 'Pendiente' : item.status}
-                                            </span>
-                                        </div>
-                                        <p className="text-[10px] text-muted-foreground truncate">{item.client}</p>
-                                        <div className="flex items-center gap-2 mt-0.5">
-                                            {item.time && item.time !== 'N/A' && (
-                                                <span className="text-[9px] font-bold text-orange-400/80">{item.time}</span>
-                                            )}
-                                            <span className="text-[9px] text-muted-foreground/60 truncate">{item.service_name}</span>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            );
-                        })}
-                    </div>
-                ) : (
-                    <p className="text-xs text-muted-foreground/50 italic">Sin cremaciones programadas para hoy.</p>
-                )}
-            </div>
-
-            {/* Header with Welcome Message & Quick Action Buttons */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="text-center sm:text-left">
-                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-foreground leading-tight">Bienvenido de nuevo, 👋</h1>
-                    <p className="text-muted-foreground mt-1 text-sm sm:text-base font-medium">Aquí tienes el estado operativo y comercial de hoy.</p>
-                </div>
-
-                <div className="flex items-center justify-center sm:justify-end gap-2.5 flex-wrap">
-                    <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => setShowQuickTrackingModal(true)}
-                        className="px-4 py-3 rounded-2xl bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 font-bold text-xs sm:text-sm text-foreground transition-all flex items-center gap-2"
-                        title="Buscar orden en vivo y compartir tracking"
-                    >
-                        <Compass size={16} className="text-primary" />
-                        <span>Buscar Tracking</span>
-                    </motion.button>
-
-                    <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => router.push('/dashboard/recepcion-pedidos')}
-                        className="px-4 py-3 rounded-2xl bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 font-bold text-xs sm:text-sm text-foreground transition-all flex items-center gap-2"
-                    >
-                        <Clock size={16} className="text-muted-foreground" />
-                        <span>Ver Pedidos</span>
-                    </motion.button>
-
-                    <motion.button
-                        whileHover={{ scale: 1.03 }}
-                        whileTap={{ scale: 0.97 }}
-                        onClick={() => setShowQuickRegistrationModal(true)}
-                        className="px-5 py-3 rounded-2xl bg-gradient-to-r from-primary via-primary/90 to-emerald-500 text-primary-foreground font-extrabold text-xs sm:text-sm tracking-wide shadow-xl shadow-primary/20 hover:shadow-primary/30 transition-all flex items-center gap-2"
-                    >
-                        <Sparkles size={18} className="animate-pulse text-yellow-300" />
-                        <span>+ Nuevo Registro Rápido</span>
-                    </motion.button>
-                </div>
-            </div>
-
-            {showFinancials && (
-                <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-                        {/* Ingresos */}
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            whileHover={{ scale: 1.02 }}
-                            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/20 via-primary/5 to-transparent border border-primary/20 shadow-primary/10 p-0.5 shadow-lg w-full sm:min-w-[220px] group"
-                        >
-                            <div className="relative h-full bg-card/50 backdrop-blur-sm rounded-xl px-4 py-2.5 flex items-center justify-between gap-4 min-w-0">
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2 mb-0.5">
-                                        <div className="p-1 rounded-md bg-primary/20 text-primary">
-                                            <Sparkles size={10} />
-                                        </div>
-                                        <span className="text-[9px] font-bold text-primary/80 uppercase tracking-widest">Ingresos</span>
-                                    </div>
-                                    <div className="text-xl sm:text-2xl font-black tracking-tighter text-foreground drop-shadow-sm tabular-nums break-all">
-                                        ${monthlyRevenue.toLocaleString('es-CL')}
-                                    </div>
-                                    {revenuePct !== null ? (
-                                        <div className={`flex items-center gap-1 text-[9px] font-bold mt-0.5 ${revenuePct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                            {revenuePct >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                                            {revenuePct >= 0 ? '+' : ''}{revenuePct.toFixed(1)}% vs. mes anterior
-                                        </div>
-                                    ) : (
-                                        <div className="text-[8px] font-semibold text-primary/60 uppercase tracking-tight">Este Mes</div>
-                                    )}
-                                </div>
-                                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 group-hover:bg-primary/20 group-hover:scale-110 transition-all duration-500 shrink-0">
-                                    <TrendingUp size={16} className="text-primary" />
-                                </div>
-                            </div>
-                            <div className="absolute -inset-1 bg-gradient-to-r from-primary/0 via-primary/10 to-primary/0 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 animate-pulse" />
-                        </motion.div>
-
-                        {/* Pendientes */}
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            whileHover={{ scale: 1.02 }}
-                            onClick={() => router.push('/dashboard/operaciones')}
-                            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-yellow-500/20 via-yellow-500/5 to-transparent border border-yellow-500/20 shadow-yellow-500/10 p-0.5 shadow-lg w-full sm:min-w-[200px] group cursor-pointer"
-                        >
-                            <div className="relative h-full bg-card/50 backdrop-blur-sm rounded-xl px-4 py-2.5 flex items-center justify-between gap-4 min-w-0">
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2 mb-0.5">
-                                        <div className="p-1 rounded-md bg-yellow-500/20 text-yellow-500">
-                                            <Sparkles size={10} />
-                                        </div>
-                                        <span className="text-[9px] font-bold text-yellow-500/80 uppercase tracking-widest">$ Pendientes</span>
-                                    </div>
-                                    <div className="text-xl sm:text-2xl font-black tracking-tighter text-foreground drop-shadow-sm tabular-nums break-all">
-                                        ${(data?.stats.pending_revenue || 0).toLocaleString('es-CL')}
-                                    </div>
-                                    <div className="text-[8px] font-semibold text-yellow-500/60 uppercase tracking-tight">Por Cobrar</div>
-                                </div>
-                                <div className="h-8 w-8 rounded-full bg-yellow-500/10 flex items-center justify-center border border-yellow-500/20 group-hover:bg-yellow-500/20 group-hover:scale-110 transition-all duration-500 shrink-0">
-                                    <Clock size={16} className="text-yellow-500" />
-                                </div>
-                            </div>
-                            <div className="absolute -inset-1 bg-gradient-to-r from-yellow-500/0 via-yellow-500/10 to-yellow-500/0 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 animate-pulse" />
-                        </motion.div>
-                    </div>
-                )}
-
-            {/* Primary Stats Grid — se oculta solo para operadores puros */}
-            {!isOperator && (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                    {primaryCards.map(renderStatCard)}
-                </div>
-            )}
-
-            {/* Catalog Cards — colapsable, solo owners */}
-            {showCatalogCards && (
-                <div>
-                    <button
-                        onClick={() => setCatalogExpanded(v => !v)}
-                        className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 hover:text-muted-foreground transition-colors mb-3 group"
-                    >
-                        {catalogExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                        Límites del plan
-                        <span className="text-[9px] bg-foreground/5 px-2 py-0.5 rounded-full">
-                            {catalogCards.map(c => c.name).join(' · ')}
-                        </span>
-                    </button>
-                    {catalogExpanded && (
-                        <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="grid grid-cols-2 sm:grid-cols-4 gap-3"
-                        >
-                            {catalogCards.map(renderStatCard)}
-                        </motion.div>
+                                    + {hiddenActive} más
+                                </button>
+                            )}
+                        </div>
                     )}
                 </div>
+            </section>
+
+            {/* Indicadores del mes */}
+            {!isOperator && (
+                <section className={`grid grid-cols-2 gap-3 sm:gap-4 ${isOwner ? 'lg:grid-cols-4' : ''}`}>
+                    {isOwner && (
+                        <KpiCard
+                            label="Ingresos del mes"
+                            value={formatCLP(stats.monthly_revenue)}
+                            icon={TrendingUp}
+                            hint={revenuePct !== null ? (
+                                <span className="inline-flex items-center gap-1">
+                                    {revenuePct >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                                    {revenuePct >= 0 ? '+' : ''}{revenuePct.toFixed(1)}% vs. mismo período mes anterior
+                                </span>
+                            ) : 'Órdenes entregadas este mes'}
+                            hintClassName={revenuePct === null ? 'text-muted-foreground' : revenuePct >= 0 ? 'text-emerald-500' : 'text-red-500'}
+                        />
+                    )}
+                    {isOwner && (
+                        <KpiCard
+                            label="Por cobrar"
+                            value={formatCLP(stats.pending_revenue)}
+                            icon={Wallet}
+                            hint="Órdenes abiertas"
+                            onClick={() => router.push('/dashboard/recepcion-pedidos')}
+                        />
+                    )}
+                    <KpiCard
+                        label="Entregadas"
+                        value={String(stats.cremations_this_month)}
+                        icon={CheckCircle2}
+                        hint="Este mes"
+                    />
+                    <KpiCard
+                        label="Órdenes del plan"
+                        value={hasOrdersCap ? `${ordersQuota.usage} / ${ordersQuota.max}` : String(ordersQuota.usage)}
+                        icon={Gauge}
+                        hint={hasOrdersCap ? `Quedan ${Math.max(ordersQuota.max - ordersQuota.usage, 0)} este mes` : 'Sin límite mensual'}
+                        progress={ordersPct}
+                    />
+                </section>
             )}
 
-            {/* Trend Chart — solo owners */}
-            {showTrend && (
-                <div className="glass-card rounded-3xl px-5 py-4 sm:px-8 sm:py-6">
-                    <div className="flex items-center justify-between mb-1">
-                        <h2 className="text-base sm:text-lg font-bold flex items-center text-foreground">
-                            <TrendingUp className="mr-2 text-primary" size={18} />
-                            Tendencia últimos 6 meses
-                        </h2>
-                    </div>
-                    <DashboardTrendChart />
-                </div>
-            )}
-
-            {/* Actividad Reciente — full width, alta jerarquía */}
-            <div className="glass-card rounded-3xl p-5 sm:p-8 border border-primary/10">
-                <div className="flex items-center justify-between mb-6 sm:mb-8">
-                    <h2 className="text-lg sm:text-xl font-bold flex items-center text-foreground">
-                        <Clock className="mr-2 sm:mr-3 text-primary" size={20} />
-                        Actividad Reciente
+            {/* Tendencia — solo owners */}
+            {isOwner && (
+                <section className="glass-card rounded-3xl px-5 py-4 sm:px-8 sm:py-6">
+                    <h2 className="text-base sm:text-lg font-bold flex items-center text-foreground mb-1">
+                        <TrendingUp className="mr-2 text-primary" size={18} />
+                        Tendencia últimos 6 meses
                     </h2>
-                    <button
-                        onClick={() => router.push('/dashboard/recepcion-pedidos')}
-                        className="text-[10px] font-bold uppercase tracking-widest text-primary hover:underline transition-all underline-offset-4 flex items-center"
-                    >
-                        Ver todos <ArrowRight size={12} className="ml-1" />
-                    </button>
-                </div>
-                <div className="space-y-3">
-                    {(() => {
-                        const activeRecent = (data?.recent_cremations || []).filter(
-                            (item: RecentCremation) => !['entregado', 'delivered', 'completado', 'completed'].includes((item.status || '').toLowerCase())
-                        );
-                        return activeRecent.length > 0 ? (
-                            activeRecent.map((item: RecentCremation) => (
-                                <CremationRow key={item.id} item={item} onComplete={handleComplete} />
-                            ))
-                        ) : (
-                            <p className="text-center py-10 text-muted-foreground italic text-xs">No hay actividad reciente.</p>
-                        );
-                    })()}
-                </div>
-            </div>
-
-            {/* La "Bandeja de Entrada" se retiró: duplicaba la campana del Navbar,
-               que ya notifica cada solicitud del formulario (type "new_submission")
-               y lleva al mismo detalle /dashboard/registros/{id}. */}
+                    <DashboardTrendChart />
+                </section>
+            )}
 
             <PlanLimitModal
-                isOpen={showUpgradeModal}
-                onClose={() => setShowUpgradeModal(false)}
-                resourceName={exceededResource?.name}
+                isOpen={limitModalResource !== null}
+                onClose={() => setLimitModalResource(null)}
+                resourceName={limitModalResource ?? undefined}
             />
 
             <QuickRegistrationModal
                 isOpen={showQuickRegistrationModal}
                 onClose={() => setShowQuickRegistrationModal(false)}
-                onSuccess={() => {
-                    refetch();
-                }}
+                onSuccess={() => refetch()}
             />
 
             <QuickTrackingModal
@@ -697,17 +422,11 @@ export default function DashboardPage() {
             />
 
             <SubmissionDetailModal
-                isOpen={isSubmissionModalOpen}
+                isOpen={selectedSubmissionId !== null}
                 submissionId={selectedSubmissionId}
-                onClose={() => setIsSubmissionModalOpen(false)}
-                onProcessed={() => {
-                    queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
-                    setIsSubmissionModalOpen(false);
-                }}
-                onDeleted={() => {
-                    queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
-                    setIsSubmissionModalOpen(false);
-                }}
+                onClose={() => setSelectedSubmissionId(null)}
+                onProcessed={refreshAfterSubmission}
+                onDeleted={refreshAfterSubmission}
             />
         </div>
     );

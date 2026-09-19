@@ -68,6 +68,29 @@ class LimitChecker:
     }
 
     @staticmethod
+    def get_usage(db: Session, tenant_id: int, resource_name: str) -> int:
+        """Uso actual de un recurso tal como lo cuenta el bloqueo del plan.
+        El dashboard lo reutiliza para que la cuota mostrada coincida con el límite real."""
+        config = LimitChecker.RESOURCE_CONFIG[resource_name]
+        model = config["model"]
+
+        query = db.query(func.count(model.id)).filter(model.tenant_id == tenant_id)
+
+        if config["type"] == "monthly":
+            # Hora de Chile para que el cambio de mes coincida con lo que ve el usuario.
+            start_of_month = tz.get_now().date().replace(day=1)
+            return query.filter(model.created_at >= start_of_month).scalar() or 0
+
+        # Para total, a veces queremos filtrar por 'is_active' si el modelo lo tiene
+        if hasattr(model, "is_active"):
+            query = query.filter(model.is_active == True)
+        elif hasattr(model, "status") and model == PartnerLinkV2: # Para PartnerLinkV2
+            query = query.filter(model.status == PartnerLinkStatus.active)
+        elif hasattr(model, "activo"): # Retrocompatibilidad si queda algo
+            query = query.filter(model.activo == True)
+        return query.scalar() or 0
+
+    @staticmethod
     def check_limit(db: Session, tenant_id: int, resource_name: str):
         if resource_name not in LimitChecker.RESOURCE_CONFIG:
             return True # O lanzar error si es un recurso no registrado
@@ -101,29 +124,7 @@ class LimitChecker:
         if limit == -1 or limit >= 999999:
             return True
 
-        # Calcular uso actual
-        usage = 0
-        model = config["model"]
-        
-        query = db.query(func.count(model.id)).filter(model.tenant_id == tenant_id)
-        
-        if config["type"] == "monthly":
-            # Usar hora de Chile (igual que el dashboard /summary) para que el
-            # bloqueo coincida exactamente con el uso mensual que se muestra al
-            # usuario. Antes usaba datetime.utcnow(), lo que descuadraba el conteo
-            # en el cambio de mes respecto al indicador.
-            start_of_month = tz.get_now().date().replace(day=1)
-            usage = query.filter(model.created_at >= start_of_month).scalar()
-        else:
-            # Para total, a veces queremos filtrar por 'is_active' si el modelo lo tiene
-            if hasattr(model, "is_active"):
-                usage = query.filter(model.is_active == True).scalar()
-            elif hasattr(model, "status") and model == PartnerLinkV2: # Para PartnerLinkV2
-                usage = query.filter(model.status == PartnerLinkStatus.active).scalar()
-            elif hasattr(model, "activo"): # Retrocompatibilidad si queda algo
-                usage = query.filter(model.activo == True).scalar()
-            else:
-                usage = query.scalar()
+        usage = LimitChecker.get_usage(db, tenant_id, resource_name)
 
         if usage >= limit:
             raise HTTPException(

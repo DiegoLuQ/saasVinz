@@ -4,7 +4,7 @@
 // backend en el HTML guardado). Pensado para generar PDFs fieles a la impresión.
 
 import { CertFrame, getFrameColor, frameActive, FRAME_BORDER_PCT, FEATHER_INNER_STOP } from './certFrame';
-import { TextBg, drawTextBackground } from './certText';
+import { TextBg, renderCanvasText } from './certText';
 
 export interface CertDrawItem extends TextBg {
     kind: 'image' | 'text';
@@ -26,6 +26,7 @@ export interface CertDrawItem extends TextBg {
     color?: string;
     align?: 'left' | 'center' | 'right';
     bold?: boolean;
+    is_free_text?: boolean;
 }
 
 export interface CertDrawSpec {
@@ -131,6 +132,8 @@ export async function renderCertSpecToCanvas(spec: CertDrawSpec, baseWidth = 816
         try { const bg = await loadImageSmart(spec.backgroundUrl); drawCover(bg, 0, 0, W, H); } catch { /* sin fondo */ }
     }
 
+    const DESIGN_BASE_WIDTH = 816;
+
     const items = [...(spec.items || [])].sort((a, b) => (a.z ?? 50) - (b.z ?? 50));
     for (const it of items) {
         const cx = (it.x / 100) * W;
@@ -139,16 +142,26 @@ export async function renderCertSpecToCanvas(spec: CertDrawSpec, baseWidth = 816
         if (it.kind === 'text') {
             if (!it.value) continue;
             const weight = it.bold ? '700' : '400';
-            const fontPx = (it.fontSize || 32) * scale;
+            // Escalar el fontSize proporcionalmente al ancho del canvas
+            // respecto al ancho de referencia del diseño (816px ≈ A4).
+            const fontScale = W / DESIGN_BASE_WIDTH;
+            const fontPx = (it.fontSize || 32) * fontScale;
             ctx.font = `${weight} ${fontPx}px ${it.fontFamily || 'Georgia, serif'}`;
-            ctx.textAlign = (it.align as CanvasTextAlign) || 'center';
-            ctx.textBaseline = 'middle';
-            // El fondo se pinta antes del texto y con ctx.font ya configurado.
-            drawTextBackground(ctx, it, {
-                value: it.value, cx, cy, fontPx, align: it.align, scale,
+
+            const isFreeText = it.is_free_text || (it.w !== undefined && it.w > 0);
+            const maxWPct = it.w || (isFreeText ? 80 : undefined);
+            const maxW = maxWPct ? (maxWPct / 100) * W : undefined;
+
+            renderCanvasText(ctx, it.value, it, {
+                cx,
+                cy,
+                fontPx,
+                color: it.color,
+                align: it.align,
+                scale: fontScale,
+                maxW,
+                lineHeightFactor: isFreeText ? 1.4 : 1.2,
             });
-            ctx.fillStyle = it.color || '#1a1a1a';
-            ctx.fillText(it.value, cx, cy);
             continue;
         }
 

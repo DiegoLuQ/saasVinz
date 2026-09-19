@@ -409,6 +409,7 @@ async def submit_public_form(
             title=f"Nueva Solicitud: {pet_dict.get('name')} ({owner_dict.get('fullName')})",
             message=f"Se ha recibido una nueva solicitud de {owner_dict.get('fullName')} para la mascota {pet_dict.get('name')}.",
             type="new_submission",
+            audience="ordenes",  # recepción/roles de órdenes procesan la solicitud
             data={
                 "submission_id": submission_id,
                 "owner_name": owner_dict.get("fullName"),

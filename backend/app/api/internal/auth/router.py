@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from app.utils import tz
+from app.api.internal.common.dashboard import services as dashboard_services
+from app.api.internal.common.notifications import audience as notif_audience
 
 router = APIRouter()
 
@@ -311,11 +313,7 @@ def get_bootstrap(
     ]
     active_announcements.sort(key=lambda x: x.priority, reverse=True)
     
-    # 6. Get Notifications (Latest 5 unread)
-    notifications = db.query(models.Notification).filter(
-        models.Notification.tenant_id == user.tenant_id,
-        models.Notification.is_read == False
-    ).order_by(models.Notification.created_at.desc()).limit(20).all()
+    # 6. Notificaciones: se filtran por rol más abajo, una vez resuelto el RBAC
 
     # 7. Get Pending Submissions (Latest 10)
     submissions = db.query(models.FormSubmission).filter(
@@ -335,150 +333,8 @@ def get_bootstrap(
             created_at=s.created_at
         ))
 
-    # 8. Dashboard Summary Logic
-    today = tz.get_now().date()
-    start_of_month = today.replace(day=1)
-    tenant_id = user.tenant_id
-
-    # Usage counts
-    monthly_pets = db.query(models.Pet).filter(models.Pet.tenant_id == tenant_id, models.Pet.created_at >= start_of_month).count()
-    monthly_customers = db.query(models.Customer).filter(models.Customer.tenant_id == tenant_id, models.Customer.created_at >= start_of_month).count()
-    
-    # Query for all monthly orders created in the current month
-    monthly_orders = db.query(models.CremationOC).filter(
-        models.CremationOC.tenant_id == tenant_id, 
-        models.CremationOC.created_at >= start_of_month
-    ).count()
-    total_services = db.query(models.Service).filter(models.Service.tenant_id == tenant_id).count()
-    total_products = db.query(models.Product).filter(models.Product.tenant_id == tenant_id).count()
-    total_plans = db.query(models.Plan).filter(models.Plan.tenant_id == tenant_id).count()
-    total_users_total = db.query(models.User).filter(models.User.tenant_id == tenant_id).count()
-    total_partners = db.query(models.PartnerLink).filter(models.PartnerLink.tenant_id == tenant_id, models.PartnerLink.status == 'active').count()
-
-    # Current stats
-    total_customers_total = db.query(models.Customer).filter(models.Customer.tenant_id == tenant_id).count()
-    total_pets_total = db.query(models.Pet).filter(models.Pet.tenant_id == tenant_id).count()
-    total_orders_completed = db.query(models.CremationOC).filter(models.CremationOC.tenant_id == tenant_id, models.CremationOC.status == 'completado').count()
-    
-    from sqlalchemy import or_, and_
-    monthly_cremations_query = db.query(models.CremationOC).join(
-        models.CremationScheduling, models.CremationOC.id == models.CremationScheduling.cremation_id
-    ).options(
-        joinedload(models.CremationOC.financial),
-        joinedload(models.CremationOC.servicios).joinedload(models.ServicioOC.service),
-        joinedload(models.CremationOC.planes).joinedload(models.PlanOC.plan),
-        joinedload(models.CremationOC.productos)
-    ).filter(
-        models.CremationOC.tenant_id == tenant_id,
-        models.CremationOC.status.in_(['completado', 'completed', 'entregado', 'delivered']),
-        or_(
-            models.CremationScheduling.completed_at >= start_of_month,
-            and_(
-                models.CremationScheduling.completed_at == None,
-                models.CremationOC.created_at >= start_of_month
-            )
-        )
-    )
-    cremations_this_month = monthly_cremations_query.count()
-
-    monthly_revenue = 0
-    for cremation in monthly_cremations_query.all():
-        if cremation.financial and cremation.financial.total_price and cremation.financial.total_price > 0:
-            monthly_revenue += cremation.financial.total_price
-        else:
-            revenue_from_services = sum(s.precio_venta for s in cremation.servicios) if cremation.servicios else 0
-            revenue_from_plans = sum(p.precio_venta for p in cremation.planes) if cremation.planes else 0
-            revenue_from_products = sum(pr.precio_venta for pr in cremation.productos) if cremation.productos else 0
-            monthly_revenue += (revenue_from_services + revenue_from_plans + revenue_from_products)
-
-    # Pending Revenue Calculation
-    pending_cremations_query = db.query(models.CremationOC).options(
-        joinedload(models.CremationOC.financial),
-        joinedload(models.CremationOC.servicios).joinedload(models.ServicioOC.service),
-        joinedload(models.CremationOC.planes).joinedload(models.PlanOC.plan),
-        joinedload(models.CremationOC.productos)
-    ).filter(
-        models.CremationOC.tenant_id == tenant_id,
-        models.CremationOC.status.notin_(['completado', 'completed', 'entregado', 'delivered', 'rejected', 'rechazado', 'rechazado_por_cliente'])
-    )
-    
-    pending_revenue = 0
-    for cremation in pending_cremations_query.all():
-        if cremation.financial and cremation.financial.total_price and cremation.financial.total_price > 0:
-            pending_revenue += cremation.financial.total_price
-        else:
-            revenue_from_services = sum(s.precio_venta for s in cremation.servicios) if cremation.servicios else 0
-            revenue_from_plans = sum(p.precio_venta for p in cremation.planes) if cremation.planes else 0
-            revenue_from_products = sum(pr.precio_venta for pr in cremation.productos) if cremation.productos else 0
-            pending_revenue += (revenue_from_services + revenue_from_plans + revenue_from_products)
-
-    # Recent Activity (Latest 5 pending or processing cremations)
-    recent_cremations = db.query(models.CremationOC).options(
-        joinedload(models.CremationOC.scheduling),
-        joinedload(models.CremationOC.financial),
-        joinedload(models.CremationOC.servicios).joinedload(models.ServicioOC.service),
-        joinedload(models.CremationOC.planes).joinedload(models.PlanOC.plan),
-        joinedload(models.CremationOC.technical).joinedload(models.CremationTechnical.step),
-        selectinload(models.CremationOC.pet).selectinload(models.Pet.customer)
-    ).filter(
-        models.CremationOC.tenant_id == tenant_id,
-        models.CremationOC.status.in_(['pendiente', 'en_proceso', 'pending', 'processing'])
-    ).order_by(models.CremationOC.id.desc()).limit(5).all()
-
-    formatted_recent = []
-    for c in recent_cremations:
-        pet = c.pet
-        main_service_name = "Servicio"
-        if c.servicios:
-            main_service_name = c.servicios[0].service.name if c.servicios[0].service else "Servicio"
-        elif c.planes:
-            main_service_name = c.planes[0].plan.name if c.planes[0].plan else "Plan de Cremación"
-            
-        customer = pet.customer if pet else None
-        
-        tech = c.technical
-        formatted_recent.append(schemas.DashboardRecentActivity(
-            id=c.id,
-            pet=pet.name if pet else "Desconocida",
-            pet_image=(pet.images[0] if pet.images else None) if pet else None,
-            client=customer.name if customer else "Desconocido",
-            service_name=main_service_name,
-            amount=c.financial.total_price if c.financial else 0.0,
-            status=c.status,
-            step_name=tech.step.name if tech and tech.step else None,
-            time=c.scheduling.scheduled_at.strftime("%H:%M") if c.scheduling and c.scheduling.scheduled_at else (tech.start_at.strftime("%H:%M") if tech and tech.start_at else "N/A")
-        ))
-
-    plan = user.tenant.effective_plan
-
-    dashboard_summary = schemas.DashboardSummarySchema(
-        stats=schemas.DashboardStatData(
-            total_customers=total_customers_total,
-            total_pets=total_pets_total,
-            total_orders=total_orders_completed,
-            total_services=total_services,
-            total_users=total_users_total,
-            cremations_this_month=cremations_this_month,
-            monthly_revenue=monthly_revenue,
-            pending_revenue=pending_revenue
-        ),
-        limits=schemas.DashboardLimitsData(
-            pets=schemas.DashboardLimitItem(usage=monthly_pets, max=plan.max_pets if plan else 0),
-            customers=schemas.DashboardLimitItem(usage=monthly_customers, max=plan.max_customers if plan else 0),
-            orders=schemas.DashboardLimitItem(usage=monthly_orders, max=plan.max_orders if plan else 0),
-            services=schemas.DashboardLimitItem(usage=total_services, max=plan.max_services if plan else 0),
-            products=schemas.DashboardLimitItem(usage=total_products, max=plan.max_products if plan else 0),
-            plans=schemas.DashboardLimitItem(usage=total_plans, max=plan.max_plans if plan else 0),
-            partners=schemas.DashboardLimitItem(usage=total_partners, max=plan.max_partners if plan else 0),
-            users=schemas.DashboardLimitItem(usage=total_users_total, max=plan.max_users if plan else 0)
-        ),
-        recent_cremations=formatted_recent
-    )
-
-    unread_count = db.query(models.Notification).filter(
-        models.Notification.tenant_id == user.tenant_id,
-        models.Notification.is_read == False
-    ).count()
+    # 8. Dashboard Summary (sin listas de órdenes: el dashboard las pide a /dashboard/summary)
+    dashboard_summary = dashboard_services.build_dashboard_summary(db, user.tenant, include_lists=False)
 
     # 9. Get Templates
     # Incluye las plantillas propias del tenant + las GLOBALES del sistema
@@ -495,7 +351,12 @@ def get_bootstrap(
         or_(
             models.CertificateTemplate.tenant_id == user.tenant_id,
             models.CertificateTemplate.tenant_id.is_(None),
-        )
+        ),
+        # Solo plantillas de certificado: el recibo de suscripción no se emite desde aquí
+        or_(
+            models.CertificateTemplate.category.is_(None),
+            models.CertificateTemplate.category != "recibo_suscripcion",
+        ),
     ).all()
 
     # 10. Get Catalog (Services & Plans)
@@ -600,6 +461,31 @@ def get_bootstrap(
                 )
             )
 
+    # --- Lo que llega a cada rol (el bootstrap lo recibe todo el equipo) ---
+    active_keys = {p.module_key for p in final_rbac_permissions if p.is_active}
+    owner = notif_audience.is_owner(user)
+
+    # Montos del negocio solo para quien tiene acceso a Dashboard o Pagos
+    if not role_is_privileged and not active_keys & {"dashboard", "pagos"}:
+        dashboard_summary.stats.monthly_revenue = 0.0
+        dashboard_summary.stats.pending_revenue = 0.0
+        dashboard_summary.stats.previous_month_revenue = 0.0
+
+    # Notificaciones según audiencia (dueño / órdenes / todos) y estado por usuario
+    audiences = notif_audience.user_audiences(db, user, active_modules=None if owner else active_keys)
+    visible_notifs = notif_audience.visible_notifications(db, user, audiences)
+    unread_count = visible_notifs.count()
+    notifications = visible_notifs.order_by(models.Notification.created_at.desc()).limit(20).all()
+
+    if not owner:
+        # Anuncios comerciales (promos/upsell) solo para el dueño
+        active_announcements = [
+            a for a in active_announcements if a.type not in notif_audience.OWNER_ONLY_ANNOUNCEMENT_TYPES
+        ]
+        # Solicitudes web (datos personales de clientes) solo para roles de órdenes
+        if "ordenes" not in active_keys:
+            formatted_submissions = []
+
     # Prepare tenant data with renewal date and cycle
     tenant_resp = schemas.BootstrapTenantData.model_validate(user.tenant)
 
@@ -653,7 +539,7 @@ def get_bootstrap(
         operation_steps=[schemas.WorkflowStepInDB.model_validate(s) for s in operation_steps],
         metadata=schemas.BootstrapMetadata(
             unread_notifications=unread_count,
-            pending_submissions=len([s for s in submissions if s.status == "pending"])
+            pending_submissions=len([s for s in formatted_submissions if s.status == "pending"])
         )
     )
 

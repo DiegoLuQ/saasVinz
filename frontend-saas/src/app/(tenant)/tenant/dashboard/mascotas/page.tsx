@@ -15,7 +15,8 @@ import {
     Activity,
     ChevronRight,
     Filter,
-    Flame
+    Flame,
+    X
 } from 'lucide-react';
 import SearchableSelect from '@/components/tenant/SearchableSelect';
 import { TableSkeleton, CardSkeleton } from '@/components/tenant/ui/Skeleton';
@@ -89,6 +90,8 @@ export default function PetsPage() {
     // Modal & Form States
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    // Móvil: el formulario de alta queda plegado para que la lista sea lo primero
+    const [showNewForm, setShowNewForm] = useState(false);
     const [currentPet, setCurrentPet] = useState<Partial<Pet> | null>(null);
     const [selectedImages, setSelectedImages] = useState<Blob[]>([]);
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -238,6 +241,7 @@ export default function PetsPage() {
             });
 
             setIsModalOpen(false);
+            setShowNewForm(false);
 
             if (!isEdit && saved?.id) {
                 setNextStepPet(saved);
@@ -346,10 +350,18 @@ export default function PetsPage() {
                     <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Gestión de Mascotas</h1>
                     <p className="text-muted-foreground mt-1 text-sm sm:text-base">Inscribe a la mascota para iniciar la atención o consulta el directorio histórico más abajo.</p>
                 </div>
+                <button
+                    type="button"
+                    onClick={() => setShowNewForm(v => !v)}
+                    className="lg:hidden inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-primary text-primary-foreground font-bold text-sm shadow-lg shadow-primary/20"
+                >
+                    {showNewForm ? <X size={18} /> : <Plus size={18} />}
+                    {showNewForm ? 'Cerrar formulario' : 'Nueva mascota'}
+                </button>
             </div>
 
-            {/* TOP SECTION: Formulario de Inscripción Directa de Mascota */}
-            <div className="glass-card rounded-3xl p-6 sm:p-8 border border-white/10 space-y-6">
+            {/* TOP SECTION: Formulario de Inscripción Directa de Mascota (en móvil, plegado tras "Nueva mascota") */}
+            <div className={`${showNewForm ? 'block' : 'hidden'} lg:block glass-card rounded-3xl p-5 sm:p-8 border border-white/10 space-y-6`}>
                 <div className="flex items-center justify-between border-b border-white/5 pb-4">
                     <div className="flex items-center gap-3">
                         <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20 text-primary">

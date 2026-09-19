@@ -117,3 +117,17 @@ class WeightPricing(Base):
     max_weight = Column(Float)
     price = Column(Float)
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
+
+class CatalogShareToken(Base):
+    __tablename__ = "inv_catalog_tokens"
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("sys_tenants.id"), nullable=False, index=True)
+    token = Column(String(64), unique=True, index=True, nullable=False)
+    name = Column(String(100), nullable=True) # opcional: etiqueta o nombre del cliente
+    expires_at = Column(DateTime(timezone=True), nullable=True) # None = sin vencimiento
+    is_active = Column(Boolean, default=True)
+    views_count = Column(Integer, default=0)
+    last_viewed_at = Column(DateTime(timezone=True), nullable=True)
+    created_by = Column(Integer, ForeignKey("sys_users.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=tz.get_now)
+

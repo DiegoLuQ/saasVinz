@@ -104,7 +104,8 @@ export function mapCremationToFormState(
         pickup_region: normalizeRegion(cremationData.pickup_region),
         pickup_city: cremationData.pickup_city || '',
         pickup_address: cremationData.pickup_address || '',
-        partner_id: cremationData.partner_id || undefined,
+        partner_id: cremationData.partner_link_id || cremationData.partner_id || undefined,
+        partner_link_id: cremationData.partner_link_id || cremationData.partner_id || undefined,
         images:
             cremationData.images && cremationData.images.length > 0
                 ? cremationData.images

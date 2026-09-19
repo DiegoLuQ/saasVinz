@@ -61,6 +61,9 @@ export interface Cremation {
     weight?: number;
     weight_price?: number;
     partner_id?: number;
+    partner_link_id?: number;
+    partner_name?: string;
+    partner_link?: any;
     partner?: {
         id: number;
         nombre_clinica: string;

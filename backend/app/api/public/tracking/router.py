@@ -187,7 +187,9 @@ def get_tracking_info(
             tenant_name=tenant.name,
             tenant_logo=tenant.logo_url,
             pet_dedication=pet_data.get("dedication"),
-            farewell_template_config=farewell_tpl.config if farewell_tpl else None
+            farewell_template_config=farewell_tpl.config if farewell_tpl else None,
+            is_ultra_plan="ULTRA" in ((getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper()),
+            tenant_plan=(getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper()
         )
 
     # 3. Validar Nombre de Mascota (Seguridad Adicional + UX)
@@ -292,7 +294,9 @@ def get_tracking_info(
         tenant_name=tenant.name,
         tenant_logo=tenant.logo_url,
         pet_dedication=getattr(pet, "dedication", None) or getattr(pet, "notes", None),
-        farewell_template_config=farewell_tpl.config if farewell_tpl else None
+        farewell_template_config=farewell_tpl.config if farewell_tpl else None,
+        is_ultra_plan="ULTRA" in ((getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper()),
+        tenant_plan=(getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper()
     )
 
 

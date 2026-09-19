@@ -132,6 +132,16 @@ class CremationOC(Base):
     def pet_image_url(self):
         return self.pet.image_url if self.pet else None
 
+    @property
+    def partner(self):
+        return self.partner_link
+
+    @property
+    def partner_name(self):
+        if self.partner_link and getattr(self.partner_link, 'veterinary', None):
+            return self.partner_link.veterinary.name
+        return None
+
 Cremation = CremationOC # Alias
 
 class CremationTechnical(Base):
@@ -250,6 +260,9 @@ class CertificateTemplate(Base):
     sections_config = Column(JSON, nullable=True) # Dictionary for visibility and labels
     sections_order = Column(JSON, nullable=True) # List of keys in order
     is_default = Column(Boolean, default=False)
+    # Exclusiva: diseñada por el admin para UN tenant (tenant_id fijado). El
+    # tenant la usa y puede elegirla como predeterminada, pero solo el admin la edita.
+    is_locked = Column(Boolean, nullable=False, default=False, server_default="false")
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
 
 class LogisticsTask(Base):
