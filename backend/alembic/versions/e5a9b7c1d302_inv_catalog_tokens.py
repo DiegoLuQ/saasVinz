@@ -40,20 +40,17 @@ def upgrade() -> None:
         CREATE INDEX IF NOT EXISTS ix_inv_catalog_tokens_id ON inv_catalog_tokens(id);
         ALTER TABLE inv_catalog_tokens ENABLE ROW LEVEL SECURITY;
         ALTER TABLE inv_catalog_tokens FORCE ROW LEVEL SECURITY;
-        DO $$
-        BEGIN
-            IF NOT EXISTS (
-                SELECT 1 FROM pg_policies 
-                WHERE tablename = 'inv_catalog_tokens' AND policyname = 'tenant_isolation_policy'
-            ) THEN
-                CREATE POLICY tenant_isolation_policy ON inv_catalog_tokens
-                    FOR ALL
-                    USING (
-                        tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::integer
-                        OR current_setting('app.bypass_rls', true) = 'on'
-                    );
-            END IF;
-        END $$;
+        DROP POLICY IF EXISTS tenant_isolation_policy ON inv_catalog_tokens;
+        CREATE POLICY tenant_isolation_policy ON inv_catalog_tokens
+            FOR ALL
+            USING (
+                (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::integer)
+                OR (current_setting('app.bypass_rls', true) IN ('true', 'on', '1'))
+            )
+            WITH CHECK (
+                (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::integer)
+                OR (current_setting('app.bypass_rls', true) IN ('true', 'on', '1'))
+            );
     """)
     _grant_to_app_role()
 

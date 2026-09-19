@@ -17,10 +17,17 @@ router = APIRouter()
 @router.get("", response_model=List[schemas.CatalogShareTokenInDB])
 def list_catalog_share_links(
     tenant_id: int = Depends(get_tenant_id),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
     _: bool = Depends(check_permission("inventario", "view")),
 ):
     """Lista todos los enlaces de catálogo compartidos del tenant."""
+    from app.core.tenant_context import apply_tenant_rls, apply_bypass_rls
+    if current_user.role in ("creator", models.UserRole.creator):
+        apply_bypass_rls(db)
+    else:
+        apply_tenant_rls(db, tenant_id)
+
     tokens = (
         db.query(CatalogShareToken)
         .filter(CatalogShareToken.tenant_id == tenant_id)
@@ -61,6 +68,12 @@ def create_catalog_share_link(
     _: bool = Depends(check_permission("inventario", "create")),
 ):
     """Genera un nuevo token de catálogo para compartir con clientes."""
+    from app.core.tenant_context import apply_tenant_rls, apply_bypass_rls
+    if current_user.role in ("creator", models.UserRole.creator):
+        apply_bypass_rls(db)
+    else:
+        apply_tenant_rls(db, tenant_id)
+
     now = tz.get_now()
     expires_at = None
 
@@ -102,10 +115,17 @@ def create_catalog_share_link(
 def delete_catalog_share_link(
     token_id: int,
     tenant_id: int = Depends(get_tenant_id),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
     _: bool = Depends(check_permission("inventario", "delete")),
 ):
     """Revoca y elimina un enlace de catálogo."""
+    from app.core.tenant_context import apply_tenant_rls, apply_bypass_rls
+    if current_user.role in ("creator", models.UserRole.creator):
+        apply_bypass_rls(db)
+    else:
+        apply_tenant_rls(db, tenant_id)
+
     item = (
         db.query(CatalogShareToken)
         .filter(
