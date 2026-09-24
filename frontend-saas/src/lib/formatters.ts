@@ -1,7 +1,7 @@
 export const formatRut = (rut: string): string => {
     if (!rut) return '';
-    // Clean RUT
-    const value = rut.replace(/[^0-9kK]/g, '');
+    // Clean RUT (max 9 chars: 8 body + 1 dv, e.g. 12.123.456-7)
+    const value = rut.replace(/[^0-9kK]/g, '').slice(0, 9);
     if (value.length < 2) return value;
 
     const body = value.slice(0, -1);

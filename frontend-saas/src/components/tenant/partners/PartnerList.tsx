@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { getMyPartners, getAvailablePartners, PartnerLink, VeterinaryBase } from '@/lib/tenant/api';
 import LinkVeterinaryModal from './LinkVeterinaryModal';
 import QuickCreatePartnerModal from './QuickCreatePartnerModal';
-import { Plus, RefreshCw, Mail, Phone, MapPin, Search, Building2, Percent } from 'lucide-react';
+import PartnerPortalModal from './PartnerPortalModal';
+import EditPartnerModal from './EditPartnerModal';
+import { Plus, RefreshCw, Mail, Phone, MapPin, Search, Building2, Percent, KeyRound, Pencil } from 'lucide-react';
 import { useCurrentTenant } from '@/hooks/useSessionBootstrap';
 
 export default function PartnerList() {
@@ -15,6 +17,8 @@ export default function PartnerList() {
     const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
     const [isQuickCreateModalOpen, setIsQuickCreateModalOpen] = useState(false);
     const [selectedVetToInvite, setSelectedVetToInvite] = useState<VeterinaryBase | null>(null);
+    const [selectedLinkForPortal, setSelectedLinkForPortal] = useState<PartnerLink | null>(null);
+    const [selectedLinkForEdit, setSelectedLinkForEdit] = useState<PartnerLink | null>(null);
 
     // Auto-filter by Tenant Location
     const tenant = useCurrentTenant();
@@ -140,12 +144,14 @@ export default function PartnerList() {
                                         <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Comisión</th>
                                         <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Ubicación</th>
                                         <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Estado</th>
+                                        <th scope="col" className="px-6 py-4 text-center text-xs font-bold text-gray-400 uppercase tracking-wider">Editar</th>
+                                        <th scope="col" className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
                                     {filteredLinks.length === 0 ? (
                                         <tr>
-                                            <td colSpan={5} className="px-6 py-12 text-center text-gray-500 italic">
+                                            <td colSpan={7} className="px-6 py-12 text-center text-gray-500 italic">
                                                 No tienes convenios con veterinarias registrados todavía.
                                                 <br />
                                                 <button
@@ -166,7 +172,7 @@ export default function PartnerList() {
                                                 <td className="px-6 py-5 whitespace-nowrap text-sm">
                                                     <div className="flex flex-col space-y-1.5">
                                                         {link.veterinary.email && (
-                                                            <div className="flex items-center text-gray-400">
+                                                             <div className="flex items-center text-gray-400">
                                                                 <Mail className="w-3.5 h-3.5 mr-2 text-sky-500/70" />
                                                                 {link.veterinary.email}
                                                             </div>
@@ -186,11 +192,38 @@ export default function PartnerList() {
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-5 whitespace-nowrap text-sm">
-                                                    <div className="font-medium text-gray-300">{link.veterinary.city || '-'}</div>
-                                                    <div className="text-xs text-gray-500">{link.veterinary.region || ''}</div>
+                                                    <div className="font-medium text-gray-300">
+                                                        {link.veterinary.city || '-'}
+                                                        {link.veterinary.region ? <span className="text-xs text-indigo-400 font-semibold block">{link.veterinary.region}</span> : null}
+                                                    </div>
+                                                    {link.veterinary.address && <div className="text-xs text-gray-500 mt-0.5">{link.veterinary.address}</div>}
                                                 </td>
                                                 <td className="px-6 py-5 whitespace-nowrap">
                                                     {getStatusBadge(link.status)}
+                                                </td>
+                                                <td className="px-6 py-5 whitespace-nowrap text-center">
+                                                    <button
+                                                        onClick={() => setSelectedLinkForEdit(link)}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 hover:border-indigo-500/50 text-indigo-300 hover:text-white font-bold text-xs transition-all active:scale-95 shadow-sm"
+                                                        title="Editar datos y condiciones del partner"
+                                                    >
+                                                        <Pencil size={13} />
+                                                        <span>Editar Partner</span>
+                                                    </button>
+                                                </td>
+                                                <td className="px-6 py-5 whitespace-nowrap text-right">
+                                                    {link.status === 'active' ? (
+                                                        <button
+                                                            onClick={() => setSelectedLinkForPortal(link)}
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 border border-primary/20 hover:border-primary/30 text-primary font-bold text-xs transition-all active:scale-95 shadow-sm"
+                                                            title="Ver credenciales y enlace del portal para la veterinaria"
+                                                        >
+                                                            <KeyRound size={14} />
+                                                            <span>Portal Privado</span>
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground/40 italic">No disponible</span>
+                                                    )}
                                                 </td>
                                             </tr>
                                         ))
@@ -267,6 +300,21 @@ export default function PartnerList() {
                     setSelectedVetToInvite(null);
                 }}
                 preSelectedVet={selectedVetToInvite}
+                onSuccess={() => {
+                    loadLinks();
+                }}
+            />
+
+            <PartnerPortalModal
+                isOpen={!!selectedLinkForPortal}
+                onClose={() => setSelectedLinkForPortal(null)}
+                partnerLink={selectedLinkForPortal}
+            />
+
+            <EditPartnerModal
+                isOpen={!!selectedLinkForEdit}
+                onClose={() => setSelectedLinkForEdit(null)}
+                partnerLink={selectedLinkForEdit}
                 onSuccess={() => {
                     loadLinks();
                 }}

@@ -76,6 +76,11 @@ class PartnerLinkV2(Base):
     
     # Optional Bank Override
     bank_data_override = Column(JSON, nullable=True)
+
+    # Portal Privado para la Veterinaria (Token Permanente + PIN)
+    access_token = Column(String(64), unique=True, index=True, nullable=True)
+    access_pin = Column(String(10), nullable=True)
+    token_generated_at = Column(DateTime(timezone=True), nullable=True)
     
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
     updated_at = Column(DateTime(timezone=True), default=tz.get_now, onupdate=tz.get_now)

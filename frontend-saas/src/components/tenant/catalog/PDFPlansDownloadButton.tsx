@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import { PDFDownloadLink } from '@react-pdf/renderer';
+import React, { useState } from 'react';
+import { pdf } from '@react-pdf/renderer';
 import { Download, Loader2 } from 'lucide-react';
 import PlansPDF from './PlansPDF';
 import { webpUrlToPngDataUri } from '@/lib/tenant/imageToPngBase64';
@@ -44,115 +44,103 @@ interface PDFPlansDownloadButtonProps {
 
 export default function PDFPlansDownloadButton({ plans, tenantName, logoUrl, filename, showPrices = true }: PDFPlansDownloadButtonProps) {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const [convertedLogoUrl, setConvertedLogoUrl] = useState<string | null>(null);
-    const [convertedPlans, setConvertedPlans] = useState<CatalogPlan[]>([]);
-    const [isConverting, setIsConverting] = useState(true);
+    const [isGenerating, setIsGenerating] = useState(false);
 
-    const getAbsoluteUrl = React.useCallback((url?: string | null) => {
+    const getAbsoluteUrl = (url?: string | null) => {
         if (!url) return null;
         if (url.startsWith('http') || url.startsWith('data:') || url.startsWith('blob:')) return url;
         const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
         return `${backendUrl}${url.startsWith('/') ? '' : '/'}${url}`;
-    }, []);
+    };
 
-    useEffect(() => {
-        let cancelled = false;
+    const handleDownload = async () => {
+        if (isGenerating) return;
+        setIsGenerating(true);
 
-        async function convertImages() {
-            setIsConverting(true);
-
-            // 1. Convertir Logo
+        try {
             const absLogoUrl = getAbsoluteUrl(logoUrl);
-            let logoResult: string | null = null;
 
-            if (absLogoUrl) {
-                const proxyLogoUrl = (absLogoUrl.startsWith('data:') || absLogoUrl.startsWith('blob:')) 
-                    ? absLogoUrl 
-                    : `/api/image-proxy?url=${encodeURIComponent(absLogoUrl)}`;
-                try {
-                    logoResult = await webpUrlToPngDataUri(proxyLogoUrl);
-                } catch (e: any) {
-                    console.error("Logo conversion error", e);
-                    logoResult = absLogoUrl;
-                }
-            }
-
-            // 2. Convertir imágenes de los planes
+            // 1. Convertir imágenes de planes a PNG solo al hacer clic
             const processedPlans = await Promise.all(
                 plans.map(async (plan) => {
                     if (!plan.image_url) return plan;
-                    const absPlanImgUrl = getAbsoluteUrl(plan.image_url);
-                    if (!absPlanImgUrl) return plan;
+                    const absUrl = getAbsoluteUrl(plan.image_url);
+                    if (!absUrl) return plan;
 
-                    const proxyPlanImgUrl = (absPlanImgUrl.startsWith('data:') || absPlanImgUrl.startsWith('blob:'))
-                        ? absPlanImgUrl
-                        : `/api/image-proxy?url=${encodeURIComponent(absPlanImgUrl)}`;
+                    const proxyUrl = (absUrl.startsWith('data:') || absUrl.startsWith('blob:'))
+                        ? absUrl
+                        : `/api/image-proxy?url=${encodeURIComponent(absUrl)}`;
+
                     try {
-                        const planImgResult = await webpUrlToPngDataUri(proxyPlanImgUrl);
-                        return { ...plan, image_url: planImgResult };
+                        const png = await webpUrlToPngDataUri(proxyUrl);
+                        return { ...plan, image_url: png };
                     } catch (e: any) {
-                        console.error(`Error converting image for plan ${plan.name}`, e);
-                        return plan;
+                        return { ...plan, image_url: null };
                     }
                 })
             );
 
-            if (!cancelled) {
-                setConvertedLogoUrl(logoResult);
-                setConvertedPlans(processedPlans);
-                setIsConverting(false);
+            // 2. Convertir logo
+            let logoResult: string | null = null;
+            if (absLogoUrl) {
+                const proxyLogoUrl = (absLogoUrl.startsWith('data:') || absLogoUrl.startsWith('blob:'))
+                    ? absLogoUrl
+                    : `/api/image-proxy?url=${encodeURIComponent(absLogoUrl)}`;
+                try {
+                    logoResult = await webpUrlToPngDataUri(proxyLogoUrl);
+                } catch (e: any) {
+                    logoResult = absLogoUrl;
+                }
             }
-        }
 
-        convertImages();
-
-        return () => { cancelled = true; };
-    }, [logoUrl, plans, getAbsoluteUrl]);
-
-    const cacheKey = React.useMemo(() => {
-        return `${plans.map(p => `${p.id}-${p.is_active}`).join(',')}-${showPrices}`;
-    }, [plans, showPrices]);
-
-    const displayLogo = convertedLogoUrl !== null ? convertedLogoUrl : logoUrl;
-
-    if (isConverting) {
-        return (
-            <button
-                disabled
-                className="bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold py-2.5 px-5 rounded-2xl flex items-center shadow-lg shadow-amber-500/20 text-sm opacity-70 cursor-not-allowed"
-            >
-                <Loader2 className="animate-spin mr-2" size={16} />
-                Preparando imágenes...
-            </button>
-        );
-    }
-
-    return (
-        <PDFDownloadLink
-            key={cacheKey}
-            document={
+            // 3. Generar el documento PDF solo al hacer clic
+            const doc = (
                 <PlansPDF
-                    plans={convertedPlans}
+                    plans={processedPlans}
                     tenantName={tenantName}
-                    logoUrl={displayLogo}
+                    logoUrl={logoResult}
                     origin={origin}
                     showPrices={showPrices}
                 />
-            }
-            fileName={filename}
+            ) as any;
+
+            const blob = await pdf(doc).toBlob();
+
+            // 4. Disparar descarga en el navegador
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Error generando PDF de planes:', error);
+            alert('Hubo un error al generar el PDF. Por favor intenta nuevamente.');
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    return (
+        <button
+            onClick={handleDownload}
+            disabled={isGenerating}
+            className="bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold py-2.5 px-5 rounded-2xl flex items-center shadow-lg shadow-amber-500/20 hover:shadow-amber-500/30 active:scale-95 transition-all text-sm disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
+            title="Descargar catálogo de servicios en PDF"
         >
-            {({ loading }) => (
-                <button
-                    className="bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold py-2.5 px-5 rounded-2xl flex items-center shadow-lg shadow-amber-500/20 hover:shadow-amber-500/30 active:scale-95 transition-all text-sm disabled:opacity-50"
-                >
-                    {loading ? (
-                        <Loader2 className="animate-spin mr-2" size={16} />
-                    ) : (
-                        <Download className="mr-2" size={16} />
-                    )}
-                    {loading ? 'Generando...' : 'Descargar PDF'}
-                </button>
+            {isGenerating ? (
+                <>
+                    <Loader2 className="animate-spin mr-2" size={16} />
+                    <span>Generando PDF...</span>
+                </>
+            ) : (
+                <>
+                    <Download className="mr-2" size={16} />
+                    <span>Descargar PDF</span>
+                </>
             )}
-        </PDFDownloadLink>
+        </button>
     );
 }

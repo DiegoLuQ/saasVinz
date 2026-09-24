@@ -17,7 +17,9 @@ import {
     AlertCircle,
     CheckCircle2,
     Database,
-    MessageCircle
+    MessageCircle,
+    Store,
+    Globe
 } from 'lucide-react';
 import { formatChileDate, formatChileTime } from '@/lib/dates';
 
@@ -38,8 +40,30 @@ export default function NotificationDetailModal({
 }: NotificationDetailModalProps) {
     if (!notification) return null;
 
-    const getTypeConfig = (type: string) => {
-        const t = type?.toLowerCase();
+    const getTypeConfig = (notif: any) => {
+        const t = notif?.type?.toLowerCase();
+        const isVet = notif?.data?.origin === 'veterinaria' ||
+            Boolean(notif?.data?.partner_name) ||
+            (notif?.message && (notif.message.toLowerCase().includes('derivó') || notif.message.toLowerCase().includes('veterinaria')));
+        const isWebForm = (t === 'new_submission' || notif?.data?.origin === 'web_crematorio') && !isVet;
+
+        if (isVet) {
+            const partnerName = notif?.data?.partner_name || (notif?.message?.match(/^(.*?)\s+derivó/)?.[1] || '');
+            return {
+                label: partnerName ? `Veterinaria: ${partnerName}` : 'Derivación Veterinaria',
+                icon: Store,
+                color: 'text-indigo-400',
+                bg: 'bg-indigo-500/10',
+                border: 'border-indigo-500/30'
+            };
+        }
+        if (isWebForm) return {
+            label: 'Web Crematorio',
+            icon: Globe,
+            color: 'text-emerald-400',
+            bg: 'bg-emerald-500/10',
+            border: 'border-emerald-500/30'
+        };
         if (t === 'new_submission') return {
             label: 'Nueva Solicitud',
             icon: Dog,
@@ -70,7 +94,7 @@ export default function NotificationDetailModal({
         };
     };
 
-    const config = getTypeConfig(notification.type);
+    const config = getTypeConfig(notification);
 
     // Format data keys for display
     const formatKey = (key: string) => {
@@ -103,7 +127,8 @@ export default function NotificationDetailModal({
                         <div className="p-8 lg:p-10 border-b border-white/5 relative">
                             <div className="flex justify-between items-start mb-6">
                                 <div className="flex items-center gap-3">
-                                    <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${config.bg} ${config.color} ${config.border}`}>
+                                    <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border flex items-center gap-1.5 ${config.bg} ${config.color} ${config.border}`}>
+                                        <config.icon size={12} />
                                         {config.label?.toUpperCase() || 'SISTEMA'}
                                     </div>
                                     {!notification.is_read && (

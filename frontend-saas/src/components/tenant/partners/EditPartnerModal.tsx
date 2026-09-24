@@ -1,21 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Modal from '../Modal';
-import { quickCreatePartner, QuickPartnerCreateData } from '@/lib/tenant/api';
+import { updatePartnerLink, PartnerLink, PartnerLinkUpdateData } from '@/lib/tenant/api';
 import { formatRut } from '@/lib/formatters';
-import { Building2, Percent, Phone, Mail, MapPin, Hash, CheckCircle2, Loader2, Navigation, Globe } from 'lucide-react';
+import { Building2, Percent, Phone, Mail, MapPin, Hash, CheckCircle2, Loader2, Navigation, Activity, Globe } from 'lucide-react';
 import { SOUTH_AMERICA_COUNTRIES, CHILE_REGIONS_COMUNAS } from '@/lib/geo-data';
 
-interface QuickCreatePartnerModalProps {
+interface EditPartnerModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    partnerLink: PartnerLink | null;
 }
 
-export default function QuickCreatePartnerModal({ isOpen, onClose, onSuccess }: QuickCreatePartnerModalProps) {
+export default function EditPartnerModal({ isOpen, onClose, onSuccess, partnerLink }: EditPartnerModalProps) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const [form, setForm] = useState<QuickPartnerCreateData>({
+    const [form, setForm] = useState<PartnerLinkUpdateData>({
         name: '',
         rut: '',
         phone: '',
@@ -26,10 +27,29 @@ export default function QuickCreatePartnerModal({ isOpen, onClose, onSuccess }: 
         country: 'Chile',
         tipo_comision: 'porcentaje',
         porcentaje_comision: 10,
-        monto_comision: 0,
+        status: 'active',
     });
 
-    const handleChange = (field: keyof QuickPartnerCreateData, value: any) => {
+    useEffect(() => {
+        if (partnerLink) {
+            setForm({
+                name: partnerLink.veterinary?.name || '',
+                rut: partnerLink.veterinary?.rut || '',
+                phone: partnerLink.veterinary?.phone || '',
+                email: partnerLink.veterinary?.email || '',
+                address: partnerLink.veterinary?.address || '',
+                city: partnerLink.veterinary?.city || '',
+                region: partnerLink.veterinary?.region || 'Metropolitana de Santiago',
+                country: partnerLink.veterinary?.country || 'Chile',
+                tipo_comision: partnerLink.tipo_comision || 'porcentaje',
+                porcentaje_comision: partnerLink.porcentaje_comision ?? 0,
+                status: partnerLink.status || 'active',
+            });
+            setError(null);
+        }
+    }, [partnerLink, isOpen]);
+
+    const handleChange = (field: keyof PartnerLinkUpdateData, value: any) => {
         setForm(prev => ({ ...prev, [field]: value }));
     };
 
@@ -40,7 +60,9 @@ export default function QuickCreatePartnerModal({ isOpen, onClose, onSuccess }: 
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!form.name.trim()) {
+        if (!partnerLink) return;
+
+        if (!form.name?.trim()) {
             setError('El nombre de la veterinaria es obligatorio.');
             return;
         }
@@ -49,7 +71,7 @@ export default function QuickCreatePartnerModal({ isOpen, onClose, onSuccess }: 
         setError(null);
 
         try {
-            await quickCreatePartner({
+            await updatePartnerLink(partnerLink.id, {
                 ...form,
                 name: form.name.trim(),
                 rut: form.rut?.trim() || undefined,
@@ -60,33 +82,22 @@ export default function QuickCreatePartnerModal({ isOpen, onClose, onSuccess }: 
                 region: form.region?.trim() || undefined,
                 country: form.country?.trim() || 'Chile',
                 porcentaje_comision: Number(form.porcentaje_comision) || 0,
+                status: form.status,
             });
 
             onSuccess();
             onClose();
-            // Reset
-            setForm({
-                name: '',
-                rut: '',
-                phone: '',
-                email: '',
-                address: '',
-                city: '',
-                region: 'Metropolitana de Santiago',
-                country: 'Chile',
-                tipo_comision: 'porcentaje',
-                porcentaje_comision: 10,
-                monto_comision: 0,
-            });
         } catch (err: any) {
-            setError(err.message || 'Error al registrar veterinaria');
+            setError(err.message || 'Error al actualizar el partner');
         } finally {
             setLoading(false);
         }
     };
 
+    if (!partnerLink) return null;
+
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Registrar Nueva Veterinaria / Partner">
+        <Modal isOpen={isOpen} onClose={onClose} title="Editar Datos del Partner">
             <form onSubmit={handleSubmit} className="space-y-4 pt-2">
                 {error && (
                     <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-xs">
@@ -94,6 +105,7 @@ export default function QuickCreatePartnerModal({ isOpen, onClose, onSuccess }: 
                     </div>
                 )}
 
+                {/* Nombre de la Veterinaria */}
                 <div>
                     <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-1.5">
                         Nombre de la Veterinaria o Clínica *
@@ -104,13 +116,14 @@ export default function QuickCreatePartnerModal({ isOpen, onClose, onSuccess }: 
                             type="text"
                             required
                             placeholder="Ej: Clínica Veterinaria San Patricio"
-                            value={form.name}
+                            value={form.name || ''}
                             onChange={(e) => handleChange('name', e.target.value)}
                             className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm focus:border-indigo-500 focus:outline-none transition-all placeholder:text-gray-600"
                         />
                     </div>
                 </div>
 
+                {/* RUT y Teléfono */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-1.5">
@@ -281,38 +294,51 @@ export default function QuickCreatePartnerModal({ isOpen, onClose, onSuccess }: 
                     </div>
                 </div>
 
-                {/* Comisión pactada */}
-                <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl space-y-3">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                            <Percent size={15} /> Comisión Pactada del Crematorio
-                        </span>
-                        <span className="text-[11px] text-emerald-300 font-medium">Exclusivo de tu crematorio</span>
+                {/* Comisión y Estado */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Comisión pactada */}
+                    <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl space-y-2">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <Percent size={14} /> Comisión (%)
+                            </span>
+                        </div>
+                        <div className="relative">
+                            <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.5"
+                                value={form.porcentaje_comision ?? 0}
+                                onChange={(e) => handleChange('porcentaje_comision', e.target.value)}
+                                className="w-full px-4 py-2 bg-black/40 border border-emerald-500/30 rounded-xl text-emerald-300 font-black text-base outline-none focus:ring-2 focus:ring-emerald-400"
+                            />
+                            <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-emerald-500 font-bold text-sm">%</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400">Porcentaje aplicado por orden derivada.</p>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <div className="flex-1">
-                            <label className="block text-xs text-gray-400 mb-1">Porcentaje sobre la orden (%)</label>
-                            <div className="relative">
-                                <input
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    step="0.5"
-                                    value={form.porcentaje_comision}
-                                    onChange={(e) => handleChange('porcentaje_comision', e.target.value)}
-                                    className="w-full px-4 py-2 bg-black/40 border border-emerald-500/30 rounded-xl text-emerald-300 font-black text-base outline-none focus:ring-2 focus:ring-emerald-400"
-                                />
-                                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-emerald-500 font-bold text-sm">%</span>
-                            </div>
+                    {/* Estado del Vínculo */}
+                    <div className="p-4 bg-white/5 border border-white/10 rounded-2xl space-y-2">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                                <Activity size={14} className="text-indigo-400" /> Estado del Vínculo
+                            </span>
                         </div>
-
-                        <div className="text-xs text-gray-400 max-w-[200px] pt-4">
-                            Se aplicará automáticamente a todas las órdenes derivadas por este partner.
-                        </div>
+                        <select
+                            value={form.status || 'active'}
+                            onChange={(e) => handleChange('status', e.target.value)}
+                            className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-white font-medium text-sm outline-none focus:border-indigo-500 transition-all cursor-pointer"
+                        >
+                            <option value="active" className="bg-[#0f172a] text-emerald-400">Activo (Habilitado)</option>
+                            <option value="pending" className="bg-[#0f172a] text-amber-400">Pendiente</option>
+                            <option value="rejected" className="bg-[#0f172a] text-rose-400">Rechazado / Pausado</option>
+                        </select>
+                        <p className="text-[10px] text-gray-400">Controla si el partner puede registrar y ver órdenes.</p>
                     </div>
                 </div>
 
+                {/* Botones de acción */}
                 <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
                     <button
                         type="button"
@@ -324,10 +350,10 @@ export default function QuickCreatePartnerModal({ isOpen, onClose, onSuccess }: 
                     <button
                         type="submit"
                         disabled={loading}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider text-white bg-emerald-600 hover:bg-emerald-500 active:scale-95 disabled:opacity-50 transition-all shadow-lg shadow-emerald-900/30"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider text-white bg-indigo-600 hover:bg-indigo-500 active:scale-95 disabled:opacity-50 transition-all shadow-lg shadow-indigo-900/30"
                     >
                         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                        Guardar Convenio
+                        Guardar Cambios
                     </button>
                 </div>
             </form>

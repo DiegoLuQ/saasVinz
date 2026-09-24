@@ -23,7 +23,7 @@ export default async function middleware(req: NextRequest) {
     const rootDomainEnv = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000';
     const memorialDomain = process.env.NEXT_PUBLIC_MEMORIAL_DOMAIN;
 
-    let currentHost: 'admin' | 'app' | 'veterinary' | 'memorial' | 'track' | 'catalogo' | 'invalid' | undefined;
+    let currentHost: 'admin' | 'app' | 'veterinary' | 'memorial' | 'track' | 'catalogo' | 'partner' | 'invalid' | undefined;
     const isLocal = hostname?.includes('lvh.me') || hostname?.includes('localhost');
     let effectiveRoot = isLocal
         ? (hostname?.includes('lvh.me') ? 'lvh.me:3000' : 'localhost:3000')
@@ -38,6 +38,8 @@ export default async function middleware(req: NextRequest) {
             currentHost = 'track';
         } else if (hostname.startsWith('catalogo.')) {
             currentHost = 'catalogo';
+        } else if (hostname.startsWith('partner.')) {
+            currentHost = 'partner';
         } else {
             if (hostname === effectiveRoot || hostname === `www.${effectiveRoot}`) {
                 currentHost = undefined;
@@ -57,9 +59,31 @@ export default async function middleware(req: NextRequest) {
         console.log(`[Middleware] Host: ${hostname} | Detected: ${currentHost ?? 'root'} | Path: ${url.pathname}`);
     }
 
-    // Pasar de largo: API y memoriales públicos
-    if (url.pathname.startsWith('/memorials') || url.pathname.startsWith('/api')) {
+    // Portal privado de veterinaria aliada:
+    // Soporta formato estructurado /:tenant_slug/:partner_slug/portal-veterinaria/:token
+    // y lo reescribe internamente a /portal-veterinaria/:token manteniendo la URL visible
+    if (url.pathname.includes('/portal-veterinaria/')) {
+        const segments = url.pathname.split('/').filter(Boolean);
+        const portalIdx = segments.indexOf('portal-veterinaria');
+        if (portalIdx !== -1 && segments[portalIdx + 1]) {
+            const token = segments[portalIdx + 1];
+            url.pathname = `/portal-veterinaria/${token}`;
+            return NextResponse.rewrite(url);
+        }
         return NextResponse.next();
+    }
+
+    // Pasar de largo: API, memoriales públicos y portal de veterinaria
+    if (url.pathname.startsWith('/memorials') || url.pathname.startsWith('/api') || url.pathname.startsWith('/portal-veterinaria')) {
+        return NextResponse.next();
+    }
+
+    // Subdominio partner: exclusivo para el portal de veterinarias aliadas.
+    // Cualquier otra ruta (como la raíz / o enlaces sin portal) redirige al dominio principal
+    if (currentHost === 'partner') {
+        const rootUrl = new URL('/', req.url);
+        rootUrl.host = effectiveRoot;
+        return NextResponse.redirect(rootUrl);
     }
 
     // Subdomain no soportado -> redirect a root

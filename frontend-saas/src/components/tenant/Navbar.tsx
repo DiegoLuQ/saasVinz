@@ -20,6 +20,7 @@ import {
     Link2,
     Clock,
     Globe,
+    Store,
     ShieldCheck
 } from 'lucide-react';
 import Modal from '@/components/tenant/Modal';
@@ -361,11 +362,11 @@ export default function Navbar() {
                         </AnimatePresence>
                     </div>
 
-                    {/* Share Link Button — hidden on smallest screens */}
+                    {/* Share Link Button */}
                     {(userData?.role === 'admin' || userData?.role === 'recepcion' || userData?.role === 'creator') && !isRegistrarBloqueado && (
                         <button
                             onClick={handleShareLink}
-                            className="hidden sm:inline-flex p-2.5 sm:p-3 rounded-full hover:bg-foreground/5 text-muted-foreground hover:text-primary transition-colors relative"
+                            className="inline-flex p-2.5 sm:p-3 rounded-full hover:bg-foreground/5 text-muted-foreground hover:text-primary transition-colors relative"
                             title="Compartir enlace de formulario"
                             aria-label="Compartir enlace de formulario"
                         >
@@ -412,10 +413,42 @@ export default function Navbar() {
                                                             <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 flex-shrink-0 mt-1">
                                                                 <Bell size={18} />
                                                             </div>
-                                                            <div className="flex-1 min-w-0 space-y-1">
+                                                            <div className="flex-1 min-w-0 space-y-1.5">
                                                                 <p className="text-base font-bold truncate text-white group-hover:text-emerald-400 transition-colors">
                                                                     {n.title || 'Notificación del Sistema'}
                                                                 </p>
+
+                                                                {/* Badge de Origen: Formulario Web vs Veterinaria */}
+                                                                {(() => {
+                                                                    const isVet = n.data?.origin === 'veterinaria' ||
+                                                                        Boolean(n.data?.partner_name) ||
+                                                                        (n.message && (n.message.toLowerCase().includes('derivó') || n.message.toLowerCase().includes('veterinaria')));
+                                                                    const isWebForm = (n.type === 'new_submission' || n.data?.origin === 'web_crematorio') && !isVet;
+
+                                                                    if (isVet) {
+                                                                        const partnerName = n.data?.partner_name || (n.message?.match(/^(.*?)\s+derivó/)?.[1] || '');
+                                                                        return (
+                                                                            <div className="pt-0.5">
+                                                                                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                                                                                    <Store size={11} className="shrink-0" />
+                                                                                    <span>Veterinaria{partnerName ? `: ${partnerName}` : ''}</span>
+                                                                                </span>
+                                                                            </div>
+                                                                        );
+                                                                    }
+                                                                    if (isWebForm) {
+                                                                        return (
+                                                                            <div className="pt-0.5">
+                                                                                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                                                                                    <Globe size={11} className="shrink-0" />
+                                                                                    <span>Web Crematorio</span>
+                                                                                </span>
+                                                                            </div>
+                                                                        );
+                                                                    }
+                                                                    return null;
+                                                                })()}
+
                                                                 <p className="text-xs text-slate-400 leading-relaxed line-clamp-2">
                                                                     {n.message}
                                                                 </p>

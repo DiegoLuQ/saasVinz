@@ -21,7 +21,9 @@ import {
     Package,
     Flame,
     Star,
-    Shield
+    Shield,
+    Store,
+    Globe
 } from 'lucide-react';
 import { apiRequest, getImageUrl } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
@@ -39,6 +41,8 @@ interface SubmissionListItem {
     city?: string;
     status: string;
     created_at: string;
+    origin?: string;
+    partner_name?: string;
 }
 
 import { useInitialSubmissions } from '@/hooks/useSessionBootstrap';
@@ -119,7 +123,20 @@ export default function SubmissionsTable() {
                                         <User size={18} />
                                     </div>
                                     <div className="truncate">
-                                        <p className="font-bold text-sm truncate text-foreground">{sub.owner_name}</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="font-bold text-sm truncate text-foreground">{sub.owner_name}</p>
+                                            {sub.origin === 'veterinaria' || sub.partner_name ? (
+                                                <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 shrink-0">
+                                                    <Store size={10} className="shrink-0" />
+                                                    <span className="truncate max-w-[120px]">{sub.partner_name ? sub.partner_name : 'Veterinaria'}</span>
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shrink-0">
+                                                    <Globe size={10} className="shrink-0" />
+                                                    <span>Web Crematorio</span>
+                                                </span>
+                                            )}
+                                        </div>
                                         <div className="flex items-center text-[10px] text-muted-foreground gap-1">
                                             <Calendar size={8} />
                                             {sub.created_at}

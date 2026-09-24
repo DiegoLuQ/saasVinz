@@ -352,7 +352,6 @@ export default function SubmissionDetailPage() {
                                             <Store size={14} /> Partner Referido
                                         </p>
                                         <p className="text-base font-bold text-foreground mt-1">{submission.partner.name}</p>
-                                        <p className="text-[10px] text-muted-foreground font-mono mt-0.5">ID: {submission.partner.slug}</p>
                                     </div>
                                 )}
                                 <div>

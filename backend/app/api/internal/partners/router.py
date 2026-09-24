@@ -149,7 +149,7 @@ def quick_create_partner(
 
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     default_region = payload.region.strip() if payload.region else (tenant.region if tenant else None)
-    default_country = tenant.country if (tenant and tenant.country) else "Chile"
+    default_country = payload.country.strip() if payload.country else (tenant.country if (tenant and tenant.country) else "Chile")
 
     # Buscar si ya existe por RUT (si se provee) o por nombre exacto
     vet = None
@@ -184,13 +184,17 @@ def quick_create_partner(
         db.refresh(vet)
     else:
         # Completar datos faltantes en la veterinaria si no los tenía
-        if not vet.region and default_region:
+        if payload.region:
+            vet.region = payload.region.strip()
+        elif not vet.region and default_region:
             vet.region = default_region
-        if payload.address and not vet.address:
+        if payload.country:
+            vet.country = payload.country.strip()
+        if payload.address:
             vet.address = payload.address.strip()
-        if payload.city and not vet.city:
+        if payload.city:
             vet.city = payload.city.strip()
-        if payload.phone and not vet.phone:
+        if payload.phone:
             vet.phone = payload.phone.strip()
         db.commit()
         db.refresh(vet)
@@ -279,7 +283,7 @@ def update_partner_link(
     tenant_id: int = Depends(get_tenant_id),
     _perm: bool = Depends(check_permission("veterinarios", "edit"))
 ):
-    link = db.query(PartnerLink).filter(
+    link = db.query(PartnerLink).options(joinedload(PartnerLink.veterinary)).filter(
         PartnerLink.id == link_id,
         PartnerLink.tenant_id == tenant_id
     ).first()
@@ -287,13 +291,37 @@ def update_partner_link(
     if not link:
         raise HTTPException(status_code=404, detail="Vínculo no encontrado")
         
-    # Apply updates (Commission mainly)
+    # Apply updates (Commission)
     if update_data.tipo_comision:
         link.tipo_comision = update_data.tipo_comision
     if update_data.monto_comision is not None:
         link.monto_comision = update_data.monto_comision
     if update_data.porcentaje_comision is not None:
         link.porcentaje_comision = update_data.porcentaje_comision
+    if update_data.status:
+        try:
+            link.status = PartnerLinkStatus(update_data.status)
+        except ValueError:
+            pass
+
+    # Update linked veterinary details
+    if link.veterinary:
+        if update_data.name is not None and update_data.name.strip():
+            link.veterinary.name = update_data.name.strip()
+        if update_data.rut is not None:
+            link.veterinary.rut = update_data.rut.strip() if update_data.rut.strip() else None
+        if update_data.phone is not None:
+            link.veterinary.phone = update_data.phone.strip() if update_data.phone.strip() else None
+        if update_data.email is not None:
+            link.veterinary.email = update_data.email.strip() if update_data.email.strip() else None
+        if update_data.address is not None:
+            link.veterinary.address = update_data.address.strip() if update_data.address.strip() else None
+        if update_data.city is not None:
+            link.veterinary.city = update_data.city.strip() if update_data.city.strip() else None
+        if update_data.region is not None:
+            link.veterinary.region = update_data.region.strip() if update_data.region.strip() else None
+        if update_data.country is not None:
+            link.veterinary.country = update_data.country.strip() if update_data.country.strip() else "Chile"
         
     db.commit()
     db.refresh(link)
@@ -489,3 +517,91 @@ def unpay_commission(
     db.commit()
     db.refresh(comm)
     return _serialize_commission(comm)
+
+# ==========================================
+# 🔑 PARTNER PORTAL CREDENTIALS
+# ==========================================
+
+import secrets
+import random
+
+def _ensure_portal_credentials(link: PartnerLink, db: Session, force_regenerate: bool = False) -> tuple:
+    if force_regenerate or not link.access_token or not link.access_pin:
+        # Generar token URL-safe permanente y PIN numérico de 4 dígitos
+        link.access_token = secrets.token_urlsafe(24)
+        link.access_pin = f"{random.randint(1000, 9999)}"
+        link.token_generated_at = tz.get_now()
+        db.commit()
+        db.refresh(link)
+    return link.access_token, link.access_pin
+
+@router.get("/api/internal/partners/{link_id}/portal-access", response_model=schemas.PartnerPortalAccessResponse, tags=["Tenant - Partners"])
+def get_partner_portal_access(
+    link_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    _perm: bool = Depends(check_permission("veterinarios", "view"))
+):
+    link = db.query(PartnerLink).options(
+        joinedload(PartnerLink.veterinary),
+        joinedload(PartnerLink.tenant)
+    ).filter(
+        PartnerLink.id == link_id,
+        PartnerLink.tenant_id == tenant_id
+    ).first()
+    
+    if not link:
+        raise HTTPException(status_code=404, detail="Convenio no encontrado")
+        
+    token, pin = _ensure_portal_credentials(link, db, force_regenerate=False)
+    partner_name = link.veterinary.name if link.veterinary else "Veterinaria"
+    tenant_slug = link.tenant.slug if link.tenant else f"tenant-{tenant_id}"
+    partner_slug = link.veterinary.slug if (link.veterinary and link.veterinary.slug) else f"partner-{link.veterinary_id}"
+    portal_url = f"/{tenant_slug}/portal-veterinaria/{token}"
+    
+    return schemas.PartnerPortalAccessResponse(
+        link_id=link.id,
+        partner_name=partner_name,
+        tenant_slug=tenant_slug,
+        partner_slug=partner_slug,
+        access_token=token,
+        access_pin=pin,
+        portal_url=portal_url,
+        token_generated_at=link.token_generated_at
+    )
+
+@router.post("/api/internal/partners/{link_id}/portal-access/regenerate", response_model=schemas.PartnerPortalAccessResponse, tags=["Tenant - Partners"])
+def regenerate_partner_portal_access(
+    link_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    _perm: bool = Depends(check_permission("veterinarios", "edit"))
+):
+    link = db.query(PartnerLink).options(
+        joinedload(PartnerLink.veterinary),
+        joinedload(PartnerLink.tenant)
+    ).filter(
+        PartnerLink.id == link_id,
+        PartnerLink.tenant_id == tenant_id
+    ).first()
+    
+    if not link:
+        raise HTTPException(status_code=404, detail="Convenio no encontrado")
+        
+    token, pin = _ensure_portal_credentials(link, db, force_regenerate=True)
+    partner_name = link.veterinary.name if link.veterinary else "Veterinaria"
+    tenant_slug = link.tenant.slug if link.tenant else f"tenant-{tenant_id}"
+    partner_slug = link.veterinary.slug if (link.veterinary and link.veterinary.slug) else f"partner-{link.veterinary_id}"
+    portal_url = f"/{tenant_slug}/portal-veterinaria/{token}"
+    
+    return schemas.PartnerPortalAccessResponse(
+        link_id=link.id,
+        partner_name=partner_name,
+        tenant_slug=tenant_slug,
+        partner_slug=partner_slug,
+        access_token=token,
+        access_pin=pin,
+        portal_url=portal_url,
+        token_generated_at=link.token_generated_at
+    )
+

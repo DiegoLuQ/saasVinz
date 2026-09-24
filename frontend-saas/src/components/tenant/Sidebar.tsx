@@ -102,7 +102,6 @@ const navItems: NavItem[] = [
         children: [
             { name: 'Listado', href: '/dashboard/partners', icon: Store, featureKey: 'veterinarios:gestionar' },
             { name: 'Comisiones', href: '/dashboard/partners/comisiones', icon: DollarSign, featureKey: 'veterinarios:comisiones:ver' },
-            { name: 'Solicitudes', href: '/dashboard/partners/solicitudes', icon: FileText, featureKey: 'veterinarios:solicitudes' },
         ]
     },
     { name: 'Roles y Módulos', href: '/dashboard/roles-modulos', icon: ShieldCheck, moduleKey: 'configuracion', featureKey: 'configuracion:roles' }, // Nuevo
@@ -209,7 +208,7 @@ export default function Sidebar() {
                     // Desktop: always visible, never translated
                     "lg:translate-x-0",
                     // Width
-                    collapsed ? "w-[80px]" : "w-[260px]"
+                    collapsed ? "w-[80px]" : "w-[220px]"
                 )}
             >
                 {/* Logo Section */}

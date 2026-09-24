@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import { PDFDownloadLink } from '@react-pdf/renderer';
+import React, { useState } from 'react';
+import { pdf } from '@react-pdf/renderer';
 import { Download, Loader2 } from 'lucide-react';
 import CatalogPDF from './CatalogPDF';
 import { webpUrlToPngDataUri } from '@/lib/tenant/imageToPngBase64';
@@ -29,25 +29,23 @@ interface PDFDownloadButtonProps {
 
 export default function PDFDownloadButton({ products, tenantName, logoUrl, filename, showPrices = true }: PDFDownloadButtonProps) {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const [convertedProducts, setConvertedProducts] = useState<CatalogProduct[] | null>(null);
-    const [convertedLogoUrl, setConvertedLogoUrl] = useState<string | null>(null);
-    const [isConverting, setIsConverting] = useState(true);
+    const [isGenerating, setIsGenerating] = useState(false);
 
-    const getAbsoluteUrl = React.useCallback((url?: string | null) => {
+    const getAbsoluteUrl = (url?: string | null) => {
         if (!url) return null;
         if (url.startsWith('http') || url.startsWith('data:') || url.startsWith('blob:')) return url;
         return `${origin}${url.startsWith('/') ? '' : '/'}${url}`;
-    }, [origin]);
+    };
 
-    useEffect(() => {
-        let cancelled = false;
+    const handleDownload = async () => {
+        if (isGenerating) return;
+        setIsGenerating(true);
 
-        async function convertImages() {
-            setIsConverting(true);
-
+        try {
             const absLogoUrl = getAbsoluteUrl(logoUrl);
 
-            const results = await Promise.all(
+            // 1. Convertir imágenes de productos a PNG solo al hacer clic
+            const convertedProducts = await Promise.all(
                 products.map(async (product) => {
                     const base: CatalogProduct = {
                         id: product.id,
@@ -64,92 +62,81 @@ export default function PDFDownloadButton({ products, tenantName, logoUrl, filen
                     if (!product.image_url) return { ...base, image_url: null };
                     const absUrl = getAbsoluteUrl(product.image_url);
                     if (!absUrl) return { ...base, image_url: null };
-                    
-                    const proxyUrl = (absUrl.startsWith('data:') || absUrl.startsWith('blob:')) 
-                        ? absUrl 
+
+                    const proxyUrl = (absUrl.startsWith('data:') || absUrl.startsWith('blob:'))
+                        ? absUrl
                         : `/api/image-proxy?url=${encodeURIComponent(absUrl)}`;
-                    
+
                     try {
                         const png = await webpUrlToPngDataUri(proxyUrl);
                         return { ...base, image_url: png };
                     } catch (e: any) {
-                        // Append error to name for debugging in the PDF
-                        return { ...base, image_url: null, name: `${base.name} [ErrImg: ${e.message}]` };
+                        return { ...base, image_url: null };
                     }
                 })
             );
 
+            // 2. Convertir logo
             let logoResult: string | null = null;
             if (absLogoUrl) {
-                const proxyLogoUrl = (absLogoUrl.startsWith('data:') || absLogoUrl.startsWith('blob:')) 
-                    ? absLogoUrl 
+                const proxyLogoUrl = (absLogoUrl.startsWith('data:') || absLogoUrl.startsWith('blob:'))
+                    ? absLogoUrl
                     : `/api/image-proxy?url=${encodeURIComponent(absLogoUrl)}`;
                 try {
                     logoResult = await webpUrlToPngDataUri(proxyLogoUrl);
                 } catch (e: any) {
-                    console.error("Logo error", e);
                     logoResult = absLogoUrl;
                 }
             }
 
-            if (!cancelled) {
-                setConvertedProducts(results);
-                setConvertedLogoUrl(logoResult);
-                setIsConverting(false);
-            }
-        }
-
-        convertImages();
-
-        return () => { cancelled = true; };
-    }, [products, logoUrl, getAbsoluteUrl]);
-
-    const cacheKey = React.useMemo(() => {
-        return `${products.map(p => `${p.id}-${p.stock}-${p.availability_status}`).join(',')}-${showPrices}`;
-    }, [products, showPrices]);
-
-    const displayProducts = convertedProducts ?? products;
-    const displayLogo = convertedLogoUrl !== null ? convertedLogoUrl : logoUrl;
-
-    if (isConverting) {
-        return (
-            <button
-                disabled
-                className="bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold py-2.5 px-5 rounded-2xl flex items-center shadow-lg shadow-amber-500/20 text-sm opacity-70 cursor-not-allowed"
-            >
-                <Loader2 className="animate-spin mr-2" size={16} />
-                Preparando imágenes...
-            </button>
-        );
-    }
-
-    return (
-        <PDFDownloadLink
-            key={cacheKey}
-            document={
+            // 3. Generar el documento PDF solo al hacer clic
+            const doc = (
                 <CatalogPDF
-                    products={displayProducts}
+                    products={convertedProducts}
                     tenantName={tenantName}
-                    logoUrl={displayLogo}
+                    logoUrl={logoResult}
                     origin={origin}
                     showPrices={showPrices}
                 />
-            }
+            ) as any;
 
-            fileName={filename}
+            const blob = await pdf(doc).toBlob();
+
+            // 4. Disparar descarga en el navegador
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Error generando PDF de catálogo:', error);
+            alert('Hubo un error al generar el PDF. Por favor intenta nuevamente.');
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    return (
+        <button
+            onClick={handleDownload}
+            disabled={isGenerating}
+            className="bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold py-2.5 px-5 rounded-2xl flex items-center shadow-lg shadow-amber-500/20 hover:shadow-amber-500/30 active:scale-95 transition-all text-sm disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
+            title="Descargar catálogo en formato PDF"
         >
-            {({ loading }) => (
-                <button
-                    className="bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold py-2.5 px-5 rounded-2xl flex items-center shadow-lg shadow-amber-500/20 hover:shadow-amber-500/30 active:scale-95 transition-all text-sm disabled:opacity-50"
-                >
-                    {loading ? (
-                        <Loader2 className="animate-spin mr-2" size={16} />
-                    ) : (
-                        <Download className="mr-2" size={16} />
-                    )}
-                    {loading ? 'Generando...' : 'Descargar PDF'}
-                </button>
+            {isGenerating ? (
+                <>
+                    <Loader2 className="animate-spin mr-2" size={16} />
+                    <span>Generando PDF...</span>
+                </>
+            ) : (
+                <>
+                    <Download className="mr-2" size={16} />
+                    <span>Descargar PDF</span>
+                </>
             )}
-        </PDFDownloadLink>
+        </button>
     );
 }

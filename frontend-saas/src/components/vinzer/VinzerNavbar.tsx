@@ -103,10 +103,10 @@ export function VinzerNavbar({
 
     return (
         <>
-            <header className="fixed top-0 left-0 right-0 z-50 flex justify-center p-3 sm:p-5 transition-all duration-300 pointer-events-none">
+            <header className="fixed top-0 left-0 right-0 z-50 flex justify-center p-3 sm:p-4 transition-all duration-300 pointer-events-none">
                 <nav
                     aria-label="Navegación principal de Vinzer"
-                    className={`pointer-events-auto flex items-center justify-between gap-4 sm:gap-6 px-5 sm:px-8 py-2.5 sm:py-3.5 rounded-full border backdrop-blur-xl transition-all duration-500 max-w-[1320px] w-full ${
+                    className={`pointer-events-auto flex items-center justify-between gap-3 sm:gap-5 px-4 sm:px-6 py-2 sm:py-2.5 rounded-full border backdrop-blur-xl transition-all duration-500 max-w-[1020px] w-full ${
                         isScrolled ? 'shadow-2xl' : 'shadow-lg'
                     } ${
                         isLight
@@ -130,7 +130,7 @@ export function VinzerNavbar({
                     </div>
 
                     {/* Links de navegación Desktop */}
-                    <div className="hidden lg:flex items-center gap-7 xl:gap-9">
+                    <div className="hidden lg:flex items-center gap-5 xl:gap-7">
                         {/* Producto */}
                         <a
                             href="#producto"

@@ -54,6 +54,8 @@ class SubmissionListItem(BaseModel):
     city: str | None = None
     status: str
     created_at: str
+    origin: str | None = "web_crematorio"
+    partner_name: str | None = None
 
     class Config:
         from_attributes = True
@@ -70,6 +72,9 @@ def get_submissions(
     
     result = []
     for s in submissions:
+        partner_id = s.owner_data.get("partner_id")
+        ref_name = s.owner_data.get("referral_partner_name")
+        origin = "veterinaria" if (partner_id or ref_name) else "web_crematorio"
         result.append({
             "id": s.id,
             "owner_name": s.owner_data.get("fullName", "N/A"),
@@ -78,7 +83,9 @@ def get_submissions(
             "region": s.owner_data.get("region"),
             "city": s.owner_data.get("commune") or s.owner_data.get("city") or s.owner_data.get("Ciudad"),
             "status": s.status,
-            "created_at": format_tenant_datetime(s.created_at, db, tenant_id)
+            "created_at": format_tenant_datetime(s.created_at, db, tenant_id),
+            "origin": origin,
+            "partner_name": ref_name,
         })
     return result
 
@@ -208,6 +215,12 @@ def get_submission_detail(
                 "name": partner_link.veterinary.name,
                 "slug": partner_link.slug_publico
             }
+    if not partner_info and submission.owner_data.get('referral_partner_name'):
+        partner_info = {
+            "id": partner_id or 0,
+            "name": submission.owner_data.get('referral_partner_name'),
+            "slug": ""
+        }
 
     # Resolve image URLs for R2 using helper (imported at top)
     resolved_images = []
@@ -225,6 +238,7 @@ def get_submission_detail(
         "images": resolved_images,
         "status": submission.status,
         "code": submission.code,
+        "origin": "veterinaria" if (partner_id or partner_info or submission.owner_data.get('referral_partner_name')) else "web_crematorio",
         "created_at": format_tenant_datetime(submission.created_at, db, tenant_id),
         "resolved_services": resolved_services,
         "total": total,
@@ -249,6 +263,28 @@ def delete_submission(
     
     if not submission:
         raise HTTPException(status_code=404, detail="Registro no encontrado")
+
+    # 1. Eliminar archivos físicos de imágenes del disco para no dejar basura
+    try:
+        tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+        if tenant:
+            submission_dir = Path("app/static/storage") / (tenant.slug or f"tenant_{tenant.id}") / "submissions" / str(submission.id)
+            if submission_dir.exists():
+                shutil.rmtree(submission_dir, ignore_errors=True)
+    except Exception as e:
+        print(f"Error cleaning up submission folder: {e}")
+
+    # 2. Eliminar notificaciones asociadas en la campana
+    try:
+        notifs = db.query(models.Notification).filter(
+            models.Notification.tenant_id == tenant_id,
+            models.Notification.type == "new_submission"
+        ).all()
+        for n in notifs:
+            if n.data and n.data.get("submission_id") == submission_id:
+                db.delete(n)
+    except Exception as e:
+        print(f"Error cleaning up associated notifications: {e}")
         
     db.delete(submission)
     db.commit()

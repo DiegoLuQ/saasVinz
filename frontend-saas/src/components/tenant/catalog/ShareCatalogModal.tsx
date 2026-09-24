@@ -39,6 +39,7 @@ interface ShareCatalogModalProps {
     onClose: () => void;
     tenantSlug: string;
     tenantName: string;
+    zIndex?: string;
 }
 
 const EXPIRATION_OPTIONS = [
@@ -54,6 +55,7 @@ export default function ShareCatalogModal({
     onClose,
     tenantSlug,
     tenantName,
+    zIndex = 'z-[400]',
 }: ShareCatalogModalProps) {
     const { showToast } = useToast();
     const [selectedHours, setSelectedHours] = useState<number | null>(24);
@@ -141,7 +143,12 @@ export default function ShareCatalogModal({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+        <div
+            className={`fixed inset-0 ${zIndex} flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200`}
+            onClick={(e) => {
+                if (e.target === e.currentTarget) onClose();
+            }}
+        >
             <div className="bg-[#12151d] border border-white/10 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
                 {/* Header */}
                 <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">

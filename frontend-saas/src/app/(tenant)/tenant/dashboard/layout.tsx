@@ -20,7 +20,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         <div className="min-h-screen bg-background">
             <Sidebar />
             <div
-                className={`transition-[margin] duration-300 min-h-screen flex flex-col ${collapsed ? 'lg:ml-[80px]' : 'lg:ml-[260px]'
+                className={`transition-[margin] duration-300 min-h-screen flex flex-col ${collapsed ? 'lg:ml-[80px]' : 'lg:ml-[220px]'
                     }`}
             >
                 <Navbar />

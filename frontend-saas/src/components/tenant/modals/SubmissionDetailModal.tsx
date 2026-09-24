@@ -15,6 +15,7 @@ import {
     Package,
     Shield,
     Store,
+    Globe,
     ExternalLink,
     Copy,
     Check
@@ -245,8 +246,21 @@ export default function SubmissionDetailModal({
                                             <Eye size={24} />
                                         </div>
                                         <div>
-                                            <h3 className="text-lg font-bold text-foreground">Detalle del Registro</h3>
-                                            <p className="text-xs text-muted-foreground">Enviado el {submission.created_at}</p>
+                                            <div className="flex items-center gap-2.5 flex-wrap">
+                                                <h3 className="text-lg font-bold text-foreground">Detalle del Registro</h3>
+                                                {submission.origin === 'veterinaria' || submission.partner || submission.owner_data?.referral_partner_name ? (
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 text-[10px] font-black uppercase tracking-wider">
+                                                        <Store size={11} className="shrink-0" />
+                                                        <span>Veterinaria{submission.partner?.name ? `: ${submission.partner.name}` : (submission.owner_data?.referral_partner_name ? `: ${submission.owner_data.referral_partner_name}` : '')}</span>
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-black uppercase tracking-wider">
+                                                        <Globe size={11} className="shrink-0" />
+                                                        <span>Web Crematorio</span>
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-muted-foreground mt-0.5">Enviado el {submission.created_at}</p>
                                         </div>
                                     </div>
                                     <button
@@ -334,7 +348,6 @@ export default function SubmissionDetailModal({
                                                             <Store size={12} /> Partner Referido
                                                         </p>
                                                         <p className="text-sm font-bold text-foreground mt-1">{submission.partner.name}</p>
-                                                        <p className="text-[10px] text-muted-foreground font-mono mt-0.5">ID: {submission.partner.slug}</p>
                                                     </div>
                                                 )}
                                                 <div>

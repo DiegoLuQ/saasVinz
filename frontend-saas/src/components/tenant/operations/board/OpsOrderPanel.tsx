@@ -430,13 +430,12 @@ export default function OpsOrderPanel({
                             </button>
                             <button
                                 onClick={runConfirm}
-                                className={`flex-1 py-3 rounded-xl font-bold transition-all active:scale-95 shadow-md ${
-                                    typeof confirm === 'object'
+                                className={`flex-1 py-3 rounded-xl font-bold transition-all active:scale-95 shadow-md ${typeof confirm === 'object'
                                         ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-600/20'
                                         : confirm === 'finalize'
                                             ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
                                             : 'bg-primary hover:opacity-90 text-primary-foreground shadow-primary/20'
-                                }`}
+                                    }`}
                             >
                                 Confirmar
                             </button>

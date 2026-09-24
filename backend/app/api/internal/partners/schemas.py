@@ -28,6 +28,7 @@ class QuickVeterinaryPartnerCreate(BaseModel):
     address: Optional[str] = None
     city: Optional[str] = None
     region: Optional[str] = None
+    country: Optional[str] = "Chile"
     tipo_comision: str = "porcentaje"
     porcentaje_comision: float = 0.0
     monto_comision: float = 0.0
@@ -49,9 +50,18 @@ class PartnerLinkCreate(BaseModel):
     referral_message: Optional[str] = None
 
 class PartnerLinkUpdate(BaseModel):
+    name: Optional[str] = None
+    rut: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    region: Optional[str] = None
+    country: Optional[str] = None
     tipo_comision: Optional[str] = None
     monto_comision: Optional[float] = None
     porcentaje_comision: Optional[float] = None
+    status: Optional[str] = None
 
 class PartnerLinkResponse(BaseModel):
     id: int
@@ -107,3 +117,66 @@ class CommissionListResponse(BaseModel):
     stats: CommissionStats
     rows: List[CommissionSchema]
     total: int
+
+# --- Partner Portal Schemas ---
+
+class PartnerPortalAccessResponse(BaseModel):
+    link_id: int
+    partner_name: str
+    tenant_slug: str
+    partner_slug: str
+    access_token: str
+    access_pin: str
+    portal_url: str
+    token_generated_at: Optional[datetime] = None
+
+class PartnerPortalVerifyRequest(BaseModel):
+    token: str
+    pin: str
+
+class PartnerPortalInfo(BaseModel):
+    partner_id: int
+    partner_name: str
+    partner_rut: Optional[str] = None
+    partner_email: Optional[str] = None
+    partner_phone: Optional[str] = None
+    partner_address: Optional[str] = None
+    partner_city: Optional[str] = None
+    partner_region: Optional[str] = None
+    tenant_name: str
+    tenant_slug: str
+    tenant_logo_url: Optional[str] = None
+    tenant_phone: Optional[str] = None
+    tipo_comision: str
+    porcentaje_comision: float
+    monto_comision: float
+
+class PartnerPortalDashboardStats(BaseModel):
+    total_earned: float = 0.0
+    total_pending: float = 0.0
+    total_paid: float = 0.0
+    count_cases: int = 0
+    count_pending: int = 0
+    count_paid: int = 0
+
+class PartnerPortalCaseItem(BaseModel):
+    id: int # Commission id
+    cremation_id: int
+    date: datetime
+    pet_name: str
+    pet_type: Optional[str] = None
+    owner_name: str
+    owner_phone: Optional[str] = None
+    service_name: str
+    order_total: float
+    commission_amount: float
+    commission_status: str # pendiente | pagado | cancelado
+    cremation_status: str # En proceso, Finalizado, etc.
+    tracking_code: Optional[str] = None
+    paid_at: Optional[datetime] = None
+
+class PartnerPortalDashboardResponse(BaseModel):
+    partner_info: PartnerPortalInfo
+    stats: PartnerPortalDashboardStats
+    cases: List[PartnerPortalCaseItem]
+

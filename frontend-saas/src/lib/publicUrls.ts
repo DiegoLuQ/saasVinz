@@ -15,11 +15,16 @@ function rootFromHost(): string {
     if (typeof window === 'undefined') {
         return process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'lvh.me:3000';
     }
-    return window.location.host.replace(/^(app|track|catalogo|memorial|admin|veterinary|www)\./, '');
+    return window.location.host.replace(/^(app|track|catalogo|memorial|admin|veterinary|partner|www)\./, '');
 }
 
 function currentProtocol(): string {
     return typeof window !== 'undefined' ? window.location.protocol : 'https:';
+}
+
+/** Dominio raíz principal (landing/home sin subdominios, ej. http://lvh.me:3000 o https://vinzer.cl). */
+export function getMainRootUrl(): string {
+    return `${currentProtocol()}//${rootFromHost()}`;
 }
 
 /** Base del subdominio de seguimiento (track.). */
@@ -36,6 +41,14 @@ export function getCatalogBaseUrl(): string {
         return process.env.NEXT_PUBLIC_CATALOG_BASE_URL;
     }
     return `${currentProtocol()}//catalogo.${rootFromHost()}`;
+}
+
+/** Base del subdominio de partner / veterinarias (partner.). */
+export function getPartnerBaseUrl(): string {
+    if (process.env.NEXT_PUBLIC_PARTNER_BASE_URL) {
+        return process.env.NEXT_PUBLIC_PARTNER_BASE_URL;
+    }
+    return `${currentProtocol()}//partner.${rootFromHost()}`;
 }
 
 /** Base del subdominio de memoriales (memorial.). */
@@ -66,5 +79,11 @@ export function buildMemorialUrl(tenantSlug: string, petName: string, idRecuerdo
 /** Enlace público al catálogo online con token bajo el subdominio catalogo. */
 export function buildCatalogUrl(tenantSlug: string, token: string): string {
     return `${getCatalogBaseUrl()}/${tenantSlug}/${token}`;
+}
+
+/** Enlace privado para el portal de veterinaria aliada bajo el subdominio partner. */
+export function buildPartnerPortalUrl(tenantSlug: string, token: string): string {
+    const cleanTenant = (tenantSlug || 'crematorio').toLowerCase().trim().replace(/\s+/g, '-');
+    return `${getPartnerBaseUrl()}/${cleanTenant}/portal-veterinaria/${token}`;
 }
 

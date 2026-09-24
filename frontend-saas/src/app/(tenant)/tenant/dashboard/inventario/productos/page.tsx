@@ -25,7 +25,7 @@ import Cropper from 'react-easy-crop';
 import getCroppedImg from '@/lib/tenant/imageUtils';
 import { usePermissions } from '@/app/(tenant)/tenant/context/PermissionContext';
 import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
-import { useProductCategories, useProductProviders } from '@/hooks/useSessionBootstrap';
+import { useProductCategories, useProductProviders, useSessionBootstrap } from '@/hooks/useSessionBootstrap';
 import { useProducts, useSaveProduct, useDeleteProduct, useUpdateStock } from '@/hooks/useInventory';
 import { useQueryClient } from '@tanstack/react-query';
 import { PlanLimitModal } from '@/components/tenant/PlanLimitModal';
@@ -73,6 +73,10 @@ export default function ProductsPage() {
     const { showToast } = useToast();
     const { canCreate, canEdit, canDelete } = usePermissions();
     const { tenantData, formatLimit } = useTenant();
+    const { data: bootstrap } = useSessionBootstrap();
+    const userData = bootstrap?.user;
+    const canCreateProduct = canCreate('inventario') || userData?.role === 'admin' || userData?.role === 'creator';
+    const canDeleteProduct = canDelete('inventario') || userData?.role === 'admin' || userData?.role === 'creator';
     const queryClient = useQueryClient();
     const { hasFeature } = useFeatures();
 
@@ -378,14 +382,14 @@ export default function ProductsPage() {
                         )}
                         Compartir Online
                     </button>
-                    {canCreate('inventario') && (
+                    {canCreateProduct && (
                         <button
                             onClick={() => canCreateProductFeature ? handleOpenModal() : showToast('Tu plan no incluye crear productos.', 'error')}
                             disabled={isLimitReached || !canCreateProductFeature}
                             title={!canCreateProductFeature ? 'Característica no incluida en tu plan' : undefined}
-                            className={`bg-primary text-primary-foreground font-bold py-3 px-6 rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all text-sm ${(isLimitReached || !canCreateProductFeature) ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
+                            className={`bg-primary text-primary-foreground font-bold py-2.5 sm:py-3 px-4 sm:px-6 rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all text-xs sm:text-sm ${(isLimitReached || !canCreateProductFeature) ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
                         >
-                            {!canCreateProductFeature ? <Lock className="mr-2" size={18} /> : <Plus className="mr-2" size={18} />}
+                            {!canCreateProductFeature ? <Lock className="mr-2" size={16} /> : <Plus className="mr-2" size={16} />}
                             Nuevo Producto
                         </button>
                     )}
@@ -406,49 +410,58 @@ export default function ProductsPage() {
                 </div>
             </div>
 
-            {/* Table */}
+            {/* Products: Mobile Cards & Desktop Table */}
             {loadingProducts ? (
                 <div className="h-64 flex flex-col items-center justify-center space-y-4">
                     <Loader2 className="animate-spin text-primary" size={40} />
                 </div>
+            ) : filteredProducts.length === 0 ? (
+                <div className="glass-card rounded-3xl p-12 text-center flex flex-col items-center justify-center">
+                    <Package size={48} className="text-muted-foreground/40 mb-4" />
+                    <h3 className="text-lg font-bold text-white mb-1">No se encontraron productos</h3>
+                    <p className="text-sm text-muted-foreground">
+                        {searchTerm ? 'No hay productos que coincidan con la búsqueda.' : 'Aún no hay productos registrados en el inventario.'}
+                    </p>
+                </div>
             ) : (
-                <div className="glass-card rounded-3xl overflow-hidden overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead>
-                            <tr className="bg-white/5 border-b border-white/5">
-                                <th className="px-6 py-5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Producto</th>
-                                <th className="px-6 py-5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Categoría</th>
-                                <th className="px-6 py-5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Stock</th>
-                                <th className="px-6 py-5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Precio</th>
-                                <th className="px-6 py-5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Estado</th>
-                                <th className="px-6 py-5 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/5">
-                            {filteredProducts.map((product) => (
-                                <tr key={product.id} className="hover:bg-white/[0.02] transition-colors group">
-                                    <td className="px-6 py-4 align-middle">
-                                        <div className="flex items-center">
-                                            <div className="w-12 h-12 rounded-xl bg-white/5 mr-4 overflow-hidden shrink-0 flex items-center justify-center">
-                                                {product.image_url ? (
-                                                    <img src={`${API_URL}${product.image_url}`} alt={product.name} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <Package className="text-muted-foreground" size={24} />
-                                                )}
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-sm leading-tight">{product.name}</p>
-                                                <p className="text-[10px] text-muted-foreground mt-0.5 font-mono uppercase tracking-wider">{product.code}</p>
-                                            </div>
+                <>
+                    {/* Mobile Cards (visible en pantallas móviles < 768px) */}
+                    <div className="md:hidden space-y-3">
+                        {filteredProducts.map((product) => (
+                            <div key={product.id} className="glass-card rounded-3xl p-4 space-y-3 border border-white/5">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-14 h-14 rounded-2xl bg-white/5 overflow-hidden shrink-0 flex items-center justify-center border border-white/10">
+                                        {product.image_url ? (
+                                            <img src={`${API_URL}${product.image_url}`} alt={product.name} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <Package className="text-muted-foreground" size={24} />
+                                        )}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <h3 className="font-bold text-sm leading-tight truncate text-white">{product.name}</h3>
+                                            <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wider ${
+                                                product.availability_status === 'Disponible'
+                                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                    : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                            }`}>
+                                                {product.availability_status}
+                                            </span>
                                         </div>
-                                    </td>
-                                    <td className="px-6 py-4 align-middle text-sm">
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20 uppercase tracking-wide">
-                                            {product.category?.name || '-'}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 align-middle">
-                                        <div className="flex items-center gap-3">
+                                        <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-wider mt-0.5">{product.code}</p>
+                                        <div className="mt-1.5 flex items-center gap-2">
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 uppercase tracking-wide">
+                                                {product.category?.name || 'Sin categoría'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Stock y Precio */}
+                                <div className="grid grid-cols-2 gap-2 bg-white/[0.02] border border-white/5 p-3 rounded-2xl">
+                                    <div>
+                                        <span className="text-[10px] uppercase font-bold text-muted-foreground block mb-1">Stock</span>
+                                        <div className="flex items-center gap-2">
                                             <input
                                                 type="number"
                                                 defaultValue={product.stock}
@@ -458,56 +471,149 @@ export default function ProductsPage() {
                                                         (e.target as HTMLInputElement).blur();
                                                     }
                                                 }}
-                                                className="w-16 bg-white/5 border border-white/10 rounded-xl py-2 px-2 text-center text-sm focus:border-primary/50 outline-none transition-all font-bold"
+                                                className="w-16 bg-white/5 border border-white/10 rounded-xl py-1.5 px-2 text-center text-sm focus:border-primary/50 outline-none transition-all font-bold"
                                             />
                                             <span className="text-[10px] text-muted-foreground font-bold uppercase">un.</span>
                                         </div>
-                                    </td>
-                                    <td className="px-6 py-4 align-middle">
-                                        <div className="flex items-center gap-2">
+                                    </div>
+                                    <div className="text-right flex flex-col justify-center">
+                                        <span className="text-[10px] uppercase font-bold text-muted-foreground block mb-0.5">Precio</span>
+                                        <div className="flex items-center justify-end gap-1.5">
                                             <span className="text-sm font-bold text-primary">
                                                 ${product.sale_price.toLocaleString('es-CL')}
                                             </span>
                                             {product.discount_percentage !== undefined && product.discount_percentage > 0 && (
-                                                <span className="inline-flex items-center gap-1 text-[9px] font-black text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded-lg uppercase tracking-wider border border-rose-500/20">
+                                                <span className="text-[9px] font-black text-rose-400 bg-rose-500/10 px-1 py-0.5 rounded-md border border-rose-500/20">
                                                     -{product.discount_percentage}%
                                                 </span>
                                             )}
                                         </div>
-                                    </td>
-                                    <td className="px-6 py-4 align-middle">
-                                        <span className={`text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider ${product.availability_status === 'Disponible'
-                                            ? 'bg-emerald-500/10 text-emerald-500'
-                                            : 'bg-red-500/10 text-red-500'
-                                            }`}>
-                                            {product.availability_status}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 align-middle text-right">
-                                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button
-                                                onClick={() => handleOpenModal(product)}
-                                                className="p-2.5 rounded-xl hover:bg-white/10 text-muted-foreground hover:text-white transition-all active:scale-90"
-                                                title="Editar producto"
-                                            >
-                                                <Edit2 size={16} />
-                                            </button>
-                                            {canDelete('inventario') && (
-                                                <button
-                                                    onClick={() => setProductToDelete(product)}
-                                                    className="p-2.5 rounded-xl hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all active:scale-90"
-                                                    title="Eliminar producto"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            )}
-                                        </div>
-                                    </td>
+                                    </div>
+                                </div>
+
+                                {/* Acciones Móvil */}
+                                <div className="flex items-center gap-2 pt-1">
+                                    <button
+                                        onClick={() => handleOpenModal(product)}
+                                        className="flex-1 bg-white/5 hover:bg-primary/20 border border-white/10 hover:border-primary/30 text-white hover:text-primary min-h-[42px] py-2 px-4 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-2 shadow-sm"
+                                    >
+                                        <Edit2 size={15} />
+                                        <span>Editar Producto</span>
+                                    </button>
+                                    {canDeleteProduct && (
+                                        <button
+                                            onClick={() => setProductToDelete(product)}
+                                            className="min-h-[42px] min-w-[42px] px-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center shadow-sm"
+                                            title="Eliminar producto"
+                                            aria-label="Eliminar producto"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Desktop Table (visible en pantallas >= 768px) */}
+                    <div className="hidden md:block glass-card rounded-3xl overflow-hidden overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead>
+                                <tr className="bg-white/5 border-b border-white/5">
+                                    <th className="px-6 py-5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Producto</th>
+                                    <th className="px-6 py-5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Categoría</th>
+                                    <th className="px-6 py-5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Stock</th>
+                                    <th className="px-6 py-5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Precio</th>
+                                    <th className="px-6 py-5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Estado</th>
+                                    <th className="px-6 py-5 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">Acciones</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {filteredProducts.map((product) => (
+                                    <tr key={product.id} className="hover:bg-white/[0.02] transition-colors group">
+                                        <td className="px-6 py-4 align-middle">
+                                            <div className="flex items-center">
+                                                <div className="w-12 h-12 rounded-xl bg-white/5 mr-4 overflow-hidden shrink-0 flex items-center justify-center border border-white/5">
+                                                    {product.image_url ? (
+                                                        <img src={`${API_URL}${product.image_url}`} alt={product.name} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <Package className="text-muted-foreground" size={24} />
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <p className="font-bold text-sm leading-tight text-white">{product.name}</p>
+                                                    <p className="text-[10px] text-muted-foreground mt-0.5 font-mono uppercase tracking-wider">{product.code}</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 align-middle text-sm">
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20 uppercase tracking-wide">
+                                                {product.category?.name || '-'}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 align-middle">
+                                            <div className="flex items-center gap-3">
+                                                <input
+                                                    type="number"
+                                                    defaultValue={product.stock}
+                                                    onBlur={(e) => handleInlineStockUpdate(product, Number(e.target.value))}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            (e.target as HTMLInputElement).blur();
+                                                        }
+                                                    }}
+                                                    className="w-16 bg-white/5 border border-white/10 rounded-xl py-2 px-2 text-center text-sm focus:border-primary/50 outline-none transition-all font-bold"
+                                                />
+                                                <span className="text-[10px] text-muted-foreground font-bold uppercase">un.</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 align-middle">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-bold text-primary">
+                                                    ${product.sale_price.toLocaleString('es-CL')}
+                                                </span>
+                                                {product.discount_percentage !== undefined && product.discount_percentage > 0 && (
+                                                    <span className="inline-flex items-center gap-1 text-[9px] font-black text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded-lg uppercase tracking-wider border border-rose-500/20">
+                                                        -{product.discount_percentage}%
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 align-middle">
+                                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider ${
+                                                product.availability_status === 'Disponible'
+                                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                    : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                            }`}>
+                                                {product.availability_status}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 align-middle text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <button
+                                                    onClick={() => handleOpenModal(product)}
+                                                    className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-primary/20 hover:border-primary/30 text-white hover:text-primary transition-all shadow-sm active:scale-95"
+                                                    title="Editar producto"
+                                                >
+                                                    <Edit2 size={16} />
+                                                </button>
+                                                {canDeleteProduct && (
+                                                    <button
+                                                        onClick={() => setProductToDelete(product)}
+                                                        className="p-2 rounded-xl bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-400 transition-all shadow-sm active:scale-95"
+                                                        title="Eliminar producto"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </>
             )}
 
             <Modal

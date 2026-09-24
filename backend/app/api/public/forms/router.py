@@ -414,7 +414,8 @@ async def submit_public_form(
                 "submission_id": submission_id,
                 "owner_name": owner_dict.get("fullName"),
                 "pet_name": pet_dict.get("name"),
-                "service_name": service_name
+                "service_name": service_name,
+                "origin": "web_crematorio"
             }
         )
         db.add(new_notif)

@@ -171,6 +171,7 @@ export interface QuickPartnerCreateData {
     address?: string;
     city?: string;
     region?: string;
+    country?: string;
     tipo_comision?: string;
     porcentaje_comision?: number;
     monto_comision?: number;
@@ -179,6 +180,28 @@ export interface QuickPartnerCreateData {
 export const quickCreatePartner = async (data: QuickPartnerCreateData): Promise<PartnerLink> => {
     return apiRequest('/api/internal/partners/quick-create', {
         method: 'POST',
+        body: data
+    });
+};
+
+export interface PartnerLinkUpdateData {
+    name?: string;
+    rut?: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    city?: string;
+    region?: string;
+    country?: string;
+    tipo_comision?: string;
+    porcentaje_comision?: number;
+    monto_comision?: number;
+    status?: string;
+}
+
+export const updatePartnerLink = async (linkId: number, data: PartnerLinkUpdateData): Promise<PartnerLink> => {
+    return apiRequest(`/api/internal/partners/${linkId}`, {
+        method: 'PATCH',
         body: data
     });
 };
@@ -196,4 +219,26 @@ export interface ActivePartnerOption {
 export const getActivePartnerOptions = async (): Promise<ActivePartnerOption[]> => {
     return apiRequest('/api/internal/partners/active-options');
 };
+
+export interface PartnerPortalAccess {
+    link_id: number;
+    partner_name: string;
+    tenant_slug: string;
+    partner_slug: string;
+    access_token: string;
+    access_pin: string;
+    portal_url: string;
+    token_generated_at?: string;
+}
+
+export const getPartnerPortalAccess = async (linkId: number): Promise<PartnerPortalAccess> => {
+    return apiRequest(`/api/internal/partners/${linkId}/portal-access`);
+};
+
+export const regeneratePartnerPortalAccess = async (linkId: number): Promise<PartnerPortalAccess> => {
+    return apiRequest(`/api/internal/partners/${linkId}/portal-access/regenerate`, {
+        method: 'POST'
+    });
+};
+
 
