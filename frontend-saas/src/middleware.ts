@@ -78,6 +78,12 @@ export default async function middleware(req: NextRequest) {
         return NextResponse.next();
     }
 
+    // Formulario incrustable (iframe en el sitio del tenant, plan ULTRA):
+    // /embed/form?key=pk_vinzer_live_... -> /public/<slug>/form?embed=1
+    if (url.pathname === '/embed/form' && currentHost !== 'invalid') {
+        return handleFormEmbed(req);
+    }
+
     // Subdominio partner: exclusivo para el portal de veterinarias aliadas.
     // Cualquier otra ruta (como la raíz / o enlaces sin portal) redirige al dominio principal
     if (currentHost === 'partner') {
@@ -187,4 +193,81 @@ export default async function middleware(req: NextRequest) {
     // Default to /public for anything else (safety)
     url.pathname = `/public${url.pathname}`;
     return NextResponse.rewrite(url);
+}
+
+// ---------------------------------------------------------------------------
+// Formulario incrustable
+// ---------------------------------------------------------------------------
+// El backend valida la API key (activa, plan ULTRA) y devuelve el tenant y los
+// dominios autorizados. Con ellos se arma `frame-ancestors`: el navegador solo
+// permite incrustar el formulario en esos dominios (X-Frame-Options se excluye
+// para /embed en next.config.ts).
+
+type FormEmbedResult =
+    | { ok: true; tenantSlug: string; allowedDomains: string[] }
+    | { ok: false; status: number; message: string };
+
+const FORM_EMBED_TTL_MS = 60_000;
+const formEmbedCache = new Map<string, { result: FormEmbedResult; expires: number }>();
+
+async function resolveFormEmbed(apiKey: string): Promise<FormEmbedResult> {
+    const cached = formEmbedCache.get(apiKey);
+    if (cached && cached.expires > Date.now()) return cached.result;
+
+    const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
+    let result: FormEmbedResult;
+    try {
+        const res = await fetch(
+            `${apiUrl}/api/public/widget/form-embed/config?api_key=${encodeURIComponent(apiKey)}`,
+            { cache: 'no-store' }
+        );
+        if (res.ok) {
+            const data = await res.json();
+            result = { ok: true, tenantSlug: data.tenant_slug, allowedDomains: data.allowed_domains || [] };
+        } else {
+            const data = await res.json().catch(() => null);
+            const detail = typeof data?.detail === 'string' ? data.detail : 'Formulario no disponible.';
+            result = { ok: false, status: res.status, message: detail };
+        }
+    } catch {
+        // Error de red: no se cachea, el próximo intento vuelve a consultar.
+        return { ok: false, status: 503, message: 'Servicio no disponible, intenta nuevamente.' };
+    }
+
+    if (formEmbedCache.size > 500) formEmbedCache.clear();
+    formEmbedCache.set(apiKey, { result, expires: Date.now() + FORM_EMBED_TTL_MS });
+    return result;
+}
+
+function embedErrorResponse(status: number, message: string) {
+    const safe = message.replace(/[<>&"]/g, '');
+    const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Formulario no disponible</title></head><body style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:200px;margin:0;color:#555"><p>${safe}</p></body></html>`;
+    return new NextResponse(html, {
+        status,
+        headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
+    });
+}
+
+async function handleFormEmbed(req: NextRequest) {
+    const apiKey = (req.nextUrl.searchParams.get('key') || '').trim();
+    if (!apiKey) return embedErrorResponse(400, 'Falta la clave del formulario.');
+
+    const result = await resolveFormEmbed(apiKey);
+    if (!result.ok) return embedErrorResponse(result.status, result.message);
+
+    const url = req.nextUrl.clone();
+    url.pathname = `/public/${encodeURIComponent(result.tenantSlug)}/form`;
+    url.search = '';
+    url.searchParams.set('embed', '1');
+
+    // Host sin esquema: permite http/https según el esquema de la página; `:*`
+    // cubre puertos no estándar (útil para pruebas locales).
+    const ancestors = result.allowedDomains
+        .filter((d) => /^[a-z0-9.-]+$/i.test(d))
+        .flatMap((d) => [d, `${d}:*`]);
+
+    const res = NextResponse.rewrite(url);
+    res.headers.set('Content-Security-Policy', `frame-ancestors ${ancestors.length ? ancestors.join(' ') : "'none'"}`);
+    res.headers.set('Cache-Control', 'no-store');
+    return res;
 }

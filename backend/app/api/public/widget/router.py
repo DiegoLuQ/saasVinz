@@ -29,6 +29,7 @@ from app.core.client_ip import get_client_ip
 from app.core.rate_limiter import limiter
 from app.core.tenant_context import apply_bypass_rls, apply_tenant_rls
 from app.api.internal.integrations.models import TenantApiKey
+from app.api.internal.integrations.services import tenant_can_use_widget, tenant_can_use_form_embed
 
 router = APIRouter()
 
@@ -86,6 +87,11 @@ def validate_widget_key(
     if not key:
         raise HTTPException(status_code=401, detail="API key inválida o inactiva.")
 
+    # 1b. Gating por plan en runtime: si el tenant baja de PRO/ULTRA (o vence
+    #     su demo), sus claves dejan de funcionar aunque sigan activas.
+    if not tenant_can_use_widget(key.tenant):
+        raise HTTPException(status_code=403, detail="El plan del crematorio no incluye el widget.")
+
     # 2. Validación de Origin contra la whitelist del tenant.
     #    - Si la petición trae Origin/Referer (navegador embebiendo el widget),
     #      DEBE estar en la whitelist: protege contra incrustación no autorizada.
@@ -93,6 +99,10 @@ def validate_widget_key(
     #      permite: no es un escenario de incrustación y el Origin no es
     #      verificable fuera del navegador.
     allowed = [d.lower() for d in (key.allowed_domains or [])]
+    if not allowed:
+        # Una clave sin dominios queda inactiva para cualquier cliente
+        # (también curl / server-to-server), no solo para navegadores.
+        raise HTTPException(status_code=403, detail="API key sin dominios autorizados.")
     origin_header = request.headers.get("origin")
     origin_host = _host_from_origin(origin_header) or _host_from_origin(
         request.headers.get("referer")
@@ -219,6 +229,26 @@ def get_catalog_grouped(
         "grupos": grupos,
     }
     return _catalog_response(request, response, payload)
+
+
+@router.get("/form-embed/config")
+@limiter.limit("60/minute", key_func=_widget_rate_key)
+def get_form_embed_config(
+    request: Request,
+    key: TenantApiKey = Depends(validate_widget_key),
+):
+    """
+    Configuración del formulario incrustable (iframe). La consume el middleware
+    de Next (server-side) para resolver el tenant de la clave y armar el header
+    `Content-Security-Policy: frame-ancestors` con los dominios autorizados.
+    Exclusivo del plan ULTRA.
+    """
+    if not tenant_can_use_form_embed(key.tenant):
+        raise HTTPException(status_code=403, detail="El formulario incrustable está disponible solo en el plan ULTRA.")
+    return {
+        "tenant_slug": key.tenant.slug,
+        "allowed_domains": key.allowed_domains or [],
+    }
 
 
 @router.get("/tracking/{tracking_code}")

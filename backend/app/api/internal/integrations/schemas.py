@@ -26,6 +26,9 @@ def normalize_domain(raw: str) -> Optional[str]:
     return host or None
 
 
+EMPTY_DOMAINS_MSG = "Agrega al menos un dominio autorizado."
+
+
 def normalize_domains(domains: List[str]) -> List[str]:
     seen: List[str] = []
     for d in domains or []:
@@ -42,7 +45,10 @@ class ApiKeyCreate(BaseModel):
     @field_validator("allowed_domains")
     @classmethod
     def _clean_domains(cls, v: List[str]) -> List[str]:
-        return normalize_domains(v)
+        cleaned = normalize_domains(v)
+        if not cleaned:
+            raise ValueError(EMPTY_DOMAINS_MSG)
+        return cleaned
 
 
 class ApiKeyUpdate(BaseModel):
@@ -55,7 +61,10 @@ class ApiKeyUpdate(BaseModel):
     def _clean_domains(cls, v: Optional[List[str]]) -> Optional[List[str]]:
         if v is None:
             return None
-        return normalize_domains(v)
+        cleaned = normalize_domains(v)
+        if not cleaned:
+            raise ValueError(EMPTY_DOMAINS_MSG)
+        return cleaned
 
 
 class ApiKeyInDB(BaseModel):

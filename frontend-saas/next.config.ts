@@ -73,8 +73,9 @@ const nextConfig: NextConfig = {
         // subdominio (admin.* → dominio de memoriales), y SAMEORIGIN los
         // bloquearía. Los memoriales públicos son de solo lectura.
         // El widget embebible tampoco pasa por aquí (script estático en
-        // /public/widget que corre en el sitio del cliente).
-        source: '/((?!memorials).*)',
+        // /public/widget que corre en el sitio del cliente), ni /embed/*
+        // (formulario en iframe, protegido con CSP frame-ancestors).
+        source: '/((?!memorials|embed/).*)',
         headers: [
           { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
           ...baseSecurityHeaders,
@@ -82,6 +83,12 @@ const nextConfig: NextConfig = {
       },
       {
         source: '/memorials/:path*',
+        headers: baseSecurityHeaders,
+      },
+      {
+        // Formulario incrustable: el middleware fija `frame-ancestors` con los
+        // dominios autorizados de la API key (reemplaza a X-Frame-Options).
+        source: '/embed/:path*',
         headers: baseSecurityHeaders,
       },
     ];

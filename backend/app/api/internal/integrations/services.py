@@ -12,6 +12,9 @@ from . import schemas
 # Planes que pueden usar el widget embebible / API keys públicas.
 WIDGET_ALLOWED_PLANS = {"PRO", "ULTRA"}
 
+# Formulario de ingreso incrustable (iframe en el sitio del tenant): solo ULTRA.
+FORM_EMBED_ALLOWED_PLANS = {"ULTRA"}
+
 KEY_PREFIX = "pk_vinzer_live_"
 
 
@@ -21,6 +24,14 @@ def tenant_can_use_widget(tenant: models.Tenant) -> bool:
     if not plan or not plan.name:
         return False
     return plan.name.strip().upper() in WIDGET_ALLOWED_PLANS
+
+
+def tenant_can_use_form_embed(tenant: models.Tenant) -> bool:
+    """Gating del formulario incrustable: solo ULTRA (considera plan demo)."""
+    plan = tenant.effective_plan if tenant else None
+    if not plan or not plan.name:
+        return False
+    return plan.name.strip().upper() in FORM_EMBED_ALLOWED_PLANS
 
 
 def require_widget_plan(tenant: models.Tenant) -> None:

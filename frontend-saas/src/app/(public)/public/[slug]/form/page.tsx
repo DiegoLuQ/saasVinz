@@ -28,6 +28,7 @@ import html2canvas from 'html2canvas';
 
 // Hook
 import { useTenantForm } from '@/hooks/useTenantForm';
+import { useEmbedAutoHeight, postToEmbedParent } from '@/hooks/useEmbedAutoHeight';
 
 // Components
 import StepIndicator from '@/components/public/StepIndicator';
@@ -64,6 +65,13 @@ export default function TenantFormPage() {
     const slug = params.slug as string;
     const token = searchParams.get('token');
     const partnerSlug = searchParams.get('partner');
+    // Modo incrustado (iframe en el sitio del tenant, vía /embed/form?key=...).
+    // En el servidor llega `embed=1` (rewrite del middleware); en el cliente,
+    // useSearchParams refleja la URL del navegador, que trae `key`.
+    const isEmbed = searchParams.get('embed') === '1' || !!searchParams.get('key');
+    const embedThemeParam = searchParams.get('theme');
+    const embedRootRef = useEmbedAutoHeight(isEmbed);
+    const screenMinH = isEmbed ? 'min-h-[320px]' : 'min-h-screen';
 
     const [copiedTrackLink, setCopiedTrackLink] = React.useState(false);
     const [isDownloadingCard, setIsDownloadingCard] = React.useState(false);
@@ -127,11 +135,30 @@ export default function TenantFormPage() {
         farewellTemplate,
     } = useTenantForm(slug, token, partnerSlug);
 
+    // Embed: tema claro por defecto (el sitio del tenant suele serlo), salvo ?theme=dark.
+    React.useEffect(() => {
+        if (!isEmbed) return;
+        setTheme(embedThemeParam === 'dark' ? 'dark' : 'light');
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isEmbed, embedThemeParam]);
+
+    // Embed: al cambiar de paso o terminar, pedir al parent que lleve el
+    // iframe a la vista (el usuario puede haber quedado abajo en la página).
+    const isFirstStepRenderRef = React.useRef(true);
+    React.useEffect(() => {
+        if (!isEmbed) return;
+        if (isFirstStepRenderRef.current) {
+            isFirstStepRenderRef.current = false;
+            return;
+        }
+        postToEmbedParent({ type: 'scroll-top' });
+    }, [isEmbed, currentStep, isSuccess]);
+
     // --- Loading State ---
     if (loading) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center relative">
-                <SkyBackground />
+            <div ref={embedRootRef} className={`${screenMinH} flex flex-col items-center justify-center relative`}>
+                {!isEmbed && <SkyBackground />}
                 <Loader2 className="w-10 h-10 text-sky-500 animate-spin mb-4 relative z-10" />
                 <p className="text-sky-900/40 text-xs font-black uppercase tracking-widest animate-pulse relative z-10">
                     Cargando formulario...
@@ -143,8 +170,8 @@ export default function TenantFormPage() {
     // --- Error / Tenant Not Found State ---
     if (error || !tenant) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center relative">
-                <SkyBackground />
+            <div ref={embedRootRef} className={`${screenMinH} flex flex-col items-center justify-center p-6 text-center relative`}>
+                {!isEmbed && <SkyBackground />}
                 <div className="relative z-10 flex flex-col items-center">
                     <div className="w-16 h-16 bg-red-500/10 rounded-3xl flex items-center justify-center mb-6 border border-red-500/20 backdrop-blur-md">
                         <AlertCircle className="w-8 h-8 text-red-500" />
@@ -197,8 +224,8 @@ export default function TenantFormPage() {
         };
 
         return (
-            <div className="min-h-screen flex items-center justify-center p-4 relative">
-                <SkyBackground />
+            <div ref={embedRootRef} className={`${isEmbed ? 'py-4' : 'min-h-screen'} flex items-center justify-center p-4 relative`}>
+                {!isEmbed && <SkyBackground />}
                 <motion.div
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -433,10 +460,11 @@ export default function TenantFormPage() {
 
     // --- Main Form Render ---
     return (
-        <div className="min-h-screen py-10 sm:py-16 px-4 sm:px-6 lg:px-8 relative">
-            <SkyBackground />
+        <div ref={embedRootRef} className={`${isEmbed ? 'py-4 sm:py-6' : 'min-h-screen py-10 sm:py-16'} px-4 sm:px-6 lg:px-8 relative`}>
+            {!isEmbed && <SkyBackground />}
 
-            {/* Floating Theme Toggle */}
+            {/* Floating Theme Toggle (oculto en embed: lo fija el sitio con ?theme=) */}
+            {!isEmbed && (
             <div className="fixed top-4 right-4 z-50">
                 <button
                     onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
@@ -454,10 +482,12 @@ export default function TenantFormPage() {
                     )}
                 </button>
             </div>
+            )}
 
             <div className="max-w-2xl mx-auto relative z-10">
-                {/* Condolence Modal */}
-                {tenant && (
+                {/* Condolence Modal (no en embed: un modal fijo dentro de un
+                    iframe alto puede quedar fuera de la pantalla) */}
+                {tenant && !isEmbed && (
                     <CondolenceModal
                         isOpen={showWelcomeModal}
                         onClose={() => setShowWelcomeModal(false)}
@@ -465,7 +495,8 @@ export default function TenantFormPage() {
                     />
                 )}
 
-                {/* Header / Branding */}
+                {/* Header / Branding (en embed lo aporta el sitio del tenant) */}
+                {!isEmbed && (
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -494,6 +525,7 @@ export default function TenantFormPage() {
                     </h1>
                     <div className="h-1 w-12 bg-sky-400 mx-auto mt-4 rounded-full" />
                 </motion.div>
+                )}
 
                 {/* Progress Steps */}
                 <div className="mb-4">
@@ -631,6 +663,12 @@ export default function TenantFormPage() {
                 </motion.div>
 
                 {/* Secure Footer */}
+                {isEmbed ? (
+                    <p className="mt-4 text-center text-[10px] uppercase tracking-[0.15em] font-semibold text-slate-400 dark:text-slate-500 flex items-center gap-1.5 justify-center">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        Conexión segura · Vinzer
+                    </p>
+                ) : (
                 <div className="mt-16 text-center space-y-4 max-w-md mx-auto px-4 pb-8 border-t border-slate-200/20 dark:border-slate-800/40 pt-8">
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
                         {process.env.NEXT_PUBLIC_VINZER_SLOGAN || "Innovación y sensibilidad en la gestión funeraria y memoriales."}
@@ -651,6 +689,7 @@ export default function TenantFormPage() {
                         </p>
                     </div>
                 </div>
+                )}
 
             </div>
 

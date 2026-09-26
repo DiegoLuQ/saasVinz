@@ -47,6 +47,8 @@ def get_widget_info(
         "can_use": services.tenant_can_use_widget(tenant),
         "plan_name": plan.name if plan else None,
         "allowed_plans": sorted(services.WIDGET_ALLOWED_PLANS),
+        "can_use_form_embed": services.tenant_can_use_form_embed(tenant),
+        "form_embed_allowed_plans": sorted(services.FORM_EMBED_ALLOWED_PLANS),
     }
 
 
@@ -69,7 +71,7 @@ def create_api_key(
     db: Session = Depends(get_db),
     service: ApiKeyService = Depends(get_api_key_service),
 ):
-    # El SuperAdmin puede aprovisionar para cualquier tenant (override de plan).
+    # Se puede aprovisionar para cualquier tenant, pero el endpoint público exige plan PRO/ULTRA (o demo).
     tenant = _resolve_tenant(identifier, db)
     return service.create(tenant.id, data)
 

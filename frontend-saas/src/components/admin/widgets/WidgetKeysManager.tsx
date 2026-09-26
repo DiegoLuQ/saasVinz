@@ -9,7 +9,7 @@ import { motion } from 'framer-motion';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { apiRequest } from '@/lib/admin/api';
 import {
-    getWidgetBaseUrl, getWidgetEndpoints, buildHostedSnippet, buildStandaloneTemplate,
+    getWidgetBaseUrl, getWidgetEndpoints, buildHostedSnippet, buildStandaloneTemplate, buildFormEmbedSnippet, buildFormEmbedFullPage,
 } from '@/lib/widget/embedTemplates';
 
 interface ApiKey {
@@ -27,6 +27,8 @@ interface WidgetInfo {
     can_use: boolean;
     plan_name: string | null;
     allowed_plans: string[];
+    can_use_form_embed?: boolean;
+    form_embed_allowed_plans?: string[];
 }
 
 async function copyToClipboard(text: string): Promise<boolean> {
@@ -186,7 +188,8 @@ export default function WidgetKeysManager({ tenantIdentifier }: { tenantIdentifi
                     <Info size={16} className="shrink-0 mt-0.5 text-amber-400" />
                     <span>
                         El plan actual de este tenant{info.plan_name ? ` (${info.plan_name})` : ''} no incluye el widget
-                        (es feature de {info.allowed_plans.join(' / ')}). Como SuperAdmin puedes aprovisionarlo igualmente.
+                        (es feature de {info.allowed_plans.join(' / ')}). Puedes crear claves, pero no funcionarán en el sitio
+                        hasta que el tenant tenga uno de esos planes (o un acceso demo vigente).
                     </span>
                 </div>
             )}
@@ -264,6 +267,8 @@ export default function WidgetKeysManager({ tenantIdentifier }: { tenantIdentifi
                             key={k.id}
                             apiKey={k}
                             widgetBase={widgetBase}
+                            canUseFormEmbed={!!info?.can_use_form_embed}
+                            tenantName={info?.tenant.name || ''}
                             onToggle={() => updateKey(k.id, { is_active: !k.is_active })}
                             onSaveDomains={(domains) => updateKey(k.id, { allowed_domains: domains })}
                             onRotate={() => rotateKey(k.id)}
@@ -277,10 +282,12 @@ export default function WidgetKeysManager({ tenantIdentifier }: { tenantIdentifi
 }
 
 function KeyCard({
-    apiKey, widgetBase, onToggle, onSaveDomains, onRotate, onDelete,
+    apiKey, widgetBase, canUseFormEmbed, tenantName, onToggle, onSaveDomains, onRotate, onDelete,
 }: {
     apiKey: ApiKey;
     widgetBase: string;
+    canUseFormEmbed: boolean;
+    tenantName: string;
     onToggle: () => void;
     onSaveDomains: (domains: string[]) => void;
     onRotate: () => void;
@@ -288,20 +295,25 @@ function KeyCard({
 }) {
     const [domainsText, setDomainsText] = useState((apiKey.allowed_domains || []).join('\n'));
     const [confirmDelete, setConfirmDelete] = useState(false);
-    const [embedTab, setEmbedTab] = useState<'hosted' | 'full'>('hosted');
+    const [confirmRotate, setConfirmRotate] = useState(false);
+    const [embedTab, setEmbedTab] = useState<'hosted' | 'full' | 'form'>('hosted');
+    const [formTheme, setFormTheme] = useState<'light' | 'dark'>('light');
+    const [formVariant, setFormVariant] = useState<'snippet' | 'page'>('snippet');
 
     useEffect(() => {
         setDomainsText((apiKey.allowed_domains || []).join('\n'));
     }, [apiKey.allowed_domains]);
 
-    const domainsChanged =
-        domainsText.split(/[\n,]/).map((d) => d.trim()).filter(Boolean).join(',') !==
-        (apiKey.allowed_domains || []).join(',');
+    const parsedDomains = domainsText.split(/[\n,]/).map((d) => d.trim()).filter(Boolean);
+    const domainsChanged = parsedDomains.join(',') !== (apiKey.allowed_domains || []).join(',');
 
     const endpoints = getWidgetEndpoints(apiKey.api_key, widgetBase);
     const hostedSnippet = buildHostedSnippet(apiKey.api_key, widgetBase);
     const fullTemplate = buildStandaloneTemplate(apiKey.api_key, widgetBase);
-    const embedCode = embedTab === 'hosted' ? hostedSnippet : fullTemplate;
+    const formSnippet = formVariant === 'snippet'
+        ? buildFormEmbedSnippet(apiKey.api_key, widgetBase, formTheme)
+        : buildFormEmbedFullPage(apiKey.api_key, widgetBase, formTheme, tenantName);
+    const embedCode = embedTab === 'hosted' ? hostedSnippet : embedTab === 'full' ? fullTemplate : formSnippet;
 
     return (
         <div className={`glass-card rounded-3xl p-6 border space-y-5 min-w-0 ${apiKey.is_active ? 'border-white/5' : 'border-white/5 opacity-60'}`}>
@@ -322,16 +334,29 @@ function KeyCard({
                         className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 transition-all">
                         <Power size={16} />
                     </button>
-                    <button onClick={onRotate} title="Regenerar clave"
+                    <button onClick={() => { setConfirmDelete(false); setConfirmRotate(true); }} title="Regenerar clave"
                         className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 transition-all">
                         <RefreshCw size={16} />
                     </button>
-                    <button onClick={() => setConfirmDelete(true)} title="Eliminar"
+                    <button onClick={() => { setConfirmRotate(false); setConfirmDelete(true); }} title="Eliminar"
                         className="p-2.5 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all">
                         <Trash2 size={16} />
                     </button>
                 </div>
             </div>
+
+            {confirmRotate && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-500/5 border border-amber-500/20 rounded-xl p-3">
+                    <span className="text-sm text-amber-200 flex items-start gap-2">
+                        <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                        ¿Regenerar la clave? La actual dejará de funcionar de inmediato y habrá que actualizar el código embebido en el sitio.
+                    </span>
+                    <div className="flex gap-2 shrink-0 self-end sm:self-auto">
+                        <button onClick={() => setConfirmRotate(false)} className="px-3 py-1.5 rounded-lg text-xs font-bold text-white/60 hover:text-white">Cancelar</button>
+                        <button onClick={() => { setConfirmRotate(false); onRotate(); }} className="px-3 py-1.5 rounded-lg bg-amber-500 text-[#020210] text-xs font-bold hover:brightness-110">Regenerar</button>
+                    </div>
+                </div>
+            )}
 
             <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase tracking-wider text-white/50">Clave pública</label>
@@ -354,10 +379,14 @@ function KeyCard({
                     className="w-full bg-black/20 border border-white/10 rounded-xl py-2.5 px-3 text-sm outline-none focus:border-primary/50 transition-all font-mono"
                 />
                 {domainsChanged && (
-                    <div className="flex justify-end">
+                    <div className="flex items-center justify-end gap-3">
+                        {parsedDomains.length === 0 && (
+                            <span className="text-[11px] text-amber-300/80">Debe quedar al menos un dominio.</span>
+                        )}
                         <button
-                            onClick={() => onSaveDomains(domainsText.split(/[\n,]/).map((d) => d.trim()).filter(Boolean))}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary/90 text-white text-xs font-bold hover:brightness-110 transition-all"
+                            onClick={() => onSaveDomains(parsedDomains)}
+                            disabled={parsedDomains.length === 0}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary/90 text-white text-xs font-bold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                         >
                             <Check size={14} /> Guardar dominios
                         </button>
@@ -428,13 +457,67 @@ function KeyCard({
                         >
                             Plantilla completa (HTML/CSS/JS)
                         </button>
+                        <button
+                            onClick={() => canUseFormEmbed && setEmbedTab('form')}
+                            disabled={!canUseFormEmbed}
+                            title={canUseFormEmbed ? undefined : 'Exclusivo del plan ULTRA'}
+                            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all inline-flex items-center gap-1.5 ${
+                                embedTab === 'form'
+                                    ? 'bg-emerald-400 text-[#020210] shadow-md shadow-emerald-400/30'
+                                    : canUseFormEmbed
+                                        ? 'text-white/50 hover:text-white'
+                                        : 'text-white/25 cursor-not-allowed'
+                            }`}
+                        >
+                            Formulario (iframe)
+                            {!canUseFormEmbed && (
+                                <span className="text-[9px] font-black px-1 py-px rounded bg-white/10 text-white/50">ULTRA</span>
+                            )}
+                        </button>
                     </div>
 
                     <p className="text-[11px] text-white/40">
                         {embedTab === 'hosted'
                             ? 'Recomendado: carga el widget desde Vinzer y se actualiza automáticamente.'
-                            : 'Autocontenida: pega todo el bloque (productos, servicios y seguimiento) sin dependencias externas.'}
+                            : embedTab === 'full'
+                                ? 'Autocontenida: pega todo el bloque (productos, servicios y seguimiento) sin dependencias externas.'
+                                : formVariant === 'snippet'
+                                    ? 'Fragmento para pegar dentro de una página existente del sitio. Solo carga en los dominios autorizados y ajusta su alto automáticamente.'
+                                    : 'Página HTML completa, lista para publicar tal cual (ej. form.mi-crematorio.cl). Ese dominio debe estar en los dominios autorizados.'}
                     </p>
+
+                    {embedTab === 'form' && (
+                        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px]">
+                        <div className="flex items-center gap-2">
+                            <span className="text-white/40 font-bold uppercase tracking-wider">Formato</span>
+                            {([['snippet', 'Fragmento'], ['page', 'HTML completo']] as const).map(([v, label]) => (
+                                <button
+                                    key={v}
+                                    onClick={() => setFormVariant(v)}
+                                    className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                                        formVariant === v ? 'bg-white/15 text-white' : 'text-white/40 hover:text-white'
+                                    }`}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-white/40 font-bold uppercase tracking-wider">Tema</span>
+                            {(['light', 'dark'] as const).map((t) => (
+                                <button
+                                    key={t}
+                                    onClick={() => setFormTheme(t)}
+                                    className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                                        formTheme === t ? 'bg-white/15 text-white' : 'text-white/40 hover:text-white'
+                                    }`}
+                                >
+                                    {t === 'light' ? 'Claro' : 'Oscuro'}
+                                </button>
+                            ))}
+                        </div>
+                        </div>
+                    )}
 
                     {/* Bloque de código estilo terminal */}
                     <div className="rounded-xl border border-white/10 overflow-hidden min-w-0 bg-[#020308]">
@@ -444,7 +527,7 @@ function KeyCard({
                                 <span className="w-2.5 h-2.5 rounded-full bg-[#19B5FE]/80" />
                                 <span className="w-2.5 h-2.5 rounded-full bg-white/20" />
                                 <span className="ml-2 text-[10px] font-mono text-white/40">
-                                    {embedTab === 'hosted' ? 'vinzer-widget.html' : 'vinzer-widget-full.html'}
+                                    {embedTab === 'hosted' ? 'vinzer-widget.html' : embedTab === 'full' ? 'vinzer-widget-full.html' : formVariant === 'snippet' ? 'vinzer-formulario.html' : 'index.html'}
                                 </span>
                             </div>
                             <CopyButton value={embedCode} label="Copiar" />

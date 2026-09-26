@@ -151,3 +151,92 @@ export function buildStandaloneTemplate(key: string, base = getWidgetBaseUrl()):
 })();
 </script>`;
 }
+
+/**
+ * Formulario de ingreso incrustable (iframe) — plan ULTRA.
+ * El iframe solo carga en los dominios autorizados de la clave (CSP
+ * frame-ancestors). El script ajusta el alto con los mensajes que envía el
+ * formulario (`{source:'vinzer-form', type:'height'|'scroll-top'}`) y valida
+ * origen y ventana emisora. Soporta varios formularios en la misma página.
+ */
+export type FormEmbedTheme = 'light' | 'dark';
+
+function formEmbedSrc(key: string, base: string, theme: FormEmbedTheme): string {
+    return `${base}/embed/form?key=${encodeURIComponent(key)}${theme === 'dark' ? '&theme=dark' : ''}`;
+}
+
+function formEmbedIframe(src: string, lazy: boolean): string {
+    return `<iframe data-vinzer-form
+        src="${src}"
+        title="Formulario de ingreso"
+        style="width:100%;min-height:480px;border:0;display:block"${lazy ? '\n        loading="lazy"' : ''}></iframe>`;
+}
+
+const FORM_EMBED_SCRIPT = `<script>
+(function () {
+  if (window.__vinzerFormEmbed) return;
+  window.__vinzerFormEmbed = true;
+  window.addEventListener('message', function (e) {
+    var d = e.data;
+    if (!d || d.source !== 'vinzer-form') return;
+    var frames = document.querySelectorAll('iframe[data-vinzer-form]');
+    for (var i = 0; i < frames.length; i++) {
+      var f = frames[i];
+      if (f.contentWindow !== e.source || new URL(f.src).origin !== e.origin) continue;
+      if (d.type === 'height' && d.height > 0) f.style.height = d.height + 'px';
+      if (d.type === 'scroll-top' && f.getBoundingClientRect().top < 0) {
+        f.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  });
+})();
+</script>`;
+
+const escapeHtml = (v: string) =>
+    v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/** Fragmento para pegar dentro de una página existente del sitio. */
+export function buildFormEmbedSnippet(
+    key: string,
+    base = getWidgetBaseUrl(),
+    theme: FormEmbedTheme = 'light',
+): string {
+    return `<!-- Formulario de ingreso Vinzer -->
+${formEmbedIframe(formEmbedSrc(key, base, theme), true)}
+${FORM_EMBED_SCRIPT}`;
+}
+
+/**
+ * Página HTML completa y lista para publicar (ej. form.mi-crematorio.cl/index.html).
+ * Solo contiene el iframe a pantalla completa: el formulario sigue viviendo en
+ * Vinzer, así que no hay que mantener nada en el sitio del cliente.
+ */
+export function buildFormEmbedFullPage(
+    key: string,
+    base = getWidgetBaseUrl(),
+    theme: FormEmbedTheme = 'light',
+    tenantName = '',
+): string {
+    const title = escapeHtml(tenantName ? `Formulario de ingreso · ${tenantName}` : 'Formulario de ingreso');
+    const bg = theme === 'dark' ? '#0f172a' : '#f8fafc';
+    return `<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${title}</title>
+  <meta name="robots" content="noindex">
+  <style>
+    html, body { margin: 0; padding: 0; background: ${bg}; }
+    main { max-width: 820px; margin: 0 auto; padding: 16px; }
+  </style>
+</head>
+<body>
+  <main>
+    ${formEmbedIframe(formEmbedSrc(key, base, theme), false).replace(/\n/g, '\n    ')}
+  </main>
+  ${FORM_EMBED_SCRIPT.replace(/\n/g, '\n  ')}
+</body>
+</html>
+`;
+}
