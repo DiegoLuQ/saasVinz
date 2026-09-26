@@ -3,14 +3,15 @@
 import React, { useState } from 'react';
 import PartnerLinksTable from '@/components/veterinary/PartnerLinksTable';
 import VetCommissionsTable from '@/components/veterinary/VetCommissionsTable';
-import { Users, CreditCard, Calendar, DollarSign, Mail, ExternalLink, Check, Copy, Building2 } from 'lucide-react';
+import VetReferralsTable from '@/components/veterinary/VetReferralsTable';
+import { Users, CreditCard, Calendar, DollarSign, Mail, ExternalLink, Check, Copy, Building2, PawPrint } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useVeterinaryBootstrap } from '@/hooks/useVeterinaryBootstrap';
 import { copyToClipboard } from '@/lib/clipboard';
 import { getPartnerRegistroUrl } from '@/lib/publicUrls';
 
 export default function VeterinaryDashboard() {
-    const [activeTab, setActiveTab] = useState<'links' | 'commissions'>('links');
+    const [activeTab, setActiveTab] = useState<'links' | 'referrals' | 'commissions'>('links');
     const { data, isLoading, error } = useVeterinaryBootstrap();
     const [copiedLinkId, setCopiedLinkId] = useState<number | null>(null);
 
@@ -203,6 +204,16 @@ export default function VeterinaryDashboard() {
                             <Users size={14} /> Mis Vínculos
                         </button>
                         <button
+                            onClick={() => setActiveTab('referrals')}
+                            className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2
+                                ${activeTab === 'referrals'
+                                    ? 'bg-[var(--primary-color)] text-[var(--primary-foreground)] shadow-lg shadow-[var(--primary-color)]/20'
+                                    : 'text-[var(--muted-foreground)] hover:text-[var(--foreground-color)] hover:bg-[var(--muted-color)]'
+                                }`}
+                        >
+                            <PawPrint size={14} /> Derivaciones
+                        </button>
+                        <button
                             onClick={() => setActiveTab('commissions')}
                             className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2
                                 ${activeTab === 'commissions'
@@ -222,7 +233,9 @@ export default function VeterinaryDashboard() {
                         className="bg-[var(--card-color)] rounded-[3rem] border border-[var(--card-border-color)] overflow-hidden p-1"
                     >
                         {/* Pass data to components if needed, or let them use hook/context if they are smart components */}
-                        {activeTab === 'links' ? <PartnerLinksTable links={data?.links || []} /> : <VetCommissionsTable commissions={data?.commissions || []} />}
+                        {activeTab === 'links' && <PartnerLinksTable links={data?.links || []} />}
+                        {activeTab === 'referrals' && <VetReferralsTable />}
+                        {activeTab === 'commissions' && <VetCommissionsTable commissions={data?.commissions || []} />}
                     </motion.div>
                 </div>
             </main>

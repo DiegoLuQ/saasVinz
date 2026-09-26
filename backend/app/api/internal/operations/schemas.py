@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
 from typing import Optional, List, Any
 from datetime import datetime
 from app.api.internal.crm.schemas import PetInDB
@@ -76,7 +76,10 @@ class CremationTechnicalInDB(CremationTechnicalBase):
 
 class PartnerCommissionBase(BaseModel):
     cremation_id: int
-    partner_id: int
+    # El modelo guarda el vínculo en `partner_link_id`; la API lo expone como
+    # `partner_id`. Sin el alias, serializar una comisión desde el ORM fallaba
+    # (500 en el bootstrap veterinario y en órdenes con comisión).
+    partner_id: int = Field(validation_alias=AliasChoices("partner_id", "partner_link_id"))
     amount: float
     status: str
     paid_at: Optional[datetime] = None
