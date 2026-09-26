@@ -626,6 +626,9 @@ class BootstrapTenantData(BaseModel):
     name: str
     short_name: Optional[str] = None
     slug: Optional[str] = None
+    # Credencial del enlace permanente del formulario público (Navbar > Compartir).
+    # Solo se entrega en la sesión interna; el endpoint público ya no la expone.
+    public_token: Optional[str] = None
     logo_url: Optional[str] = None
     pending_reason: Optional[str] = None
     status: TenantStatus
