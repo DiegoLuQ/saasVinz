@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { ShieldCheck, Lock, Mail, ArrowRight, AlertCircle, Stethoscope } from 'lucide-react';
 import { apiRequest } from '@/lib/veterinary/api';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function VeterinaryLoginPage() {
     const router = useRouter();
@@ -108,6 +109,11 @@ export default function VeterinaryLoginPage() {
                                     className="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3.5 pl-11 pr-4 outline-none focus:border-teal-500/50 focus:bg-slate-900/80 transition-all text-sm text-slate-200 placeholder:text-slate-600"
                                     placeholder="••••••••••••"
                                 />
+                            </div>
+                            <div className="text-right">
+                                <Link href="/olvide-contrasena" className="text-xs text-slate-400 hover:text-teal-400 transition-colors">
+                                    ¿Olvidaste tu contraseña?
+                                </Link>
                             </div>
                         </div>
 

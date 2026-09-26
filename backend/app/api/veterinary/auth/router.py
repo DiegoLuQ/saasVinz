@@ -1,9 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import hashlib
+import logging
+from urllib.parse import urlparse
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.api.internal.partners.models import Veterinary
 from pydantic import BaseModel, EmailStr
-from app.auth import verify_password, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
+from app.auth import verify_password, create_access_token, get_password_hash, ACCESS_TOKEN_EXPIRE_MINUTES
+from app.core.config import settings
+from app.core.rate_limiter import limiter
 from datetime import timedelta
 
 router = APIRouter()
@@ -13,7 +18,9 @@ class VeterinaryLogin(BaseModel):
     password: str
 
 @router.post("/auth/login", tags=["Veterinary - Auth"])
+@limiter.limit(settings.RATE_LIMIT_LOGIN)  # antes sin límite: permitía fuerza bruta
 def login_for_access_token(
+    request: Request,
     login_data: VeterinaryLogin,
     db: Session = Depends(get_db)
 ):
@@ -57,6 +64,98 @@ def login_for_access_token(
     }
 
 # --- Dependencies ---
+# --- Recuperación de contraseña ---
+
+logger = logging.getLogger(__name__)
+
+RESET_TOKEN_MINUTES = 30
+RESET_ROLE = "vet_password_reset"  # distinto de "veterinary_global": no sirve como sesión
+MIN_PASSWORD_LENGTH = 8
+_GENERIC_FORGOT_MSG = "Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña."
+
+
+def _password_fingerprint(password_hash: str) -> str:
+    """Huella del hash actual: el enlace deja de valer apenas cambia la contraseña (uso único)."""
+    return hashlib.sha256((password_hash or "").encode()).hexdigest()[:16]
+
+
+def _vet_portal_url() -> str:
+    if settings.VETERINARY_PORTAL_URL:
+        return settings.VETERINARY_PORTAL_URL.rstrip("/")
+    parsed = urlparse(settings.FRONTEND_URL)
+    host = parsed.netloc
+    if host.startswith("www."):
+        host = host[4:]
+    return f"{parsed.scheme or 'https'}://veterinary.{host}"
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+async def _send_reset_email(to_email: str, name: str, url: str) -> None:
+    from app.services.email import send_vet_password_reset_email
+    try:
+        await send_vet_password_reset_email(to_email, name, url)
+    except Exception:  # noqa: BLE001 - el endpoint responde igual; se registra el fallo
+        logger.exception("No se pudo enviar el correo de restablecimiento de contraseña (veterinaria)")
+
+
+@router.post("/auth/forgot-password", tags=["Veterinary - Auth"])
+@limiter.limit("5/minute")
+def forgot_password(
+    request: Request,
+    data: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """
+    Envía un enlace para restablecer la contraseña. Responde lo mismo exista o
+    no el correo, para no revelar qué veterinarias están registradas.
+    """
+    vet = db.query(Veterinary).filter(
+        func.lower(Veterinary.email) == data.email.strip().lower(),
+        Veterinary.is_active == True,  # noqa: E712
+    ).first()
+    if vet:
+        token = create_access_token(
+            data={"sub": str(vet.id), "role": RESET_ROLE, "pwh": _password_fingerprint(vet.password_hash)},
+            expires_delta=timedelta(minutes=RESET_TOKEN_MINUTES),
+        )
+        url = f"{_vet_portal_url()}/restablecer?token={token}"
+        background_tasks.add_task(_send_reset_email, vet.email, vet.name, url)
+    return {"detail": _GENERIC_FORGOT_MSG}
+
+
+@router.post("/auth/reset-password", tags=["Veterinary - Auth"])
+@limiter.limit("10/minute")
+def reset_password(
+    request: Request,
+    data: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    """Define una nueva contraseña con el enlace del correo (30 min, uso único)."""
+    invalid = HTTPException(status_code=400, detail="El enlace no es válido o ya venció.")
+    payload = decode_access_token(data.token)
+    if not payload or payload.get("role") != RESET_ROLE or not payload.get("sub"):
+        raise invalid
+    if len(data.new_password or "") < MIN_PASSWORD_LENGTH:
+        raise HTTPException(status_code=422, detail=f"La contraseña debe tener al menos {MIN_PASSWORD_LENGTH} caracteres.")
+
+    vet = db.query(Veterinary).filter(Veterinary.id == int(payload["sub"])).first()
+    if not vet or not vet.is_active or payload.get("pwh") != _password_fingerprint(vet.password_hash):
+        raise invalid
+
+    vet.password_hash = get_password_hash(data.new_password)
+    db.commit()
+    return {"detail": "Contraseña actualizada. Ya puedes ingresar con tu nueva contraseña."}
+
+
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from app.auth import oauth2_scheme, decode_access_token

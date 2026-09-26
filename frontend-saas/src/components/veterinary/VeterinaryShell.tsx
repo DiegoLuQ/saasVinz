@@ -8,7 +8,7 @@ import VeterinaryHeader from './VeterinaryHeader';
 
 export default function VeterinaryShell({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
-    const isLoginPage = pathname.includes('/login');
+    const isLoginPage = ['/login', '/olvide-contrasena', '/restablecer'].some((p) => pathname.includes(p));
 
     return (
         <>

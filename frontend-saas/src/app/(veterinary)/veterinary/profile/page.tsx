@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Mail, Phone, MapPin, Save, Upload, Building, Camera } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Save, Building, Camera, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import ChangePasswordCard from '@/components/veterinary/ChangePasswordCard';
 import { useVeterinaryBootstrap } from '@/hooks/useVeterinaryBootstrap';
 import { apiRequest } from '@/lib/veterinary/api';
 
@@ -16,6 +18,8 @@ export default function VeterinaryProfilePage() {
         logo_url: '' // Future placeholder for logo
     });
     const [saving, setSaving] = useState(false);
+    const [saveMsg, setSaveMsg] = useState<{ ok: boolean; text: string } | null>(null);
+    const queryClient = useQueryClient();
 
     useEffect(() => {
         if (data?.veterinary) {
@@ -36,16 +40,17 @@ export default function VeterinaryProfilePage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
+        setSaveMsg(null);
         try {
-            // Endpoint needed for update
             await apiRequest('/api/veterinary/profile', {
                 method: 'PUT',
-                body: JSON.stringify(formData)
+                body: { name: formData.name, phone: formData.phone, address: formData.address },
             });
-            alert("Perfil actualizado correctamente");
-        } catch (error) {
-            console.error(error);
-            alert("Error al guardar perfil");
+            // El nombre también se muestra en el header: refrescar el bootstrap.
+            await queryClient.invalidateQueries({ queryKey: ['veterinary-bootstrap'] });
+            setSaveMsg({ ok: true, text: 'Perfil actualizado.' });
+        } catch (error: unknown) {
+            setSaveMsg({ ok: false, text: error instanceof Error ? error.message : 'No se pudo guardar el perfil.' });
         } finally {
             setSaving(false);
         }
@@ -154,7 +159,14 @@ export default function VeterinaryProfilePage() {
                             </div>
                         </div>
 
-                        <div className="pt-4 border-t border-white/5 flex justify-end">
+                        <div className="pt-4 border-t border-white/5 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-4">
+                            <div aria-live="polite" className="min-h-[1.25rem]">
+                                {saveMsg && (
+                                    <p className={`text-xs flex items-center gap-1.5 ${saveMsg.ok ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                        {saveMsg.ok ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />} {saveMsg.text}
+                                    </p>
+                                )}
+                            </div>
                             <button
                                 type="submit"
                                 disabled={saving}
@@ -171,6 +183,8 @@ export default function VeterinaryProfilePage() {
                     </motion.form>
                 </div>
             </div>
+
+            <ChangePasswordCard />
         </div>
     );
 }

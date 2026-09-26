@@ -345,3 +345,25 @@ def list_my_referrals(
             commission_status=str(getattr(comm.status, "value", comm.status)) if comm else None,
         ))
     return ReferralListResponse(items=items, total=total, summary=summary)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
+@router.post("/api/veterinary/profile/password", tags=["Veterinary - Dashboard"])
+def change_my_password(
+    data: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_vet: Veterinary = Depends(get_current_veterinary)
+):
+    """Cambia la contraseña del portal verificando la actual."""
+    from app.auth import verify_password, get_password_hash
+    if not verify_password(data.current_password, current_vet.password_hash):
+        raise HTTPException(status_code=400, detail="La contraseña actual no es correcta.")
+    if data.new_password == data.current_password:
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe ser distinta de la actual.")
+    current_vet.password_hash = get_password_hash(data.new_password)
+    db.commit()
+    return {"detail": "Contraseña actualizada."}

@@ -141,8 +141,10 @@ export default async function middleware(req: NextRequest) {
     if (currentHost === 'veterinary') {
         const token = req.cookies.get('vet_token')?.value;
         const isLoginPage = url.pathname === '/login';
+        // Recuperación de contraseña: accesible sin sesión.
+        const isPublicVetPage = isLoginPage || url.pathname === '/olvide-contrasena' || url.pathname === '/restablecer';
 
-        if (!token && !isLoginPage) {
+        if (!token && !isPublicVetPage) {
             return NextResponse.redirect(new URL('/login', req.url));
         }
         if (token && isLoginPage) {

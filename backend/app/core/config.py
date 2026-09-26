@@ -118,6 +118,9 @@ class Settings(BaseSettings):
     POLAR_SERVER: str = "sandbox" # 'sandbox' or 'production'
     BASE_URL: str = "http://localhost:3000"
     FRONTEND_URL: str = "http://lvh.me:3000"
+    # URL del portal veterinario (enlaces de correo). Vacío = se deriva de
+    # FRONTEND_URL anteponiendo el subdominio "veterinary.".
+    VETERINARY_PORTAL_URL: str = ""
 
     class Config:
         # Buscamos el .env en la carpeta backend (subiendo desde backend/app/core)
