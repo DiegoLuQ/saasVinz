@@ -3,7 +3,7 @@
  * el Navbar, el Footer y el sitemap: para publicar una guía nueva basta con
  * crear su página y agregarla aquí.
  */
-export type GuiaAccent = 'sky' | 'gold' | 'emerald';
+export type GuiaAccent = 'sky' | 'gold' | 'emerald' | 'violet';
 
 export interface Guia {
     slug: string;
@@ -55,6 +55,17 @@ export const GUIAS: Guia[] = [
         summary: 'Cómo funciona un formulario online para familias: los 5 pasos, qué recibe la familia al enviar, cómo llega al crematorio y 4 formas de compartirlo, incluido tu sitio web.',
         topics: ['WhatsApp', 'Enlace permanente', 'Sitio web', 'Veterinarias'],
         accent: 'emerald',
+    },
+    {
+        slug: 'seguimiento-cremacion-mascotas-en-linea',
+        title: 'Seguimiento de la cremación de mascotas en línea: cómo informar a las familias y reducir las llamadas',
+        shortTitle: 'Seguimiento en Línea',
+        footerLabel: 'Guía: Seguimiento en Línea',
+        badge: 'Familias',
+        description: 'Un enlace privado con etapas, fotos y fechas para cada familia.',
+        summary: 'Qué ve la familia en su enlace de seguimiento, cómo le llega (formulario, WhatsApp o código), qué registrar en cada etapa y cómo reduce las llamadas al crematorio.',
+        topics: ['Enlace privado', 'Etapas con fotos', 'WhatsApp', 'Código de seguimiento'],
+        accent: 'violet',
     },
 ];
 

@@ -4,12 +4,14 @@ import { GUIAS, guiaPath } from '@/lib/vinzer/guias';
 import { GUIA_GESTION_SLUG, GUIA_GESTION_SEO } from '@/lib/vinzer/guia-gestion-operativa';
 import { GUIA_TRAZABILIDAD_SLUG, GUIA_TRAZABILIDAD_SEO } from '@/lib/vinzer/guia-trazabilidad';
 import { GUIA_FORMULARIO_SLUG, GUIA_FORMULARIO_SEO } from '@/lib/vinzer/guia-formulario-online';
+import { GUIA_SEGUIMIENTO_SLUG, GUIA_SEGUIMIENTO_SEO } from '@/lib/vinzer/guia-seguimiento';
 
 /** Fecha de última modificación conocida por guía (las demás páginas no la declaran). */
 const GUIA_LASTMOD: Record<string, string> = {
     [GUIA_GESTION_SLUG]: GUIA_GESTION_SEO.dateModified,
     [GUIA_TRAZABILIDAD_SLUG]: GUIA_TRAZABILIDAD_SEO.dateModified,
     [GUIA_FORMULARIO_SLUG]: GUIA_FORMULARIO_SEO.dateModified,
+    [GUIA_SEGUIMIENTO_SLUG]: GUIA_SEGUIMIENTO_SEO.dateModified,
 };
 
 interface Entry { path: string; lastmod?: string }

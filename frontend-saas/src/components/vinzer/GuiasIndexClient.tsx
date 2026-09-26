@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ShieldCheck, Cpu, Globe, ArrowRight, ChevronRight, BookOpen } from 'lucide-react';
+import { ShieldCheck, Cpu, Globe, Smartphone, ArrowRight, ChevronRight, BookOpen } from 'lucide-react';
 
 import { VinzerNavbar } from './VinzerNavbar';
 import { VinzerFooter } from './VinzerFooter';
@@ -29,6 +29,13 @@ const ACCENT = {
         light: 'bg-emerald-50 border-emerald-200 text-emerald-700',
         hoverDark: 'hover:border-emerald-400/40',
         hoverLight: 'hover:border-emerald-300',
+    },
+    violet: {
+        icon: Smartphone,
+        dark: 'bg-violet-500/10 border-violet-500/25 text-violet-400',
+        light: 'bg-violet-50 border-violet-200 text-violet-700',
+        hoverDark: 'hover:border-violet-400/40',
+        hoverLight: 'hover:border-violet-300',
     },
 } satisfies Record<GuiaAccent, unknown>;
 
