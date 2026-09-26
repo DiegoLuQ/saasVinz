@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from app.database import get_db
 from app.api.internal.partners.models import Veterinary, PartnerLinkV2 as PartnerLink, PartnerLinkStatus, PartnerCommission
-from app.api.internal.partners.schemas import PartnerLinkResponse, CommissionListResponse
+from app.api.internal.partners.schemas import PartnerLinkResponse
 from pydantic import BaseModel, Field
 from app import models
 from app.api.veterinary.auth.router import get_current_veterinary  # sesión única del portal
@@ -77,69 +77,114 @@ def reject_link(
     return {"status": "rejected", "link_id": link.id}
 
 
-# Reuse the commission logic but filtered for Vet
-@router.get("/api/veterinary/dashboard/commissions", response_model=CommissionListResponse, tags=["Veterinary - Dashboard"])
+# --- Comisiones de la veterinaria ---
+
+class VetCommissionRow(BaseModel):
+    id: int
+    created_at: Optional[datetime] = None
+    paid_at: Optional[datetime] = None
+    amount: float = 0.0
+    amount_porcentaje: Optional[float] = None
+    status: str  # pendiente | pagado | cancelado
+    link_id: int
+    tenant_name: str
+    pet_name: Optional[str] = None
+    oc_number: Optional[int] = None
+
+
+class VetCommissionTotals(BaseModel):
+    pendiente: float = 0.0
+    pagado: float = 0.0
+    count_pendiente: int = 0
+    count_pagado: int = 0
+
+
+class VetCommissionLinkSummary(VetCommissionTotals):
+    link_id: int
+    tenant_name: str
+
+
+class VetCommissionListResponse(BaseModel):
+    totals: VetCommissionTotals
+    summary: List[VetCommissionLinkSummary]
+    rows: List[VetCommissionRow]
+    total: int
+
+
+def _status_value(st) -> str:
+    return str(getattr(st, "value", st) or "").lower()
+
+
+@router.get("/api/veterinary/dashboard/commissions", response_model=VetCommissionListResponse, tags=["Veterinary - Dashboard"])
 def list_my_commissions(
-    skip: int = 0,
-    limit: int = 20,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
     status: Optional[str] = None,
+    link_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_vet: Veterinary = Depends(get_current_veterinary)
 ):
-    query = db.query(PartnerCommission).join(PartnerLink).filter(
+    """
+    Comisiones de la veterinaria (más recientes primero) con totales generales y
+    por crematorio. Filtros: estado (pendiente | pagado | cancelado) y vínculo.
+    """
+    links = db.query(PartnerLink).options(joinedload(PartnerLink.tenant)).filter(
         PartnerLink.veterinary_id == current_vet.id
-    )
+    ).all()
+    tenant_by_link = {L.id: (L.tenant.name if L.tenant else "Crematorio") for L in links}
+    if not tenant_by_link:
+        return VetCommissionListResponse(totals=VetCommissionTotals(), summary=[], rows=[], total=0)
+    if link_id is not None and link_id not in tenant_by_link:
+        raise HTTPException(status_code=404, detail="Vínculo no encontrado")
+    if status and status not in ("pendiente", "pagado", "cancelado", "all", "todas"):
+        raise HTTPException(status_code=422, detail="Estado inválido")
 
-    if status and status not in ['all', 'todas']:
+    link_ids = list(tenant_by_link)
+
+    # Totales generales y por crematorio (sin filtros de página).
+    totals = VetCommissionTotals()
+    per_link = {lid: VetCommissionLinkSummary(link_id=lid, tenant_name=tenant_by_link[lid]) for lid in link_ids}
+    for lid, st, n, amount in (
+        db.query(PartnerCommission.partner_link_id, PartnerCommission.status,
+                 func.count(PartnerCommission.id), func.sum(PartnerCommission.amount))
+        .filter(PartnerCommission.partner_link_id.in_(link_ids))
+        .group_by(PartnerCommission.partner_link_id, PartnerCommission.status)
+        .all()
+    ):
+        key = _status_value(st)
+        if key not in ("pendiente", "pagado"):
+            continue  # las canceladas no suman
+        for target in (totals, per_link[lid]):
+            setattr(target, key, getattr(target, key) + float(amount or 0))
+            setattr(target, f"count_{key}", getattr(target, f"count_{key}") + int(n))
+
+    query = db.query(PartnerCommission).filter(PartnerCommission.partner_link_id.in_(link_ids))
+    if link_id is not None:
+        query = query.filter(PartnerCommission.partner_link_id == link_id)
+    if status and status not in ("all", "todas"):
         query = query.filter(PartnerCommission.status == status)
-    
-    # Stats
-    stats_query = db.query(PartnerCommission.status, PartnerCommission.amount).join(PartnerLink).filter(
-         PartnerLink.veterinary_id == current_vet.id
-    )
 
-    stats_results = stats_query.all()
-    
-    total_paid = sum([amount or 0 for st, amount in stats_results if str(st.value).lower() == 'pagado'])
-    total_pending = sum([amount or 0 for st, amount in stats_results if str(st.value).lower() == 'pendiente'])
-
-    # Data
+    total = query.count()
     commissions = query.options(
-        joinedload(PartnerCommission.partner_link).joinedload(PartnerLink.tenant), # Load Tenant Name
         joinedload(PartnerCommission.cremation).joinedload(models.Cremation.pet),
-    ).order_by(PartnerCommission.created_at.desc()).offset(skip).limit(limit).all()
-    
-    rows = []
-    for comm in commissions:
-        # Resolve names
-        pet_name = comm.cremation.pet.name if comm.cremation and comm.cremation.pet else "Mascota"
-        
-        # For Vet, partner_name should be the Tenant Name (the one paying)
-        tenant_name = comm.partner_link.tenant.name if comm.partner_link and comm.partner_link.tenant else "Empresa"
-        
-        rows.append({
-            "id": comm.id,
-            "cremation_id": comm.cremation_id,
-            "partner_id": comm.partner_link_id, 
-            "partner_name": tenant_name, # REUSE field for Tenant Name in Vet View
-            "amount": comm.amount,
-            "status": comm.status,
-            "created_at": comm.created_at,
-            "pet_name": pet_name,
-            "service_name": "Servicio",
-            # Banking info not needed for self
-            "partner_rut": None,
-            "partner_email": None,
-            "bank_name": None,
-            "account_type": None,
-            "account_number": None
-        })
+    ).order_by(PartnerCommission.created_at.desc(), PartnerCommission.id.desc()).offset(skip).limit(limit).all()
 
-    return {
-        "stats": {"total_paid": total_paid, "total_pending": total_pending},
-        "rows": rows,
-        "total": query.count()
-    }
+    rows = [
+        VetCommissionRow(
+            id=c.id,
+            created_at=c.created_at,
+            paid_at=c.paid_at,
+            amount=c.amount or 0.0,
+            amount_porcentaje=c.amount_porcentaje,
+            status=_status_value(c.status),
+            link_id=c.partner_link_id,
+            tenant_name=tenant_by_link.get(c.partner_link_id, "Crematorio"),
+            pet_name=c.cremation.pet.name if c.cremation and c.cremation.pet else None,
+            oc_number=c.cremation.oc_number if c.cremation else None,
+        )
+        for c in commissions
+    ]
+    return VetCommissionListResponse(totals=totals, summary=list(per_link.values()), rows=rows, total=total)
 
 
 # --- Perfil de la veterinaria ---

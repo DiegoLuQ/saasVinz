@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import PartnerLinksTable from '@/components/veterinary/PartnerLinksTable';
 import VetCommissionsTable from '@/components/veterinary/VetCommissionsTable';
 import VetReferralsTable from '@/components/veterinary/VetReferralsTable';
-import { Users, CreditCard, Calendar, DollarSign, Mail, ExternalLink, Check, Copy, Building2, PawPrint } from 'lucide-react';
+import VetLinkQrModal from '@/components/veterinary/VetLinkQrModal';
+import { Users, CreditCard, Calendar, DollarSign, Mail, ExternalLink, Check, Copy, Building2, PawPrint, QrCode } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useVeterinaryBootstrap } from '@/hooks/useVeterinaryBootstrap';
 import { copyToClipboard } from '@/lib/clipboard';
@@ -14,6 +15,7 @@ export default function VeterinaryDashboard() {
     const [activeTab, setActiveTab] = useState<'links' | 'referrals' | 'commissions'>('links');
     const { data, isLoading, error } = useVeterinaryBootstrap();
     const [copiedLinkId, setCopiedLinkId] = useState<number | null>(null);
+    const [qrLink, setQrLink] = useState<{ url: string; tenantName: string } | null>(null);
 
     const clp = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
     const allLinks = data?.links || [];
@@ -182,6 +184,14 @@ export default function VeterinaryDashboard() {
                                                 {copied ? <Check size={14} /> : <Copy size={14} />}
                                                 {copied ? 'Copiado' : 'Copiar'}
                                             </button>
+                                            <button
+                                                onClick={() => setQrLink({ url, tenantName: link.tenant?.name || 'Crematorio' })}
+                                                title="Ver código QR para imprimir"
+                                                aria-label="Ver código QR"
+                                                className="shrink-0 inline-flex items-center gap-1.5 border border-[var(--card-border-color)] hover:bg-white/10 px-3 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
+                                            >
+                                                <QrCode size={14} /> QR
+                                            </button>
                                         </div>
                                     </div>
                                 );
@@ -235,10 +245,14 @@ export default function VeterinaryDashboard() {
                         {/* Pass data to components if needed, or let them use hook/context if they are smart components */}
                         {activeTab === 'links' && <PartnerLinksTable links={data?.links || []} />}
                         {activeTab === 'referrals' && <VetReferralsTable />}
-                        {activeTab === 'commissions' && <VetCommissionsTable commissions={data?.commissions || []} />}
+                        {activeTab === 'commissions' && <VetCommissionsTable />}
                     </motion.div>
                 </div>
             </main>
+
+            {qrLink && (
+                <VetLinkQrModal url={qrLink.url} tenantName={qrLink.tenantName} onClose={() => setQrLink(null)} />
+            )}
 
             {/* Footer */}
             <div className="pt-10 pb-20 text-center relative z-10">
