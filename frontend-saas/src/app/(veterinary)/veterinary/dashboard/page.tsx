@@ -1,38 +1,32 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import PartnerLinksTable from '@/components/veterinary/PartnerLinksTable';
 import VetCommissionsTable from '@/components/veterinary/VetCommissionsTable';
-import { LayoutDashboard, Users, CreditCard, Calendar, DollarSign, Award, ExternalLink, Link as LinkIcon } from 'lucide-react';
+import { Users, CreditCard, Calendar, DollarSign, Mail, ExternalLink, Check, Copy, Building2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useVeterinaryBootstrap } from '@/hooks/useVeterinaryBootstrap';
 import { copyToClipboard } from '@/lib/clipboard';
+import { getPartnerRegistroUrl } from '@/lib/publicUrls';
 
 export default function VeterinaryDashboard() {
     const [activeTab, setActiveTab] = useState<'links' | 'commissions'>('links');
     const { data, isLoading, error } = useVeterinaryBootstrap();
-    const [stats, setStats] = useState({
-        total_paid: 0,
-        total_pending: 0,
-        total_referrals: 0,
-        paid_this_month: 0
-    });
+    const [copiedLinkId, setCopiedLinkId] = useState<number | null>(null);
 
-    useEffect(() => {
-        if (data) {
-            // Calculate stats from bootstrap data
-            const totalPending = data.metadata.total_commission_pending || 0;
-            const totalReferrals = data.links.reduce((acc: number, link: any) => acc + (link.referrals_count || 0), 0); // Assuming metadata or link has this count, if not we default.
+    const clp = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
+    const allLinks = data?.links || [];
+    const activeLinks = allLinks.filter((l) => l.status === 'active');
+    const pendingLinks = allLinks.filter((l) => l.status === 'pending');
+    const totalPaid = data?.metadata.total_commission_paid || 0;
+    const totalPending = data?.metadata.total_commission_pending || 0;
 
-            // For now, if metadata doesn't have all detailed stats, we use what we have
-            setStats({
-                total_paid: 0, // Field might need to be added to bootstrap or deduced
-                total_pending: totalPending,
-                total_referrals: data.metadata.active_links_count, // Or actual referrals count if available
-                paid_this_month: 0
-            });
+    const handleCopy = async (linkId: number, url: string) => {
+        if (await copyToClipboard(url)) {
+            setCopiedLinkId(linkId);
+            setTimeout(() => setCopiedLinkId(null), 2000);
         }
-    }, [data]);
+    };
 
     if (isLoading) {
         return (
@@ -65,9 +59,6 @@ export default function VeterinaryDashboard() {
         );
     }
 
-    // Default to first active link for display purposes if multiple links exist
-    const primaryLink = data?.links?.[0];
-
     return (
         <div className="min-h-screen bg-[#020617] text-white selection:bg-emerald-500/30">
             {/* Background Ambience */}
@@ -84,7 +75,7 @@ export default function VeterinaryDashboard() {
                     <div>
                         <p className="text-[10px] font-black text-[var(--muted-foreground)] uppercase tracking-[0.3em] mb-2 px-1">Resumen General</p>
                         <h3 className="text-4xl font-black text-[var(--primary-color)] tracking-tighter drop-shadow-[0_0_25px_rgba(var(--primary-color),0.3)]">
-                            {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(stats.total_paid)}
+                            {clp.format(totalPaid)}
                         </h3>
                         <p className="text-xs text-[var(--muted-foreground)] mt-1">Total Pagado Histórico</p>
                     </div>
@@ -106,7 +97,7 @@ export default function VeterinaryDashboard() {
                         </div>
                         <div className="relative z-10">
                             <p className="text-[10px] font-black text-indigo-200/40 uppercase tracking-[0.2em] mb-4">Vínculos Activos</p>
-                            <h2 className="text-5xl font-black tracking-tighter text-white mb-2">{data?.metadata.active_links_count || 0}</h2>
+                            <h2 className="text-5xl font-black tracking-tighter text-white mb-2">{activeLinks.length}</h2>
                         </div>
                     </div>
 
@@ -118,69 +109,85 @@ export default function VeterinaryDashboard() {
                         <div className="relative z-10">
                             <p className="text-[10px] font-black text-indigo-200/40 uppercase tracking-[0.2em] mb-4">Comisión Pendiente</p>
                             <h2 className="text-5xl font-black tracking-tighter text-blue-400 mb-2">
-                                {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', minimumFractionDigits: 0 }).format(stats.total_pending)}
+                                {clp.format(totalPending)}
                             </h2>
                         </div>
                     </div>
 
-                    {/* Model Info */}
+                    {/* Invitaciones pendientes */}
                     <div className="group relative bg-[#0B1121] rounded-[2.5rem] border border-white/5 p-8 transition-transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-purple-500/10 overflow-hidden">
                         <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-                            <Award size={80} />
+                            <Mail size={80} />
                         </div>
                         <div className="relative z-10">
-                            <p className="text-[10px] font-black text-indigo-200/40 uppercase tracking-[0.2em] mb-4">Modelo Comercial</p>
-                            {primaryLink ? (
-                                <div>
-                                    <h2 className="text-3xl font-black tracking-tighter text-purple-400 mb-1">
-                                        {primaryLink.tipo_comision === 'fijo'
-                                            ? new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(primaryLink.monto_comision)
-                                            : `${primaryLink.porcentaje_comision}%`
-                                        }
-                                    </h2>
-                                    <p className="text-xs text-indigo-200/50 uppercase tracking-wider">{primaryLink.tipo_comision}</p>
-                                </div>
-                            ) : (
-                                <h2 className="text-3xl font-black text-white/20">-</h2>
+                            <p className="text-[10px] font-black text-indigo-200/40 uppercase tracking-[0.2em] mb-4">Invitaciones Pendientes</p>
+                            <h2 className="text-5xl font-black tracking-tighter text-purple-400 mb-2">{pendingLinks.length}</h2>
+                            {pendingLinks.length > 0 && (
+                                <p className="text-xs text-indigo-200/50">Revísalas en &quot;Mis Vínculos&quot;.</p>
                             )}
                         </div>
                     </div>
                 </div>
 
-                {/* Growth Link Section (Only if link is active) */}
-                {primaryLink && (
-                    <div className="relative rounded-[3rem] overflow-hidden bg-gradient-to-r from-[var(--primary-color)]/20 to-[var(--accent-color)]/20 border border-[var(--card-border-color)] p-10 md:p-14">
-                        <div className="absolute inset-0 bg-[url('/noise.png')] opacity-20 mix-blend-overlay"></div>
-                        <div className="flex flex-col xl:flex-row items-center justify-between gap-10 relative z-10">
-                            <div className="space-y-6 max-w-2xl">
-                                <div className="inline-flex px-4 py-1.5 rounded-full bg-[var(--primary-color)]/20 border border-[var(--primary-color)]/20 backdrop-blur-md">
-                                    <span className="text-[10px] font-black text-[var(--primary-color)] uppercase tracking-widest">Enlace de Crecimiento</span>
-                                </div>
-                                <h2 className="text-4xl md:text-5xl font-black tracking-tighter leading-[0.9]">
-                                    Compártelo con tus pacientes
-                                </h2>
-                                <p className="text-lg text-[var(--muted-foreground)] leading-relaxed font-medium">
-                                    Este enlace registrará automáticamente los servicios bajo tu convenio.
-                                </p>
-                            </div>
-
-                            <div className="w-full xl:w-auto flex flex-col items-center gap-4 bg-[var(--card-color)]/90 backdrop-blur-xl p-3 pl-6 pr-3 rounded-[2rem] border border-[var(--card-border-color)] shadow-2xl shadow-[var(--primary-color)]/20">
-                                <div className="flex items-center gap-4 w-full">
-                                    <ExternalLink className="text-[var(--primary-color)] shrink-0" size={20} />
-                                    <span className="font-mono text-xs text-[var(--muted-foreground)] truncate max-w-[200px] selection:bg-[var(--primary-color)]/30">
-                                        {`.../registro/${primaryLink.slug_publico}`}
-                                    </span>
-                                    <button
-                                        onClick={() => copyToClipboard(`${window.location.origin}/registro/${primaryLink.slug_publico}`)}
-                                        className="bg-[var(--primary-color)] hover:bg-[var(--primary-color)]/80 text-[var(--primary-foreground)] px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all hover:scale-105 active:scale-95 shadow-lg shadow-[var(--primary-color)]/20"
-                                    >
-                                        Copiar
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                {/* Enlaces de derivación: uno por crematorio activo (cada uno con su comisión) */}
+                <section className="space-y-5">
+                    <div>
+                        <p className="text-[10px] font-black text-[var(--muted-foreground)] uppercase tracking-[0.3em] mb-2 px-1">Enlaces de Derivación</p>
+                        <h2 className="text-2xl md:text-3xl font-black tracking-tighter">Compártelos con tus pacientes</h2>
+                        <p className="text-sm text-[var(--muted-foreground)] mt-1">
+                            Cada crematorio tiene su propio enlace: los servicios que lleguen por él quedan registrados bajo tu convenio.
+                        </p>
                     </div>
-                )}
+
+                    {activeLinks.length === 0 ? (
+                        <div className="rounded-[2rem] border border-[var(--card-border-color)] bg-[var(--card-color)] p-8 text-center text-sm text-[var(--muted-foreground)]">
+                            {pendingLinks.length > 0
+                                ? 'Acepta una invitación en "Mis Vínculos" para obtener tu enlace de derivación.'
+                                : 'Aún no tienes convenios activos con crematorios.'}
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                            {activeLinks.map((link) => {
+                                const url = getPartnerRegistroUrl(link.slug_publico);
+                                const copied = copiedLinkId === link.id;
+                                return (
+                                    <div key={link.id} className="rounded-[2rem] border border-[var(--card-border-color)] bg-[var(--card-color)] p-6 space-y-4">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <span className="w-11 h-11 shrink-0 rounded-2xl bg-[var(--primary-color)]/15 text-[var(--primary-color)] flex items-center justify-center">
+                                                    <Building2 size={20} />
+                                                </span>
+                                                <div className="min-w-0">
+                                                    <p className="font-black text-lg tracking-tight truncate">{link.tenant?.name || 'Crematorio'}</p>
+                                                    <p className="text-xs text-[var(--muted-foreground)]">Convenio activo</p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right shrink-0">
+                                                <p className="text-2xl font-black text-purple-400 tracking-tighter">
+                                                    {link.tipo_comision === 'fijo' ? clp.format(link.monto_comision || 0) : `${link.porcentaje_comision || 0}%`}
+                                                </p>
+                                                <p className="text-[10px] text-indigo-200/50 uppercase tracking-wider">
+                                                    {link.tipo_comision === 'fijo' ? 'Monto fijo' : 'Comisión'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 bg-black/20 border border-[var(--card-border-color)] rounded-2xl p-2 pl-4">
+                                            <ExternalLink className="text-[var(--primary-color)] shrink-0" size={16} />
+                                            <span className="font-mono text-xs text-[var(--muted-foreground)] truncate flex-1" title={url}>{url}</span>
+                                            <button
+                                                onClick={() => handleCopy(link.id, url)}
+                                                className="shrink-0 inline-flex items-center gap-1.5 bg-[var(--primary-color)] hover:bg-[var(--primary-color)]/80 text-[var(--primary-foreground)] px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
+                                            >
+                                                {copied ? <Check size={14} /> : <Copy size={14} />}
+                                                {copied ? 'Copiado' : 'Copiar'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </section>
 
                 {/* Tabs & Content */}
                 <div>

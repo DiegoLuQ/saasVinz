@@ -16,6 +16,8 @@ export interface BootstrapUserData {
 export interface VetMetadata {
     unread_notifications: number;
     total_commission_pending: number;
+    /** Total histórico pagado (comisiones en estado "pagado"). */
+    total_commission_paid: number;
     active_links_count: number;
 }
 
@@ -80,8 +82,10 @@ export function useVeterinaryBootstrap() {
         staleTime: 5 * 60 * 1000, // 5 minutes
         retry: 1,
         refetchOnMount: false,
+        // En el subdominio veterinary.* el navegador ve /dashboard (el prefijo
+        // /veterinary lo agrega el middleware solo en el servidor): exigir
+        // startsWith('/veterinary') dejaba la consulta siempre deshabilitada.
         enabled: typeof window !== 'undefined'
-            && window.location.pathname.startsWith('/veterinary')
             && !window.location.pathname.includes('/login')
     });
 }

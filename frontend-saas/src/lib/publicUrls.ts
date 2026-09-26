@@ -27,6 +27,15 @@ export function getMainRootUrl(): string {
     return `${currentProtocol()}//${rootFromHost()}`;
 }
 
+/**
+ * Enlace de derivación de una veterinaria aliada (/registro/{slug_publico}).
+ * Va al dominio principal: en el subdominio del portal (veterinary.) la ruta
+ * no existe y el paciente terminaba en el login de la veterinaria.
+ */
+export function getPartnerRegistroUrl(slugPublico: string): string {
+    return `${getMainRootUrl()}/registro/${encodeURIComponent(slugPublico)}`;
+}
+
 /** Base del subdominio de seguimiento (track.). */
 export function getTrackingBaseUrl(): string {
     if (process.env.NEXT_PUBLIC_TRACKING_BASE_URL) {

@@ -4,30 +4,11 @@ from typing import List, Optional
 from app.database import get_db
 from app.api.internal.partners.models import Veterinary, PartnerLinkV2 as PartnerLink, PartnerLinkStatus, PartnerCommission
 from app.api.internal.partners.schemas import PartnerLinkResponse, CommissionListResponse
-# from app.auth import get_current_user_id # REMOVED (Not exists)
-from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
-from app.auth import SECRET_KEY, ALGORITHM
+from pydantic import BaseModel, Field
+from app import models
+from app.api.veterinary.auth.router import get_current_veterinary  # sesión única del portal
 
 router = APIRouter()
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/veterinary/auth/login")
-
-# --- Dependency to get Current Vet ---
-def get_current_veterinary(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> Veterinary:
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
-        role: str = payload.get("role")
-        if user_id is None or role != "veterinary_global":
-            raise HTTPException(status_code=401, detail="Invalid credentials or role")
-    except JWTError:
-         raise HTTPException(status_code=401, detail="Could not validate credentials")
-         
-    vet = db.query(Veterinary).filter(Veterinary.id == int(user_id)).first()
-    if not vet:
-        raise HTTPException(status_code=401, detail="Veterinary not found")
-    return vet
 
 # --- Endpoints ---
 
@@ -123,8 +104,7 @@ def list_my_commissions(
     # Data
     commissions = query.options(
         joinedload(PartnerCommission.partner_link).joinedload(PartnerLink.tenant), # Load Tenant Name
-        joinedload(PartnerCommission.cremation).joinedload(PartnerLink.veterinary), # Ensure loaded
-        joinedload(PartnerCommission.cremation).joinedload(PartnerCommission.cremation.pet)
+        joinedload(PartnerCommission.cremation).joinedload(models.Cremation.pet),
     ).order_by(PartnerCommission.created_at.desc()).offset(skip).limit(limit).all()
     
     rows = []
@@ -157,4 +137,34 @@ def list_my_commissions(
         "stats": {"total_paid": total_paid, "total_pending": total_pending},
         "rows": rows,
         "total": query.count()
+    }
+
+
+# --- Perfil de la veterinaria ---
+
+class VeterinaryProfileUpdate(BaseModel):
+    # El email es el usuario de acceso: no se cambia desde el portal.
+    name: str = Field(..., min_length=2, max_length=120)
+    phone: Optional[str] = Field(None, max_length=30)
+    address: Optional[str] = Field(None, max_length=200)
+
+
+@router.put("/api/veterinary/profile", tags=["Veterinary - Dashboard"])
+def update_my_profile(
+    data: VeterinaryProfileUpdate,
+    db: Session = Depends(get_db),
+    current_vet: Veterinary = Depends(get_current_veterinary)
+):
+    """Actualiza los datos de contacto de la clínica (nombre, teléfono, dirección)."""
+    current_vet.name = data.name.strip()
+    current_vet.phone = (data.phone or "").strip() or None
+    current_vet.address = (data.address or "").strip() or None
+    db.commit()
+    db.refresh(current_vet)
+    return {
+        "id": current_vet.id,
+        "name": current_vet.name,
+        "email": current_vet.email,
+        "phone": current_vet.phone,
+        "address": current_vet.address,
     }

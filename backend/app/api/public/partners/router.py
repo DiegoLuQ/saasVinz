@@ -419,6 +419,48 @@ async def submit_partner_admission(
 # 5. RESOLVER PARTNERS EXISTENTES (RETROCOMPATIBILIDAD)
 # ---------------------------------------------------------------------------
 
+@router.get("/partners/link/{slug_publico}")
+def get_partner_link_public(slug_publico: str, db: Session = Depends(get_db)):
+    """
+    Resuelve el enlace de derivación de una veterinaria (/registro/{slug_publico})
+    sin conocer el crematorio: devuelve la veterinaria y el crematorio del vínculo.
+
+    Declarada ANTES de /partners/{tenant_slug}/{partner_slug} para que "link" no
+    se interprete como slug de tenant. La página /registro llamaba a
+    /partners/{slug}, que es el listado por crematorio, y siempre fallaba.
+    """
+    # Bypass puntual: slug_publico identifica el vínculo entre todos los tenants.
+    apply_bypass_rls(db)
+    link = db.query(PartnerLink).options(
+        joinedload(PartnerLink.veterinary),
+        joinedload(PartnerLink.tenant)
+    ).filter(
+        PartnerLink.slug_publico == slug_publico,
+        PartnerLink.status == PartnerLinkStatus.active
+    ).first()
+
+    if not link or not link.tenant or not link.veterinary or not link.veterinary.is_active:
+        raise HTTPException(status_code=404, detail="Enlace inválido o convenio inactivo")
+    if link.tenant.status in [models.TenantStatus.inactive, models.TenantStatus.suspended]:
+        raise HTTPException(status_code=404, detail="Enlace inválido o convenio inactivo")
+
+    return {
+        "id_partner": link.id,
+        "nombre_clinica": link.veterinary.name,
+        "slug_publico": link.slug_publico,
+        "tipo_comision": link.tipo_comision,
+        "porcentaje_comision": link.porcentaje_comision,
+        "monto_comision": link.monto_comision,
+        "tenant": {
+            "id": link.tenant.id,
+            "name": link.tenant.name,
+            "slug": link.tenant.slug,
+            "logo_url": link.tenant.logo_url,
+            "phone": link.tenant.phone,
+            "email": link.tenant.email,
+        },
+    }
+
 @router.get("/partners/{tenant_slug}/{partner_slug}")
 async def get_partner_by_slug(
     tenant_slug: str,
@@ -428,6 +470,9 @@ async def get_partner_by_slug(
     tenant = db.query(models.Tenant).filter(models.Tenant.slug == tenant_slug).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
+    # ptn_partner_links tiene RLS por tenant: sin fijarlo la consulta no ve filas
+    # y el formulario con ?partner= nunca resolvía la veterinaria.
+    apply_tenant_rls(db, tenant.id)
 
     partner_link = db.query(PartnerLink).filter(
         PartnerLink.tenant_id == tenant.id,
@@ -452,6 +497,9 @@ async def list_tenant_partners(
     tenant = db.query(models.Tenant).filter(models.Tenant.slug == tenant_slug).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
+    # ptn_partner_links tiene RLS por tenant: sin fijarlo la consulta no ve filas
+    # y el formulario con ?partner= nunca resolvía la veterinaria.
+    apply_tenant_rls(db, tenant.id)
 
     partners = db.query(PartnerLink).filter(
         PartnerLink.tenant_id == tenant.id,

@@ -63,9 +63,20 @@ class PartnerLinkUpdate(BaseModel):
     porcentaje_comision: Optional[float] = None
     status: Optional[str] = None
 
+class LinkTenantMini(BaseModel):
+    """Crematorio del vínculo (lo que ve la veterinaria en su portal)."""
+    id: int
+    name: str
+    slug: Optional[str] = None
+    logo_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
 class PartnerLinkResponse(BaseModel):
     id: int
     veterinary: VeterinaryBase
+    tenant: Optional[LinkTenantMini] = None
     status: str
     slug_publico: str
     

@@ -85,7 +85,7 @@ export default function PartnerRegistroPage() {
                 }
 
                 // Fetch Partner by Slug
-                const partnerData = await apiRequest<any>(`/api/public/partners/${partnerSlug}`);
+                const partnerData = await apiRequest<any>(`/api/public/partners/link/${encodeURIComponent(partnerSlug)}`);
                 setPartner(partnerData);
 
                 if (partnerData.tenant) {
