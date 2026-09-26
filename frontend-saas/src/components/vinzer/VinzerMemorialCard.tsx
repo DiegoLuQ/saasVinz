@@ -149,7 +149,7 @@ export function VinzerMemorialCard({ className = '' }: VinzerMemorialCardProps) 
                                 {/* Badges de validación */}
                                 <div className="mt-2.5 flex flex-wrap items-center gap-2">
                                     <span className="font-mono text-[10px] bg-[#19b5fe]/10 text-[#19b5fe] px-2 py-0.5 rounded border border-[#19b5fe]/30 font-bold tracking-wide">
-                                        Precinto QR #VP-2026
+                                        Código 7KQ2M9XA4B
                                     </span>
                                     <span className="text-[10px] text-emerald-400 flex items-center gap-1 font-medium">
                                         <Check size={12} strokeWidth={3} /> Custodia verificada
@@ -165,7 +165,7 @@ export function VinzerMemorialCard({ className = '' }: VinzerMemorialCardProps) 
                         <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] flex items-center justify-between text-xs">
                             <span className="flex items-center gap-2.5 text-slate-300">
                                 <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
-                                <span>1. Recepción y colocación de precinto</span>
+                                <span>1. Recepción y registro fotográfico</span>
                             </span>
                             <span className="font-mono text-[10px] text-slate-400 shrink-0">09:30 hrs</span>
                         </div>

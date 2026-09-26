@@ -222,7 +222,7 @@ export default function VinzerLandingClient({ initialConfig = null, initialPlans
 
                         {/* Subtítulo descriptivo */}
                         <p className="text-base sm:text-lg md:text-xl max-w-2xl mx-auto lg:mx-0 font-normal leading-relaxed text-slate-200">
-                            Trazabilidad digital inmutable, registro fotográfico por etapas, emisión de certificados y seguimiento transparente en tiempo real para las familias.
+                            Trazabilidad con código único, registro fotográfico por etapas, emisión de certificados y seguimiento transparente en tiempo real para las familias.
                         </p>
 
                         {/* Botones de acción */}

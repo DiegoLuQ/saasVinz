@@ -41,87 +41,87 @@ interface ModuleItem {
 const TOUR_MODULES: ModuleItem[] = [
     {
         id: 'recepcion',
-        title: 'Admisión y Asignación de Código de Verificación Único',
-        subtitle: 'Ingreso rápido de mascotas, custodia y emisión inmediata del código familiar',
+        title: 'Recepción y Código de Verificación Único',
+        subtitle: 'Registro guiado de la mascota, el tutor y el servicio en una sola orden',
         badge: 'Módulo 01 · Recepción',
-        description: 'Al registrar a la mascota en recepción o retiro en clínica veterinaria, el sistema genera automáticamente un código alfanumérico único e irrepetible. Este código actúa como llave criptográfica para toda la bitácora de custodia, eliminando el riesgo de confusiones con etiquetas manuales.',
-        seoAlt: 'Pantalla de registro de orden con código de verificación único en Vinzer',
-        seoCaption: 'Captura del formulario de admisión: registro de datos de la mascota, peso, tutor y asignación automática del identificador único de trazabilidad.',
+        description: 'Al registrar un servicio, Vinzer genera automáticamente un código de verificación único de 10 caracteres y un enlace privado de seguimiento. El formulario de recepción, organizado en 4 pestañas, reúne los datos de la mascota y del tutor, la logística, las fotografías y el detalle comercial, y guarda borradores automáticamente.',
+        seoAlt: 'Formulario de recepción de una orden de cremación con código de verificación único en Vinzer',
+        seoCaption: 'Formulario de recepción: datos de la mascota y del tutor, retiro programado, fotografías y detalle comercial en una sola orden.',
         imageUrl: 'https://i.postimg.cc/mD9jZNX2/portada-1.webp',
-        tags: ['Identificador Criptográfico', 'Registro en 2 Minutos', 'Tutor & Mascota'],
+        tags: ['Código Único', 'Formulario en 4 Pestañas', 'Autoguardado'],
         highlights: [
-            'Generación de código irrepetible al instante',
-            'Cálculo automático de peso y requerimientos de horno',
-            'Envío automático de enlace privado por WhatsApp y correo a la familia',
-            'Historial de quién registró el servicio con fecha y hora exacta'
+            'Código de verificación único por servicio',
+            'Retiro programado, peso estimado y dirección de entrega',
+            'Hasta 3 fotografías y notas internas por orden',
+            'Enlace de seguimiento listo para compartir con la familia'
         ]
     },
     {
         id: 'bitacora-planta',
-        title: 'Bitácora Operativa de Horno con Evidencia Fotográfica',
-        subtitle: 'Validación obligatoria de identidad antes de encender el incinerador',
+        title: 'Operación por Etapas con Evidencia Fotográfica',
+        subtitle: 'Cada crematorio define sus etapas y registra cada avance',
         badge: 'Módulo 02 · Operación de Planta',
-        description: 'La seguridad no es negociable. Antes de ingresar la mascota al horno, el operador escanea o digita el código de verificación y toma una fotografía del cuerpo con su identificador físico. El sistema registra firma digital del operador, hora exacta y bloquea cualquier avance si falta la evidencia.',
-        seoAlt: 'Bitácora de incineración con captura de fotos y firma de operador en software Vinzer',
-        seoCaption: 'Interfaz del operador de planta: control de etapas de cremación, subida de foto de confirmación y firma de custodia en tiempo real.',
+        description: 'Cada crematorio configura la secuencia real de su servicio (retiro, recepción, cremación, entrega o las que use). Desde el panel de Operaciones, el equipo ve las órdenes pendientes y avanza cada una dejando una fotografía y comentarios, con fecha y hora registradas.',
+        seoAlt: 'Panel de operaciones de Vinzer con avance por etapas y evidencia fotográfica',
+        seoCaption: 'Panel de operaciones: órdenes pendientes, avance por etapas configurables y registro de fotografías y comentarios.',
         imageUrl: 'https://i.postimg.cc/mD9jZNX2/portada-1.webp',
-        tags: ['Fotos Obligatorias', 'Firma de Operador', 'Anti-Error de Identidad'],
+        tags: ['Etapas Configurables', 'Foto por Etapa', 'Fecha y Hora'],
         highlights: [
-            'Obligatoriedad de fotografía antes de iniciar el ciclo',
-            'Firma táctil del operador responsable en tablet o teléfono',
-            'Marca de tiempo inviolable en servidor seguro',
-            'Control simultáneo de múltiples cámaras u hornos sin cruces'
+            'Etapas del servicio definidas por cada crematorio',
+            'Fotografía y comentarios en cada avance',
+            'Fecha y hora registradas automáticamente',
+            'Vista de órdenes pendientes para todo el equipo'
         ]
     },
     {
         id: 'portal-familias',
         title: 'Portal de Seguimiento en Tiempo Real para Familias',
-        subtitle: 'Tranquilidad total para los tutores desde su móvil, sin llamadas ni contraseñas',
+        subtitle: 'Tranquilidad para los tutores desde su celular, sin llamadas ni contraseñas',
         badge: 'Módulo 03 · Portal Público',
-        description: 'Las familias reciben un enlace directo a un portal web elegante y sobrio. Solo ingresando su código único, pueden consultar en qué fase exacta se encuentra su compañero (En Custodia, En Planta, Completado) junto a la fecha y hora de cada paso, reduciendo en más de un 80% las llamadas de consulta.',
-        seoAlt: 'Portal móvil familiar de seguimiento de cremación de mascotas en tiempo real',
-        seoCaption: 'Vista responsive del portal público para familias: línea de tiempo de custodia, estado del servicio y datos de la mascota con diseño sereno.',
+        description: 'Cada familia recibe un enlace privado a un portal sobrio y responsive. Sin crear cuentas, ve las etapas del servicio de su mascota, cuál está en curso y las fotografías y comentarios de cada avance. También puede buscar su servicio con el código de verificación.',
+        seoAlt: 'Portal móvil de seguimiento de cremación de mascotas en tiempo real para familias',
+        seoCaption: 'Portal público para familias: línea de tiempo del servicio, etapa en curso y evidencias de cada avance con un diseño sereno.',
         imageUrl: 'https://i.postimg.cc/mD9jZNX2/portada-1.webp',
-        tags: ['Acceso Directo', 'Línea de Tiempo en Vivo', '0% Inquietud Familiar'],
+        tags: ['Sin Contraseñas', 'Línea de Tiempo en Vivo', 'Menos Llamadas'],
         highlights: [
-            'Acceso sin usuario ni contraseña mediante el código único',
-            'Visualización de fases autorizadas con diseño respetuoso y sobrio',
-            'Descarga directa del certificado digital una vez finalizado el servicio',
-            'Totalmente responsive y optimizado para teléfonos móviles'
+            'Acceso con enlace privado, sin usuario ni contraseña',
+            'Búsqueda del servicio por código de verificación',
+            'Etapas, fotografías y comentarios de cada avance',
+            'Diseño responsive pensado para el celular'
         ]
     },
     {
         id: 'certificados-qr',
-        title: 'Certificados Digitales Oficiales con Código QR de Autenticidad',
-        subtitle: 'Documentos PDF inviolables con verificación pública al instante',
-        badge: 'Módulo 04 · Certificación Legal',
-        description: 'Al concluir el servicio, Vinzer emite automáticamente un certificado oficial en alta resolución PDF con los datos de la mascota, fecha de incineración, sello de agua institucional y un código QR dinámico. Cualquier persona que escanee el código QR accede a la validación de autenticidad en la nube de Vinzer.',
-        seoAlt: 'Certificado de cremación de mascotas con código QR dinámico y sello de agua',
-        seoCaption: 'Plantilla de certificado digital oficial: personalizable con los colores, sellos y firmas de tu crematorio, con validación de autenticidad mediante código QR.',
+        title: 'Certificados de Cremación en PDF Personalizables',
+        subtitle: 'Plantillas con el diseño de tu crematorio, listas para imprimir o enviar',
+        badge: 'Módulo 04 · Certificados',
+        description: 'Desde el plan NORMAL, Vinzer genera el certificado de cremación en PDF con los datos de la mascota y del servicio, usando plantillas con el logo, los colores, los textos, la marca de agua y el espacio de firma y sello de tu crematorio.',
+        seoAlt: 'Certificado de cremación de mascotas en PDF con plantilla personalizable',
+        seoCaption: 'Plantilla de certificado de cremación: personalizable con el logo, los colores, los textos y la firma de tu crematorio.',
         imageUrl: 'https://i.postimg.cc/mD9jZNX2/portada-1.webp',
-        tags: ['Código QR Verificable', 'Sello Anti-Falsificación', 'PDF en Alta Definición'],
+        tags: ['Plantillas Editables', 'Marca de Agua', 'PDF Listo para Imprimir'],
         highlights: [
-            'Código QR público de verificación que demuestra la autenticidad',
-            'Personalización de colores, logos, firmas y sellos institucionales',
-            'Generación instantánea en PDF listo para imprimir o enviar',
-            'Numeración correlativa y correlación con el expediente digital'
+            'Plantillas con logo, colores y textos del crematorio',
+            'Marca de agua con el logo de fondo',
+            'Espacio de firma y sello personalizable',
+            'Formatos Carta y Oficio'
         ]
     },
     {
         id: 'inventario-anforas',
-        title: 'Gestión de Ánforas, Productos y Logística de Retiros',
-        subtitle: 'Control de existencias de urnas, servicios adicionales y despacho',
-        badge: 'Módulo 05 · Inventario y Logística',
-        description: 'Controla el stock de ánforas estándar y personalizadas, placas conmemorativas y relicarios. El sistema descuenta existencias automáticamente cuando un producto es asignado a una orden y permite gestionar la ruta de retiro o entrega a domicilio con choferes asignados.',
-        seoAlt: 'Control de inventario de ánforas y coordinación de retiros en Vinzer',
-        seoCaption: 'Módulo de inventario y catálogo: vista de stock disponible, alertas de reposición de urnas y asignación de despachos.',
+        title: 'Inventario de Ánforas, Productos y Catálogo',
+        subtitle: 'Stock, precios y catálogo descargable en un solo lugar',
+        badge: 'Módulo 05 · Inventario',
+        description: 'Controla el stock de ánforas, relicarios y productos con su precio de costo y de venta. Las existencias se descuentan automáticamente cuando un producto se agrega a una orden, y el catálogo completo se puede descargar en PDF para compartirlo con familias y veterinarias.',
+        seoAlt: 'Inventario de ánforas y productos con control de stock en Vinzer',
+        seoCaption: 'Módulo de inventario y catálogo: stock disponible, precios de costo y venta, y catálogo descargable en PDF.',
         imageUrl: 'https://i.postimg.cc/mD9jZNX2/portada-1.webp',
-        tags: ['Control de Stock', 'Descuento Automático', 'Rutas de Entrega'],
+        tags: ['Control de Stock', 'Descuento Automático', 'Catálogo PDF'],
         highlights: [
-            'Catálogo con fotos, precios y niveles mínimos de alerta de existencias',
-            'Asignación directa de urnas a cada orden de cremación',
-            'Historial de movimientos e ingresos de proveedores',
-            'Hoja de ruta clara para el personal de retiro y entrega'
+            'Stock, precio de costo y precio de venta por producto',
+            'Descuento automático al agregar productos a una orden',
+            'Catálogo de productos y servicios descargable en PDF',
+            'Planes, servicios y productos en un mismo catálogo'
         ]
     }
 ];
@@ -309,7 +309,7 @@ export default function VinzerTourClient() {
                                 className="p-3 rounded-xl bg-white/5 hover:bg-cyan-500/10 border border-white/5 hover:border-cyan-500/30 transition-all text-left group"
                             >
                                 <div className="text-[10px] font-mono text-cyan-400">01:15 - Minuto 2</div>
-                                <div className="text-xs font-bold mt-1 group-hover:text-cyan-300">Horno y Fotos</div>
+                                <div className="text-xs font-bold mt-1 group-hover:text-cyan-300">Etapas y Fotos</div>
                             </a>
                             <a
                                 href="#portal-familias"

@@ -1,97 +1,73 @@
 import React from 'react';
 import type { Metadata } from 'next';
 import { GuiaTrazabilidadClient } from '@/components/vinzer/GuiaTrazabilidadClient';
+import { SITE_URL, siteUrl } from '@/lib/vinzer/site';
+import { guiaPath } from '@/lib/vinzer/guias';
+import { GUIA_TRAZABILIDAD_SLUG, GUIA_TRAZABILIDAD_SEO as SEO, GUIA_TRAZABILIDAD_FAQ } from '@/lib/vinzer/guia-trazabilidad';
+
+const URL_GUIA = siteUrl(guiaPath(GUIA_TRAZABILIDAD_SLUG));
+const OG_IMAGE = { url: '/images/og-image-vinzer.jpg', width: 1200, height: 630, alt: 'Seguimiento de cremación de mascotas con Vinzer' };
 
 export const metadata: Metadata = {
-    title: '¿Cómo Garantizar la Trazabilidad y Cadena de Custodia en un Crematorio de Mascotas? | Vinzer',
-    description: 'Guía B2B para directores de crematorios: protocolo de trazabilidad con código QR, registro fotográfico, control de hornos y emisión de certificados inviolables.',
-    keywords: [
-        'trazabilidad crematorio mascotas',
-        'cadena de custodia crematorio',
-        'software crematorio mascotas chile',
-        'codigo qr cenizas mascotas',
-        'certificado cremacion digital',
-        'protocolo cremacion mascotas',
-        'gestion crematorio mascotas'
-    ],
+    metadataBase: new URL(SITE_URL),
+    title: SEO.title,
+    description: SEO.description,
+    keywords: SEO.keywords,
     alternates: {
-        canonical: 'https://vinzer.app/guias/software-trazabilidad-cadena-custodia-crematorios-mascotas',
+        canonical: URL_GUIA,
     },
     openGraph: {
-        title: 'Trazabilidad y Cadena de Custodia en Crematorios de Mascotas | Vinzer',
-        description: 'Elimina el error humano y entrega tranquilidad absoluta a las familias con trazabilidad digital inviolable.',
-        url: 'https://vinzer.app/guias/software-trazabilidad-cadena-custodia-crematorios-mascotas',
+        title: SEO.headline,
+        description: SEO.description,
+        url: URL_GUIA,
         siteName: 'Vinzer',
         locale: 'es_CL',
         type: 'article',
-        images: [
-            {
-                url: '/images/MockupVinzer_comprimido.webp',
-                width: 800,
-                height: 1200,
-                alt: 'Portal de trazabilidad y custodia Vinzer',
-            },
-        ],
+        publishedTime: SEO.datePublished,
+        modifiedTime: SEO.dateModified,
+        images: [OG_IMAGE],
     },
     twitter: {
         card: 'summary_large_image',
-        title: 'Trazabilidad y Cadena de Custodia en Crematorios de Mascotas | Vinzer',
-        description: 'Protocolo paso a paso para directores de crematorios y clínicas veterinarias.',
-        images: ['/images/MockupVinzer_comprimido.webp'],
-    }
+        title: SEO.title,
+        description: SEO.description,
+        images: [OG_IMAGE.url],
+    },
 };
-
-const FAQ_ENTITIES = [
-    {
-        question: '¿Cómo demuestro a una veterinaria aliada que el proceso es 100% individual?',
-        answer: 'Vinzer genera una bitácora temporal inmutable con marca de tiempo (timestamp) en cada hito. Cada mascota recibe un token y precinto QR inviolable. El operador debe escanear el QR antes de abrir el horno y subir la evidencia fotográfica del ingreso individual. La clínica veterinaria puede consultar este historial desde su propio portal de convenios sin revelar datos de otros clientes.',
-    },
-    {
-        question: '¿Qué respaldo legal y técnico entrega el sistema frente a reclamos o sospechas?',
-        answer: 'El certificado de cremación emitido por Vinzer incluye un código de verificación criptográfica (hash) y un código QR de consulta pública permanente. Cualquier tutor o perito puede escanear el certificado y comprobar en el servidor la fecha, hora exacta de inicio/fin del ciclo de cremación, operario responsable y fotografía de custodia, eliminando cualquier ambigüedad.',
-    },
-    {
-        question: '¿Los tutores pueden ver el estado del proceso en tiempo real?',
-        answer: 'Sí. El crematorio decide qué hitos mostrar al tutor a través de un enlace de seguimiento sin necesidad de contraseñas. La familia puede verificar cuándo su mascota fue recibida en el centro, cuándo ingresó a la sala de custodia y cuándo sus cenizas están listas para el retiro, mitigando la angustia y llamadas constantes al call center.',
-    },
-];
 
 export default function GuiaTrazabilidadPage() {
     const jsonLdArticle = {
         '@context': 'https://schema.org',
-        '@type': 'TechArticle',
-        headline: '¿Cómo Garantizar la Trazabilidad y Cadena de Custodia en un Crematorio de Mascotas?',
-        description: 'Guía técnica y de procesos para directores de crematorios de mascotas: control de custodia, prevención de errores con código QR y certificados digitales.',
-        url: 'https://vinzer.app/guias/software-trazabilidad-cadena-custodia-crematorios-mascotas',
+        '@type': 'Article',
+        headline: SEO.headline,
+        description: SEO.description,
+        url: URL_GUIA,
+        mainEntityOfPage: { '@type': 'WebPage', '@id': URL_GUIA },
+        image: siteUrl(OG_IMAGE.url),
         inLanguage: 'es-CL',
-        image: 'https://vinzer.app/images/MockupVinzer_comprimido.webp',
-        author: {
-            '@type': 'Organization',
-            name: 'Equipo de Ingeniería y Operaciones Vinzer',
-            url: 'https://vinzer.app',
-        },
+        keywords: SEO.keywords.join(', '),
+        about: [
+            { '@type': 'Thing', name: 'Crematorio de mascotas' },
+            { '@type': 'Thing', name: 'Cadena de custodia' },
+        ],
+        author: { '@type': 'Organization', name: 'Equipo Vinzer', url: SITE_URL },
         publisher: {
             '@type': 'Organization',
-            name: 'Vinzer SaaS',
-            logo: {
-                '@type': 'ImageObject',
-                url: 'https://vinzer.app/images/logomododark.webp',
-            },
+            name: 'Vinzer',
+            url: SITE_URL,
+            logo: { '@type': 'ImageObject', url: siteUrl('/images/logomododark.webp') },
         },
-        datePublished: '2026-09-16',
-        dateModified: '2026-09-16',
+        datePublished: SEO.datePublished,
+        dateModified: SEO.dateModified,
     };
 
     const jsonLdFaq = {
         '@context': 'https://schema.org',
         '@type': 'FAQPage',
-        mainEntity: FAQ_ENTITIES.map((item) => ({
+        mainEntity: GUIA_TRAZABILIDAD_FAQ.map((item) => ({
             '@type': 'Question',
             name: item.question,
-            acceptedAnswer: {
-                '@type': 'Answer',
-                text: item.answer,
-            },
+            acceptedAnswer: { '@type': 'Answer', text: item.answer },
         })),
     };
 
@@ -99,44 +75,19 @@ export default function GuiaTrazabilidadPage() {
         '@context': 'https://schema.org',
         '@type': 'BreadcrumbList',
         itemListElement: [
-            {
-                '@type': 'ListItem',
-                position: 1,
-                name: 'Inicio',
-                item: 'https://vinzer.app/',
-            },
-            {
-                '@type': 'ListItem',
-                position: 2,
-                name: 'Guías',
-                item: 'https://vinzer.app/#producto',
-            },
-            {
-                '@type': 'ListItem',
-                position: 3,
-                name: 'Trazabilidad y Cadena de Custodia',
-                item: 'https://vinzer.app/guias/software-trazabilidad-cadena-custodia-crematorios-mascotas',
-            },
+            { '@type': 'ListItem', position: 1, name: 'Inicio', item: siteUrl('/') },
+            { '@type': 'ListItem', position: 2, name: 'Guías', item: siteUrl('/guias') },
+            { '@type': 'ListItem', position: 3, name: 'Trazabilidad y cadena de custodia', item: URL_GUIA },
         ],
     };
 
     return (
         <>
-            {/* Structured Data JSON-LD preservado en Server Component para SEO */}
-            <script
-                type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdArticle) }}
-            />
-            <script
-                type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdFaq) }}
-            />
-            <script
-                type="application/ld+json"
-                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumbs) }}
-            />
+            {/* Structured Data JSON-LD en Server Component para SEO */}
+            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdArticle) }} />
+            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdFaq) }} />
+            <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdBreadcrumbs) }} />
 
-            {/* Componente interactivo de cliente con soporte dark/light y Hero 3D */}
             <GuiaTrazabilidadClient />
         </>
     );

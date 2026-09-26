@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import VinzerLandingClient from '@/components/vinzer/VinzerLandingClient';
 import { fetchPublicPlans } from '@/lib/api/plans';
 import { VINZER_FAQS } from '@/lib/vinzer-faqs';
+import { SITE_URL } from '@/lib/vinzer/site';
 
 // Server-Side Metadata Generation for the main Vinzer landing page
 export async function generateMetadata(): Promise<Metadata> {
@@ -18,7 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
         const seo = data.config?.seo || {};
 
         return {
-            metadataBase: new URL('https://vinzer.app'),
+            metadataBase: new URL(SITE_URL),
             title: (seo.title && seo.title !== 'App - Crematorio de Mascotas') ? seo.title : "Vinzer | Software para crematorios de mascotas en Chile",
             description: (seo.description && seo.description !== 'Gestión integral para crematorios') ? seo.description : "Software para crematorios de mascotas. Gestiona servicios, trazabilidad, evidencias, certificados y seguimiento familiar con Vinzer.",
             keywords: [
@@ -38,7 +39,7 @@ export async function generateMetadata(): Promise<Metadata> {
                 images: seo.ogImage
                     ? [{ url: seo.ogImage }]
                     : [{ url: '/images/og-image-vinzer.jpg', width: 1200, height: 630, alt: 'Panel de gestión de Vinzer' }],
-                url: 'https://vinzer.app',
+                url: SITE_URL,
                 siteName: 'Vinzer',
                 locale: 'es_CL',
                 type: 'website',
@@ -50,13 +51,13 @@ export async function generateMetadata(): Promise<Metadata> {
                 images: seo.ogImage ? [seo.ogImage] : ['/images/og-image-vinzer.jpg'],
             },
             alternates: {
-                canonical: seo.canonical || 'https://vinzer.app',
+                canonical: seo.canonical || SITE_URL,
             },
         };
     } catch (error) {
         console.error('SEO metadata fetch error on root domain:', error);
         return {
-            metadataBase: new URL('https://vinzer.app'),
+            metadataBase: new URL(SITE_URL),
             title: "Vinzer | Software para crematorios de mascotas en Chile",
             description: "Software para crematorios de mascotas. Gestiona servicios, trazabilidad, evidencias, certificados y seguimiento familiar con Vinzer.",
         };

@@ -55,7 +55,7 @@ const comparisonData: FeatureCategory[] = [
             { name: "Flujo Operativo (Workflow)", description: "Registro del paso a paso de cada servicio con firmas del operador", free: false, track: true, normal: true, pro: true, ultra: true },
             { name: "Evidencia Fotográfica", description: "Subir fotografías de respaldo por cada fase completada", free: false, track: true, normal: true, pro: true, ultra: true },
             { name: "Plan de Tracking Público", description: "Línea de tiempo pública con token único para que la familia vea el estado actual sin login", free: "Básico (sin fotos)", track: true, normal: true, pro: true, ultra: true },
-            { name: "Certificados de Cremación PDF", description: "Generación automatizada de certificado en formato PDF con firma digital y marca de agua", free: false, track: false, normal: true, pro: true, ultra: true },
+            { name: "Certificados de Cremación PDF", description: "Generación de certificado en PDF desde plantilla personalizable, con marca de agua y espacio de firma", free: false, track: false, normal: true, pro: true, ultra: true },
             { name: "Memoriales Digitales Personalizados", description: "Homenaje digital para las familias con dedicatorias, fotos, encendido de velas y personalización", free: false, track: false, normal: true, pro: true, ultra: true },
             { name: "Buzón de Dedicatorias Moderado", description: "Filtro de aprobación por el crematorio de los mensajes familiares antes de publicarse", free: false, track: false, normal: true, pro: true, ultra: true },
         ]
@@ -65,7 +65,7 @@ const comparisonData: FeatureCategory[] = [
         features: [
             { name: "Aislamiento de Datos Multi-Tenant", description: "Garantía de privacidad: tus datos están aislados lógicamente de otros crematorios", free: true, track: true, normal: true, pro: true, ultra: true },
             { name: "Roles de Usuario Granulares (RBAC)", description: "Roles para administración, conductores, recepción, operadores, auditor, etc.", free: true, track: true, normal: true, pro: true, ultra: true },
-            { name: "Registro de Auditoría (Audit-Log)", description: "Historial inviolable de quién modificó qué, cuándo y desde dónde", free: true, track: true, normal: true, pro: true, ultra: true },
+            { name: "Registro de Auditoría (Audit-Log)", description: "Registro interno de las acciones realizadas por cada usuario", free: true, track: true, normal: true, pro: true, ultra: true },
             { name: "Exportación de Datos Excel/CSV", description: "Descarga de reportes operativos, financieros e información de clientes", free: false, track: false, normal: false, pro: true, ultra: true },
             { name: "Analítica y Reportes Avanzados", description: "Gráficos de volumen de servicios, productos más vendidos y rendimientos de operarios", free: false, track: false, normal: false, pro: false, ultra: true },
         ]

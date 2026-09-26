@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { VinzerLogo } from './VinzerLogo';
+import { GUIAS, guiaPath } from '@/lib/vinzer/guias';
 
 interface VinzerFooterProps {
     theme?: 'dark' | 'light';
@@ -23,7 +24,7 @@ export function VinzerFooter({ theme = 'dark' }: VinzerFooterProps) {
                 <div className="md:col-span-4 space-y-6">
                     <VinzerLogo size="md" />
                     <p className="text-xs text-slate-500 max-w-sm leading-relaxed">
-                        Vinzer es la plataforma de software SaaS especializada en el sector funerario y cremación de mascotas en Chile y Latinoamérica. Aportamos tranquilidad a las familias a través del control y la trazabilidad digital inviolable.
+                        Vinzer es la plataforma de software SaaS especializada en el sector funerario y cremación de mascotas en Chile y Latinoamérica. Aportamos tranquilidad a las familias a través del control y la trazabilidad digital de cada servicio.
                     </p>
                 </div>
 
@@ -54,23 +55,21 @@ export function VinzerFooter({ theme = 'dark' }: VinzerFooterProps) {
                         </h5>
                         <ul className={`space-y-2.5 text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                             <li>
-                                <Link
-                                    href="/guias/software-trazabilidad-cadena-custodia-crematorios-mascotas"
-                                    className="hover:text-[#0284C7] transition-colors line-clamp-2"
-                                    title="Guía: Trazabilidad y Cadena de Custodia"
-                                >
-                                    Guía: Trazabilidad y Custodia
+                                <Link href="/guias" className="hover:text-[#0284C7] transition-colors font-semibold">
+                                    Todas las guías
                                 </Link>
                             </li>
-                            <li>
-                                <Link
-                                    href="/guias/sistema-gestion-operativa-automatizacion-crematorio-mascotas"
-                                    className="hover:text-[#0284C7] transition-colors line-clamp-2"
-                                    title="Guía: Gestión Operativa de Hornos"
-                                >
-                                    Guía: Gestión Operativa de Hornos
-                                </Link>
-                            </li>
+                            {GUIAS.map((g) => (
+                                <li key={g.slug}>
+                                    <Link
+                                        href={guiaPath(g.slug)}
+                                        className="hover:text-[#0284C7] transition-colors line-clamp-2"
+                                        title={`Guía: ${g.shortTitle}`}
+                                    >
+                                        {g.footerLabel}
+                                    </Link>
+                                </li>
+                            ))}
                             <li><a href="/#faqs" className="hover:text-[#0284C7] transition-colors">Preguntas Frecuentes</a></li>
                             <li><a href="/#trazabilidad" className="hover:text-[#0284C7] transition-colors">Trazabilidad en Vivo</a></li>
                         </ul>

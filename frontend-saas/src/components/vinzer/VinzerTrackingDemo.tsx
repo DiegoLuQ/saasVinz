@@ -37,9 +37,9 @@ const STEPS: StepItem[] = [
         status: 'completed',
         time: '09:30 hrs',
         subtitle: 'Solicitud confirmada',
-        desc: 'Servicio confirmado directamente con la familia. Generación inmediata de la ficha técnica y código único de trazabilidad.',
-        details: 'Orden de servicio #OS-2026-981 generada digitalmente. Notificación y enlace de seguimiento enviados a la familia.',
-        operator: 'Atención al Cliente • Base Central',
+        desc: 'Servicio confirmado con la familia. Se crea la orden con su código de verificación único.',
+        details: 'Orden registrada con el código 7KQ2M9XA4B. Enlace de seguimiento compartido con la familia.',
+        operator: 'Recepción',
     },
     {
         id: 1,
@@ -48,9 +48,9 @@ const STEPS: StepItem[] = [
         status: 'completed',
         time: '10:15 hrs',
         subtitle: 'Domicilio Familiar',
-        desc: 'Retiro respetuoso en el hogar de la familia Muñoz. Colocación de precinto de seguridad numerado en presencia del tutor.',
-        details: 'Precinto inviolable #VP-892 instalado y fotografiado en domicilio antes del traslado.',
-        operator: 'Conductor / Operador: M. Castro',
+        desc: 'Retiro respetuoso en el hogar de la familia Muñoz.',
+        details: 'Fotografía de recepción registrada en el domicilio antes del traslado.',
+        operator: 'Equipo de retiro',
     },
     {
         id: 2,
@@ -59,9 +59,9 @@ const STEPS: StepItem[] = [
         status: 'completed',
         time: '11:00 hrs',
         subtitle: 'Instalaciones Centrales',
-        desc: 'Llegada a planta del crematorio. Validación de precinto, pesaje digital certificado (4.2 kg) y asignación de cámara fría.',
-        details: 'Pesaje verificado con báscula calibrada: 4.20 kg. Custodia en cámara de preservación individual.',
-        operator: 'Operador de Planta: R. Lagos',
+        desc: 'Llegada a las instalaciones del crematorio y resguardo individual.',
+        details: 'Fotografía y comentario de ingreso registrados con fecha y hora.',
+        operator: 'Equipo de planta',
     },
     {
         id: 3,
@@ -69,10 +69,10 @@ const STEPS: StepItem[] = [
         shortName: 'Cremación',
         status: 'active',
         time: 'Iniciado 12:40 hrs',
-        subtitle: 'Cámara Individual 02',
-        desc: 'Supervisada por Operador Técnico: R. Valenzuela. Sensor térmico activo a 850°C y registro continuo.',
-        details: 'Cámara individual refractaria 02. Inicio certificado a las 12:40 hrs. Monitoreo constante de ciclo.',
-        operator: 'Operador Técnico: R. Valenzuela',
+        subtitle: 'Servicio individual',
+        desc: 'Cremación individual en curso. El equipo registró el inicio de la etapa con una fotografía.',
+        details: 'Etapa iniciada a las 12:40 hrs con evidencia fotográfica.',
+        operator: 'Equipo de planta',
     },
     {
         id: 4,
@@ -82,8 +82,8 @@ const STEPS: StepItem[] = [
         time: 'Pendiente',
         subtitle: 'Enfriamiento y Urna',
         desc: 'Proceso de enfriamiento gradual, tratamiento fino y depósito en la urna seleccionada por la familia.',
-        details: 'Control de calidad final, sellado de urna y preparación de reliquias conmemorativas.',
-        operator: 'Área de Acabados y Custodia',
+        details: 'Depósito de las cenizas en la urna elegida por la familia.',
+        operator: 'Equipo de planta',
     },
     {
         id: 5,
@@ -92,9 +92,9 @@ const STEPS: StepItem[] = [
         status: 'pending',
         time: 'Pendiente',
         subtitle: 'Urna y Certificado',
-        desc: 'Entrega solemne en el domicilio de la familia junto al certificado de defunción y trazabilidad digital inviolable.',
-        details: 'Emisión de Certificado Notarial Digital con numeración correlativa y código QR verificable.',
-        operator: 'Coordinación con Familia Muñoz',
+        desc: 'Entrega de la urna a la familia junto a su certificado de cremación.',
+        details: 'Certificado de cremación en PDF emitido desde la plantilla del crematorio.',
+        operator: 'Coordinación con la familia',
     },
 ];
 
@@ -228,10 +228,10 @@ export function VinzerTrackingDemo({ theme = 'dark' }: VinzerTrackingDemoProps) 
                                     isLight ? 'text-slate-800' : 'text-slate-200'
                                 }`}
                             >
-                                Certificación Digital Inalterable
+                                Historial fotográfico por etapa
                             </p>
                             <p className={isLight ? 'text-slate-500' : 'text-slate-400'}>
-                                Custodia 100% verificada con QR
+                                Consulta con el código de verificación
                             </p>
                         </div>
                     </div>

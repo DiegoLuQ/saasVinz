@@ -16,6 +16,7 @@ import {
     BookOpen
 } from 'lucide-react';
 import { VinzerLogo } from './VinzerLogo';
+import { GUIAS, guiaPath } from '@/lib/vinzer/guias';
 
 export interface VinzerNavbarProps {
     theme?: 'dark' | 'light';
@@ -24,26 +25,18 @@ export interface VinzerNavbarProps {
     onNavigateSection?: (e: React.MouseEvent<any>, sectionId: string) => void;
 }
 
-export const SOLUTIONS_LINKS = [
-    {
-        title: 'Trazabilidad y Cadena de Custodia',
-        href: '/guias/software-trazabilidad-cadena-custodia-crematorios-mascotas',
-        badge: 'Transparencia',
-        description: '¿Cómo garantizar cero errores y máxima transparencia a las familias?',
-        icon: ShieldCheck,
-        iconColor: 'text-[#19B5FE]',
-        bgIcon: 'bg-[#19B5FE]/10 border-[#19B5FE]/20',
-    },
-    {
-        title: 'Gestión Operativa y Cumplimiento',
-        href: '/guias/sistema-gestion-operativa-automatizacion-crematorio-mascotas',
-        badge: 'Eficiencia',
-        description: 'Control de hornos, recepción veterinaria, logística y certificados.',
-        icon: Cpu,
-        iconColor: 'text-[#E7C15A]',
-        bgIcon: 'bg-[#E7C15A]/10 border-[#E7C15A]/20',
-    },
-];
+const ACCENT_STYLES = {
+    sky: { icon: ShieldCheck, iconColor: 'text-[#19B5FE]', bgIcon: 'bg-[#19B5FE]/10 border-[#19B5FE]/20' },
+    gold: { icon: Cpu, iconColor: 'text-[#E7C15A]', bgIcon: 'bg-[#E7C15A]/10 border-[#E7C15A]/20' },
+} as const;
+
+export const SOLUTIONS_LINKS = GUIAS.map((g) => ({
+    title: g.shortTitle,
+    href: guiaPath(g.slug),
+    badge: g.badge,
+    description: g.description,
+    ...ACCENT_STYLES[g.accent],
+}));
 
 export function VinzerNavbar({
     theme: themeProp,

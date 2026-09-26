@@ -1,29 +1,30 @@
 import React from 'react';
 import type { Metadata } from 'next';
 import VinzerTourClient from '@/components/vinzer/VinzerTourClient';
+import { SITE_URL, siteUrl } from '@/lib/vinzer/site';
 
 export const metadata: Metadata = {
-    metadataBase: new URL('https://vinzer.app'),
+    metadataBase: new URL(SITE_URL),
     title: "Tour del Software y Capturas de Módulos | Vinzer Crematorios",
-    description: "Recorrido visual completo por el software Vinzer para crematorios de mascotas. Conoce la recepción con código único, bitácora de cremación con fotos, portal familiar y certificados digitales con QR.",
+    description: "Recorrido visual completo por el software Vinzer para crematorios de mascotas. Conoce la recepción con código único, la operación por etapas con fotos, el portal para familias y los certificados en PDF.",
     keywords: [
         'tour software crematorio de mascotas',
         'capturas de pantalla software crematorio',
         'modulo de recepcion crematorio',
         'bitacora de incineracion digital',
         'portal seguimiento familias cremacion',
-        'certificados cremacion codigo QR',
+        'certificado de cremacion de mascotas pdf',
         'demo vinzer chile',
         'software para crematorios de mascotas'
     ],
     robots: "index, follow",
     alternates: {
-        canonical: 'https://vinzer.app/tour',
+        canonical: siteUrl('/tour'),
     },
     openGraph: {
         title: "Tour de la Plataforma y Capturas de Módulos | Vinzer",
         description: "Explora la arquitectura y pantallas reales de Vinzer: trazabilidad total, registro de evidencias fotográficas, seguimiento en vivo para familias y certificados automáticos.",
-        url: 'https://vinzer.app/tour',
+        url: siteUrl('/tour'),
         siteName: 'Vinzer',
         locale: 'es_CL',
         type: 'website',
@@ -39,7 +40,7 @@ export const metadata: Metadata = {
     twitter: {
         card: 'summary_large_image',
         title: "Tour de la Plataforma y Capturas de Módulos | Vinzer",
-        description: "Explora cada módulo de Vinzer: recepción, bitácora de horno con fotos, portal público de seguimiento y certificados con QR.",
+        description: "Explora cada módulo de Vinzer: recepción, etapas con fotos, portal de seguimiento para familias y certificados en PDF.",
         images: ['/images/og-image-vinzer.jpg'],
     },
 };
@@ -56,13 +57,13 @@ export default function VinzerTourPage() {
                         '@type': 'ListItem',
                         'position': 1,
                         'name': 'Inicio',
-                        'item': 'https://vinzer.app'
+                        'item': SITE_URL
                     },
                     {
                         '@type': 'ListItem',
                         'position': 2,
                         'name': 'Tour del Software',
-                        'item': 'https://vinzer.app/tour'
+                        'item': siteUrl('/tour')
                     }
                 ]
             },
@@ -71,7 +72,7 @@ export default function VinzerTourPage() {
                 'name': 'Vinzer - Software para Crematorios de Mascotas',
                 'applicationCategory': 'BusinessApplication',
                 'operatingSystem': 'Web, Cloud, Responsive Mobile & Desktop',
-                'description': 'Plataforma SaaS para la gestión operativa, trazabilidad con código único, bitácora fotográfica de incineración y portal para familias en crematorios de mascotas.',
+                'description': 'Plataforma SaaS para la gestión operativa, trazabilidad con código único, registro fotográfico por etapas y portal para familias en crematorios de mascotas.',
                 'offers': {
                     '@type': 'Offer',
                     'price': '0',
@@ -86,7 +87,7 @@ export default function VinzerTourPage() {
             {
                 '@type': 'VideoObject',
                 'name': 'Demostración en Video del Sistema Vinzer',
-                'description': 'Paso a paso de cómo opera el sistema Vinzer: desde la admisión en recepción hasta la emisión del certificado final de cremación con código QR.',
+                'description': 'Paso a paso de cómo opera el sistema Vinzer: desde la admisión en recepción hasta la emisión del certificado de cremación en PDF.',
                 'thumbnailUrl': 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
                 'uploadDate': '2026-01-15T08:00:00+00:00',
                 'embedUrl': 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ'

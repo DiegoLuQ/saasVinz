@@ -83,7 +83,7 @@ export function VinzerTracking({ theme = 'dark' }: VinzerTrackingProps) {
                             >
                                 Cada servicio genera un enlace privado y código único de verificación. Los tutores
                                 comprueban cada fase del proceso —recepción, custodia y entrega de cenizas— con
-                                evidencia fotográfica inalterable, sin registros ni llamadas.
+                                evidencia fotográfica de cada etapa, sin crear cuentas ni llamar al crematorio.
                             </p>
 
                             {/* Píldoras de valor y micro-confianza */}

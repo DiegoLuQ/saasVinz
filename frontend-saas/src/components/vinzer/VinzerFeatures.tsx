@@ -34,7 +34,7 @@ const pillars = [
     {
         icon: FileCheck2,
         title: 'Certificados digitales personalizables',
-        copy: 'Certificados PDF automáticos con los datos de la mascota, el tutor, el tipo de servicio, firma digital, marca de agua y numeración correlativa. Las plantillas son editables en secciones, colores, orden y tipografías.',
+        copy: 'Certificados PDF con los datos de la mascota, el tutor y el servicio, marca de agua con tu logo y espacio de firma y sello. Las plantillas son editables en secciones, colores, orden y tipografías.',
         note: 'Disponible desde el plan Normal',
     },
     {
@@ -51,7 +51,7 @@ const traditional = [
     },
     {
         bold: 'Planillas y papel:',
-        desc: 'Información duplicada en Excel y riesgo de confundir precintos, fichas o urnas.',
+        desc: 'Información duplicada en Excel y riesgo de confundir fichas, etiquetas o urnas.',
     },
     {
         bold: 'Familias con incertidumbre:',
@@ -70,7 +70,7 @@ const traditional = [
 const modern = [
     {
         bold: 'Historial digital único:',
-        desc: 'Trazabilidad inmutable con código único de verificación desde el retiro hasta la entrega.',
+        desc: 'Historial por etapas con código único de verificación desde el retiro hasta la entrega.',
     },
     {
         bold: 'Operación 100% en la nube:',
@@ -82,7 +82,7 @@ const modern = [
     },
     {
         bold: 'Certificados en 1 clic:',
-        desc: 'Emisión automática en PDF con firma digital, numeración correlativa y diseño personalizable.',
+        desc: 'Emisión en PDF con marca de agua, espacio de firma y sello, y diseño personalizable.',
     },
     {
         bold: 'Auditoría blindada:',

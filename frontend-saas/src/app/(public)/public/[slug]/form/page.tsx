@@ -676,7 +676,7 @@ export default function TenantFormPage() {
                     </p>
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-[10px] uppercase tracking-[0.15em] font-semibold">
                         <Link 
-                            href={process.env.NEXT_PUBLIC_VINZER_URL || "https://vinzer.app"}
+                            href={process.env.NEXT_PUBLIC_VINZER_URL || "https://vinzer.cl"}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300 transition-colors underline decoration-sky-500/30 underline-offset-4"
