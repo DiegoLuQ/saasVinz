@@ -21,6 +21,7 @@ import {
     Phone as PhoneIcon,
     Sparkles,
     Download,
+    Stethoscope,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -108,6 +109,7 @@ export default function TenantFormPage() {
         isSuccess,
         submissionCode,
         partnerId,
+        partnerName,
         isExpired,
         isExtending,
         showWelcomeModal,
@@ -526,6 +528,16 @@ export default function TenantFormPage() {
                     </h1>
                     <div className="h-1 w-12 bg-sky-400 mx-auto mt-4 rounded-full" />
                 </motion.div>
+                )}
+
+                {/* Derivación de una veterinaria aliada */}
+                {partnerName && (
+                    <div className="flex justify-center mb-6">
+                        <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/25">
+                            <Stethoscope size={14} />
+                            Referido por {partnerName}
+                        </span>
+                    </div>
                 )}
 
                 {/* Progress Steps */}

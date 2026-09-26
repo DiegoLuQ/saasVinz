@@ -3,6 +3,7 @@ import { apiRequest, API_BASE_URL } from '@/lib/api';
 import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 import { compressImages } from '@/lib/clientImageCompressor';
 import { Service } from '@/components/public/ServiceSelectionStep';
+import { saveDraftImages, loadDraftImages, clearDraftImages } from '@/lib/formDraftImages';
 
 export interface Tenant {
     id: number;
@@ -93,6 +94,7 @@ export function useTenantForm(
     const [isSuccess, setIsSuccess] = useState(false);
     const [submissionCode, setSubmissionCode] = useState<string>('');
     const [partnerId, setPartnerId] = useState<number | null>(null);
+    const [partnerName, setPartnerName] = useState<string | null>(null);
     const [isExpired, setIsExpired] = useState(false);
     const [isExtending, setIsExtending] = useState(false);
     const [showWelcomeModal, setShowWelcomeModal] = useState(false);
@@ -115,6 +117,9 @@ export function useTenantForm(
 
     const storageKey = `form_data_${slug}`;
     const isFirstLoadRef = useRef(true);
+    // Las fotos se guardan aparte (IndexedDB): no se escriben hasta haber
+    // intentado restaurarlas, para no pisar el borrador con una lista vacía.
+    const imagesRestoredRef = useRef(false);
 
     // 1. Carga de Tema
     useEffect(() => {
@@ -155,6 +160,23 @@ export function useTenantForm(
             }
         }
     }, [slug, storageKey]);
+
+    // 2b. Fotos del borrador (IndexedDB): se restauran al entrar y se guardan en cada cambio.
+    useEffect(() => {
+        if (!slug) return;
+        let cancelled = false;
+        loadDraftImages(storageKey).then((files) => {
+            if (cancelled) return;
+            if (files.length > 0) setImages((prev) => (prev.length > 0 ? prev : files));
+            imagesRestoredRef.current = true;
+        });
+        return () => { cancelled = true; };
+    }, [slug, storageKey]);
+
+    useEffect(() => {
+        if (!slug || isSuccess || !imagesRestoredRef.current) return;
+        saveDraftImages(storageKey, images);
+    }, [images, slug, storageKey, isSuccess]);
 
     const [farewellTemplate, setFarewellTemplate] = useState<any>(null);
 
@@ -256,11 +278,15 @@ export function useTenantForm(
     // 5. Resolución de Partner en caso de estar presente
     useEffect(() => {
         if (partnerSlug && tenant) {
-            fetch(`${API_BASE_URL}/api/public/partners/${tenant.slug}/${partnerSlug}`)
+            fetch(`${API_BASE_URL}/api/public/partners/${tenant.slug}/${encodeURIComponent(partnerSlug)}`)
                 .then(res => (res.ok ? res.json() : null))
                 .then(data => {
                     if (data?.id_partner) {
                         setPartnerId(data.id_partner);
+                        setPartnerName(data.nombre_clinica || null);
+                    } else {
+                        // Sin partner válido el envío sería rechazado al final: avisar desde el inicio.
+                        setError('El enlace de la veterinaria no es válido o el convenio no está activo.');
                     }
                 })
                 .catch(err => {
@@ -460,7 +486,9 @@ export function useTenantForm(
             }
 
             setIsSuccess(true);
+            // El borrador solo se borra al registrar con éxito.
             localStorage.removeItem(storageKey);
+            clearDraftImages(storageKey);
             window.scrollTo(0, 0);
 
         } catch (err: any) {
@@ -479,6 +507,7 @@ export function useTenantForm(
         isSuccess,
         submissionCode,
         partnerId,
+        partnerName,
         isExpired,
         isExtending,
         showWelcomeModal,
