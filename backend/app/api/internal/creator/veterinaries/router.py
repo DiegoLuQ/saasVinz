@@ -4,7 +4,7 @@ from typing import List
 from app.database import get_db
 from app.api.internal.partners.models import Veterinary
 from pydantic import BaseModel, EmailStr
-from app.auth import get_password_hash
+from app.auth import get_password_hash, get_current_creator
 from typing import Optional
 from datetime import datetime
 
@@ -51,7 +51,10 @@ class VeterinaryResponse(BaseModel):
     class Config:
         from_attributes = True
 
-router = APIRouter()
+# Todo el router es exclusivo del SuperAdmin (creator). Antes no tenía ninguna
+# dependencia de auth: cualquiera podía listar, crear, editar (incluida la
+# contraseña) o eliminar veterinarias.
+router = APIRouter(dependencies=[Depends(get_current_creator)])
 
 # --- Endpoints ---
 

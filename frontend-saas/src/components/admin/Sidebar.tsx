@@ -26,7 +26,7 @@ import {
     Code2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAdminVets, useAdminMetadata, useAdminSaasConfig } from '@/hooks/useAdminBootstrap';
+import { useAdminMetadata, useAdminSaasConfig } from '@/hooks/useAdminBootstrap';
 import { getImageUrl } from '@/lib/admin/api';
 
 interface SidebarProps {
@@ -51,10 +51,8 @@ export default function Sidebar({ onLogout, isCollapsed: isCollapsedProp, setIsC
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pathname]);
 
-    const vets = useAdminVets();
     const metadata = useAdminMetadata();
     const saasConfig = useAdminSaasConfig();
-    const loadingVets = !vets;
     const unreadCount = metadata?.unread_notifications || 0;
 
     const sections = React.useMemo(() => [
@@ -77,15 +75,11 @@ export default function Sidebar({ onLogout, isCollapsed: isCollapsedProp, setIsC
                     href: '/dashboard/veterinaries',
                     icon: Briefcase,
                     label: 'Veterinarias Globales',
-                    subItems: loadingVets
-                        ? [{ href: '#', label: 'Cargando...' }]
-                        : [
-                            ...vets.slice(0, 10).map(v => ({
-                                href: `/dashboard/veterinaries?id=${v.id}`,
-                                label: v.name
-                            })),
-                            { href: '/dashboard/veterinaries', label: 'Ver Todas →' }
-                        ]
+                    // Sin listado de veterinarias en el menú: una veterinaria puede
+                    // asociarse a varios crematorios, se gestionan desde la tabla.
+                    subItems: [
+                        { href: '/dashboard/veterinaries', label: 'Ver todas' },
+                    ]
                 },
             ]
         },
@@ -142,7 +136,7 @@ export default function Sidebar({ onLogout, isCollapsed: isCollapsedProp, setIsC
                 { href: '/dashboard/configuracion', icon: Settings, label: 'Configuración Global' },
             ]
         },
-    ], [vets, loadingVets]);
+    ], []);
 
     const allItems = React.useMemo(() => sections.flatMap(s => s.items), [sections]);
 
