@@ -27,7 +27,7 @@ export default function VeterinaryLoginPage() {
 
         try {
             // Veterinary Auth Endpoint
-            const data = await apiRequest('/api/veterinary/auth/login', {
+            await apiRequest('/api/veterinary/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -36,15 +36,9 @@ export default function VeterinaryLoginPage() {
                 }),
             });
 
-            // Save token (localStorage + Cookie for middleware)
-            localStorage.setItem('vet_token', data.access_token);
-
-            // Cookie expires in 7 days
-            const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toUTCString();
-            const isSecure = typeof window !== 'undefined' && window.location.protocol === 'https:';
-            document.cookie = `vet_token=${data.access_token}; path=/; max-age=604800; SameSite=Strict${isSecure ? '; Secure' : ''}`;
-
-            router.push('/dashboard');
+            // El backend deja la sesión en una cookie httpOnly (no accesible desde JS).
+            // Navegación completa para que el middleware vea la cookie nueva.
+            window.location.href = '/dashboard';
 
         } catch (err: any) {
             setError(err.detail || err.message || 'Error al iniciar sesión');

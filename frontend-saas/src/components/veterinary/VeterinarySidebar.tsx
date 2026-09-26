@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     LayoutDashboard,
@@ -19,15 +19,16 @@ import { cn } from '@/lib/utils'; // Assuming this exists, otherwise I'll remove
 
 export default function VeterinarySidebar() {
     const pathname = usePathname();
-    const router = useRouter();
     const [isOpen, setIsOpen] = useState(false);
 
 
 
-    const handleLogout = () => {
-        localStorage.removeItem('vet_token');
-        document.cookie = 'vet_token=; path=/; max-age=0;';
-        router.push('/login');
+    const handleLogout = async () => {
+        // La cookie de sesión es httpOnly: solo el backend puede borrarla.
+        try {
+            await fetch('/api/veterinary/auth/logout', { method: 'POST', credentials: 'same-origin' });
+        } catch { /* sin red: igual se sale */ }
+        window.location.href = '/login';
     };
 
     const navItems = [

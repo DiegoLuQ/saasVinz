@@ -14,6 +14,8 @@ class Veterinary(Base):
     slug = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True)
     password_hash = Column(String, nullable=False)
+    # Se incrementa al cambiar/restablecer la contraseña: invalida las sesiones abiertas.
+    token_version = Column(Integer, nullable=False, default=0, server_default="0")
     
     address = Column(String, nullable=True)
     city = Column(String, nullable=True)

@@ -1,7 +1,7 @@
 import hashlib
 import logging
 from urllib.parse import urlparse
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.api.internal.partners.models import Veterinary
@@ -10,8 +10,44 @@ from app.auth import verify_password, create_access_token, get_password_hash, AC
 from app.core.config import settings
 from app.core.rate_limiter import limiter
 from datetime import timedelta
+from typing import Optional
 
 router = APIRouter()
+
+# --- Sesión del portal (cookie httpOnly) ---
+
+VET_SESSION_COOKIE = "vet_token"  # mismo nombre que lee el middleware de Next
+
+
+def issue_vet_session_token(vet: Veterinary) -> str:
+    """JWT de sesión; `ver` permite invalidarlo al cambiar la contraseña."""
+    return create_access_token(
+        data={"sub": str(vet.id), "role": "veterinary_global", "slug": vet.slug, "ver": vet.token_version or 0},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+
+
+def set_vet_session_cookie(response: Response, token: str) -> None:
+    """Host-only (veterinary.*), httpOnly, SameSite=Lax; Secure solo en producción (dev corre en http)."""
+    response.set_cookie(
+        VET_SESSION_COOKIE, token,
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/", httponly=True, secure=settings.IS_PRODUCTION, samesite="lax",
+    )
+
+
+def _session_invalid(detail: str) -> HTTPException:
+    # Borra la cookie en la misma respuesta: evita el bucle login <-> dashboard
+    # cuando el middleware ve una cookie que el backend ya no acepta.
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail=detail,
+        headers={
+            "WWW-Authenticate": "Bearer",
+            "Set-Cookie": f"{VET_SESSION_COOKIE}=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax",
+        },
+    )
+
 
 class VeterinaryLogin(BaseModel):
     email: EmailStr
@@ -21,6 +57,7 @@ class VeterinaryLogin(BaseModel):
 @limiter.limit(settings.RATE_LIMIT_LOGIN)  # antes sin límite: permitía fuerza bruta
 def login_for_access_token(
     request: Request,
+    response: Response,
     login_data: VeterinaryLogin,
     db: Session = Depends(get_db)
 ):
@@ -46,15 +83,10 @@ def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
         
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": str(vet.id), "role": "veterinary_global", "slug": vet.slug},
-        expires_delta=access_token_expires
-    )
-    
+    # Sesión en cookie httpOnly (el JWT ya no se entrega a JavaScript).
+    set_vet_session_cookie(response, issue_vet_session_token(vet))
+
     return {
-        "access_token": access_token, 
-        "token_type": "bearer",
         "veterinary": {
             "id": vet.id,
             "name": vet.name,
@@ -152,6 +184,7 @@ def reset_password(
         raise invalid
 
     vet.password_hash = get_password_hash(data.new_password)
+    vet.token_version = (vet.token_version or 0) + 1  # cierra las sesiones abiertas
     db.commit()
     return {"detail": "Contraseña actualizada. Ya puedes ingresar con tu nueva contraseña."}
 
@@ -166,38 +199,40 @@ from app.api.internal.partners.models import PartnerLinkV2, PartnerCommission
 from app.api.internal.common.models import Notification
 
 def get_current_veterinary(
+    request: Request,
     db: Session = Depends(get_db),
-    token: str = Depends(oauth2_scheme)
+    token: Optional[str] = Depends(oauth2_scheme),
 ):
     """
     Sesión del portal veterinario (única fuente; el router del dashboard la
-    reutiliza).
+    reutiliza). Token por header Authorization (precedencia; scripts/tests) o
+    por la cookie httpOnly `vet_token`.
 
-    - Rechaza veterinarias desactivadas en cada petición (antes conservaban el
-      acceso hasta que expiraba su token).
+    - Rechaza veterinarias desactivadas y sesiones de una versión anterior de
+      la contraseña (`ver` != token_version).
     - Activa bypass de RLS: ptn_partner_links, comisiones y órdenes son tablas
-      de tenant y la veterinaria no tiene tenant, así que sin esto no veía
-      ninguna fila. TODAS las consultas del portal deben filtrar explícitamente
-      por la veterinaria (veterinary_id o sus link_ids).
+      de tenant y la veterinaria no tiene tenant. TODAS las consultas del
+      portal deben filtrar explícitamente por la veterinaria.
     """
-    payload = decode_access_token(token)
-    if not payload or payload.get("role") != "veterinary_global":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Sesión de veterinaria inválida",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    token = token or request.cookies.get(VET_SESSION_COOKIE)
+    payload = decode_access_token(token) if token else None
+    if not payload or payload.get("role") != "veterinary_global" or not payload.get("sub"):
+        raise _session_invalid("Sesión de veterinaria inválida")
 
-    vet_id = int(payload.get("sub"))
     apply_bypass_rls(db)
-    vet = db.query(Veterinary).filter(Veterinary.id == vet_id).first()
+    vet = db.query(Veterinary).filter(Veterinary.id == int(payload["sub"])).first()
     if not vet or not vet.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Cuenta de veterinaria no disponible",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise _session_invalid("Cuenta de veterinaria no disponible")
+    if int(payload.get("ver", 0)) != (vet.token_version or 0):
+        raise _session_invalid("La sesión expiró. Vuelve a ingresar.")
     return vet
+
+
+@router.post("/auth/logout", tags=["Veterinary - Auth"])
+def logout_veterinary(response: Response):
+    """Cierra la sesión: borra la cookie httpOnly (JavaScript no puede hacerlo)."""
+    response.delete_cookie(VET_SESSION_COOKIE, path="/")
+    return {"detail": "Sesión cerrada"}
 
 # --- Consolidated Bootstrap ---
 @router.get("/auth/bootstrap", response_model=schemas.VeterinaryBootstrapResponse, tags=["Veterinary - Auth"])

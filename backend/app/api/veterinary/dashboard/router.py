@@ -8,7 +8,8 @@ from app.api.internal.partners.models import Veterinary, PartnerLinkV2 as Partne
 from app.api.internal.partners.schemas import PartnerLinkResponse
 from pydantic import BaseModel, Field
 from app import models
-from app.api.veterinary.auth.router import get_current_veterinary  # sesión única del portal
+from fastapi import Response
+from app.api.veterinary.auth.router import get_current_veterinary, issue_vet_session_token, set_vet_session_cookie  # sesión única del portal
 
 router = APIRouter()
 
@@ -355,6 +356,7 @@ class ChangePasswordRequest(BaseModel):
 @router.post("/api/veterinary/profile/password", tags=["Veterinary - Dashboard"])
 def change_my_password(
     data: ChangePasswordRequest,
+    response: Response,
     db: Session = Depends(get_db),
     current_vet: Veterinary = Depends(get_current_veterinary)
 ):
@@ -365,5 +367,8 @@ def change_my_password(
     if data.new_password == data.current_password:
         raise HTTPException(status_code=400, detail="La nueva contraseña debe ser distinta de la actual.")
     current_vet.password_hash = get_password_hash(data.new_password)
+    # Cierra las demás sesiones abiertas y mantiene viva la actual con un token nuevo.
+    current_vet.token_version = (current_vet.token_version or 0) + 1
     db.commit()
-    return {"detail": "Contraseña actualizada."}
+    set_vet_session_cookie(response, issue_vet_session_token(current_vet))
+    return {"detail": "Contraseña actualizada. Cerramos tus otras sesiones abiertas."}

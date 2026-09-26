@@ -4,16 +4,11 @@ export const API_URL = typeof window !== 'undefined'
     : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
 
 export async function apiRequest(endpoint: string, options: Omit<RequestInit, 'body'> & { body?: any } = {}) {
-    let token = typeof window !== 'undefined' ? localStorage.getItem('vet_token') : null;
-
-    // Fallback to cookie if not in localStorage
-    if (!token && typeof window !== 'undefined') {
-        const match = document.cookie.match(new RegExp('(^| )vet_token=([^;]+)'));
-        if (match) token = match[2];
-    }
-
-    if (token === 'null' || token === 'undefined') {
-        token = null;
+    // La sesión va en la cookie httpOnly `vet_token` (el navegador la envía sola
+    // en peticiones same-origin vía el proxy de Next). Se limpia el token que
+    // versiones anteriores guardaban en localStorage.
+    if (!isServer) {
+        try { localStorage.removeItem('vet_token'); } catch { /* noop */ }
     }
 
     const isFormData = options.body instanceof FormData;
@@ -21,7 +16,6 @@ export async function apiRequest(endpoint: string, options: Omit<RequestInit, 'b
 
     const headers = {
         ...((isFormData || isUrlSearchParams) ? {} : { 'Content-Type': 'application/json' }),
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         ...options.headers,
     } as any;
 
@@ -33,6 +27,7 @@ export async function apiRequest(endpoint: string, options: Omit<RequestInit, 'b
 
     const response = await fetch(fullUrl, {
         ...options,
+        credentials: 'same-origin',
         headers,
         body: (options.body && !isFormData && !isUrlSearchParams && typeof options.body !== 'string')
             ? JSON.stringify(options.body)
@@ -53,9 +48,7 @@ export async function apiRequest(endpoint: string, options: Omit<RequestInit, 'b
         if (response.status === 401) {
             if (typeof window !== 'undefined' && !window.location.pathname.includes('login')) {
                 console.warn('[VET API] Session expired or invalid. Redirecting to login.');
-                localStorage.removeItem('vet_token');
-                // Clear cookie
-                document.cookie = 'vet_token=; path=/; max-age=0;';
+                // El backend ya borró la cookie httpOnly en la respuesta 401.
                 window.location.href = '/login';
             }
         }
