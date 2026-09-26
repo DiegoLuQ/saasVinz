@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
-from app.api.internal.partners.models import Veterinary
+from sqlalchemy import or_
+from app import models
+from app.api.internal.partners.models import Veterinary, PartnerLinkV2
+from app.core.tenant_context import apply_bypass_rls
 from pydantic import BaseModel, EmailStr
 from app.auth import get_password_hash, get_current_creator
 from typing import Optional
@@ -51,6 +54,20 @@ class VeterinaryResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class VeterinaryCrematorio(BaseModel):
+    """Crematorio (tenant) asociado a una veterinaria vía ptn_partner_links."""
+    tenant_id: int
+    tenant_name: str
+    status: str  # pending | active | rejected
+
+class VeterinaryListItem(VeterinaryResponse):
+    # Relación N:M: una veterinaria puede tener varios crematorios y viceversa.
+    crematorios: List[VeterinaryCrematorio] = []
+
+class VeterinaryListResponse(BaseModel):
+    items: List[VeterinaryListItem]
+    total: int
+
 # Todo el router es exclusivo del SuperAdmin (creator). Antes no tenía ninguna
 # dependencia de auth: cualquiera podía listar, crear, editar (incluida la
 # contraseña) o eliminar veterinarias.
@@ -98,19 +115,50 @@ def create_veterinary(
     db.refresh(new_vet)
     return new_vet
 
-@router.get("/api/internal/creator/veterinaries", response_model=List[VeterinaryResponse], tags=["Creator - Veterinaries"])
+@router.get("/api/internal/creator/veterinaries", response_model=VeterinaryListResponse, tags=["Creator - Veterinaries"])
 def list_veterinaries(
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
     search: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
+    """
+    Listado paginado de veterinarias (más recientes primero) con los
+    crematorios asociados a cada una. Búsqueda por nombre o RUT.
+    """
+    # ptn_partner_links es una tabla de tenant (RLS): el SuperAdmin la lee completa.
+    apply_bypass_rls(db)
+
     query = db.query(Veterinary)
-    
-    if search:
-        query = query.filter(Veterinary.name.ilike(f"%{search}%"))
-        
-    return query.offset(skip).limit(limit).all()
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+        query = query.filter(or_(Veterinary.name.ilike(term), Veterinary.rut.ilike(term)))
+
+    total = query.count()
+    vets = query.order_by(Veterinary.created_at.desc(), Veterinary.id.desc()).offset(skip).limit(limit).all()
+
+    # Una sola consulta para los vínculos de la página (evita N+1).
+    by_vet: dict[int, List[VeterinaryCrematorio]] = {v.id: [] for v in vets}
+    if vets:
+        rows = (
+            db.query(PartnerLinkV2.veterinary_id, PartnerLinkV2.tenant_id, PartnerLinkV2.status, models.Tenant.name)
+            .join(models.Tenant, models.Tenant.id == PartnerLinkV2.tenant_id)
+            .filter(PartnerLinkV2.veterinary_id.in_(list(by_vet)))
+            .order_by(models.Tenant.name)
+            .all()
+        )
+        for vet_id, tenant_id, status, tenant_name in rows:
+            by_vet[vet_id].append(VeterinaryCrematorio(
+                tenant_id=tenant_id,
+                tenant_name=tenant_name,
+                status=getattr(status, "value", status) or "pending",
+            ))
+
+    items = [
+        VeterinaryListItem(**VeterinaryResponse.model_validate(v).model_dump(), crematorios=by_vet[v.id])
+        for v in vets
+    ]
+    return VeterinaryListResponse(items=items, total=total)
 
 @router.get("/api/internal/creator/veterinaries/{vet_id}", response_model=VeterinaryResponse, tags=["Creator - Veterinaries"])
 def get_veterinary(

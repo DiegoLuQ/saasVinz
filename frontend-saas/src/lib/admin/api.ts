@@ -115,9 +115,32 @@ export interface Veterinary {
     phone?: string;
 }
 
-export async function getVeterinaries(search: string = ''): Promise<Veterinary[]> {
+/** Crematorio (tenant) asociado a una veterinaria. La relación es N:M. */
+export interface VeterinaryCrematorio {
+    tenant_id: number;
+    tenant_name: string;
+    status: 'pending' | 'active' | 'rejected' | string;
+}
+
+export interface VeterinaryListItem extends Veterinary {
+    crematorios: VeterinaryCrematorio[];
+}
+
+export interface VeterinaryListResponse {
+    items: VeterinaryListItem[];
+    total: number;
+}
+
+/** Listado paginado (más recientes primero). Busca por nombre o RUT. */
+export async function getVeterinaries(
+    search: string = '',
+    page: number = 1,
+    pageSize: number = 20,
+): Promise<VeterinaryListResponse> {
     const params = new URLSearchParams();
     if (search) params.append('search', search);
+    params.append('skip', String((page - 1) * pageSize));
+    params.append('limit', String(pageSize));
     return apiRequest(`/api/internal/creator/veterinaries?${params.toString()}`);
 }
 
