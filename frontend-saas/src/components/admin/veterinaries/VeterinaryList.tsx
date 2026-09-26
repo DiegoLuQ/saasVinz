@@ -200,28 +200,12 @@ export default function VeterinaryList() {
                             <table className="min-w-full divide-y divide-white/5">
                                 <thead className="bg-white/5">
                                     <tr>
-                                        <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                            Clínica
-                                        </th>
-                                        <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                            RUT
-                                        </th>
-                                        <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                            Email / Usuario
-                                        </th>
-                                        <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                            Crematorios
-                                        </th>
-                                        <th scope="col" className="px-6 py-4 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                            Derivaciones
-                                        </th>
-                                        <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                            Estado
-                                        </th>
-                                        <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                            Fecha Alta
-                                        </th>
-                                        <th scope="col" className="relative px-6 py-4">
+                                        <th scope="col" className="px-4 py-3.5 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Clínica</th>
+                                        <th scope="col" className="px-4 py-3.5 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Contacto</th>
+                                        <th scope="col" className="px-4 py-3.5 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Crematorios</th>
+                                        <th scope="col" className="px-4 py-3.5 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Derivaciones</th>
+                                        <th scope="col" className="px-4 py-3.5 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Estado</th>
+                                        <th scope="col" className="relative px-4 py-3.5">
                                             <span className="sr-only">Acciones</span>
                                         </th>
                                     </tr>
@@ -229,7 +213,7 @@ export default function VeterinaryList() {
                                 <tbody className="divide-y divide-white/5 bg-transparent">
                                     {vets.length === 0 ? (
                                         <tr>
-                                            <td colSpan={8} className="px-6 py-10 text-center text-gray-500">
+                                            <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
                                                 {debouncedSearch
                                                     ? `No hay veterinarias que coincidan con "${debouncedSearch}".`
                                                     : 'No se encontraron veterinarias registradas.'}
@@ -243,7 +227,7 @@ export default function VeterinaryList() {
                                             return (
                                             <React.Fragment key={vet.id}>
                                             <tr className="hover:bg-white/5 transition-colors">
-                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                <td className="px-4 py-3.5">
                                                     <button
                                                         type="button"
                                                         onClick={() => toggleExpanded(vet.id)}
@@ -253,45 +237,43 @@ export default function VeterinaryList() {
                                                         title={isOpen ? 'Ocultar detalle por crematorio' : 'Ver comisión y derivaciones por crematorio'}
                                                     >
                                                         <ChevronDown size={16} className={`shrink-0 text-gray-500 group-hover:text-sky-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                                                        <span>
+                                                        <span className="min-w-0">
                                                             <span className="block text-sm font-medium text-white">{vet.name}</span>
-                                                            <span className="block text-sm text-gray-500">{vet.slug}</span>
+                                                            <span className="block text-xs text-gray-500 truncate max-w-[14rem]">{vet.slug}</span>
                                                         </span>
                                                     </button>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                                                    {vet.rut}
+                                                <td className="px-4 py-3.5 text-sm">
+                                                    <div className="text-gray-300 break-all max-w-[16rem]">{vet.email}</div>
+                                                    <div className="text-xs text-gray-500 whitespace-nowrap">RUT {vet.rut}</div>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                                                    {vet.email}
-                                                </td>
-                                                <td className="px-6 py-4">
+                                                <td className="px-4 py-3.5">
                                                     <CrematoriosCell crematorios={vet.crematorios} />
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                <td className="px-4 py-3.5 whitespace-nowrap text-right">
                                                     <div className="text-sm font-medium text-white tabular-nums">{totalDerivaciones}</div>
                                                     <div className="text-xs text-gray-500">{totalClientes} {totalClientes === 1 ? 'cliente' : 'clientes'}</div>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                <td className="px-4 py-3.5 whitespace-nowrap">
                                                     <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-medium rounded-full border ${vet.is_active ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
                                                         {vet.is_active ? 'Activo' : 'Inactivo'}
                                                     </span>
+                                                    <div className="mt-1 text-xs text-gray-500" title="Fecha de alta">
+                                                        Alta {new Date(vet.created_at).toLocaleDateString()}
+                                                    </div>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                                                    {new Date(vet.created_at).toLocaleDateString()}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                    <div className="flex justify-end gap-3">
+                                                <td className="px-4 py-3.5 whitespace-nowrap text-right text-sm font-medium">
+                                                    <div className="flex justify-end gap-1">
                                                         <button
                                                             onClick={() => handleEdit(vet)}
-                                                            className="text-sky-400 hover:text-sky-300 transition-colors p-1 rounded-lg hover:bg-sky-500/10"
+                                                            className="text-sky-400 hover:text-sky-300 transition-colors p-1.5 rounded-lg hover:bg-sky-500/10"
                                                             title="Editar"
                                                         >
                                                             <Pencil size={18} />
                                                         </button>
                                                         <button
                                                             onClick={() => handleDelete(vet)}
-                                                            className="text-gray-500 hover:text-rose-400 transition-colors p-1 rounded-lg hover:bg-rose-500/10"
+                                                            className="text-gray-500 hover:text-rose-400 transition-colors p-1.5 rounded-lg hover:bg-rose-500/10"
                                                             title="Eliminar"
                                                         >
                                                             <Trash2 size={18} />
@@ -301,7 +283,7 @@ export default function VeterinaryList() {
                                             </tr>
                                             {isOpen && (
                                                 <tr id={`vet-detail-${vet.id}`} className="bg-white/[0.02]">
-                                                    <td colSpan={8} className="px-6 pb-4 pt-1 pl-14">
+                                                    <td colSpan={6} className="px-4 pb-4 pt-1 pl-11">
                                                         <CrematoriosDetail crematorios={vet.crematorios} />
                                                     </td>
                                                 </tr>
