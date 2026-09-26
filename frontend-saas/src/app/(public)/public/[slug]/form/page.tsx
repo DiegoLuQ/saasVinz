@@ -70,6 +70,7 @@ export default function TenantFormPage() {
     // useSearchParams refleja la URL del navegador, que trae `key`.
     const isEmbed = searchParams.get('embed') === '1' || !!searchParams.get('key');
     const embedThemeParam = searchParams.get('theme');
+    const widgetKey = searchParams.get('key');
     const embedRootRef = useEmbedAutoHeight(isEmbed);
     const screenMinH = isEmbed ? 'min-h-[320px]' : 'min-h-screen';
 
@@ -133,7 +134,7 @@ export default function TenantFormPage() {
         handleExtend,
         handleSubmit,
         farewellTemplate,
-    } = useTenantForm(slug, token, partnerSlug);
+    } = useTenantForm(slug, token, partnerSlug, widgetKey);
 
     // Embed: tema claro por defecto (el sitio del tenant suele serlo), salvo ?theme=dark.
     React.useEffect(() => {

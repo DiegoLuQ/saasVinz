@@ -12,7 +12,6 @@ export interface Tenant {
     phone?: string;
     email?: string;
     social_media?: any;
-    public_token?: string;
     country?: string;
     region?: string;
     city?: string;
@@ -78,7 +77,12 @@ export const INITIAL_PET_DATA: PetData = {
     dedication: '',
 };
 
-export function useTenantForm(slug: string, token: string | null, partnerSlug: string | null) {
+export function useTenantForm(
+    slug: string,
+    token: string | null,
+    partnerSlug: string | null,
+    widgetKey: string | null = null,
+) {
     const { executeRecaptcha } = useGoogleReCaptcha();
 
     // Core State
@@ -183,6 +187,15 @@ export function useTenantForm(slug: string, token: string | null, partnerSlug: s
         if (!slug) return;
 
         let isMounted = true;
+
+        // El envío exige una credencial: token (temporal o permanente),
+        // partner o API key del widget. Sin ninguna, el enlace no es válido.
+        if (!token && !partnerSlug && !widgetKey) {
+            setError('Este enlace no es válido. Solicita a la empresa el enlace del formulario.');
+            setLoading(false);
+            return;
+        }
+
         const fetchData = async () => {
             try {
                 const requests: [
@@ -238,7 +251,7 @@ export function useTenantForm(slug: string, token: string | null, partnerSlug: s
         return () => {
             isMounted = false;
         };
-    }, [slug, token]);
+    }, [slug, token, partnerSlug, widgetKey]);
 
     // 5. Resolución de Partner en caso de estar presente
     useEffect(() => {
@@ -395,7 +408,8 @@ export function useTenantForm(slug: string, token: string | null, partnerSlug: s
             formData.append('owner_data', JSON.stringify(ownerData));
             formData.append('pet_data', JSON.stringify(petData));
             formData.append('selected_services', JSON.stringify(selectedServices));
-            formData.append('token', token || tenant.public_token || '');
+            if (token) formData.append('token', token);
+            if (widgetKey) formData.append('widget_key', widgetKey);
 
             if (executeRecaptcha) {
                 try {

@@ -14,7 +14,8 @@ class TenantPublicInfo(BaseModel):
     social_media: dict | None = None
     phone: str | None = None
     email: str | None = None
-    public_token: str | None = None
+    # public_token NO se expone: es la credencial del enlace permanente del
+    # formulario y solo la entrega la sesión interna del tenant.
 
     class Config:
         from_attributes = True

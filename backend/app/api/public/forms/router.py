@@ -16,6 +16,8 @@ from app.core.rate_limiter import limiter
 from app.services.recaptcha import verify_recaptcha
 from app.core.tenant_context import apply_tenant_rls, apply_bypass_rls
 from app.utils.upload_validation import read_and_validate_image, enforce_max_files
+from app.api.internal.integrations.models import TenantApiKey
+from app.api.internal.integrations.services import tenant_can_use_form_embed
 
 router = APIRouter()
 BASE_UPLOAD_DIR = "app/static/storage"
@@ -99,6 +101,7 @@ async def submit_public_form(
     selected_services: str = Form(default="[]"),
     token: str | None = Form(None),
     partner_id: int | None = Form(None),  # NEW: Optional partner ID
+    widget_key: str | None = Form(None),  # Formulario incrustable (iframe, plan ULTRA)
     recaptcha_token: str = Form(default=""),
     files: list[UploadFile] = File(default=[]),
     db: Session = Depends(get_db)
@@ -134,7 +137,8 @@ async def submit_public_form(
             detail=f"Acceso denegado. Esta empresa está {tenant.status.value}."
         )
 
-    # 1.1 Verify Token (Temporary o Permanent) OR Valid Partner
+    # 1.1 Autorización: partner activo, API key del widget, o token
+    #     (temporal vigente o permanente del tenant). Sin ninguno -> 403.
     token_valid = False
     
     # Check Partner First (Stronger or Alternate Auth)
@@ -149,6 +153,21 @@ async def submit_public_form(
             token_valid = True
         else:
             raise HTTPException(status_code=404, detail="Partner no encontrado o inactivo")
+
+    # Formulario incrustable: la API key del widget reemplaza al token. El
+    # control de dónde se incrusta lo hace el navegador (CSP frame-ancestors).
+    if not token_valid and widget_key:
+        api_key = db.query(TenantApiKey).filter(
+            TenantApiKey.api_key == widget_key.strip(),
+            TenantApiKey.tenant_id == tenant.id,
+            TenantApiKey.is_active == True
+        ).first()
+        if not api_key or not api_key.allowed_domains or not tenant_can_use_form_embed(tenant):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Formulario no disponible. Contacte a la empresa."
+            )
+        token_valid = True
 
     # If no partner, check standard tokens
     if not token_valid:
@@ -174,9 +193,6 @@ async def submit_public_form(
                 # Fallback: Verificar token permanente
                 if tenant.public_token and tenant.public_token == token:
                     token_valid = True
-        else:
-            # Enlace permanente público de la empresa (sin token en URL)
-            token_valid = True
     
     if not token_valid:
         raise HTTPException(

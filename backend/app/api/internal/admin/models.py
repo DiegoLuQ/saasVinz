@@ -4,6 +4,7 @@ from app.database import Base
 from datetime import datetime
 from app.utils import tz
 import enum
+import secrets
 # Import UserRole for reference in some contexts if needed, usually passed as string in DB but Enum in SA
 # Actually UserRole is in auth.models now. 
 # We don't import it here to avoid circular imports if unneeded, but TenantStatus is local.
@@ -83,7 +84,9 @@ class Tenant(Base):
     demo_plan = relationship("SubscriptionPlan", foreign_keys=[demo_plan_id])
 
     plan = Column(String, default="FREE")  # Deprecated in favor of subscription_plan_id
-    public_token = Column(String, unique=True, index=True)
+    # Credencial del enlace permanente del formulario público (?token=...).
+    # Se genera en cualquier vía de creación del tenant.
+    public_token = Column(String, unique=True, index=True, default=lambda: secrets.token_urlsafe(12))
     default_certificate_template_id = Column(Integer, nullable=True)
     
     # --- Facturación ---

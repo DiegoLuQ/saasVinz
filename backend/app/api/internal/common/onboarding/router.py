@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app import models, auth, schemas
 from pydantic import BaseModel, EmailStr
-import uuid
 
 router = APIRouter()
 
@@ -48,7 +47,6 @@ def create_free_account(
             subscription_plan_id=free_plan.id,
             plan="FREE", # Legacy field
             status=models.TenantStatus.active,
-            public_token=str(uuid.uuid4())[:8]
         )
         db.add(new_tenant)
         db.flush() # Para obtener el ID
