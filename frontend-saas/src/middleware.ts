@@ -178,7 +178,9 @@ export default async function middleware(req: NextRequest) {
     }
 
     // Memoriales, seguimiento o páginas públicas del tenant (form, track, catalogo) -> /public
-    const isPublicTenantPath = url.pathname.includes('/track/') || url.pathname.includes('/form') || url.pathname.includes('/catalogo/');
+    // '/form' como segmento exacto (/{slug}/form): con includes('/form') rutas como
+    // /guias/formulario-... se reescribían por error al formulario de un tenant.
+    const isPublicTenantPath = url.pathname.includes('/track/') || /\/form(\/|$)/.test(url.pathname) || url.pathname.includes('/catalogo/');
     if (currentHost === 'memorial' || currentHost === 'track' || isPublicTenantPath) {
         url.pathname = `/public${url.pathname}`;
         return NextResponse.rewrite(url);

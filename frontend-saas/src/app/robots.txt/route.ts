@@ -20,7 +20,9 @@ export function GET(request: Request) {
             'Disallow: /embed/',
             'Disallow: /memorials/',
             'Disallow: /portal-veterinaria/',
-            'Disallow: /*/form',
+            // Segmento exacto: un prefijo '/*/form' bloquearía /guias/formulario-...
+            'Disallow: /*/form$',
+            'Disallow: /*/form?',
             'Disallow: /*/track/',
             'Disallow: /*/catalogo/',
             '',

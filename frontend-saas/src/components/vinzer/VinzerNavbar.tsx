@@ -13,7 +13,8 @@ import {
     ChevronDown,
     ShieldCheck,
     Cpu,
-    BookOpen
+    BookOpen,
+    Globe
 } from 'lucide-react';
 import { VinzerLogo } from './VinzerLogo';
 import { GUIAS, guiaPath } from '@/lib/vinzer/guias';
@@ -28,6 +29,7 @@ export interface VinzerNavbarProps {
 const ACCENT_STYLES = {
     sky: { icon: ShieldCheck, iconColor: 'text-[#19B5FE]', bgIcon: 'bg-[#19B5FE]/10 border-[#19B5FE]/20' },
     gold: { icon: Cpu, iconColor: 'text-[#E7C15A]', bgIcon: 'bg-[#E7C15A]/10 border-[#E7C15A]/20' },
+    emerald: { icon: Globe, iconColor: 'text-emerald-400', bgIcon: 'bg-emerald-500/10 border-emerald-500/20' },
 } as const;
 
 export const SOLUTIONS_LINKS = GUIAS.map((g) => ({
