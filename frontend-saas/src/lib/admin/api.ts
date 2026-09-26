@@ -117,9 +117,18 @@ export interface Veterinary {
 
 /** Crematorio (tenant) asociado a una veterinaria. La relación es N:M. */
 export interface VeterinaryCrematorio {
+    link_id: number;
     tenant_id: number;
     tenant_name: string;
     status: 'pending' | 'active' | 'rejected' | string;
+    /** Comisión propia de cada vínculo veterinaria-crematorio. */
+    tipo_comision: 'porcentaje' | 'fijo' | string;
+    porcentaje_comision: number;
+    monto_comision: number;
+    /** Órdenes de cremación derivadas por la veterinaria a este crematorio. */
+    derivaciones: number;
+    /** Clientes distintos detrás de esas órdenes. */
+    clientes: number;
 }
 
 export interface VeterinaryListItem extends Veterinary {

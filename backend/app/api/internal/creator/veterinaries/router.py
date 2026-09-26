@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from app import models
 from app.api.internal.partners.models import Veterinary, PartnerLinkV2
 from app.core.tenant_context import apply_bypass_rls
@@ -55,10 +55,20 @@ class VeterinaryResponse(BaseModel):
         from_attributes = True
 
 class VeterinaryCrematorio(BaseModel):
-    """Crematorio (tenant) asociado a una veterinaria vía ptn_partner_links."""
+    """Crematorio (tenant) asociado a una veterinaria vía ptn_partner_links.
+    La comisión es propia de cada vínculo: una veterinaria puede tener
+    condiciones distintas con cada crematorio."""
+    link_id: int
     tenant_id: int
     tenant_name: str
     status: str  # pending | active | rejected
+    tipo_comision: str = "porcentaje"  # porcentaje | fijo
+    porcentaje_comision: float = 0.0
+    monto_comision: float = 0.0
+    # Órdenes de cremación derivadas por la veterinaria a este crematorio
+    # (oc_cremations.partner_link_id) y clientes distintos detrás de ellas.
+    derivaciones: int = 0
+    clientes: int = 0
 
 class VeterinaryListItem(VeterinaryResponse):
     # Relación N:M: una veterinaria puede tener varios crematorios y viceversa.
@@ -140,18 +150,43 @@ def list_veterinaries(
     # Una sola consulta para los vínculos de la página (evita N+1).
     by_vet: dict[int, List[VeterinaryCrematorio]] = {v.id: [] for v in vets}
     if vets:
-        rows = (
-            db.query(PartnerLinkV2.veterinary_id, PartnerLinkV2.tenant_id, PartnerLinkV2.status, models.Tenant.name)
+        links = (
+            db.query(PartnerLinkV2, models.Tenant.name)
             .join(models.Tenant, models.Tenant.id == PartnerLinkV2.tenant_id)
             .filter(PartnerLinkV2.veterinary_id.in_(list(by_vet)))
             .order_by(models.Tenant.name)
             .all()
         )
-        for vet_id, tenant_id, status, tenant_name in rows:
-            by_vet[vet_id].append(VeterinaryCrematorio(
-                tenant_id=tenant_id,
+
+        # Derivaciones y clientes distintos por vínculo, agregados en una consulta.
+        link_ids = [link.id for link, _ in links]
+        stats: dict[int, tuple[int, int]] = {}
+        if link_ids:
+            for link_id, n_ordenes, n_clientes in (
+                db.query(
+                    models.Cremation.partner_link_id,
+                    func.count(models.Cremation.id),
+                    func.count(func.distinct(models.Pet.customer_id)),
+                )
+                .outerjoin(models.Pet, models.Pet.id == models.Cremation.pet_id)
+                .filter(models.Cremation.partner_link_id.in_(link_ids))
+                .group_by(models.Cremation.partner_link_id)
+                .all()
+            ):
+                stats[link_id] = (n_ordenes, n_clientes)
+
+        for link, tenant_name in links:
+            n_ordenes, n_clientes = stats.get(link.id, (0, 0))
+            by_vet[link.veterinary_id].append(VeterinaryCrematorio(
+                link_id=link.id,
+                tenant_id=link.tenant_id,
                 tenant_name=tenant_name,
-                status=getattr(status, "value", status) or "pending",
+                status=getattr(link.status, "value", link.status) or "pending",
+                tipo_comision=link.tipo_comision or "porcentaje",
+                porcentaje_comision=link.porcentaje_comision or 0.0,
+                monto_comision=link.monto_comision or 0.0,
+                derivaciones=n_ordenes,
+                clientes=n_clientes,
             ))
 
     items = [

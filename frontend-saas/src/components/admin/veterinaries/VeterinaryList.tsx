@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { getVeterinaries, deleteVeterinary, Veterinary, VeterinaryListItem, VeterinaryCrematorio } from '@/lib/admin/api';
 import CreateVeterinaryModal from './CreateVeterinaryModal';
-import { Plus, Search, Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 
 const PAGE_SIZE = 20;
@@ -12,6 +12,48 @@ const STATUS_STYLES: Record<string, { label: string; cls: string }> = {
     pending: { label: 'Pendiente', cls: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
     rejected: { label: 'Rechazado', cls: 'bg-rose-500/10 text-rose-400 border-rose-500/20' },
 };
+
+const clp = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
+
+function formatComision(c: VeterinaryCrematorio): string {
+    return c.tipo_comision === 'fijo' ? `${clp.format(c.monto_comision || 0)} fijo` : `${c.porcentaje_comision || 0}%`;
+}
+
+/** Detalle por crematorio: estado, comisión del vínculo, derivaciones y clientes. */
+function CrematoriosDetail({ crematorios }: { crematorios: VeterinaryCrematorio[] }) {
+    if (crematorios.length === 0) {
+        return <p className="text-sm text-gray-500 py-2">Esta veterinaria aún no está asociada a ningún crematorio.</p>;
+    }
+    return (
+        <table className="min-w-full text-sm">
+            <thead>
+                <tr className="text-xs uppercase tracking-wider text-gray-500">
+                    <th scope="col" className="text-left font-medium py-2 pr-4">Crematorio</th>
+                    <th scope="col" className="text-left font-medium py-2 pr-4">Estado</th>
+                    <th scope="col" className="text-left font-medium py-2 pr-4">Comisión</th>
+                    <th scope="col" className="text-right font-medium py-2 pr-4">Derivaciones</th>
+                    <th scope="col" className="text-right font-medium py-2">Clientes</th>
+                </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+                {crematorios.map((c) => {
+                    const st = STATUS_STYLES[c.status] ?? { label: c.status, cls: 'bg-white/5 text-gray-400 border-white/10' };
+                    return (
+                        <tr key={c.link_id}>
+                            <td className="py-2 pr-4 text-white font-medium">{c.tenant_name}</td>
+                            <td className="py-2 pr-4">
+                                <span className={`px-2 py-0.5 text-xs rounded-full border ${st.cls}`}>{st.label}</span>
+                            </td>
+                            <td className="py-2 pr-4 text-gray-300">{formatComision(c)}</td>
+                            <td className="py-2 pr-4 text-right text-gray-300 tabular-nums">{c.derivaciones}</td>
+                            <td className="py-2 text-right text-gray-300 tabular-nums">{c.clientes}</td>
+                        </tr>
+                    );
+                })}
+            </tbody>
+        </table>
+    );
+}
 
 /** Crematorios asociados (relación N:M): primeros MAX_CHIPS como chips y el resto como "+N". */
 function CrematoriosCell({ crematorios }: { crematorios: VeterinaryCrematorio[] }) {
@@ -57,6 +99,15 @@ export default function VeterinaryList() {
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [editingVet, setEditingVet] = useState<Veterinary | null>(null);
+    const [expanded, setExpanded] = useState<Set<number>>(new Set());
+
+    const toggleExpanded = (id: number) =>
+        setExpanded((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
 
     // Búsqueda con debounce: al cambiar el término se vuelve a la página 1.
     useEffect(() => {
@@ -161,6 +212,9 @@ export default function VeterinaryList() {
                                         <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                                             Crematorios
                                         </th>
+                                        <th scope="col" className="px-6 py-4 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                            Derivaciones
+                                        </th>
                                         <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                                             Estado
                                         </th>
@@ -175,18 +229,35 @@ export default function VeterinaryList() {
                                 <tbody className="divide-y divide-white/5 bg-transparent">
                                     {vets.length === 0 ? (
                                         <tr>
-                                            <td colSpan={7} className="px-6 py-10 text-center text-gray-500">
+                                            <td colSpan={8} className="px-6 py-10 text-center text-gray-500">
                                                 {debouncedSearch
                                                     ? `No hay veterinarias que coincidan con "${debouncedSearch}".`
                                                     : 'No se encontraron veterinarias registradas.'}
                                             </td>
                                         </tr>
                                     ) : (
-                                        vets.map((vet) => (
-                                            <tr key={vet.id} className="hover:bg-white/5 transition-colors">
+                                        vets.map((vet) => {
+                                            const isOpen = expanded.has(vet.id);
+                                            const totalDerivaciones = vet.crematorios.reduce((sum, c) => sum + c.derivaciones, 0);
+                                            const totalClientes = vet.crematorios.reduce((sum, c) => sum + c.clientes, 0);
+                                            return (
+                                            <React.Fragment key={vet.id}>
+                                            <tr className="hover:bg-white/5 transition-colors">
                                                 <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="text-sm font-medium text-white">{vet.name}</div>
-                                                    <div className="text-sm text-gray-500">{vet.slug}</div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleExpanded(vet.id)}
+                                                        aria-expanded={isOpen}
+                                                        aria-controls={`vet-detail-${vet.id}`}
+                                                        className="flex items-center gap-2 text-left group"
+                                                        title={isOpen ? 'Ocultar detalle por crematorio' : 'Ver comisión y derivaciones por crematorio'}
+                                                    >
+                                                        <ChevronDown size={16} className={`shrink-0 text-gray-500 group-hover:text-sky-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                                                        <span>
+                                                            <span className="block text-sm font-medium text-white">{vet.name}</span>
+                                                            <span className="block text-sm text-gray-500">{vet.slug}</span>
+                                                        </span>
+                                                    </button>
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
                                                     {vet.rut}
@@ -196,6 +267,10 @@ export default function VeterinaryList() {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <CrematoriosCell crematorios={vet.crematorios} />
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                    <div className="text-sm font-medium text-white tabular-nums">{totalDerivaciones}</div>
+                                                    <div className="text-xs text-gray-500">{totalClientes} {totalClientes === 1 ? 'cliente' : 'clientes'}</div>
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-medium rounded-full border ${vet.is_active ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
@@ -224,7 +299,16 @@ export default function VeterinaryList() {
                                                     </div>
                                                 </td>
                                             </tr>
-                                        ))
+                                            {isOpen && (
+                                                <tr id={`vet-detail-${vet.id}`} className="bg-white/[0.02]">
+                                                    <td colSpan={8} className="px-6 pb-4 pt-1 pl-14">
+                                                        <CrematoriosDetail crematorios={vet.crematorios} />
+                                                    </td>
+                                                </tr>
+                                            )}
+                                            </React.Fragment>
+                                            );
+                                        })
                                     )}
                                 </tbody>
                             </table>
