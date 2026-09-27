@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Plus,
     Search,
-    ExternalLink,
+    MapPin,
     Building2,
     Trash2,
     Wrench,
@@ -23,16 +23,21 @@ import { apiRequest } from '@/lib/admin/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import DeleteTenantModal from '@/components/admin/DeleteTenantModal';
 
-import { useAdminTenants, useAdminBootstrap } from '@/hooks/useAdminBootstrap';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 export default function TenantsPage() {
     const router = useRouter();
     const { showToast } = useToast();
-    const bootstrapTenants = useAdminTenants();
-    const { refetch: refetchBootstrap } = useAdminBootstrap();
-    const [tenants, setTenants] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
+    // Lista completa (el bootstrap del dashboard solo trae las 15 más recientes)
+    const { data: tenants = [], isLoading: loading } = useQuery<any[]>({
+        queryKey: ['admin-tenants'],
+        queryFn: () => apiRequest('/api/internal/creator/tenants'),
+        staleTime: 30 * 1000,
+    });
     const [searchTerm, setSearchTerm] = useState('');
+    const [planFilter, setPlanFilter] = useState('');
+    const [regionFilter, setRegionFilter] = useState('');
 
     // Modal states
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -50,20 +55,10 @@ export default function TenantsPage() {
     const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
     const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
 
-    // Sync local state with bootstrap data
-    useEffect(() => {
-        if (bootstrapTenants && bootstrapTenants.length > 0) {
-            setTenants(bootstrapTenants);
-            setLoading(false);
-        }
-    }, [bootstrapTenants]);
-
-    const fetchData = async () => {
-        try {
-            await refetchBootstrap();
-        } catch (err) {
-            console.error('Error refetching tenants:', err);
-        }
+    // Tras un cambio se refrescan la tabla y el dashboard (que también lista tenants)
+    const fetchData = () => {
+        queryClient.invalidateQueries({ queryKey: ['admin-tenants'] });
+        queryClient.invalidateQueries({ queryKey: ['admin-bootstrap'] });
     };
 
     const handleCreateTenant = () => {
@@ -135,7 +130,7 @@ export default function TenantsPage() {
 
         const results = await Promise.allSettled(
             slugs.map(slug =>
-                action === 'delete'
+                (action === 'delete'
                     ? apiRequest(`/api/internal/creator/tenants/${slug}`, { method: 'DELETE' })
                     : apiRequest(`/api/internal/creator/tenants/${slug}`, {
                           method: 'PUT',
@@ -143,7 +138,8 @@ export default function TenantsPage() {
                               status: action === 'suspend' ? 'suspended' : 'active',
                               pending_reason: action === 'suspend' ? 'Suspensión masiva por administrador.' : '',
                           }),
-                      }).then(res => { setBulkProgress(p => ({ ...p, done: p.done + 1 })); return res; })
+                      })
+                ).finally(() => setBulkProgress(p => ({ ...p, done: p.done + 1 })))
             )
         );
 
@@ -163,14 +159,16 @@ export default function TenantsPage() {
 
     const handleExportCSV = () => {
         const rows = [
-            ['Empresa', 'Slug', 'Plan', 'Estado', 'Vencimiento', 'Precio Mensual', 'Revenue MRR'],
+            ['Empresa', 'Slug', 'Ciudad', 'Región', 'País', 'Plan', 'Estado', 'Vencimiento', 'Revenue MRR'],
             ...filteredTenants.map(t => [
                 t.name,
                 t.slug,
+                t.city ?? '',
+                t.region ?? '',
+                t.country ?? '',
                 t.plan,
                 t.status,
                 t.billing_end_date ? new Date(t.billing_end_date).toLocaleDateString('es-CL') : 'N/A',
-                t.monthly_price ?? '',
                 t.revenue ?? 0,
             ]),
         ];
@@ -192,13 +190,18 @@ export default function TenantsPage() {
         }
     };
 
+    const q = searchTerm.trim().toLowerCase();
     const filteredTenants = tenants.filter(t =>
-        t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.slug.toLowerCase().includes(searchTerm.toLowerCase())
+        (!q || [t.name, t.slug, t.city, t.region, t.country].some(v => (v || '').toLowerCase().includes(q))) &&
+        (!planFilter || t.plan === planFilter) &&
+        (!regionFilter || t.region === regionFilter)
     );
+    const planOptions = Array.from(new Set(tenants.map(t => t.plan).filter(Boolean))) as string[];
+    const regionOptions = (Array.from(new Set(tenants.map(t => t.region).filter(Boolean))) as string[]).sort();
 
     const planColors: Record<string, string> = {
         'FREE': 'text-yellow-400 border-yellow-400/20 bg-yellow-400/10',
+        'TRACK': 'text-cyan-400 border-cyan-400/20 bg-cyan-400/10',
         'NORMAL': 'text-blue-400 border-blue-400/20 bg-blue-400/10',
         'PRO': 'text-orange-500 border-orange-500/20 bg-orange-500/10',
         'ULTRA': 'text-emerald-400 border-emerald-400/20 bg-emerald-400/10',
@@ -206,6 +209,7 @@ export default function TenantsPage() {
 
     const planDotColors: Record<string, string> = {
         'FREE': 'bg-yellow-400',
+        'TRACK': 'bg-cyan-400',
         'NORMAL': 'bg-blue-400',
         'PRO': 'bg-orange-500',
         'ULTRA': 'bg-emerald-400',
@@ -213,17 +217,24 @@ export default function TenantsPage() {
 
     const planNames: Record<string, string> = {
         'FREE': 'Free',
+        'TRACK': 'Track',
         'NORMAL': 'Normal',
         'PRO': 'Pro',
         'ULTRA': 'Ultra',
     };
 
+    const selectCls = 'bg-[#0a192f] border border-white/10 rounded-2xl py-3.5 px-4 text-sm text-white/80 outline-none focus:border-primary/50 transition-all cursor-pointer';
+    const actionBtn = 'w-8 h-8 rounded-lg flex items-center justify-center transition-all border active:scale-95';
+
     return (
-        <div className="p-8 max-w-7xl mx-auto space-y-8 min-h-screen">
+        <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-6 min-h-screen">
             <header className="flex items-center justify-between">
                 <div>
                     <h2 className="text-3xl font-black text-white italic tracking-tight">Administración de Tenants</h2>
-                    <p className="text-white/40 text-sm">Gestiona todas las empresas registradas en la plataforma</p>
+                    <p className="text-white/40 text-sm">
+                        Gestiona todas las empresas registradas en la plataforma
+                        {!loading && <span className="text-white/60 font-bold"> · {filteredTenants.length} de {tenants.length}</span>}
+                    </p>
                 </div>
 
                 <button
@@ -235,17 +246,25 @@ export default function TenantsPage() {
             </header>
 
             {/* Toolbar */}
-            <div className="flex gap-4">
-                <div className="relative flex-1">
+            <div className="flex flex-wrap gap-3">
+                <div className="relative flex-1 min-w-[240px]">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={18} />
                     <input
                         type="text"
-                        placeholder="Buscar por nombre o slug..."
+                        placeholder="Buscar por nombre, slug, ciudad, región o país..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full bg-[#0a192f] border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-white outline-none focus:border-primary/50 transition-all shadow-xl"
                     />
                 </div>
+                <select value={planFilter} onChange={e => setPlanFilter(e.target.value)} className={selectCls} aria-label="Filtrar por plan">
+                    <option value="">Todos los planes</option>
+                    {planOptions.map(p => <option key={p} value={p}>{planNames[p] || p}</option>)}
+                </select>
+                <select value={regionFilter} onChange={e => setRegionFilter(e.target.value)} className={selectCls} aria-label="Filtrar por región">
+                    <option value="">Todas las regiones</option>
+                    {regionOptions.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
                 <button
                     onClick={handleExportCSV}
                     className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white font-bold py-3 px-5 rounded-2xl transition-all active:scale-95"
@@ -305,224 +324,203 @@ export default function TenantsPage() {
                         <p>Cargando empresas...</p>
                     </div>
                 ) : (
+                    <div className="overflow-x-auto">
                     <table className="w-full text-left">
                         <thead className="bg-white/5 text-[10px] uppercase font-black text-white/40 tracking-widest">
                             <tr>
-                                <th className="pl-6 pr-2 py-5 w-10">
+                                <th className="pl-5 pr-2 py-4 w-10">
                                     <input
                                         type="checkbox"
                                         checked={filteredTenants.length > 0 && selectedSlugs.size === filteredTenants.length}
                                         onChange={toggleAll}
                                         className="w-4 h-4 rounded accent-primary cursor-pointer"
+                                        aria-label="Seleccionar todos"
                                     />
                                 </th>
-                                <th className="px-8 py-5">Empresa</th>
-                                <th className="px-8 py-5">Identificador (Slug)</th>
-                                <th className="px-8 py-5">Estado</th>
-                                <th className="px-8 py-5">Plan suscripción</th>
-                                <th className="px-8 py-5">Vencimiento</th>
-                                <th className="px-8 py-5 text-right">Ingresos MRR</th>
-                                <th className="px-8 py-5 text-center">Acciones</th>
+                                <th className="px-4 py-4">Empresa</th>
+                                <th className="px-4 py-4">Ubicación</th>
+                                <th className="px-4 py-4">Estado</th>
+                                <th className="px-4 py-4">Plan</th>
+                                <th className="px-4 py-4">Vencimiento</th>
+                                <th className="px-4 py-4 text-right">MRR</th>
+                                <th className="px-4 py-4 text-right">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
                             {filteredTenants.length > 0 ? filteredTenants.map((tenant) => {
-                                 const isFree = tenant.plan === 'FREE';
-                                 const now = new Date();
-                                 const billingEndDate = tenant.billing_end_date ? new Date(tenant.billing_end_date) : null;
-                                 const isExpired = !isFree && billingEndDate && now > billingEndDate;
-                                 // Período de gracia: 3 días
-                                 const isGraceExpired = !isFree && billingEndDate && now > new Date(billingEndDate.getTime() + 3 * 24 * 60 * 60 * 1000);                                 const getCellClass = (colIndex: number) => {
-                                     let base = "px-8 py-5 transition-all duration-300";
-                                     if (colIndex === 0) base += " relative";
-                                     if (colIndex === 5) base += " text-right font-mono font-bold text-white/90";
-                                     if (colIndex === 6) base += " text-center";
+                                const isFree = tenant.plan === 'FREE';
+                                const now = new Date();
+                                const billingEndDate = tenant.billing_end_date ? new Date(tenant.billing_end_date) : null;
+                                const isExpired = !isFree && billingEndDate && now > billingEndDate;
+                                // Período de gracia: 3 días
+                                const isGraceExpired = !isFree && billingEndDate && now > new Date(billingEndDate.getTime() + 3 * 24 * 60 * 60 * 1000);
+                                const rowTint = isGraceExpired
+                                    ? 'bg-red-500/[0.04] hover:bg-red-500/[0.07]'
+                                    : isExpired
+                                        ? 'bg-orange-500/[0.03] hover:bg-orange-500/[0.05]'
+                                        : 'hover:bg-white/[0.03]';
+                                const isSelected = selectedSlugs.has(tenant.slug);
+                                const place = [tenant.city, tenant.region].filter(Boolean).join(', ');
 
-                                     if (isGraceExpired) {
-                                         base += " border-t border-b border-red-500/30 bg-red-500/[0.03] group-hover:bg-red-500/[0.06]";
-                                         if (colIndex === 0) base += " border-l border-l-red-500/30 rounded-l-2xl";
-                                         if (colIndex === 6) base += " border-r border-r-red-500/30 rounded-r-2xl";
-                                     } else if (isExpired) {
-                                         base += " border-t border-b border-orange-500/20 bg-orange-500/[0.02] group-hover:bg-orange-500/[0.04]";
-                                         if (colIndex === 0) base += " border-l border-l-orange-500/20 rounded-l-2xl";
-                                         if (colIndex === 6) base += " border-r border-r-orange-500/20 rounded-r-2xl";
-                                     } else {
-                                         base += " border-t border-b border-transparent group-hover:bg-white/5";
-                                         if (colIndex === 0) base += " border-l border-l-transparent rounded-l-2xl";
-                                         if (colIndex === 6) base += " border-r border-r-transparent rounded-r-2xl";
-                                     }
-                                     return base;
-                                 };
-
-                                 const isSelected = selectedSlugs.has(tenant.slug);
-                                 return (
-                                     <tr key={tenant.id} className={`group transition-all duration-300 ${isSelected ? 'bg-primary/5' : ''}`}>
-                                         <td className="pl-6 pr-2 py-5">
-                                             <input
-                                                 type="checkbox"
-                                                 checked={isSelected}
-                                                 onChange={() => toggleSelect(tenant.slug)}
-                                                 className="w-4 h-4 rounded accent-primary cursor-pointer"
-                                             />
-                                         </td>
-                                         <td className={getCellClass(0)}>
-                                             {isGraceExpired && (
-                                                 <div className="absolute left-0 top-0 bottom-0 w-[5px] bg-gradient-to-b from-red-500 to-rose-600 shadow-[0_0_12px_rgba(239,68,68,0.8)] z-10 rounded-l-2xl" />
-                                             )}
-                                             {!isGraceExpired && isExpired && (
-                                                 <div className="absolute left-0 top-0 bottom-0 w-[5px] bg-gradient-to-b from-orange-400 to-amber-500 shadow-[0_0_10px_rgba(249,115,22,0.6)] z-10 rounded-l-2xl" />
-                                             )}
-                                             <div className="flex items-center gap-3">
-                                                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 ${
-                                                     isGraceExpired 
-                                                         ? 'bg-red-500/20 text-red-400 border border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.25)]' 
-                                                         : isExpired 
-                                                             ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30 shadow-[0_0_8px_rgba(249,115,22,0.2)]' 
-                                                             : 'bg-white/5 text-primary group-hover:scale-110'
-                                                 }`}>
-                                                     {isGraceExpired || isExpired ? (
-                                                         <AlertTriangle size={20} className={isGraceExpired ? "animate-pulse text-red-400" : "text-orange-400"} />
-                                                     ) : (
-                                                         <Building2 size={20} />
-                                                     )}
-                                                 </div>
-                                                 <div>
-                                                     <div className={`font-bold leading-tight transition-colors ${
-                                                         isGraceExpired ? 'text-red-200' : isExpired ? 'text-orange-200' : 'text-white'
-                                                     }`}>{tenant.name}</div>
-                                                     <div className="text-[9px] text-white/30 uppercase font-black mt-0.5 tracking-tighter">SLUG: {tenant.slug}</div>
-                                                 </div>
-                                             </div>
-                                         </td>
-                                         <td className={getCellClass(1)}>
-                                             <div className="flex items-center gap-2">
-                                                 <span className="text-white/40 font-mono text-xs">/{tenant.slug}</span>
-                                                 <a href="http://app.localhost:3000" target="_blank" className="p-1.5 hover:bg-white/10 rounded-lg text-white/20 hover:text-primary transition-all" title="Abrir portal de tenants">
-                                                     <ExternalLink size={12} />
-                                                 </a>
-                                             </div>
-                                         </td>
-                                         <td className={getCellClass(2)}>
-                                             {isGraceExpired ? (
-                                                 <span className="inline-flex items-center px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border bg-red-500/10 text-red-400 border-red-500/20 shadow-[0_0_8px_rgba(239,68,68,0.15)]">
-                                                     <div className="w-1.5 h-1.5 rounded-full mr-2 bg-red-500 animate-ping" />
-                                                     Suspendido
-                                                 </span>
-                                             ) : !isGraceExpired && isExpired ? (
-                                                 <span className="inline-flex items-center px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border bg-orange-500/10 text-orange-400 border-orange-500/20 shadow-[0_0_8px_rgba(249,115,22,0.15)]">
-                                                     <div className="w-1.5 h-1.5 rounded-full mr-2 bg-orange-400 animate-pulse" />
-                                                     En Gracia
-                                                 </span>
-                                             ) : (
-                                                 <span className={`inline-flex items-center px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border ${tenant.status === 'active'
-                                                     ? 'bg-green-500/10 text-green-400 border-green-500/20'
-                                                     : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
-                                                     }`}>
-                                                     <div className={`w-1.5 h-1.5 rounded-full mr-2 ${tenant.status === 'active' ? 'bg-green-400 animate-pulse' : 'bg-yellow-500'}`} />
-                                                     {tenant.status}
-                                                 </span>
-                                             )}
-                                         </td>
-                                         <td className={getCellClass(3)}>
-                                             <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border ${planColors[tenant.plan] || 'bg-white/5 border-white/5 text-white/80'}`}>
-                                                 <div className={`w-2 h-2 rounded-full ${planDotColors[tenant.plan] || 'bg-white/20'}`} />
-                                                 <span className="text-[10px] font-black tracking-wider uppercase">{planNames[tenant.plan] || tenant.plan}</span>
-                                             </div>
-                                         </td>
-                                         <td className={getCellClass(4)}>
-                                             <div className="flex flex-col">
-                                                 <div className={`flex items-center gap-1.5 font-mono text-xs ${
-                                                     isGraceExpired 
-                                                          ? 'text-red-400 font-bold drop-shadow-[0_0_6px_rgba(239,68,68,0.4)]' 
-                                                          : isExpired 
-                                                              ? 'text-orange-400 font-bold drop-shadow-[0_0_6px_rgba(249,115,22,0.4)]' 
-                                                              : 'text-white/80'
-                                                 }`}>
-                                                     {isGraceExpired || isExpired ? (
-                                                         <AlertTriangle size={12} className={isGraceExpired ? "text-red-400" : "text-orange-400"} />
-                                                     ) : (
-                                                         <Calendar size={12} className="text-primary/50" />
-                                                     )}
-                                                     {tenant.billing_end_date
-                                                          ? new Date(tenant.billing_end_date).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })
-                                                          : 'N/A'
-                                                      }
-                                                 </div>
-                                                 <div className="flex flex-wrap gap-1 mt-1">
-                                                     {isGraceExpired && (
-                                                          <span className="inline-flex items-center gap-1 text-[8px] bg-red-500/20 text-red-400 border border-red-500/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shadow-[0_0_8px_rgba(239,68,68,0.25)] animate-pulse">
-                                                              Vencido y Bloqueado
-                                                          </span>
-                                                     )}
-                                                     {!isGraceExpired && isExpired && (
-                                                          <span className="inline-flex items-center gap-1 text-[8px] bg-orange-500/20 text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shadow-[0_0_8px_rgba(249,115,22,0.25)]">
-                                                              Periodo de Gracia
-                                                          </span>
-                                                     )}
-                                                     {tenant.polar_customer_id && (
-                                                          <span className="text-[8px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full font-bold uppercase w-fit">Polar Active</span>
-                                                     )}
-                                                 </div>
-                                             </div>
-                                         </td>
-                                         <td className={getCellClass(5)}>
-                                             <span className="text-primary/50 mr-1">$</span>
-                                             {tenant.revenue.toLocaleString()}
-                                         </td>
-                                         <td className={getCellClass(6)}>
-                                             <div className="flex items-center justify-center gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
-                                                 {tenant.status === 'active' && !isGraceExpired ? (
-                                                     <button
-                                                         onClick={() => handleOpenStatusModal(tenant, 'suspend')}
-                                                         className="w-10 h-10 bg-yellow-500/10 hover:bg-yellow-500 text-yellow-400 hover:text-white rounded-xl flex items-center justify-center transition-all duration-300 border border-yellow-500/20 hover:scale-110 active:scale-95"
-                                                         title="Suspender tenant"
-                                                     >
-                                                         <PauseCircle size={18} />
-                                                     </button>
-                                                 ) : tenant.status === 'suspended' || isGraceExpired ? (
-                                                     <button
-                                                         onClick={() => handleOpenStatusModal(tenant, 'reactivate')}
-                                                         className="w-10 h-10 bg-green-500/10 hover:bg-green-500 text-green-400 hover:text-white rounded-xl flex items-center justify-center transition-all duration-300 border border-green-500/20 hover:scale-110 active:scale-95"
-                                                         title="Reactivar tenant"
-                                                     >
-                                                         <PlayCircle size={18} />
-                                                     </button>
-                                                 ) : null}
-                                                 {tenant.polar_customer_id && (
-                                                     <button
-                                                         onClick={() => handleOpenPolarPortal(tenant.polar_customer_id)}
-                                                         className="w-10 h-10 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded-xl flex items-center justify-center transition-all duration-300 border border-blue-500/20 hover:scale-110 active:scale-95"
-                                                         title="Gestionar en Polar"
-                                                     >
-                                                         <ArrowUpRight size={18} />
-                                                     </button>
-                                                 )}
-                                                 <button
-                                                     onClick={() => handleEditTenant(tenant)}
-                                                     className="w-10 h-10 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-xl flex items-center justify-center transition-all duration-300 border border-primary/20 hover:scale-110 active:scale-95"
-                                                     title="Administrar"
-                                                 >
-                                                     <Wrench size={18} />
-                                                 </button>
-                                                 <button
-                                                     onClick={() => router.push(`/dashboard/tenants/${tenant.slug}/facturacion`)}
-                                                     className="w-10 h-10 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-xl flex items-center justify-center transition-all duration-300 border border-emerald-500/20 hover:scale-110 active:scale-95"
-                                                     title="Configurar Facturación"
-                                                 >
-                                                     <CreditCard size={18} />
-                                                 </button>
-                                                 <button
-                                                     onClick={() => handleDeleteClick(tenant)}
-                                                     className="w-10 h-10 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white rounded-xl flex items-center justify-center transition-all duration-300 border border-red-500/20 hover:scale-110 active:scale-95"
-                                                     title="Eliminar Todo"
-                                                 >
-                                                     <Trash2 size={18} />
-                                                 </button>
-                                             </div>
-                                         </td>
-                                     </tr>
-                                 );
-                             }) : (
+                                return (
+                                    <tr key={tenant.id} className={`group transition-colors ${isSelected ? 'bg-primary/5' : rowTint}`}>
+                                        <td className="pl-5 pr-2 py-4 relative">
+                                            {(isGraceExpired || isExpired) && (
+                                                <div className={`absolute left-0 top-0 bottom-0 w-1 ${isGraceExpired ? 'bg-red-500' : 'bg-orange-400'}`} />
+                                            )}
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={() => toggleSelect(tenant.slug)}
+                                                className="w-4 h-4 rounded accent-primary cursor-pointer"
+                                                aria-label={`Seleccionar ${tenant.name}`}
+                                            />
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className={`w-9 h-9 shrink-0 rounded-xl flex items-center justify-center ${
+                                                    isGraceExpired
+                                                        ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                                        : isExpired
+                                                            ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                                                            : 'bg-white/5 text-primary'
+                                                }`}>
+                                                    {isGraceExpired || isExpired ? <AlertTriangle size={16} /> : <Building2 size={16} />}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <button
+                                                        onClick={() => handleEditTenant(tenant)}
+                                                        className={`font-bold leading-tight truncate max-w-[220px] block text-left hover:underline ${
+                                                            isGraceExpired ? 'text-red-200' : isExpired ? 'text-orange-200' : 'text-white'
+                                                        }`}
+                                                        title={tenant.name}
+                                                    >
+                                                        {tenant.name}
+                                                    </button>
+                                                    <div className="text-[10px] text-white/30 font-mono mt-0.5">/{tenant.slug}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            {place || tenant.country ? (
+                                                <div className="flex items-start gap-1.5 min-w-0">
+                                                    <MapPin size={12} className="text-primary/50 mt-0.5 shrink-0" />
+                                                    <div className="min-w-0">
+                                                        <div className="text-xs text-white/80 truncate max-w-[180px]" title={place}>{place || '—'}</div>
+                                                        <div className="text-[10px] text-white/35 uppercase tracking-wider font-bold">{tenant.country || '—'}</div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs text-white/20 italic">Sin ubicación</span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            {isGraceExpired ? (
+                                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border bg-red-500/10 text-red-400 border-red-500/20">
+                                                    <span className="w-1.5 h-1.5 rounded-full mr-1.5 bg-red-500" />
+                                                    Bloqueado
+                                                </span>
+                                            ) : isExpired ? (
+                                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border bg-orange-500/10 text-orange-400 border-orange-500/20">
+                                                    <span className="w-1.5 h-1.5 rounded-full mr-1.5 bg-orange-400" />
+                                                    En gracia
+                                                </span>
+                                            ) : (
+                                                <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${tenant.status === 'active'
+                                                    ? 'bg-green-500/10 text-green-400 border-green-500/20'
+                                                    : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+                                                    }`}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${tenant.status === 'active' ? 'bg-green-400' : 'bg-yellow-500'}`} />
+                                                    {tenant.status === 'active' ? 'Activo' : tenant.status === 'suspended' ? 'Suspendido' : tenant.status}
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${planColors[tenant.plan] || 'bg-white/5 border-white/5 text-white/80'}`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${planDotColors[tenant.plan] || 'bg-white/20'}`} />
+                                                <span className="text-[10px] font-black tracking-wider uppercase">{planNames[tenant.plan] || tenant.plan}</span>
+                                            </div>
+                                            {tenant.demo_plan_name && (
+                                                <div className="text-[9px] text-violet-300 font-bold uppercase tracking-wider mt-1">Demo {tenant.demo_plan_name}</div>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            <div className={`flex items-center gap-1.5 font-mono text-xs whitespace-nowrap ${
+                                                isGraceExpired ? 'text-red-400 font-bold' : isExpired ? 'text-orange-400 font-bold' : 'text-white/70'
+                                            }`}>
+                                                <Calendar size={12} className="opacity-50" />
+                                                {billingEndDate
+                                                    ? billingEndDate.toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })
+                                                    : 'N/A'}
+                                            </div>
+                                            {tenant.polar_customer_id && (
+                                                <span className="inline-block mt-1 text-[8px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full font-bold uppercase">Polar</span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-4 text-right font-mono font-bold text-white/90 whitespace-nowrap">
+                                            <span className="text-primary/50 mr-0.5">$</span>
+                                            {Number(tenant.revenue || 0).toLocaleString('es-CL')}
+                                        </td>
+                                        <td className="px-4 py-4">
+                                            <div className="flex items-center justify-end gap-1.5">
+                                                {tenant.status === 'active' && !isGraceExpired ? (
+                                                    <button
+                                                        onClick={() => handleOpenStatusModal(tenant, 'suspend')}
+                                                        className={`${actionBtn} bg-yellow-500/10 hover:bg-yellow-500 text-yellow-400 hover:text-black border-yellow-500/20`}
+                                                        title="Suspender"
+                                                        aria-label={`Suspender ${tenant.name}`}
+                                                    >
+                                                        <PauseCircle size={15} />
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => handleOpenStatusModal(tenant, 'reactivate')}
+                                                        className={`${actionBtn} bg-green-500/10 hover:bg-green-500 text-green-400 hover:text-black border-green-500/20`}
+                                                        title="Reactivar"
+                                                        aria-label={`Reactivar ${tenant.name}`}
+                                                    >
+                                                        <PlayCircle size={15} />
+                                                    </button>
+                                                )}
+                                                {tenant.polar_customer_id && (
+                                                    <button
+                                                        onClick={() => handleOpenPolarPortal(tenant.polar_customer_id)}
+                                                        className={`${actionBtn} bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white border-blue-500/20`}
+                                                        title="Gestionar en Polar"
+                                                        aria-label={`Gestionar ${tenant.name} en Polar`}
+                                                    >
+                                                        <ArrowUpRight size={15} />
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => handleEditTenant(tenant)}
+                                                    className={`${actionBtn} bg-primary/10 hover:bg-primary text-primary hover:text-white border-primary/20`}
+                                                    title="Administrar"
+                                                    aria-label={`Administrar ${tenant.name}`}
+                                                >
+                                                    <Wrench size={15} />
+                                                </button>
+                                                <button
+                                                    onClick={() => router.push(`/dashboard/tenants/${tenant.slug}/facturacion`)}
+                                                    className={`${actionBtn} bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white border-emerald-500/20`}
+                                                    title="Facturación"
+                                                    aria-label={`Facturación de ${tenant.name}`}
+                                                >
+                                                    <CreditCard size={15} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteClick(tenant)}
+                                                    className={`${actionBtn} bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border-red-500/20`}
+                                                    title="Eliminar"
+                                                    aria-label={`Eliminar ${tenant.name}`}
+                                                >
+                                                    <Trash2 size={15} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            }) : (
                                 <tr>
                                     <td colSpan={8} className="px-8 py-20 text-center text-white/20 italic">
                                         No se encontraron empresas con esos criterios
@@ -531,9 +529,9 @@ export default function TenantsPage() {
                             )}
                         </tbody>
                     </table>
+                    </div>
                 )}
             </div>
-
 
             <DeleteTenantModal
                 isOpen={deleteModalOpen}

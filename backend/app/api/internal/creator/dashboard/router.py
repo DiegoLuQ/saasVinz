@@ -499,6 +499,48 @@ async def get_creator_bootstrap(
         raise HTTPException(status_code=500, detail=f"Error interno en bootstrap: {str(e)}")
 
 
+@router.get("/tenants", response_model=List[schemas.CreatorBootstrapTenant])
+async def list_tenants(
+    current_creator: User = Depends(get_current_creator),
+    db: Session = Depends(get_db)
+):
+    """Todas las empresas para la tabla de administración (sin métricas de recursos:
+    el bootstrap solo trae las 15 más recientes)."""
+    from sqlalchemy.orm import joinedload
+
+    tenants = db.query(models.Tenant).options(
+        joinedload(models.Tenant.billing_info),
+        joinedload(models.Tenant.subscription_plan),
+        joinedload(models.Tenant.demo_plan),
+    ).order_by(models.Tenant.created_at.desc()).all()
+
+    return [
+        schemas.CreatorBootstrapTenant(
+            id=t.id,
+            name=t.name,
+            slug=t.slug,
+            rut=t.rut,
+            email=t.email,
+            phone=t.phone,
+            address=t.address,
+            region=t.region,
+            city=t.city,
+            country=t.country,
+            status=t.status if t.status else "active",
+            plan=t.subscription_plan.name if t.subscription_plan else (t.plan or "FREE"),
+            revenue=t.billing_info.monthly_price if t.billing_info else 0.0,
+            billing_end_date=t.billing_end_date,
+            polar_customer_id=t.polar_customer_id,
+            created_at=t.created_at.isoformat() if t.created_at else "",
+            # Solo una demo vigente: una vencida no debe aparecer como plan activo
+            demo_plan_id=t.demo_plan_id if t.demo_active else None,
+            demo_plan_name=(t.demo_plan.name if t.demo_active and t.demo_plan else None),
+            demo_expires_at=t.demo_expires_at if t.demo_active else None,
+        )
+        for t in tenants
+    ]
+
+
 @router.post("/tenants", response_model=TenantResponse)
 async def create_tenant(
     tenant_data: TenantCreate,

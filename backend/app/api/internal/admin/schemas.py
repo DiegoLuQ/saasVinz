@@ -847,10 +847,12 @@ class CreatorBootstrapTenant(BaseModel):
     address: Optional[str] = None
     region: Optional[str] = None
     city: Optional[str] = None
+    country: Optional[str] = None
     status: str
     plan: str
     revenue: float
     billing_end_date: Optional[datetime] = None
+    polar_customer_id: Optional[str] = None
     created_at: str
     resources: Optional[dict] = None
     # Acceso de demostración (plan superior temporal)
