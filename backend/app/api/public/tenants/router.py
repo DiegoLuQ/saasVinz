@@ -119,42 +119,29 @@ def get_tenant_services(slug: str, db: Session = Depends(get_db)):
     return all_items
 
 
+def resolve_farewell_template(db: Session, tenant_id: int):
+    """
+    Plantilla de la tarjeta de homenaje de un tenant: "Plantilla Formulario" >
+    predeterminada > primera disponible (propias o globales). La usan el
+    formulario público y el expediente de la orden.
+    """
+    from sqlalchemy import or_
+    scope = or_(models.FarewellTemplate.tenant_id == tenant_id, models.FarewellTemplate.tenant_id.is_(None))
+    return (
+        db.query(models.FarewellTemplate).filter(scope, models.FarewellTemplate.name.ilike("%Plantilla Formulario%")).first()
+        or db.query(models.FarewellTemplate).filter(scope, models.FarewellTemplate.is_default == True).first()  # noqa: E712
+        or db.query(models.FarewellTemplate).filter(scope).first()
+    )
+
+
 @router.get("/tenant/{slug}/farewell-template")
 def get_tenant_farewell_template(slug: str, db: Session = Depends(get_db)):
     """Retorna la plantilla de despedida para la previsualización del formulario público."""
-    from sqlalchemy import or_
     tenant = db.query(models.Tenant).filter(models.Tenant.slug == slug).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
 
-    # 1. Buscar plantilla nombrada "Plantilla Formulario"
-    template = db.query(models.FarewellTemplate).filter(
-        or_(
-            models.FarewellTemplate.tenant_id == tenant.id,
-            models.FarewellTemplate.tenant_id.is_(None)
-        ),
-        models.FarewellTemplate.name.ilike("%Plantilla Formulario%")
-    ).first()
-
-    # 2. Fallback: plantilla por defecto
-    if not template:
-        template = db.query(models.FarewellTemplate).filter(
-            or_(
-                models.FarewellTemplate.tenant_id == tenant.id,
-                models.FarewellTemplate.tenant_id.is_(None)
-            ),
-            models.FarewellTemplate.is_default == True
-        ).first()
-
-    # 3. Fallback: primera plantilla disponible
-    if not template:
-        template = db.query(models.FarewellTemplate).filter(
-            or_(
-                models.FarewellTemplate.tenant_id == tenant.id,
-                models.FarewellTemplate.tenant_id.is_(None)
-            )
-        ).first()
-
+    template = resolve_farewell_template(db, tenant.id)
     if not template:
         return None
 
