@@ -347,6 +347,11 @@ async def submit_public_form(
     # Store partner_id in owner_data as fallback since model might not have the column enabled
     if partner_id:
         owner_dict['partner_id'] = partner_id
+        # Nombre de la veterinaria para la lista de solicitudes (el portal partner
+        # ya lo guardaba; el formulario con ?partner= no, y aparecía sin nombre).
+        ref_link = db.query(PartnerLink).filter(PartnerLink.id == partner_id).first()
+        if ref_link and ref_link.veterinary:
+            owner_dict['referral_partner_name'] = ref_link.veterinary.name
 
     from app.utils.generators import generate_unique_code
     submission = models.FormSubmission(
@@ -419,20 +424,36 @@ async def submit_public_form(
     try:
         # Get first service name for display
         service_name = enriched_services[0].get("name") if enriched_services else "N/A"
-        
+
+        # Derivación de una veterinaria (?partner= o /registro/{slug}): la
+        # notificación la identifica igual que el portal partner. Antes siempre
+        # decía "web_crematorio" aunque la solicitud trajera partner_id.
+        vet_name = None
+        if partner_id:
+            link = db.query(PartnerLink).filter(PartnerLink.id == partner_id).first()
+            vet_name = (link.veterinary.name if link and link.veterinary else None) or "Veterinaria"
+
+        notif_data = {
+            "submission_id": submission_id,
+            "owner_name": owner_dict.get("fullName"),
+            "pet_name": pet_dict.get("name"),
+            "service_name": service_name,
+        }
+        if vet_name:
+            notif_data["partner_name"] = vet_name
+            notif_data["origin"] = "veterinaria"
+            message = f"{vet_name} derivó una nueva solicitud para {pet_dict.get('name')} (Tutor: {owner_dict.get('fullName')})."
+        else:
+            notif_data["origin"] = "web_crematorio"
+            message = f"Se ha recibido una nueva solicitud de {owner_dict.get('fullName')} para la mascota {pet_dict.get('name')}."
+
         new_notif = models.Notification(
             tenant_id=tenant_id,
             title=f"Nueva Solicitud: {pet_dict.get('name')} ({owner_dict.get('fullName')})",
-            message=f"Se ha recibido una nueva solicitud de {owner_dict.get('fullName')} para la mascota {pet_dict.get('name')}.",
+            message=message,
             type="new_submission",
             audience="ordenes",  # recepción/roles de órdenes procesan la solicitud
-            data={
-                "submission_id": submission_id,
-                "owner_name": owner_dict.get("fullName"),
-                "pet_name": pet_dict.get("name"),
-                "service_name": service_name,
-                "origin": "web_crematorio"
-            }
+            data=notif_data,
         )
         db.add(new_notif)
         db.commit()
