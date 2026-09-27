@@ -32,7 +32,6 @@ import { apiRequest } from '@/lib/tenant/api';
 import { isOwnerRole } from '@/lib/tenant/roles';
 import { clearToken } from '@/lib/auth/token';
 import { formatChileDate, formatChileTime } from '@/lib/dates';
-import SubmissionDetailModal from '@/components/tenant/modals/SubmissionDetailModal';
 import NotificationDetailModal from '@/components/tenant/modals/NotificationDetailModal';
 import GlobalSearchModal from '@/components/tenant/GlobalSearchModal';
 import { copyToClipboard } from '@/lib/clipboard';
@@ -59,8 +58,6 @@ export default function Navbar() {
     const [showPalette, setShowPalette] = useState(false);
     const [showUserMenu, setShowUserMenu] = useState(false);
     const [showNotifications, setShowNotifications] = useState(false);
-    const [selectedSubmissionId, setSelectedSubmissionId] = useState<number | null>(null);
-    const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedNotification, setSelectedNotification] = useState<any>(null);
     const [showNotifModal, setShowNotifModal] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -565,20 +562,6 @@ export default function Navbar() {
                     </div>
                 </div>
             </header>
-
-            <SubmissionDetailModal
-                isOpen={isModalOpen}
-                submissionId={selectedSubmissionId}
-                onClose={() => setIsModalOpen(false)}
-                onProcessed={() => {
-                    queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
-                    setIsModalOpen(false);
-                }}
-                onDeleted={() => {
-                    queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
-                    setIsModalOpen(false);
-                }}
-            />
 
             <Modal
                 isOpen={isShareModalOpen}

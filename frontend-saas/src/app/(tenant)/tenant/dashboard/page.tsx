@@ -25,8 +25,6 @@ import { useDashboardSummary, type DashboardOrder, type DashboardSummary } from 
 import { useCurrentUser, useInitialSubmissions, type BootstrapSubmissionData } from '@/hooks/useSessionBootstrap';
 import QuickRegistrationModal from '@/components/tenant/dashboard/QuickRegistrationModal';
 import QuickTrackingModal from '@/components/tenant/dashboard/QuickTrackingModal';
-import SubmissionDetailModal from '@/components/tenant/modals/SubmissionDetailModal';
-import { useQueryClient } from '@tanstack/react-query';
 
 const OWNER_ROLES = ['admin', 'contabilidad', 'creator'];
 const OPERATOR_ROLES = ['operador_cremacion', 'operator', 'driver'];
@@ -163,12 +161,10 @@ function reachedLimits(data: DashboardSummary) {
 export default function DashboardPage() {
     const { data, isError, refetch, isFetching } = useDashboardSummary();
     const router = useRouter();
-    const queryClient = useQueryClient();
     const currentUser = useCurrentUser();
     const [limitModalResource, setLimitModalResource] = useState<string | null>(null);
     const [showQuickRegistrationModal, setShowQuickRegistrationModal] = useState(false);
     const [showQuickTrackingModal, setShowQuickTrackingModal] = useState(false);
-    const [selectedSubmissionId, setSelectedSubmissionId] = useState<number | null>(null);
 
     const role = currentUser?.role ?? '';
     const isOwner = OWNER_ROLES.includes(role);
@@ -182,11 +178,6 @@ export default function DashboardPage() {
     const pendingSubmissions = rawSubmissions.filter((s: BootstrapSubmissionData) => s.status === 'pending' || s.status === 'pendiente');
 
     const openOrder = (id: number) => router.push(`/dashboard/recepcion-pedidos?orden=${id}`);
-    const refreshAfterSubmission = () => {
-        queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
-        queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
-        setSelectedSubmissionId(null);
-    };
 
     if (isError && !data) {
         return (
@@ -268,7 +259,7 @@ export default function DashboardPage() {
                         {pendingSubmissions.slice(0, 3).map((s) => (
                             <button
                                 key={s.id}
-                                onClick={() => setSelectedSubmissionId(s.id)}
+                                onClick={() => router.push(`/dashboard/registros/${s.id}`)}
                                 className="flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-500/15 hover:bg-amber-500/25 px-3 py-1.5 rounded-lg border border-amber-500/20 transition-colors"
                             >
                                 {s.pet_name && s.pet_name !== 'N/A' ? s.pet_name : s.owner_name || `#${s.id}`}
@@ -419,14 +410,6 @@ export default function DashboardPage() {
             <QuickTrackingModal
                 isOpen={showQuickTrackingModal}
                 onClose={() => setShowQuickTrackingModal(false)}
-            />
-
-            <SubmissionDetailModal
-                isOpen={selectedSubmissionId !== null}
-                submissionId={selectedSubmissionId}
-                onClose={() => setSelectedSubmissionId(null)}
-                onProcessed={refreshAfterSubmission}
-                onDeleted={refreshAfterSubmission}
             />
         </div>
     );

@@ -30,7 +30,6 @@ import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePermissions } from '@/app/(tenant)/tenant/context/PermissionContext';
 
-import SubmissionDetailModal from './modals/SubmissionDetailModal';
 
 interface SubmissionListItem {
     id: number;
@@ -53,8 +52,6 @@ export default function SubmissionsTable() {
     const bootstrapSubmissions = useInitialSubmissions();
     const queryClient = useQueryClient();
     const [loading, setLoading] = useState(false);
-    const [selectedSubmissionId, setSelectedSubmissionId] = useState<number | null>(null);
-    const [isModalOpen, setIsModalOpen] = useState(false);
 
     const { showToast } = useToast();
     const { canDelete } = usePermissions();
@@ -200,20 +197,6 @@ export default function SubmissionsTable() {
                     <ArrowRight size={12} />
                 </button>
             </div>
-
-            <SubmissionDetailModal
-                isOpen={isModalOpen}
-                submissionId={selectedSubmissionId}
-                onClose={() => setIsModalOpen(false)}
-                onProcessed={() => {
-                    queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
-                    setIsModalOpen(false);
-                }}
-                onDeleted={(id) => {
-                    queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
-                    setIsModalOpen(false);
-                }}
-            />
         </div>
     );
 }
