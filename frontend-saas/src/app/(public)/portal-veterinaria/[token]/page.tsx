@@ -121,8 +121,14 @@ export default function PartnerPortalPage() {
         rut: '',
         phone: '',
         email: '',
+        // Dirección del tutor (entrega de cenizas)
         address: '',
         commune: '',
+        region: '',
+        // Lugar de retiro (por defecto, la clínica)
+        veterinary: '',
+        pickupCommune: '',
+        pickupRegion: '',
         notes: ''
     });
 
@@ -155,35 +161,24 @@ export default function PartnerPortalPage() {
     } | null>(null);
     const [copiedTracking, setCopiedTracking] = useState(false);
 
-    // Prellenar dirección de retiro con la de la veterinaria actual si está disponible
+    // Región de la clínica normalizada a una clave de CHILE_REGIONS_COMUNAS
+    const clinicRegion = useMemo(() => matchRegionKey(partnerInfo?.partner_region), [partnerInfo?.partner_region]);
+
+    // Prellenar: retiro en la clínica; la región del tutor parte en la de la clínica
     useEffect(() => {
         if (partnerInfo) {
             setOwnerData(prev => ({
                 ...prev,
-                address: prev.address || partnerInfo.partner_address || '',
-                commune: prev.commune || partnerInfo.partner_city || '',
+                veterinary: prev.veterinary || partnerInfo.partner_address || '',
+                pickupCommune: prev.pickupCommune || partnerInfo.partner_city || '',
+                pickupRegion: prev.pickupRegion || clinicRegion,
+                region: prev.region || clinicRegion,
             }));
         }
-    }, [partnerInfo]);
+    }, [partnerInfo, clinicRegion]);
 
-    // Comunas disponibles según la región de la clínica veterinaria
-    const comunasList = useMemo(() => {
-        const regionName = partnerInfo?.partner_region || 'Metropolitana de Santiago';
-        const clean = regionName.toLowerCase().trim();
-        for (const [regionKey, comunas] of Object.entries(CHILE_REGIONS_COMUNAS)) {
-            const keyClean = regionKey.toLowerCase().trim();
-            if (clean === keyClean || clean.includes(keyClean) || keyClean.includes(clean)) {
-                return comunas;
-            }
-            if (clean.includes("metropolitana") || clean.includes("santiago") || clean === "rm") {
-                if (regionKey.includes("Metropolitana")) return comunas;
-            }
-            if (clean.replace(/[áéíóú]/g, 'a') === keyClean.replace(/[áéíóú]/g, 'a')) {
-                return comunas;
-            }
-        }
-        return CHILE_REGIONS_COMUNAS["Metropolitana de Santiago"] || [];
-    }, [partnerInfo?.partner_region]);
+    const ownerComunas = CHILE_REGIONS_COMUNAS[ownerData.region] || [];
+    const pickupComunas = CHILE_REGIONS_COMUNAS[ownerData.pickupRegion] || [];
 
     // Validación de email
     const isValidEmail = (emailStr: string): boolean => {
@@ -389,8 +384,12 @@ export default function PartnerPortalPage() {
             rut: '',
             phone: '',
             email: '',
-            address: partnerInfo?.partner_address || '',
-            commune: partnerInfo?.partner_city || '',
+            address: '',
+            commune: '',
+            region: clinicRegion,
+            veterinary: partnerInfo?.partner_address || '',
+            pickupCommune: partnerInfo?.partner_city || '',
+            pickupRegion: clinicRegion,
             notes: ''
         });
         setPetData({
@@ -788,73 +787,81 @@ export default function PartnerPortalPage() {
                                             />
                                         </div>
 
-                                        {/* Comuna según la región de la veterinaria */}
-                                        <div className="space-y-1.5">
-                                            <div className="flex items-center justify-between">
-                                                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-                                                    Comuna / Ciudad *
-                                                </label>
-                                                {partnerInfo?.partner_region && (
-                                                    <span className="text-[10px] text-emerald-400 font-bold truncate max-w-[140px]" title={partnerInfo.partner_region}>
-                                                        {partnerInfo.partner_region}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <select
-                                                required
-                                                value={ownerData.commune}
-                                                onChange={e => setOwnerData({ ...ownerData, commune: e.target.value })}
-                                                className="w-full bg-[#161c2e] border border-slate-700 rounded-2xl py-3 px-4 text-sm text-white outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 transition-all cursor-pointer"
-                                            >
-                                                <option value="">Selecciona Comuna</option>
-                                                {comunasList.map(c => (
-                                                    <option key={c} value={c} className="bg-[#0e1320] text-white">
-                                                        {c}
-                                                    </option>
-                                                ))}
-                                                {ownerData.commune && !comunasList.includes(ownerData.commune) && (
-                                                    <option value={ownerData.commune} className="bg-[#0e1320] text-white">
-                                                        {ownerData.commune}
-                                                    </option>
-                                                )}
-                                            </select>
-                                        </div>
+                                    </div>
 
-                                        {/* Dirección de retiro prellenada con la veterinaria actual */}
-                                        <div className="space-y-1.5 sm:col-span-2">
-                                            <div className="flex items-center justify-between">
-                                                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
-                                                    Dirección de Retiro de la Mascota *
-                                                </label>
-                                                {partnerInfo?.partner_address && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setOwnerData(prev => ({
-                                                            ...prev,
-                                                            address: partnerInfo.partner_address || '',
-                                                            commune: partnerInfo.partner_city || prev.commune
-                                                        }))}
-                                                        className="text-[11px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 cursor-pointer transition-colors"
-                                                    >
-                                                        <Store size={12} />
-                                                        <span>Restablecer Dirección Clínica</span>
-                                                    </button>
-                                                )}
+                                    {/* Lugar de retiro: por defecto la clínica */}
+                                    <div className="space-y-3 pt-4 border-t border-slate-800">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <Building2 className="text-emerald-400" size={16} />
+                                                <h5 className="text-sm font-bold text-white">Lugar de retiro de la mascota</h5>
                                             </div>
-                                            <div className="relative">
-                                                <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                                                <input
-                                                    required
-                                                    value={ownerData.address}
-                                                    onChange={e => setOwnerData({ ...ownerData, address: e.target.value })}
-                                                    placeholder="Calle, número, sucursal o domicilio de retiro..."
-                                                    className="w-full pl-10 pr-4 bg-[#161c2e] border border-slate-700 rounded-2xl py-3 text-sm text-white placeholder:text-slate-500 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 transition-all"
-                                                />
-                                            </div>
-                                            <p className="text-[11px] text-slate-400">
-                                                📍 Prellenado por defecto con la dirección de tu clínica. Puedes editarla libremente si el retiro es en otro lugar.
-                                            </p>
+                                            {partnerInfo?.partner_address && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setOwnerData(prev => ({
+                                                        ...prev,
+                                                        veterinary: partnerInfo.partner_address || '',
+                                                        pickupCommune: partnerInfo.partner_city || '',
+                                                        pickupRegion: clinicRegion,
+                                                    }))}
+                                                    className="text-[11px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                                >
+                                                    <Store size={12} />
+                                                    <span>Usar dirección de la clínica</span>
+                                                </button>
+                                            )}
                                         </div>
+                                        <AddressFields
+                                            address={ownerData.veterinary}
+                                            region={ownerData.pickupRegion}
+                                            commune={ownerData.pickupCommune}
+                                            comunas={pickupComunas}
+                                            addressLabel="Dirección de retiro *"
+                                            addressPlaceholder="Calle, número o sucursal donde se retira..."
+                                            onAddress={v => setOwnerData(prev => ({ ...prev, veterinary: v.slice(0, 100) }))}
+                                            onRegion={v => setOwnerData(prev => ({ ...prev, pickupRegion: v, pickupCommune: '' }))}
+                                            onCommune={v => setOwnerData(prev => ({ ...prev, pickupCommune: v }))}
+                                        />
+                                        <p className="text-[11px] text-slate-400">
+                                            📍 Prellenado con la dirección de tu clínica. Edítala si el retiro es en otro lugar.
+                                        </p>
+                                    </div>
+
+                                    {/* Dirección del tutor: entrega de cenizas */}
+                                    <div className="space-y-3 pt-4 border-t border-slate-800">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <MapPin className="text-emerald-400" size={16} />
+                                                <h5 className="text-sm font-bold text-white">Dirección del tutor (entrega)</h5>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setOwnerData(prev => ({
+                                                    ...prev,
+                                                    address: prev.veterinary.slice(0, 70),
+                                                    commune: prev.pickupCommune,
+                                                    region: prev.pickupRegion,
+                                                }))}
+                                                className="text-[11px] text-emerald-400 hover:text-emerald-300 font-bold cursor-pointer transition-colors"
+                                            >
+                                                Igual al retiro
+                                            </button>
+                                        </div>
+                                        <AddressFields
+                                            address={ownerData.address}
+                                            region={ownerData.region}
+                                            commune={ownerData.commune}
+                                            comunas={ownerComunas}
+                                            addressLabel="Dirección del tutor *"
+                                            addressPlaceholder="Calle y número del domicilio del tutor..."
+                                            onAddress={v => setOwnerData(prev => ({ ...prev, address: v.slice(0, 70) }))}
+                                            onRegion={v => setOwnerData(prev => ({ ...prev, region: v, commune: '' }))}
+                                            onCommune={v => setOwnerData(prev => ({ ...prev, commune: v }))}
+                                        />
+                                        <p className="text-[11px] text-slate-400">
+                                            Donde el crematorio entrega las cenizas y contacta a la familia.
+                                        </p>
                                     </div>
 
                                     <div className="flex justify-end pt-4 border-t border-slate-800">
@@ -863,6 +870,14 @@ export default function PartnerPortalPage() {
                                             onClick={() => {
                                                 if (!ownerData.fullName || !ownerData.phone) {
                                                     alert('Por favor completa al menos el nombre y teléfono del tutor');
+                                                    return;
+                                                }
+                                                if (!ownerData.veterinary.trim()) {
+                                                    alert('Indica la dirección de retiro de la mascota');
+                                                    return;
+                                                }
+                                                if (!ownerData.address.trim() || !ownerData.commune) {
+                                                    alert('Indica la dirección y comuna del tutor (entrega de cenizas)');
                                                     return;
                                                 }
                                                 if (ownerData.email && !isValidEmail(ownerData.email)) {
@@ -1148,9 +1163,14 @@ export default function PartnerPortalPage() {
                                         <p className="text-slate-300">
                                             Mascota: <strong className="text-white font-bold">{petData.name}</strong> ({petData.type}) • Tutor: <strong className="text-white font-bold">{ownerData.fullName}</strong> ({ownerData.phone})
                                         </p>
+                                        {ownerData.veterinary && (
+                                            <p className="text-slate-400 text-[11px]">
+                                                Retiro: {[ownerData.veterinary, ownerData.pickupCommune, ownerData.pickupRegion].filter(Boolean).join(', ')}
+                                            </p>
+                                        )}
                                         {ownerData.address && (
                                             <p className="text-slate-400 text-[11px]">
-                                                Retiro: {ownerData.address} {ownerData.commune ? `(${ownerData.commune})` : ''}
+                                                Entrega: {[ownerData.address, ownerData.commune, ownerData.region].filter(Boolean).join(', ')}
                                             </p>
                                         )}
                                     </div>
@@ -1462,6 +1482,74 @@ export default function PartnerPortalPage() {
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+
+const SELECT_CLS = 'w-full bg-[#161c2e] border border-slate-700 rounded-2xl py-3 px-4 text-sm text-white outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 transition-all cursor-pointer';
+
+/** Normaliza el nombre de región de la clínica a una clave de CHILE_REGIONS_COMUNAS. */
+function matchRegionKey(regionName?: string | null): string {
+    const strip = (v: string) => v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const keys = Object.keys(CHILE_REGIONS_COMUNAS);
+    if (!regionName) return keys.find(k => k.includes('Metropolitana')) || '';
+    const clean = strip(regionName);
+    if (clean.includes('metropolitana') || clean.includes('santiago') || clean === 'rm') {
+        return keys.find(k => k.includes('Metropolitana')) || '';
+    }
+    return keys.find(k => {
+        const kc = strip(k);
+        return kc === clean || kc.includes(clean) || clean.includes(kc);
+    }) || '';
+}
+
+/** Dirección + región + comuna (usado para el retiro y para la entrega). */
+function AddressFields({
+    address, region, commune, comunas, addressLabel, addressPlaceholder, onAddress, onRegion, onCommune,
+}: {
+    address: string;
+    region: string;
+    commune: string;
+    comunas: string[];
+    addressLabel: string;
+    addressPlaceholder: string;
+    onAddress: (v: string) => void;
+    onRegion: (v: string) => void;
+    onCommune: (v: string) => void;
+}) {
+    return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5 sm:col-span-2">
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">{addressLabel}</label>
+                <input
+                    required
+                    value={address}
+                    onChange={e => onAddress(e.target.value)}
+                    placeholder={addressPlaceholder}
+                    className="w-full bg-[#161c2e] border border-slate-700 rounded-2xl py-3 px-4 text-sm text-white placeholder:text-slate-500 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 transition-all"
+                />
+            </div>
+            <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">Región</label>
+                <select value={region} onChange={e => onRegion(e.target.value)} className={SELECT_CLS}>
+                    <option value="">Selecciona Región</option>
+                    {Object.keys(CHILE_REGIONS_COMUNAS).map(r => (
+                        <option key={r} value={r} className="bg-[#0e1320] text-white">{r}</option>
+                    ))}
+                </select>
+            </div>
+            <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">Comuna</label>
+                <select value={commune} onChange={e => onCommune(e.target.value)} className={SELECT_CLS} disabled={!region}>
+                    <option value="">Selecciona Comuna</option>
+                    {comunas.map(c => (
+                        <option key={c} value={c} className="bg-[#0e1320] text-white">{c}</option>
+                    ))}
+                    {commune && !comunas.includes(commune) && (
+                        <option value={commune} className="bg-[#0e1320] text-white">{commune}</option>
+                    )}
+                </select>
+            </div>
         </div>
     );
 }

@@ -19,6 +19,8 @@ export interface OwnerData {
     veterinary?: string;
     pickupRegion?: string;
     pickupCommune?: string;
+    /** El retiro es en la misma dirección del tutor (copia dirección, región y comuna) */
+    pickupSameAsOwner?: boolean;
     service_code?: string;
     contactPreference?: 'whatsapp' | 'phone' | 'any' | '';
 }
@@ -116,6 +118,15 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
             updateData({ pickupRegion: tenantRegion });
         }
     }, [tenantRegion, data.region, data.pickupRegion, updateData]);
+
+    // "Mismo lugar que el tutor": el retiro copia la dirección de entrega
+    useEffect(() => {
+        if (!data.pickupSameAsOwner) return;
+        const next = { veterinary: data.address || '', pickupRegion: data.region || '', pickupCommune: data.commune || '' };
+        if (next.veterinary !== (data.veterinary || '') || next.pickupRegion !== (data.pickupRegion || '') || next.pickupCommune !== (data.pickupCommune || '')) {
+            updateData(next);
+        }
+    }, [data.pickupSameAsOwner, data.address, data.region, data.commune, data.veterinary, data.pickupRegion, data.pickupCommune, updateData]);
 
     useEffect(() => {
         const fetchPartners = async () => {
@@ -257,18 +268,37 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">¿Dónde se encuentra ahora tu mascota?</p>
                         </div>
                     </div>
-                    
+
+                    <label className="flex items-center gap-3 mb-5 cursor-pointer select-none">
+                        <input
+                            type="checkbox"
+                            checked={!!data.pickupSameAsOwner}
+                            onChange={(e) => updateData({ pickupSameAsOwner: e.target.checked })}
+                            className="w-4 h-4 accent-amber-600 cursor-pointer"
+                        />
+                        <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                            El retiro es en la misma dirección del tutor (dirección de entrega)
+                        </span>
+                    </label>
+
+                    {data.pickupSameAsOwner ? (
+                        <p className="text-[11px] text-slate-400 dark:text-slate-500 ml-1">
+                            Usaremos la dirección de entrega que indiques abajo.
+                            {errors.veterinary && !data.address && <span className="block text-red-500 font-bold mt-1">! Completa la dirección de entrega</span>}
+                        </p>
+                    ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                         <div className="sm:col-span-2">
-                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Dirección o Lugar de Retiro</label>
+                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Dirección o Lugar de Retiro *</label>
                             <input
                                 type="text"
                                 value={data.veterinary || ''}
                                 onChange={(e) => updateData({ veterinary: e.target.value.slice(0, 100) })}
-                                className="input-emotional"
-                                placeholder="Ej: Mi domicilio, Clínica Veterinaria Andes, etc."
+                                className={`input-emotional ${errors.veterinary ? 'border-red-500/50 focus:ring-red-500/10' : ''}`}
+                                placeholder="Ej: Clínica Veterinaria Andes, Av. Grecia 123"
                                 maxLength={100}
                             />
+                            {errors.veterinary && <p className="text-[10px] text-red-500 mt-2 font-bold uppercase tracking-tight ml-2">! {errors.veterinary}</p>}
                         </div>
                         <div>
                             <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Región de Retiro</label>
@@ -316,6 +346,7 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                             )}
                         </div>
                     </div>
+                    )}
                 </div>
             </div>
 

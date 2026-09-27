@@ -302,6 +302,8 @@ export function useTenantForm(
         if (ownerData.email && !/\S+@\S+\.\S+/.test(ownerData.email)) errors.email = 'Email inválido';
         if (!ownerData.phone) errors.phone = 'Requerido';
         if (!ownerData.address) errors.address = 'Requerido';
+        // Retiro y entrega son dos direcciones: el retiro también es obligatorio
+        if (!(ownerData.veterinary || '').trim()) errors.veterinary = 'Requerido';
 
         if (ownerData.fullName.length > 50) errors.fullName = 'Máx 50 caracteres';
         if (ownerData.email && ownerData.email.length > 50) errors.email = 'Máx 50 caracteres';
