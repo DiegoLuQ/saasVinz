@@ -599,12 +599,20 @@ def create_services_from_submission(
         db.flush() # Get ID
         
         # 2. Partitioned: Logistics
+        # Retiro: el formulario público guarda el lugar de retiro en `veterinary`
+        # ("Dirección o Lugar de Retiro") y su región/comuna en pickupRegion /
+        # pickupCommune. Antes solo iba a las notas y "Dirección de Retiro"
+        # aparecía vacía en la orden.
+        pickup_text = (owner.get("veterinary") or "").strip()
         db.add(models.CremationLogistics(
             cremation_id=db_cremation.id,
             tenant_id=tenant_id,
             region=region,
             city=city,
-            address=owner.get("address") or owner.get("Dirección")
+            address=owner.get("address") or owner.get("Dirección"),
+            pickup_address=pickup_text or None,
+            pickup_region=(owner.get("pickupRegion") or "").strip() or None,
+            pickup_city=(owner.get("pickupCommune") or "").strip() or None,
         ))
         
         # 3. Partitioned: Financial
