@@ -18,6 +18,9 @@ import {
     RotateCcw,
     Plus,
     Building2,
+    Lock,
+    Copy,
+    Link2,
 } from 'lucide-react';
 import { apiRequest, getImageUrl } from '@/lib/admin/api';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -49,8 +52,17 @@ interface FarewellTemplate {
     config: any;
     preview_url: string | null;
     is_default: boolean;
+    is_locked?: boolean;
     created_at: string;
+    /** Nombre del crematorio dueño (solo exclusivas) */
+    tenant_name?: string | null;
+    /** Crematorios cuyo formulario usa esta tarjeta */
+    form_tenants?: { id: number; name: string; explicit: boolean }[];
+    /** Es la global que usan los crematorios sin tarjeta asignada */
+    is_form_fallback?: boolean;
 }
+
+type TenantLite = { id: number; name: string; slug: string };
 
 const DEFAULT_NEW_TEMPLATE: FarewellTemplate = {
     id: 0,
@@ -140,19 +152,23 @@ export default function FarewellTemplatesAdminPage() {
     const [settingDefaultId, setSettingDefaultId] = useState<number | null>(null);
     const [editing, setEditing] = useState<FarewellTemplate | null>(null);
     const [isCreating, setIsCreating] = useState(false);
+    // "Formulario de un crematorio": copia exclusiva o usar tal cual
+    const [assigning, setAssigning] = useState<FarewellTemplate | null>(null);
 
     const showToast = (text: string, type: 'success' | 'error' = 'success') => {
         setMessage({ text, type });
         setTimeout(() => setMessage(null), 3500);
     };
 
-    const fetchTemplates = async () => {
+    const fetchTemplates = async (): Promise<FarewellTemplate[]> => {
         try {
             setLoading(true);
-            const data = await apiRequest(API);
-            setTemplates(data || []);
+            const data: FarewellTemplate[] = (await apiRequest(API)) || [];
+            setTemplates(data);
+            return data;
         } catch (err: any) {
             showToast(err.message || 'Error al cargar plantillas', 'error');
+            return [];
         } finally {
             setLoading(false);
         }
@@ -178,6 +194,27 @@ export default function FarewellTemplatesAdminPage() {
         } finally {
             setSettingDefaultId(null);
         }
+    };
+
+    const handleCustomize = async (template: FarewellTemplate, tenantId: number) => {
+        const copy: FarewellTemplate = await apiRequest(`${API}/${template.id}/customize`, {
+            method: 'POST',
+            body: { tenant_id: tenantId },
+        });
+        setAssigning(null);
+        const fresh = await fetchTemplates();
+        showToast('Copia exclusiva creada y asignada a su formulario', 'success');
+        setEditing(fresh.find((t) => t.id === copy.id) || copy); // abrir el editor para personalizarla
+    };
+
+    const handleAssign = async (templateId: number | null, tenantId: number) => {
+        await apiRequest(`${API}/form-assignment`, {
+            method: 'PUT',
+            body: { tenant_id: tenantId, template_id: templateId },
+        });
+        setAssigning(null);
+        await fetchTemplates();
+        showToast(templateId ? 'Tarjeta asignada al formulario' : 'El formulario vuelve a la tarjeta predeterminada', 'success');
     };
 
     const handleDelete = async (template: FarewellTemplate) => {
@@ -260,6 +297,8 @@ export default function FarewellTemplatesAdminPage() {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {templates.map((template) => {
+                            const isExclusive = template.tenant_id != null;
+                            const formTenants = template.form_tenants || [];
                             const cfg = template.config || {};
                             const bg = cfg.styles?.background || '#1a1a1a';
                             const color = cfg.styles?.color || '#fff';
@@ -303,7 +342,11 @@ export default function FarewellTemplatesAdminPage() {
                                                 </p>
                                             </div>
                                         )}
-                                        {template.is_default ? (
+                                        {isExclusive ? (
+                                            <span className="absolute top-3 right-3 text-[9px] bg-amber-400/90 text-slate-950 px-2.5 py-1 rounded-full font-black uppercase tracking-[0.12em] shadow-lg flex items-center gap-1 max-w-[70%] truncate" title={`Exclusiva de ${template.tenant_name || 'un crematorio'}`}>
+                                                <Lock size={10} /> {template.tenant_name || 'Exclusiva'}
+                                            </span>
+                                        ) : template.is_default ? (
                                             <span className="absolute top-3 right-3 text-[9px] bg-amber-500 text-slate-950 px-2.5 py-1 rounded-full font-black uppercase tracking-[0.16em] shadow-lg flex items-center gap-1">
                                                 <Star size={10} className="fill-slate-950" /> Predeterminada
                                             </span>
@@ -322,7 +365,7 @@ export default function FarewellTemplatesAdminPage() {
                                                 Hacer Default
                                             </button>
                                         )}
-                                        {template.name.toLowerCase().includes('formulario') && (
+                                        {formTenants.length > 0 && (
                                             <span className="absolute top-3 left-3 text-[9px] bg-primary text-white px-2.5 py-1 rounded-full font-black uppercase tracking-[0.14em] shadow-lg flex items-center gap-1">
                                                 <Sparkles size={9} /> Formulario Web
                                             </span>
@@ -336,8 +379,19 @@ export default function FarewellTemplatesAdminPage() {
                                             </h4>
                                         </div>
                                         <p className="text-xs text-white/50 line-clamp-2 mb-4 flex-1">
-                                            {template.description || (template.name.toLowerCase().includes('formulario') ? 'Plantilla utilizada para las tarjetas de homenaje creadas desde el formulario público de los tenants.' : 'Sin descripción')}
+                                            {template.description || 'Sin descripción'}
                                         </p>
+
+                                        {formTenants.length > 0 && (
+                                            <div className="mb-3 rounded-xl bg-primary/[0.06] border border-primary/15 px-3 py-2">
+                                                <p className="text-[9px] font-black uppercase tracking-widest text-primary/80 mb-1">
+                                                    Formulario de {template.is_form_fallback && !isExclusive ? '(predeterminada)' : ''}
+                                                </p>
+                                                <p className="text-[11px] text-white/70 leading-snug">
+                                                    {formTenants.map((t) => t.name).join(', ')}
+                                                </p>
+                                            </div>
+                                        )}
 
                                         <div className="flex gap-2 flex-wrap mb-4">
                                             {template.is_default && (
@@ -365,8 +419,15 @@ export default function FarewellTemplatesAdminPage() {
                                             )}
                                         </div>
 
-                                        <div className="flex gap-2 justify-end">
-                                            {!template.is_default && (
+                                        <div className="flex flex-wrap gap-2 justify-end">
+                                            <button
+                                                onClick={() => setAssigning(template)}
+                                                className="w-full flex items-center justify-center gap-1.5 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10 py-2 px-3 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all active:scale-95"
+                                                title={isExclusive ? 'Asignar al formulario de su crematorio' : 'Personalizar o asignar a un crematorio'}
+                                            >
+                                                <Building2 size={13} /> {isExclusive ? 'Asignar a su formulario' : 'Personalizar para un crematorio'}
+                                            </button>
+                                            {!template.is_default && !isExclusive && (
                                                 <button
                                                     onClick={(e) => handleSetDefault(template, e)}
                                                     disabled={settingDefaultId === template.id}
@@ -407,6 +468,18 @@ export default function FarewellTemplatesAdminPage() {
                     </div>
                 )}
             </div>
+
+            <AnimatePresence>
+                {assigning && (
+                    <AssignModal
+                        template={assigning}
+                        onClose={() => setAssigning(null)}
+                        onCustomize={handleCustomize}
+                        onAssign={handleAssign}
+                        onError={(msg) => showToast(msg, 'error')}
+                    />
+                )}
+            </AnimatePresence>
 
             <AnimatePresence>
                 {(editing || isCreating) && (
@@ -851,6 +924,14 @@ function EditModal({
                                     className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white text-sm font-medium outline-none focus:border-primary/40 resize-y"
                                 />
                             </div>
+                            {template.tenant_id != null ? (
+                            <div className="bg-amber-500/[0.06] border border-amber-500/20 rounded-xl p-3.5 flex items-start gap-2.5">
+                                <Lock size={14} className="text-amber-400 mt-0.5 shrink-0" />
+                                <p className="text-[11px] text-amber-200/80">
+                                    Exclusiva de <strong>{template.tenant_name || 'un crematorio'}</strong>: el crematorio la usa en su formulario pero no puede modificarla.
+                                </p>
+                            </div>
+                            ) : (
                             <div className="bg-white/[0.02] border border-white/10 rounded-xl p-3.5 space-y-1">
                                 <label className="flex items-center gap-3 cursor-pointer">
                                     <input
@@ -865,9 +946,10 @@ function EditModal({
                                     </span>
                                 </label>
                                 <p className="text-[11px] text-white/40 pl-8">
-                                    Será la plantilla por defecto cargada automáticamente en los formularios de registro público de los tenants y en el visualizador de homenajes.
+                                    La usan los formularios de los crematorios que no tienen una tarjeta asignada.
                                 </p>
                             </div>
+                            )}
                         </Section>
 
                         {/* Ratio */}
@@ -1584,5 +1666,122 @@ function EditModal({
                 </footer>
             </motion.div>
         </motion.div>
+    );
+}
+
+/** Formulario de un crematorio: crear una copia exclusiva (recomendado, se
+ *  personaliza con su logo y textos) o usar esta tarjeta tal cual. */
+function AssignModal({
+    template,
+    onClose,
+    onCustomize,
+    onAssign,
+    onError,
+}: {
+    template: FarewellTemplate;
+    onClose: () => void;
+    onCustomize: (template: FarewellTemplate, tenantId: number) => Promise<void>;
+    onAssign: (templateId: number | null, tenantId: number) => Promise<void>;
+    onError: (msg: string) => void;
+}) {
+    const isExclusive = template.tenant_id != null;
+    const [tenants, setTenants] = useState<TenantLite[]>([]);
+    const [tenantId, setTenantId] = useState<number | ''>(isExclusive ? (template.tenant_id as number) : '');
+    const [busy, setBusy] = useState<'copy' | 'assign' | 'reset' | null>(null);
+
+    useEffect(() => {
+        apiRequest('/api/internal/creator/tenants')
+            .then((d: TenantLite[]) => setTenants(d || []))
+            .catch(() => onError('No se pudieron cargar los crematorios'));
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const current = (template.form_tenants || []).map((t) => t.id);
+    const run = async (kind: 'copy' | 'assign' | 'reset') => {
+        if (!tenantId) return;
+        setBusy(kind);
+        try {
+            if (kind === 'copy') await onCustomize(template, tenantId);
+            else if (kind === 'assign') await onAssign(template.id, tenantId);
+            else await onAssign(null, tenantId);
+        } catch (err: unknown) {
+            onError(err instanceof Error ? err.message : 'Error');
+        } finally {
+            setBusy(null);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+            <motion.div
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                className="relative w-full max-w-md bg-[#0a192f] border border-white/10 rounded-3xl p-6 shadow-2xl space-y-5"
+            >
+                <div className="flex items-start justify-between gap-3">
+                    <div>
+                        <h3 className="font-black text-white">Tarjeta del formulario</h3>
+                        <p className="text-xs text-white/40 mt-0.5">{template.name}</p>
+                    </div>
+                    <button onClick={onClose} className="text-white/40 hover:text-white" aria-label="Cerrar"><X size={18} /></button>
+                </div>
+
+                <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-white/40">Crematorio</label>
+                    <select
+                        value={tenantId}
+                        disabled={isExclusive}
+                        onChange={(e) => setTenantId(e.target.value ? Number(e.target.value) : '')}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-primary/50 disabled:opacity-70"
+                    >
+                        <option value="">Selecciona un crematorio…</option>
+                        {tenants.map((t) => (
+                            <option key={t.id} value={t.id}>
+                                {t.name}{current.includes(t.id) ? ' · ya la usa' : ''}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className="space-y-2">
+                    {!isExclusive && (
+                        <button
+                            onClick={() => run('copy')}
+                            disabled={!tenantId || !!busy}
+                            className="w-full flex items-start gap-3 text-left rounded-2xl border border-primary/30 bg-primary/10 hover:bg-primary/15 p-3.5 transition-all disabled:opacity-40"
+                        >
+                            {busy === 'copy' ? <Loader2 size={16} className="animate-spin text-primary mt-0.5" /> : <Copy size={16} className="text-primary mt-0.5" />}
+                            <span>
+                                <span className="block text-sm font-black text-white">Crear copia personalizada</span>
+                                <span className="block text-[11px] text-white/50">Exclusiva de ese crematorio (su logo, colores y textos). Solo tú la editas.</span>
+                            </span>
+                        </button>
+                    )}
+                    <button
+                        onClick={() => run('assign')}
+                        disabled={!tenantId || !!busy}
+                        className="w-full flex items-start gap-3 text-left rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 p-3.5 transition-all disabled:opacity-40"
+                    >
+                        {busy === 'assign' ? <Loader2 size={16} className="animate-spin text-white mt-0.5" /> : <Link2 size={16} className="text-white/70 mt-0.5" />}
+                        <span>
+                            <span className="block text-sm font-black text-white">{isExclusive ? 'Usar en su formulario' : 'Usar esta tarjeta tal cual'}</span>
+                            <span className="block text-[11px] text-white/50">
+                                {isExclusive ? 'Su formulario mostrará esta tarjeta.' : 'Compartida: los cambios a esta tarjeta afectan a todos los que la usan.'}
+                            </span>
+                        </span>
+                    </button>
+                    {tenantId !== '' && current.includes(Number(tenantId)) && (
+                        <button
+                            onClick={() => run('reset')}
+                            disabled={!!busy}
+                            className="w-full text-[11px] font-bold text-white/40 hover:text-white py-1.5"
+                        >
+                            {busy === 'reset' ? 'Restableciendo…' : 'Volver a la tarjeta predeterminada'}
+                        </button>
+                    )}
+                </div>
+            </motion.div>
+        </div>
     );
 }

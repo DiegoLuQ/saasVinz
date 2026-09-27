@@ -597,6 +597,7 @@ class FarewellTemplateUpdate(BaseModel):
 class FarewellTemplate(FarewellTemplateBase):
     id: int
     tenant_id: Optional[int] = None
+    is_locked: bool = False
     created_at: datetime
     model_config = {"from_attributes": True}
 

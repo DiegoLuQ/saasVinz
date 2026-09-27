@@ -127,6 +127,9 @@ class FarewellTemplate(Base):
     config = Column(JSON, nullable=False)
     preview_url = Column(String)
     is_default = Column(Boolean, default=False)
+    # Copia exclusiva de un tenant creada por el SuperAdmin: el tenant la usa
+    # pero no la edita ni la borra.
+    is_locked = Column(Boolean, nullable=False, default=False, server_default="false")
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
 
 class ThemeConfig(Base):

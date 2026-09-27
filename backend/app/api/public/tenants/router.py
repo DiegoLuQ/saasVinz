@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from app import models
+from app.core.tenant_context import apply_tenant_rls
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -121,16 +122,27 @@ def get_tenant_services(slug: str, db: Session = Depends(get_db)):
 
 def resolve_farewell_template(db: Session, tenant_id: int):
     """
-    Plantilla de la tarjeta de homenaje de un tenant: "Plantilla Formulario" >
-    predeterminada > primera disponible (propias o globales). La usan el
-    formulario público y el expediente de la orden.
+    Tarjeta de homenaje de un tenant (formulario público y expediente):
+    la asignada por el SuperAdmin (`tenant.form_farewell_template_id`) >
+    su copia exclusiva más reciente > global predeterminada > global
+    "Plantilla Formulario" (legado, por nombre) > primera global.
+    ops_farewell_templates tiene RLS: el llamador debe haber fijado el tenant
+    (o bypass) para que se vean las exclusivas.
     """
-    from sqlalchemy import or_
-    scope = or_(models.FarewellTemplate.tenant_id == tenant_id, models.FarewellTemplate.tenant_id.is_(None))
+    FT = models.FarewellTemplate
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if tenant and tenant.form_farewell_template_id:
+        chosen = db.query(FT).filter(
+            FT.id == tenant.form_farewell_template_id,
+            (FT.tenant_id == tenant_id) | (FT.tenant_id.is_(None)),
+        ).first()
+        if chosen:
+            return chosen
     return (
-        db.query(models.FarewellTemplate).filter(scope, models.FarewellTemplate.name.ilike("%Plantilla Formulario%")).first()
-        or db.query(models.FarewellTemplate).filter(scope, models.FarewellTemplate.is_default == True).first()  # noqa: E712
-        or db.query(models.FarewellTemplate).filter(scope).first()
+        db.query(FT).filter(FT.tenant_id == tenant_id, FT.is_locked == True).order_by(FT.id.desc()).first()  # noqa: E712
+        or db.query(FT).filter(FT.tenant_id.is_(None), FT.is_default == True).first()  # noqa: E712
+        or db.query(FT).filter(FT.tenant_id.is_(None), FT.name.ilike("%Plantilla Formulario%")).first()
+        or db.query(FT).filter(FT.tenant_id.is_(None)).order_by(FT.id).first()
     )
 
 
@@ -141,6 +153,8 @@ def get_tenant_farewell_template(slug: str, db: Session = Depends(get_db)):
     if not tenant:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
 
+    # RLS: sin fijar el tenant solo se verían las plantillas globales
+    apply_tenant_rls(db, tenant.id)
     template = resolve_farewell_template(db, tenant.id)
     if not template:
         return None

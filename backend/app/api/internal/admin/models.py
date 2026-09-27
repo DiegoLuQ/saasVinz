@@ -88,6 +88,8 @@ class Tenant(Base):
     # Se genera en cualquier vía de creación del tenant.
     public_token = Column(String, unique=True, index=True, default=lambda: secrets.token_urlsafe(12))
     default_certificate_template_id = Column(Integer, nullable=True)
+    # Tarjeta de homenaje del formulario público (NULL = global predeterminada)
+    form_farewell_template_id = Column(Integer, ForeignKey("ops_farewell_templates.id", ondelete="SET NULL"), nullable=True)
     
     # --- Facturación ---
     billing_cycle = Column(String, default="monthly") 

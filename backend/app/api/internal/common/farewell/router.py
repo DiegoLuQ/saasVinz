@@ -66,6 +66,8 @@ def update_farewell_template(
     ).first()
     if not db_template:
         raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    if db_template.is_locked:
+        raise HTTPException(status_code=403, detail="Esta tarjeta es exclusiva y solo la puede modificar el administrador de Vinzer")
 
     update_data = template_update.dict(exclude_unset=True)
     for key, value in update_data.items():
@@ -91,6 +93,8 @@ def update_farewell_template_by_name(
     
     if not db_template:
         raise HTTPException(status_code=404, detail="Plantilla no encontrada por nombre")
+    if db_template.is_locked:
+        raise HTTPException(status_code=403, detail="Esta tarjeta es exclusiva y solo la puede modificar el administrador de Vinzer")
 
     update_data = template_update.dict(exclude_unset=True)
     for key, value in update_data.items():
@@ -113,6 +117,8 @@ def delete_farewell_template(
     
     if not db_template:
         raise HTTPException(status_code=404, detail="Plantilla no encontrada")
+    if db_template.is_locked:
+        raise HTTPException(status_code=403, detail="Esta tarjeta es exclusiva y solo la puede modificar el administrador de Vinzer")
 
     db.delete(db_template)
     db.commit()
