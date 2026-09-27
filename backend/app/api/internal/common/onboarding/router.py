@@ -1,8 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import hmac
+import secrets
+
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app import models, auth, schemas
 from pydantic import BaseModel, EmailStr
+from app.core.config import settings
+from app.core.rate_limiter import limiter
 
 router = APIRouter()
 
@@ -13,15 +18,30 @@ class FreeOnboardingRequest(BaseModel):
     admin_name: str
     phone: str | None = None
 
+def _require_onboarding_key(x_onboarding_key: str | None = Header(default=None)):
+    """Endpoint servidor-a-servidor: exige la clave compartida ONBOARDING_API_KEY.
+    Sin la variable configurada queda deshabilitado (antes era público y creaba
+    cuentas con la contraseña fija "123456")."""
+    expected = settings.ONBOARDING_API_KEY
+    if not expected:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
+    if not x_onboarding_key or not hmac.compare_digest(x_onboarding_key, expected):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado")
+
+
 @router.post("/free")
+@limiter.limit("5/minute")
 def create_free_account(
+    request: Request,
     data: FreeOnboardingRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _key: None = Depends(_require_onboarding_key),
 ):
     """
     Crea una cuenta FREE de forma automatizada.
-    Usado por el flujo de WhatsApp.
+    Usado por el flujo de WhatsApp (requiere el header X-Onboarding-Key).
     """
+    temp_password = secrets.token_urlsafe(9)
     # 1. Verificar si el slug ya existe
     existing_tenant = db.query(models.Tenant).filter(models.Tenant.slug == data.slug).first()
     if existing_tenant:
@@ -55,7 +75,7 @@ def create_free_account(
         new_user = models.User(
             name=data.admin_name,
             email=data.admin_email,
-            hashed_password=auth.get_password_hash("123456"), # Password temporal por defecto
+            hashed_password=auth.get_password_hash(temp_password),  # temporal, única por cuenta
             role=models.UserRole.admin,
             tenant_id=new_tenant.id,
             is_active=True
@@ -72,7 +92,7 @@ def create_free_account(
             "access_url": f"/login?slug={new_tenant.slug}",
             "credentials": {
                 "email": new_user.email,
-                "password": "123456 (Cámbiala al ingresar)"
+                "password": f"{temp_password} (Cámbiala al ingresar)"
             }
         }
 

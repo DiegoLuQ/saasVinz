@@ -79,6 +79,8 @@ class Settings(BaseSettings):
     RATE_LIMIT_API: str = "100/minute"
     # Por defecto usamos memoria para evitar errores si no hay Redis configurado
     REDIS_URL: str = "memory://"
+    # Clave compartida del flujo externo de alta FREE (WhatsApp). Vacía = endpoint deshabilitado.
+    ONBOARDING_API_KEY: str = ""
 
     # CORS: orígenes separados por coma. Si está vacío, se usan los defaults
     # (dev en lvh.me + dominios de producción conocidos) para no romper

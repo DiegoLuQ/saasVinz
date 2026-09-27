@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 from app.database import get_db
 from app.api.deps import get_current_user
+from app.auth import get_current_creator
 from app import models
 from . import schemas
 from typing import List, Optional
@@ -17,12 +18,23 @@ from datetime import datetime
 router = APIRouter()
 
 
+def _is_creator(user) -> bool:
+    return user.role in (models.UserRole.creator, "creator")
+
+
+def _ensure_can_read(receipt, user) -> None:
+    """Un recibo lo ve el SuperAdmin o el tenant al que pertenece."""
+    if not _is_creator(user) and receipt.tenant_id != getattr(user, "tenant_id", None):
+        raise HTTPException(status_code=404, detail="Receipt not found")
+
+
 @router.get("/receipts", response_model=schemas.ReceiptListResponse)
 def list_receipts(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     tenant_id: Optional[int] = None,
     status: Optional[str] = None,
+    current_user: models.User = Depends(get_current_creator),
     db: Session = Depends(get_db)
 ):
     """
@@ -54,6 +66,7 @@ def list_receipts(
 @router.get("/receipts/{receipt_id}", response_model=schemas.ReceiptResponse)
 def get_receipt(
     receipt_id: int,
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -62,6 +75,7 @@ def get_receipt(
     receipt = db.query(models.Receipt).filter(models.Receipt.id == receipt_id).first()
     if not receipt:
         raise HTTPException(status_code=404, detail="Receipt not found")
+    _ensure_can_read(receipt, current_user)
     return receipt
 
 
@@ -69,6 +83,7 @@ def get_receipt(
 def void_receipt(
     receipt_id: int,
     void_request: schemas.ReceiptVoidRequest,
+    current_user: models.User = Depends(get_current_creator),
     db: Session = Depends(get_db)
 ):
     """
@@ -96,14 +111,12 @@ def void_receipt(
 def delete_receipt(
     receipt_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_creator)
 ):
     """
-    Delete a receipt (Admin/Creator only)
+    Delete a receipt (SuperAdmin only)
     """
-    if current_user.role not in [models.UserRole.admin, models.UserRole.creator]:
-        raise HTTPException(status_code=403, detail="Not authorized")
-        
+
     receipt = db.query(models.Receipt).filter(models.Receipt.id == receipt_id).first()
     if not receipt:
         raise HTTPException(status_code=404, detail="Receipt not found")
@@ -118,6 +131,7 @@ def delete_receipt(
 @router.get("/receipts/download/{receipt_number}")
 def download_receipt(
     receipt_number: str,
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -126,6 +140,7 @@ def download_receipt(
     receipt = db.query(models.Receipt).filter(models.Receipt.receipt_number == receipt_number).first()
     if not receipt:
         raise HTTPException(status_code=404, detail="Receipt not found")
+    _ensure_can_read(receipt, current_user)
     
     return {
         "receipt_number": receipt.receipt_number,
@@ -139,6 +154,7 @@ def download_receipt(
 @router.get("/receipts/by-reference/{reference}", response_model=schemas.ReceiptResponse)
 def get_receipt_by_reference(
     reference: str,
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -151,7 +167,7 @@ def get_receipt_by_reference(
         BillingTransaction.payment_reference == reference
     ).first()
     
-    if not transaction:
+    if not transaction or (not _is_creator(current_user) and transaction.tenant_id != getattr(current_user, "tenant_id", None)):
         raise HTTPException(status_code=404, detail="Transaction reference not found")
         
     # Then find the receipt for this transaction
@@ -175,6 +191,7 @@ def get_receipt_by_reference(
 @router.get("/receipts/tenant/{tenant_id}/latest")
 def get_tenant_latest_receipt(
     tenant_id: int,
+    current_user: models.User = Depends(get_current_creator),
     db: Session = Depends(get_db)
 ):
     """
@@ -192,7 +209,7 @@ def get_tenant_latest_receipt(
 
 
 @router.get("/stats/receipts")
-def get_receipt_stats(db: Session = Depends(get_db)):
+def get_receipt_stats(current_user: models.User = Depends(get_current_creator), db: Session = Depends(get_db)):
     """
     Get receipt statistics
     """
@@ -212,6 +229,7 @@ def get_receipt_stats(db: Session = Depends(get_db)):
 @router.post("/receipts/generate", response_model=schemas.ReceiptResponse)
 async def generate_receipt(
     receipt_data: schemas.ReceiptCreate,
+    current_user: models.User = Depends(get_current_creator),
     db: Session = Depends(get_db)
 ):
     """

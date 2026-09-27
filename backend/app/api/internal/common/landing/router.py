@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app import models
 from app import schemas
+from app.auth import get_current_creator
 from datetime import datetime
 from app.utils import tz
 
@@ -66,7 +67,8 @@ def get_landing_config(
 def update_landing_config(
     config_in: schemas.LandingConfigCreate,
     key: str = "main_landing",
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_creator: models.User = Depends(get_current_creator)
 ):
     config = db.query(models.LandingConfig).filter(models.LandingConfig.key == key).first()
     if config:

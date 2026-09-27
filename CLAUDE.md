@@ -133,7 +133,7 @@ Note: `integrations` holds the models/schemas/services for the public widget API
 ## Environment Variables
 
 ### Backend (`backend/.env`)
-Key vars: `SECRET_KEY`, `SQLALCHEMY_DATABASE_URL`, `DB_ADMIN_USER/PASS`, `R2_*` (Cloudflare R2), `POLAR_*` (payments), `MAIL_*` (Gmail SMTP), `RECAPTCHA_SECRET_KEY`, `REDIS_URL`, `CORS_ORIGINS` (optional, comma-separated; falls back to the defaults in `app/core/config.py` when unset).
+Key vars: `SECRET_KEY`, `SQLALCHEMY_DATABASE_URL`, `DB_ADMIN_USER/PASS`, `R2_*` (Cloudflare R2), `POLAR_*` (payments), `MAIL_*` (Gmail SMTP), `RECAPTCHA_SECRET_KEY`, `REDIS_URL`, `CORS_ORIGINS` (optional, comma-separated; falls back to the defaults in `app/core/config.py` when unset). `ONBOARDING_API_KEY` (optional: shared key for `POST /api/internal/onboarding/free`, sent as `X-Onboarding-Key`; unset = endpoint disabled).
 
 ### Frontend (`frontend-saas/.env`)
 Key vars: `NEXT_PUBLIC_ROOT_DOMAIN`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_CLOUDFLARE_R2`, `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`.

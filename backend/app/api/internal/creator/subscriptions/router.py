@@ -2,7 +2,8 @@
 Subscription Management API Endpoints
 Handles CRUD operations for tenant subscriptions and billing transactions
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from app.core.rate_limiter import limiter
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc
 from typing import List, Optional
@@ -870,7 +871,9 @@ async def delete_coupon(
 
 
 @router.get("/coupons/validate/{code}")
+@limiter.limit("10/minute")
 async def validate_coupon(
+    request: Request,
     code: str,
     db: Session = Depends(get_db)
 ):

@@ -18,6 +18,7 @@ from app.utils.sanitize import sanitize_text
 from collections import defaultdict
 import time
 from app.api.internal.common.media_service import MediaService
+from app.core.rate_limiter import limiter
 
 # ─── Rate Limiting (in-memory, per-IP) ───
 _rate_limit_store: dict[str, list[float]] = defaultdict(list)
@@ -80,6 +81,7 @@ def list_public_memorials(
     db: Session = Depends(get_db)
 ):
     """List public memorials for the gallery"""
+    limit = max(1, min(limit, 50))  # tope defensivo
     print(f"DEBUG: list_public_memorials called with limit={limit}")
     query = db.query(mem_models.Memorial).options(
         joinedload(mem_models.Memorial.pet),
@@ -352,7 +354,9 @@ def create_dedication(
     return db_dedication
 
 @router.post("/{recuerdo_uuid}/login", response_model=mem_schemas.MemorialManageResponse)
+@limiter.limit("5/minute")
 def login_memorial(
+    request: Request,
     recuerdo_uuid: UUID,
     login_in: mem_schemas.PinLoginRequest,
     db: Session = Depends(get_db)

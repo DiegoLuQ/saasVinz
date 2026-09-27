@@ -28,12 +28,12 @@ class BlueprintUpdate(BaseModel):
     cells: List[BlueprintCell]
 
 @router.get("/modules")
-def get_modules(db: Session = Depends(get_db)):
+def get_modules(db: Session = Depends(get_db), current_creator: models.User = Depends(auth.get_current_creator)):
     """Lista todos los módulos disponibles en el sistema."""
     return db.query(models.Module).all()
 
 @router.get("/blueprint")
-def get_blueprint(db: Session = Depends(get_db)):
+def get_blueprint(db: Session = Depends(get_db), current_creator: models.User = Depends(auth.get_current_creator)):
     """Retorna la matriz maestra (blueprint) de roles y módulos."""
     return db.query(models.RoleModuleBlueprint).all()
 

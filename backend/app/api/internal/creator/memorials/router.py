@@ -67,7 +67,8 @@ def list_all_memorials(
 def update_memorial_admin(
     memorial_id: int,
     update_data: schemas.AdminMemorialUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_creator: models.User = Depends(auth.get_current_creator)
 ):
     memorial = db.query(Memorial).options(
         joinedload(Memorial.pet).joinedload(Pet.customer),

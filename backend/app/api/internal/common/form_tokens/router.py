@@ -152,7 +152,8 @@ def revoke_token(
 
 @router.post("/cleanup")
 def cleanup_expired_tokens(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_creator: models.User = Depends(auth.get_current_creator)
 ):
     """
     Limpia tokens expirados (tarea de mantenimiento).

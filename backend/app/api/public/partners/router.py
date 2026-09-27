@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Header, Form, File, UploadFile, Request, status
+from app.core.rate_limiter import limiter
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 import json
@@ -43,12 +44,36 @@ def _get_partner_link_by_token(token: str, db: Session) -> PartnerLink:
         )
     return link
 
+# Bloqueo por intentos fallidos de PIN, por enlace (el PIN es de 4 dígitos: sin
+# límite se adivina en minutos). Cubre verify, catálogo, dashboard y submit, y
+# frena también intentos repartidos entre varias IPs. En memoria: el backend
+# corre en una sola instancia.
+_PIN_MAX_FAILS = 10
+_PIN_WINDOW_SECONDS = 15 * 60
+_pin_failures: dict[int, list[float]] = {}
+
+
 def _verify_partner_pin(link: PartnerLink, pin: str):
-    if not link.access_pin or link.access_pin.strip() != pin.strip():
+    import hmac
+    import time
+
+    now = time.time()
+    fails = [t for t in _pin_failures.get(link.id, []) if now - t < _PIN_WINDOW_SECONDS]
+    if len(fails) >= _PIN_MAX_FAILS:
+        _pin_failures[link.id] = fails
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiados intentos con PIN incorrecto. Intenta nuevamente en 15 minutos."
+        )
+    expected = (link.access_pin or "").strip()
+    if not expected or not hmac.compare_digest(expected, (pin or "").strip()):
+        fails.append(now)
+        _pin_failures[link.id] = fails
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="PIN de acceso incorrecto."
         )
+    _pin_failures.pop(link.id, None)
 
 # ---------------------------------------------------------------------------
 # 1. VERIFICACIÓN DE ACCESO CON PIN
@@ -59,7 +84,9 @@ def _verify_partner_pin(link: PartnerLink, pin: str):
     response_model=partner_schemas.PartnerPortalInfo,
     tags=["Público - Portal Partner"]
 )
+@limiter.limit("5/minute")
 async def verify_partner_portal_access(
+    request: Request,
     payload: partner_schemas.PartnerPortalVerifyRequest,
     db: Session = Depends(get_db)
 ):

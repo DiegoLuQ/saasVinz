@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Body
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Body, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.auth import get_current_creator
+from app.auth import get_current_creator, get_token_from_request
 from app.api.internal.common.media_service import MediaService
 from app.api.internal.common.models import MediaLibrary, MediaCategory
 import os
@@ -10,6 +10,17 @@ import re
 import uuid
 
 router = APIRouter(prefix="/media", tags=["Media Library"])
+
+
+def _optional_creator(db: Session = Depends(get_db), token=Depends(get_token_from_request)):
+    """SuperAdmin si hay sesión válida de creador; None en cualquier otro caso.
+    Solo el listado lo usa: sin sesión se entregan únicamente recursos globales."""
+    if not token:
+        return None
+    try:
+        return get_current_creator(db, token)
+    except HTTPException:
+        return None
 
 
 def _slugify_category_key(text: str) -> str:
@@ -21,6 +32,7 @@ def _slugify_category_key(text: str) -> str:
 
 @router.post("/upload")
 async def upload_media(
+    current_creator=Depends(get_current_creator),
     file: UploadFile = File(...),
     category: str = Form("gallery"),
     ratio: str = Form("original"),
@@ -83,6 +95,7 @@ async def list_media(
     global_only: bool = False,
     page: int = 1,
     page_size: int = 24,
+    creator=Depends(_optional_creator),
     db: Session = Depends(get_db)
 ):
     """
@@ -94,6 +107,12 @@ async def list_media(
 
     page = max(1, page)
     page_size = min(max(1, page_size), 100)  # tope defensivo
+
+    # Sin sesión de SuperAdmin (p. ej. la gestión pública del memorial pide los
+    # fondos globales) solo se exponen recursos globales, nunca archivos de tenants.
+    if creator is None:
+        global_only = True
+        tenant_id = None
 
     query = db.query(MediaLibrary)
     if category:
@@ -151,7 +170,7 @@ async def list_media(
 
 
 @router.get("/facets")
-async def media_facets(db: Session = Depends(get_db)):
+async def media_facets(current_creator=Depends(get_current_creator), db: Session = Depends(get_db)):
     """
     Devuelve las opciones de filtro (empresas y categorías) con sus contadores
     sobre TODA la biblioteca, independiente de la página. Tres consultas agregadas
@@ -214,7 +233,7 @@ def _serialize_category(c: MediaCategory) -> dict:
 
 
 @router.get("/categories")
-async def list_categories(include_inactive: bool = False, db: Session = Depends(get_db)):
+async def list_categories(current_creator=Depends(get_current_creator), include_inactive: bool = False, db: Session = Depends(get_db)):
     """Categorías del selector de subida. Por defecto solo las activas."""
     query = db.query(MediaCategory)
     if not include_inactive:
@@ -225,6 +244,7 @@ async def list_categories(include_inactive: bool = False, db: Session = Depends(
 
 @router.post("/categories")
 async def create_category(
+    current_creator=Depends(get_current_creator),
     label: str = Form(...),
     key: str = Form(None),
     sort_order: int = Form(None),
@@ -255,6 +275,7 @@ async def create_category(
 @router.put("/categories/{category_id}")
 async def update_category(
     category_id: int,
+    current_creator=Depends(get_current_creator),
     label: str = Form(None),
     sort_order: int = Form(None),
     is_active: bool = Form(None),
@@ -277,7 +298,7 @@ async def update_category(
 
 
 @router.delete("/categories/{category_id}")
-async def delete_category(category_id: int, db: Session = Depends(get_db)):
+async def delete_category(category_id: int, current_creator=Depends(get_current_creator), db: Session = Depends(get_db)):
     cat = db.query(MediaCategory).filter(MediaCategory.id == category_id).first()
     if not cat:
         raise HTTPException(status_code=404, detail="Categoría no encontrada.")
@@ -299,6 +320,7 @@ async def delete_category(category_id: int, db: Session = Depends(get_db)):
 @router.delete("/{media_id}")
 async def delete_media(
     media_id: int,
+    current_creator=Depends(get_current_creator),
     db: Session = Depends(get_db)
 ):
     media_item = db.query(MediaLibrary).filter(MediaLibrary.id == media_id).first()
@@ -316,6 +338,7 @@ async def delete_media(
 @router.put("/{media_id}")
 async def update_media(
     media_id: int,
+    current_creator=Depends(get_current_creator),
     category: str = Form(None),
     description: str = Form(None),
     alt_text: str = Form(None),
@@ -340,6 +363,7 @@ async def update_media(
 @router.put("/{media_id}/theme")
 async def update_media_theme(
     media_id: int,
+    current_creator=Depends(get_current_creator),
     theme_config: dict = Body(...),
     db: Session = Depends(get_db)
 ):
