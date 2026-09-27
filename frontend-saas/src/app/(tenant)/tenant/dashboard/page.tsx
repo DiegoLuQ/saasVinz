@@ -175,7 +175,12 @@ export default function DashboardPage() {
     const todayLabel = `${DAYS_ES[now.getDay()]} ${now.getDate()} de ${MONTHS_ES[now.getMonth()]}`;
 
     const rawSubmissions = useInitialSubmissions();
-    const pendingSubmissions = rawSubmissions.filter((s: BootstrapSubmissionData) => s.status === 'pending' || s.status === 'pendiente');
+    // Orden de llegada: la más antigua primero (se atiende en ese orden)
+    const pendingSubmissions = rawSubmissions
+        .filter((s: BootstrapSubmissionData) => s.status === 'pending' || s.status === 'pendiente')
+        .sort((a: BootstrapSubmissionData, b: BootstrapSubmissionData) =>
+            (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) || a.id - b.id
+        );
 
     const openOrder = (id: number) => router.push(`/dashboard/recepcion-pedidos?orden=${id}`);
 
