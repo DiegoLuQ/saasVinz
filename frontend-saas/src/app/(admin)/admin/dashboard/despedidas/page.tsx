@@ -21,6 +21,9 @@ import {
     Lock,
     Copy,
     Link2,
+    ChevronDown,
+    Check,
+    Search,
 } from 'lucide-react';
 import { apiRequest, getImageUrl } from '@/lib/admin/api';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -154,6 +157,9 @@ export default function FarewellTemplatesAdminPage() {
     const [isCreating, setIsCreating] = useState(false);
     // "Formulario de un crematorio": copia exclusiva o usar tal cual
     const [assigning, setAssigning] = useState<FarewellTemplate | null>(null);
+    // Confirmación en la propia tarjeta: "t:<id>" = retirar exclusiva, "a:<tplId>:<tenantId>" = quitar asignación
+    const [confirmRetire, setConfirmRetire] = useState<string | null>(null);
+    const [retiring, setRetiring] = useState<string | null>(null);
 
     const showToast = (text: string, type: 'success' | 'error' = 'success') => {
         setMessage({ text, type });
@@ -215,6 +221,37 @@ export default function FarewellTemplatesAdminPage() {
         setAssigning(null);
         await fetchTemplates();
         showToast(templateId ? 'Tarjeta asignada al formulario' : 'El formulario vuelve a la tarjeta predeterminada', 'success');
+    };
+
+    // Exclusiva: se elimina la copia y el formulario del crematorio vuelve a la predeterminada
+    const handleRetireExclusive = async (template: FarewellTemplate) => {
+        const key = `t:${template.id}`;
+        setRetiring(key);
+        try {
+            await apiRequest(`${API}/${template.id}`, { method: 'DELETE' });
+            showToast(`Tarjeta retirada de ${template.tenant_name || 'el crematorio'}`, 'success');
+            setConfirmRetire(null);
+            fetchTemplates();
+        } catch (err: any) {
+            showToast(err.message || 'Error al retirar', 'error');
+        } finally {
+            setRetiring(null);
+        }
+    };
+
+    // Global asignada: se quita solo de ese formulario
+    const handleUnassign = async (template: FarewellTemplate, tenant: { id: number; name: string }) => {
+        const key = `a:${template.id}:${tenant.id}`;
+        setRetiring(key);
+        try {
+            await handleAssign(null, tenant.id);
+            showToast(`"${template.name}" retirada del formulario de ${tenant.name}`, 'success');
+            setConfirmRetire(null);
+        } catch (err: any) {
+            showToast(err.message || 'Error al retirar', 'error');
+        } finally {
+            setRetiring(null);
+        }
     };
 
     const handleDelete = async (template: FarewellTemplate) => {
@@ -387,9 +424,38 @@ export default function FarewellTemplatesAdminPage() {
                                                 <p className="text-[9px] font-black uppercase tracking-widest text-primary/80 mb-1">
                                                     Formulario de {template.is_form_fallback && !isExclusive ? '(predeterminada)' : ''}
                                                 </p>
-                                                <p className="text-[11px] text-white/70 leading-snug">
-                                                    {formTenants.map((t) => t.name).join(', ')}
-                                                </p>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {formTenants.map((t) => {
+                                                        const key = `a:${template.id}:${t.id}`;
+                                                        const canRemove = !isExclusive && t.explicit;
+                                                        if (confirmRetire === key) {
+                                                            return (
+                                                                <span key={t.id} className="inline-flex items-center gap-1.5 text-[11px] bg-red-500/10 border border-red-500/25 rounded-md pl-2 pr-1 py-0.5 text-red-200">
+                                                                    ¿Quitar de {t.name}?
+                                                                    <button onClick={() => handleUnassign(template, t)} disabled={retiring === key} className="font-black text-red-300 hover:text-white px-1">
+                                                                        {retiring === key ? <Loader2 size={11} className="animate-spin" /> : 'Sí'}
+                                                                    </button>
+                                                                    <button onClick={() => setConfirmRetire(null)} className="text-white/40 hover:text-white px-1">No</button>
+                                                                </span>
+                                                            );
+                                                        }
+                                                        return (
+                                                            <span key={t.id} className="inline-flex items-center gap-1 text-[11px] text-white/75 bg-white/5 border border-white/10 rounded-md pl-2 pr-1 py-0.5">
+                                                                {t.name}
+                                                                {canRemove ? (
+                                                                    <button
+                                                                        onClick={() => setConfirmRetire(key)}
+                                                                        className="text-white/30 hover:text-red-400 p-0.5"
+                                                                        title={`Retirar del formulario de ${t.name}`}
+                                                                        aria-label={`Retirar del formulario de ${t.name}`}
+                                                                    >
+                                                                        <X size={11} />
+                                                                    </button>
+                                                                ) : <span className="w-1" />}
+                                                            </span>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
                                         )}
 
@@ -448,6 +514,33 @@ export default function FarewellTemplatesAdminPage() {
                                             >
                                                 <Pencil size={13} /> Editar
                                             </button>
+                                            {isExclusive ? (
+                                                confirmRetire === `t:${template.id}` ? (
+                                                    <div className="w-full flex items-center justify-between gap-2 rounded-xl bg-red-500/10 border border-red-500/25 px-3 py-2">
+                                                        <span className="text-[11px] text-red-200">
+                                                            ¿Retirar de {template.tenant_name || 'este crematorio'}? Su formulario usará otra de sus tarjetas o la predeterminada.
+                                                        </span>
+                                                        <div className="flex items-center gap-1 shrink-0">
+                                                            <button onClick={() => setConfirmRetire(null)} className="text-[11px] font-bold text-white/50 hover:text-white px-2 py-1">No</button>
+                                                            <button
+                                                                onClick={() => handleRetireExclusive(template)}
+                                                                disabled={retiring === `t:${template.id}`}
+                                                                className="text-[11px] font-black text-white bg-red-500 hover:bg-red-400 rounded-lg px-2.5 py-1 flex items-center gap-1"
+                                                            >
+                                                                {retiring === `t:${template.id}` && <Loader2 size={11} className="animate-spin" />} Retirar
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => setConfirmRetire(`t:${template.id}`)}
+                                                        className="flex items-center justify-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/15 py-2 px-3 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all active:scale-95"
+                                                        title={`Retirar la tarjeta de ${template.tenant_name || 'este crematorio'}`}
+                                                    >
+                                                        <Trash2 size={13} /> Retirar
+                                                    </button>
+                                                )
+                                            ) : (
                                             <button
                                                 onClick={() => handleDelete(template)}
                                                 disabled={deletingId === template.id}
@@ -460,6 +553,7 @@ export default function FarewellTemplatesAdminPage() {
                                                     <Trash2 size={14} />
                                                 )}
                                             </button>
+                                            )}
                                         </div>
                                     </div>
                                 </article>
@@ -1696,6 +1790,39 @@ function AssignModal({
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const current = (template.form_tenants || []).map((t) => t.id);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [searchFilter, setSearchFilter] = useState('');
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsDropdownOpen(false);
+            }
+        }
+        function handleKeyDown(event: KeyboardEvent) {
+            if (event.key === 'Escape') {
+                setIsDropdownOpen(false);
+            }
+        }
+        if (isDropdownOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            document.addEventListener('keydown', handleKeyDown);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isDropdownOpen]);
+
+    const selectedTenant = tenants.find((t) => t.id === tenantId);
+    const displayName = selectedTenant?.name || (isExclusive ? (template.tenant_name || `Crematorio #${tenantId}`) : null);
+
+    const filteredTenants = useMemo(() => {
+        if (!searchFilter.trim()) return tenants;
+        return tenants.filter((t) => t.name.toLowerCase().includes(searchFilter.toLowerCase()));
+    }, [tenants, searchFilter]);
+
     const run = async (kind: 'copy' | 'assign' | 'reset') => {
         if (!tenantId) return;
         setBusy(kind);
@@ -1727,21 +1854,126 @@ function AssignModal({
                     <button onClick={onClose} className="text-white/40 hover:text-white" aria-label="Cerrar"><X size={18} /></button>
                 </div>
 
-                <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-white/40">Crematorio</label>
-                    <select
-                        value={tenantId}
-                        disabled={isExclusive}
-                        onChange={(e) => setTenantId(e.target.value ? Number(e.target.value) : '')}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-primary/50 disabled:opacity-70"
-                    >
-                        <option value="">Selecciona un crematorio…</option>
-                        {tenants.map((t) => (
-                            <option key={t.id} value={t.id}>
-                                {t.name}{current.includes(t.id) ? ' · ya la usa' : ''}
-                            </option>
-                        ))}
-                    </select>
+                <div className="space-y-1.5" ref={dropdownRef}>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-white/50 block">Crematorio</label>
+                    <div className="relative">
+                        <button
+                            type="button"
+                            disabled={isExclusive}
+                            onClick={() => {
+                                setIsDropdownOpen((prev) => !prev);
+                                setSearchFilter('');
+                            }}
+                            className={`w-full flex items-center justify-between gap-3 rounded-2xl px-3.5 py-3 text-sm border transition-all text-left outline-none ${
+                                isExclusive
+                                    ? 'bg-white/5 border-white/10 text-white/70 cursor-not-allowed'
+                                    : isDropdownOpen
+                                    ? 'bg-[#122543] border-primary/60 ring-2 ring-primary/20 text-white shadow-lg'
+                                    : 'bg-[#0e213b] hover:bg-[#142947] border-white/15 hover:border-white/25 text-white'
+                            }`}
+                        >
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                <div className={`p-1.5 rounded-lg flex items-center justify-center shrink-0 ${
+                                    selectedTenant ? 'bg-primary/20 text-primary' : 'bg-white/10 text-white/40'
+                                }`}>
+                                    <Building2 size={16} />
+                                </div>
+                                <span className={`truncate font-semibold ${displayName ? 'text-white' : 'text-white/40'}`}>
+                                    {displayName || 'Selecciona un crematorio…'}
+                                </span>
+                                {selectedTenant && current.includes(selectedTenant.id) && (
+                                    <span className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                        Ya la usa
+                                    </span>
+                                )}
+                            </div>
+                            {isExclusive ? (
+                                <span className="flex items-center gap-1.5 text-[10px] font-bold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/20 shrink-0">
+                                    <Lock size={11} /> Exclusiva
+                                </span>
+                            ) : (
+                                <ChevronDown
+                                    size={16}
+                                    className={`text-white/40 shrink-0 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180 text-primary' : ''}`}
+                                />
+                            )}
+                        </button>
+
+                        <AnimatePresence>
+                            {isDropdownOpen && !isExclusive && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                                    transition={{ duration: 0.15 }}
+                                    className="absolute z-50 top-full left-0 right-0 mt-2 bg-[#0c1e38] border border-white/20 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-2xl"
+                                >
+                                    {tenants.length > 4 && (
+                                        <div className="p-2 border-b border-white/10 bg-white/[0.03]">
+                                            <div className="relative">
+                                                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Buscar crematorio..."
+                                                    value={searchFilter}
+                                                    onChange={(e) => setSearchFilter(e.target.value)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    autoFocus
+                                                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-white/40 outline-none focus:border-primary/50 focus:bg-white/[0.08] transition-all"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="max-h-56 overflow-y-auto p-1.5 space-y-1 custom-scrollbar">
+                                        {filteredTenants.length === 0 ? (
+                                            <div className="py-6 text-center text-xs text-white/40">
+                                                {tenants.length === 0 ? 'Cargando crematorios...' : 'No se encontraron resultados'}
+                                            </div>
+                                        ) : (
+                                            filteredTenants.map((t) => {
+                                                const isSelected = tenantId === t.id;
+                                                const isCurrentlyUsing = current.includes(t.id);
+                                                return (
+                                                    <button
+                                                        key={t.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setTenantId(t.id);
+                                                            setIsDropdownOpen(false);
+                                                            setSearchFilter('');
+                                                        }}
+                                                        className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs sm:text-sm text-left transition-all ${
+                                                            isSelected
+                                                                ? 'bg-primary/20 text-white font-semibold border border-primary/30'
+                                                                : 'text-white/80 hover:bg-white/10 hover:text-white'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center gap-2.5 min-w-0">
+                                                            <div className={`p-1 rounded-md shrink-0 ${isSelected ? 'bg-primary/30 text-primary' : 'bg-white/5 text-white/40'}`}>
+                                                                <Building2 size={13} />
+                                                            </div>
+                                                            <span className="truncate">{t.name}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 shrink-0">
+                                                            {isCurrentlyUsing && (
+                                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/25">
+                                                                    Ya la usa
+                                                                </span>
+                                                            )}
+                                                            {isSelected && (
+                                                                <Check size={15} className="text-primary stroke-[2.5]" />
+                                                            )}
+                                                        </div>
+                                                    </button>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
                 </div>
 
                 <div className="space-y-2">
