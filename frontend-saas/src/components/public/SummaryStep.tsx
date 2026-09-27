@@ -253,6 +253,8 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
                 subtitle: '',
                 farewellText: petData.dedication || 'Gracias por cada instante de ternura y amor incondicional. Tu recuerdo vivirá por siempre en nuestra memoria.',
                 image2Url: primaryImageBlobUrl,
+                tenantName: (base.elements?.tenantName && String(base.elements.tenantName).trim()) || '',
+                tenantWebsite: (base.elements?.tenantWebsite && String(base.elements.tenantWebsite).trim()) || '',
             },
         };
     }, [farewellTemplate, petData, primaryImageBlobUrl]);

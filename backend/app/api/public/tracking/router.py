@@ -7,6 +7,7 @@ from app import schemas
 from app.core.rate_limiter import limiter
 from datetime import datetime
 from typing import List, Optional
+from app.api.public.tenants.router import resolve_farewell_template
 
 router = APIRouter()
 
@@ -156,24 +157,11 @@ def get_tracking_info(
         owner_data = submission.owner_data or {}
         owner_name = owner_data.get("fullName") or owner_data.get("name") or None
 
-        farewell_tpl = db.query(models.FarewellTemplate).filter(
-            or_(
-                models.FarewellTemplate.tenant_id == tenant.id,
-                models.FarewellTemplate.tenant_id.is_(None)
-            ),
-            models.FarewellTemplate.name.ilike("%Plantilla Formulario%")
-        ).first() or db.query(models.FarewellTemplate).filter(
-            or_(
-                models.FarewellTemplate.tenant_id == tenant.id,
-                models.FarewellTemplate.tenant_id.is_(None)
-            ),
-            models.FarewellTemplate.is_default == True
-        ).first() or db.query(models.FarewellTemplate).filter(
-            or_(
-                models.FarewellTemplate.tenant_id == tenant.id,
-                models.FarewellTemplate.tenant_id.is_(None)
-            )
-        ).first()
+        farewell_tpl = resolve_farewell_template(db, tenant.id)
+
+        tenant_website = None
+        if isinstance(tenant.social_media, dict):
+            tenant_website = tenant.social_media.get("website") or tenant.social_media.get("instagram")
 
         return schemas.PublicTrackingResponse(
             pet_name=pet_name_db,
@@ -186,6 +174,8 @@ def get_tracking_info(
             timeline=timeline_events,
             tenant_name=tenant.name,
             tenant_logo=tenant.logo_url,
+            tenant_website=tenant_website,
+            tenant_social_media=tenant.social_media if isinstance(tenant.social_media, dict) else None,
             pet_dedication=pet_data.get("dedication"),
             farewell_template_config=farewell_tpl.config if farewell_tpl else None,
             is_ultra_plan="ULTRA" in ((getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper()),
@@ -263,24 +253,11 @@ def get_tracking_info(
     
     owner_name = pet.customer.name if pet.customer else None
 
-    farewell_tpl = db.query(models.FarewellTemplate).filter(
-        or_(
-            models.FarewellTemplate.tenant_id == tenant.id,
-            models.FarewellTemplate.tenant_id.is_(None)
-        ),
-        models.FarewellTemplate.name.ilike("%Plantilla Formulario%")
-    ).first() or db.query(models.FarewellTemplate).filter(
-        or_(
-            models.FarewellTemplate.tenant_id == tenant.id,
-            models.FarewellTemplate.tenant_id.is_(None)
-        ),
-        models.FarewellTemplate.is_default == True
-    ).first() or db.query(models.FarewellTemplate).filter(
-        or_(
-            models.FarewellTemplate.tenant_id == tenant.id,
-            models.FarewellTemplate.tenant_id.is_(None)
-        )
-    ).first()
+    farewell_tpl = resolve_farewell_template(db, tenant.id)
+
+    tenant_website = None
+    if isinstance(tenant.social_media, dict):
+        tenant_website = tenant.social_media.get("website") or tenant.social_media.get("instagram")
 
     return schemas.PublicTrackingResponse(
         pet_name=pet.name,
@@ -293,6 +270,8 @@ def get_tracking_info(
         timeline=timeline_events,
         tenant_name=tenant.name,
         tenant_logo=tenant.logo_url,
+        tenant_website=tenant_website,
+        tenant_social_media=tenant.social_media if isinstance(tenant.social_media, dict) else None,
         pet_dedication=getattr(pet, "dedication", None) or getattr(pet, "notes", None),
         farewell_template_config=farewell_tpl.config if farewell_tpl else None,
         is_ultra_plan="ULTRA" in ((getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper()),

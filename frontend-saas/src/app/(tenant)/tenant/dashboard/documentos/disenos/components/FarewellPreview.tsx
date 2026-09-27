@@ -221,6 +221,44 @@ function drawFeathered(
     ctx.globalCompositeOperation = 'source-over';
 }
 
+export function resolveSocialTags(
+    templateText: string | undefined | null,
+    socialMedia?: {
+        website?: string;
+        pagina_web?: string;
+        instagram?: string;
+        tiktok?: string;
+        facebook?: string;
+        [key: string]: any;
+    } | null,
+    fallbackText = 'www.crematorio.com'
+): string {
+    if (!templateText) return '';
+    const sm = socialMedia || {};
+    const website = sm.website || sm.pagina_web || '';
+    const instagram = sm.instagram || '';
+    const tiktok = sm.tiktok || '';
+    const facebook = sm.facebook || '';
+
+    // Check if the template contains any of our dynamic variables:
+    // {sitio_web}, {website}, {pagina_web}, {instagram}, {tiktok}, {facebook}
+    const hasTags = /\{(?:sitio_web|website|pagina_web|instagram|tiktok|facebook)\}/i.test(templateText);
+
+    if (hasTags) {
+        const isPreviewOrEmpty = !socialMedia || Object.values(socialMedia).every(v => !v);
+        let res = templateText
+            .replace(/\{(?:sitio_web|website|pagina_web)\}/gi, website || (isPreviewOrEmpty ? 'www.crematorio.com' : ''))
+            .replace(/\{instagram\}/gi, instagram || (isPreviewOrEmpty ? '@crematorio_pet' : ''))
+            .replace(/\{tiktok\}/gi, tiktok || (isPreviewOrEmpty ? '@crematorio_pet' : ''))
+            .replace(/\{facebook\}/gi, facebook || (isPreviewOrEmpty ? 'crematoriopet' : ''));
+
+        res = res.trim();
+        return res || website || instagram || fallbackText;
+    }
+
+    return templateText;
+}
+
 interface FarewellPreviewProps {
     config: any;
 }
@@ -615,6 +653,81 @@ const FarewellPreview = forwardRef<HTMLDivElement, FarewellPreviewProps>(({ conf
                     );
                 })()
             )}
+
+            {/* Nombre del Crematorio */}
+            {(() => {
+                const isEnabled = !!config.tenantNameFormatting?.enabled;
+                const nameText = config.elements?.tenantName || (isEnabled ? 'Nombre del Crematorio' : '');
+                if (!isEnabled || !nameText) return null;
+                return (
+                    <div
+                        className="absolute w-full text-center pointer-events-none"
+                        style={{
+                            top: '50%',
+                            paddingLeft: `${px(20, 20)}px`,
+                            paddingRight: `${px(20, 20)}px`,
+                            transform: `translateY(-50%) translate(${pxX(config.elements?.tenantNameX)}px, ${pxY(config.elements?.tenantNameY, 200)}px)`,
+                            zIndex: config.tenantNameFormatting?.zIndex ?? 20,
+                        }}
+                    >
+                        <p
+                            style={{
+                                fontFamily: config.tenantNameFormatting?.fontFamily || fontFamily,
+                                fontSize: `${px(config.tenantNameFormatting?.fontSize, 14)}px`,
+                                fontWeight: config.tenantNameFormatting?.bold ?? true ? 'bold' : 'normal',
+                                fontStyle: config.tenantNameFormatting?.italic ? 'italic' : 'normal',
+                                letterSpacing: `${px(config.tenantNameFormatting?.letterSpacing, 1.2)}px`,
+                                textTransform: config.tenantNameFormatting?.uppercase ?? true ? 'uppercase' : 'none',
+                                color: config.tenantNameFormatting?.color || config.styles?.color || 'inherit',
+                                opacity: config.tenantNameFormatting?.opacity ?? 0.88,
+                                margin: 0,
+                            }}
+                        >
+                            {nameText}
+                        </p>
+                    </div>
+                );
+            })()}
+
+            {/* Sitio Web o Red Social del Crematorio */}
+            {(() => {
+                const isEnabled = !!config.tenantWebsiteFormatting?.enabled;
+                const rawText = config.elements?.tenantWebsite || (isEnabled ? '{sitio_web}' : '');
+                if (!isEnabled || !rawText) return null;
+                const websiteText = resolveSocialTags(
+                    rawText,
+                    config.elements?.tenantSocialMedia || config.tenantSocialMedia,
+                    'www.crematorio.com'
+                );
+                if (!websiteText) return null;
+                return (
+                    <div
+                        className="absolute w-full text-center pointer-events-none"
+                        style={{
+                            top: '50%',
+                            paddingLeft: `${px(20, 20)}px`,
+                            paddingRight: `${px(20, 20)}px`,
+                            transform: `translateY(-50%) translate(${pxX(config.elements?.tenantWebsiteX)}px, ${pxY(config.elements?.tenantWebsiteY, 222)}px)`,
+                            zIndex: config.tenantWebsiteFormatting?.zIndex ?? 20,
+                        }}
+                    >
+                        <p
+                            style={{
+                                fontFamily,
+                                fontSize: `${px(config.tenantWebsiteFormatting?.fontSize, 11)}px`,
+                                fontWeight: config.tenantWebsiteFormatting?.bold ? 'bold' : 'normal',
+                                fontStyle: config.tenantWebsiteFormatting?.italic ? 'italic' : 'normal',
+                                letterSpacing: `${px(config.tenantWebsiteFormatting?.letterSpacing, 0.5)}px`,
+                                color: config.tenantWebsiteFormatting?.color || config.styles?.color || 'inherit',
+                                opacity: config.tenantWebsiteFormatting?.opacity ?? 0.75,
+                                margin: 0,
+                            }}
+                        >
+                            {websiteText}
+                        </p>
+                    </div>
+                );
+            })()}
         </div>
     );
 });

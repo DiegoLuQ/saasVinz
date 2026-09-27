@@ -223,7 +223,11 @@ export default function TenantFormPage() {
                 farewellText: petData.dedication || 'Gracias por cada instante de ternura y amor incondicional. Tu recuerdo vivirá por siempre en nuestra memoria.',
                 image2Url: primaryImageBlobUrl,
                 tenantLogoUrl: tenant?.logo_url ? getImageUrl(tenant.logo_url) : null,
+                tenantName: (baseFarewellConfig.elements?.tenantName && String(baseFarewellConfig.elements.tenantName).trim()) || tenant?.name || '',
+                tenantWebsite: (baseFarewellConfig.elements?.tenantWebsite && String(baseFarewellConfig.elements.tenantWebsite).trim()) || '{sitio_web}',
+                tenantSocialMedia: tenant?.social_media || {},
             },
+            tenantSocialMedia: tenant?.social_media || {},
         };
 
         return (

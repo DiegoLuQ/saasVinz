@@ -163,7 +163,11 @@ export default function TrackingPage() {
                 farewellText: data.pet_dedication || 'Gracias por cada instante de ternura y amor incondicional. Tu recuerdo vivirá por siempre en nuestra memoria.',
                 image2Url: getImageUrl(data.pet_image_url),
                 tenantLogoUrl: data.tenant_logo ? getImageUrl(data.tenant_logo) : null,
+                tenantName: (base.elements?.tenantName && String(base.elements.tenantName).trim()) || data.tenant_name || '',
+                tenantWebsite: (base.elements?.tenantWebsite && String(base.elements.tenantWebsite).trim()) || '{sitio_web}',
+                tenantSocialMedia: data.tenant_social_media || {},
             },
+            tenantSocialMedia: data.tenant_social_media || {},
         };
     }, [data]);
 

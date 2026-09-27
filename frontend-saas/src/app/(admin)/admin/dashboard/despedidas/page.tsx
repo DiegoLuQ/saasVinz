@@ -24,10 +24,26 @@ import {
     ChevronDown,
     Check,
     Search,
+    Globe,
+    Instagram,
+    Facebook,
 } from 'lucide-react';
 import { apiRequest, getImageUrl } from '@/lib/admin/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import FarewellPreview from '@/app/(tenant)/tenant/dashboard/documentos/disenos/components/FarewellPreview';
+
+const TikTokIcon = ({ size = 13, className = "" }: { size?: number; className?: string }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
+    </svg>
+);
+
+const SOCIAL_TAGS = [
+    { tag: '{sitio_web}', label: 'Sitio Web', icon: Globe, badgeClass: 'text-sky-400 border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20' },
+    { tag: '{instagram}', label: 'Instagram', icon: Instagram, badgeClass: 'text-pink-400 border-pink-500/30 bg-pink-500/10 hover:bg-pink-500/20' },
+    { tag: '{tiktok}', label: 'TikTok', icon: TikTokIcon, badgeClass: 'text-cyan-400 border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20' },
+    { tag: '{facebook}', label: 'Facebook', icon: Facebook, badgeClass: 'text-blue-400 border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20' },
+];
 
 const TENANT_LOGO_PLACEHOLDER_SVG = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
@@ -91,6 +107,12 @@ const DEFAULT_NEW_TEMPLATE: FarewellTemplate = {
             image2Url: null,
             image2X: 0,
             image2Y: -140,
+            tenantName: '',
+            tenantNameX: 0,
+            tenantNameY: 200,
+            tenantWebsite: '',
+            tenantWebsiteX: 0,
+            tenantWebsiteY: 222,
         },
         styles: {
             background: '#FDFBF7',
@@ -141,6 +163,19 @@ const DEFAULT_NEW_TEMPLATE: FarewellTemplate = {
             x: 0,
             y: 0,
             opacity: 0.95,
+        },
+        tenantNameFormatting: {
+            enabled: true,
+            fontSize: 14,
+            bold: true,
+            uppercase: true,
+            letterSpacing: 1.2,
+        },
+        tenantWebsiteFormatting: {
+            enabled: true,
+            fontSize: 11,
+            bold: false,
+            letterSpacing: 0.5,
         },
     },
 };
@@ -778,6 +813,42 @@ function EditModal({
         typeof baseConfig.tenantLogo?.opacity === 'number' ? baseConfig.tenantLogo.opacity : 0.95
     );
 
+    // Nombre del Crematorio
+    const [tenantNameEnabled, setTenantNameEnabled] = useState<boolean>(
+        baseConfig.tenantNameFormatting?.enabled !== undefined
+            ? !!baseConfig.tenantNameFormatting.enabled
+            : !!(baseConfig.elements?.tenantName || template.tenant_name)
+    );
+    const [tenantNameText, setTenantNameText] = useState<string>(
+        baseConfig.elements?.tenantName ?? (template.tenant_name || '')
+    );
+    const [tenantNameFontSize, setTenantNameFontSize] = useState<number>(
+        baseConfig.tenantNameFormatting?.fontSize ?? 14
+    );
+    const [tenantNameX, setTenantNameX] = useState<number>(baseConfig.elements?.tenantNameX ?? 0);
+    const [tenantNameY, setTenantNameY] = useState<number>(baseConfig.elements?.tenantNameY ?? 200);
+    const [tenantNameBold, setTenantNameBold] = useState<boolean>(
+        baseConfig.tenantNameFormatting?.bold ?? true
+    );
+    const [tenantNameUppercase, setTenantNameUppercase] = useState<boolean>(
+        baseConfig.tenantNameFormatting?.uppercase ?? true
+    );
+
+    // Sitio Web o Red Social
+    const [tenantWebsiteEnabled, setTenantWebsiteEnabled] = useState<boolean>(
+        baseConfig.tenantWebsiteFormatting?.enabled !== undefined
+            ? !!baseConfig.tenantWebsiteFormatting.enabled
+            : !!baseConfig.elements?.tenantWebsite
+    );
+    const [tenantWebsiteText, setTenantWebsiteText] = useState<string>(
+        baseConfig.elements?.tenantWebsite || (baseConfig.tenantWebsiteFormatting?.enabled ? '{sitio_web}' : '')
+    );
+    const [tenantWebsiteFontSize, setTenantWebsiteFontSize] = useState<number>(
+        baseConfig.tenantWebsiteFormatting?.fontSize ?? 11
+    );
+    const [tenantWebsiteX, setTenantWebsiteX] = useState<number>(baseConfig.elements?.tenantWebsiteX ?? 0);
+    const [tenantWebsiteY, setTenantWebsiteY] = useState<number>(baseConfig.elements?.tenantWebsiteY ?? 222);
+
     const [previewZoom, setPreviewZoom] = useState<number>(0.55);
 
     const [uploading, setUploading] = useState(false);
@@ -824,6 +895,12 @@ function EditModal({
                 subtitleY,
                 farewellTextX: farewellX,
                 farewellTextY: farewellY,
+                tenantName: tenantNameEnabled ? (tenantNameText.trim() || (template.tenant_name || '')) : '',
+                tenantNameX,
+                tenantNameY,
+                tenantWebsite: tenantWebsiteEnabled ? (tenantWebsiteText.trim() || '{sitio_web}') : '',
+                tenantWebsiteX,
+                tenantWebsiteY,
             },
             styles: {
                 ...(prev.styles || {}),
@@ -860,6 +937,18 @@ function EditModal({
                 x: logoX,
                 y: logoY,
                 opacity: logoOpacity,
+            },
+            tenantNameFormatting: {
+                ...(prev.tenantNameFormatting || {}),
+                enabled: tenantNameEnabled,
+                fontSize: tenantNameFontSize,
+                bold: tenantNameBold,
+                uppercase: tenantNameUppercase,
+            },
+            tenantWebsiteFormatting: {
+                ...(prev.tenantWebsiteFormatting || {}),
+                enabled: tenantWebsiteEnabled,
+                fontSize: tenantWebsiteFontSize,
             },
             imageSettings: {
                 ...imageSettingsBase,
@@ -902,6 +991,12 @@ function EditModal({
                 // Inyectamos la silueta solo para que el SuperAdmin vea dónde
                 // aparecerá la foto real del tenant. No se persiste.
                 image2Url: PET_PLACEHOLDER_SVG,
+                tenantName: tenantNameEnabled
+                    ? (tenantNameText || (template.tenant_name || 'Nombre del Crematorio'))
+                    : '',
+                tenantWebsite: tenantWebsiteEnabled
+                    ? (tenantWebsiteText || '{sitio_web}')
+                    : '',
             },
             tenantLogo: {
                 ...c.tenantLogo,
@@ -913,6 +1008,18 @@ function EditModal({
                 opacity: logoOpacity,
                 sampleUrl: TENANT_LOGO_PLACEHOLDER_SVG,
             },
+            tenantNameFormatting: {
+                ...(c.tenantNameFormatting || {}),
+                enabled: tenantNameEnabled,
+                fontSize: tenantNameFontSize,
+                bold: tenantNameBold,
+                uppercase: tenantNameUppercase,
+            },
+            tenantWebsiteFormatting: {
+                ...(c.tenantWebsiteFormatting || {}),
+                enabled: tenantWebsiteEnabled,
+                fontSize: tenantWebsiteFontSize,
+            },
             imageSettings: {
                 ...c.imageSettings,
                 image2: {
@@ -922,7 +1029,7 @@ function EditModal({
             },
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [format, bgColor, textColor, font, bgUrl, bgOpacity, photoShape, photoBorderColor, photoBorderWidth, glowEnabled, glowColor, glowSize, frameEnabled, frameColor, frameWidth, frameMargin, petNamePlaceholder, subtitleText, farewellDefault, photoSize, photoX, photoY, petNameFontSize, petNameX, petNameY, subtitleFontSize, subtitleX, subtitleY, farewellFontSize, farewellX, farewellY, farewellWidth, petNameFontFamily, logoEnabled, logoPosition, logoSize, logoX, logoY, logoOpacity]);
+    }, [format, bgColor, textColor, font, bgUrl, bgOpacity, photoShape, photoBorderColor, photoBorderWidth, glowEnabled, glowColor, glowSize, frameEnabled, frameColor, frameWidth, frameMargin, petNamePlaceholder, subtitleText, farewellDefault, photoSize, photoX, photoY, petNameFontSize, petNameX, petNameY, subtitleFontSize, subtitleX, subtitleY, farewellFontSize, farewellX, farewellY, farewellWidth, petNameFontFamily, logoEnabled, logoPosition, logoSize, logoX, logoY, logoOpacity, tenantNameEnabled, tenantNameText, tenantNameFontSize, tenantNameX, tenantNameY, tenantNameBold, tenantNameUppercase, tenantWebsiteEnabled, tenantWebsiteText, tenantWebsiteFontSize, tenantWebsiteX, tenantWebsiteY]);
 
     const handleSave = async () => {
         if (!name.trim()) {
@@ -1609,6 +1716,236 @@ function EditModal({
                                                 step={2}
                                                 value={logoY}
                                                 onChange={(e) => setLogoY(Number(e.target.value))}
+                                                className="w-full accent-primary"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </Section>
+
+                        {/* Nombre del Crematorio */}
+                        <Section title="Nombre del Crematorio">
+                            <label className="flex items-center gap-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={tenantNameEnabled}
+                                    onChange={(e) => setTenantNameEnabled(e.target.checked)}
+                                    className="w-5 h-5 accent-primary cursor-pointer"
+                                />
+                                <div>
+                                    <span className="text-sm font-bold text-white block">Mostrar Nombre del Crematorio</span>
+                                    <span className="text-[11px] text-white/50 block">Incluye el nombre de la empresa/crematorio en la tarjeta</span>
+                                </div>
+                            </label>
+
+                            {tenantNameEnabled && (
+                                <div className="space-y-4 pl-8 border-l border-white/10 mt-2">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-white/60 uppercase tracking-[0.16em] mb-1.5">
+                                            Texto del Nombre
+                                            <span className="ml-2 text-white/40 text-[9px] tracking-normal normal-case">
+                                                {template.tenant_id != null ? 'Fijo para este crematorio' : 'Si se deja vacío, tomará el nombre de cada crematorio'}
+                                            </span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={tenantNameText}
+                                            onChange={(e) => setTenantNameText(e.target.value)}
+                                            placeholder={template.tenant_name || 'Ej: Crematorio San Roque'}
+                                            maxLength={80}
+                                            className="w-full h-10 bg-black/30 border border-white/10 rounded-lg px-3 text-white text-sm font-medium outline-none focus:border-primary/40"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className="text-[10px] font-black text-white/60 uppercase tracking-[0.16em]">Tamaño</label>
+                                                <span className="text-[10px] font-mono text-white/50">{tenantNameFontSize}px</span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min={10}
+                                                max={36}
+                                                step={1}
+                                                value={tenantNameFontSize}
+                                                onChange={(e) => setTenantNameFontSize(Number(e.target.value))}
+                                                className="w-full accent-primary"
+                                            />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className="text-[10px] font-black text-white/60 uppercase tracking-[0.16em]">Posición X</label>
+                                                <span className="text-[10px] font-mono text-white/50">{tenantNameX > 0 ? `+${tenantNameX}` : tenantNameX}px</span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min={-250}
+                                                max={250}
+                                                step={2}
+                                                value={tenantNameX}
+                                                onChange={(e) => setTenantNameX(Number(e.target.value))}
+                                                className="w-full accent-primary"
+                                            />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className="text-[10px] font-black text-white/60 uppercase tracking-[0.16em]">Posición Y</label>
+                                                <span className="text-[10px] font-mono text-white/50">{tenantNameY > 0 ? `+${tenantNameY}` : tenantNameY}px</span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min={-350}
+                                                max={350}
+                                                step={2}
+                                                value={tenantNameY}
+                                                onChange={(e) => setTenantNameY(Number(e.target.value))}
+                                                className="w-full accent-primary"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-6">
+                                        <label className="flex items-center gap-2 cursor-pointer text-xs text-white/80">
+                                            <input
+                                                type="checkbox"
+                                                checked={tenantNameBold}
+                                                onChange={(e) => setTenantNameBold(e.target.checked)}
+                                                className="w-4 h-4 accent-primary"
+                                            />
+                                            Negrita (Bold)
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer text-xs text-white/80">
+                                            <input
+                                                type="checkbox"
+                                                checked={tenantNameUppercase}
+                                                onChange={(e) => setTenantNameUppercase(e.target.checked)}
+                                                className="w-4 h-4 accent-primary"
+                                            />
+                                            MAYÚSCULAS
+                                        </label>
+                                    </div>
+                                </div>
+                            )}
+                        </Section>
+
+                        {/* Sitio Web o Red Social */}
+                        <Section title="Sitio Web o Red Social">
+                            <label className="flex items-center gap-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={tenantWebsiteEnabled}
+                                    onChange={(e) => setTenantWebsiteEnabled(e.target.checked)}
+                                    className="w-5 h-5 accent-primary cursor-pointer"
+                                />
+                                <div>
+                                    <span className="text-sm font-bold text-white block">Mostrar Sitio Web o Red Social</span>
+                                    <span className="text-[11px] text-white/50 block">Muestra el dominio web, Instagram o contacto del crematorio</span>
+                                </div>
+                            </label>
+
+                            {tenantWebsiteEnabled && (
+                                <div className="space-y-4 pl-8 border-l border-white/10 mt-2">
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <label className="block text-[10px] font-black text-white/60 uppercase tracking-[0.16em]">
+                                                Sitio Web o Red Social
+                                            </label>
+                                            <span className="text-[10px] text-white/40">
+                                                Haz clic para usar una variable
+                                            </span>
+                                        </div>
+
+                                        {/* Chips / Variables dinámicas */}
+                                        <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+                                            {SOCIAL_TAGS.map((item) => {
+                                                const Icon = item.icon;
+                                                const isSelected = tenantWebsiteText.includes(item.tag);
+                                                return (
+                                                    <button
+                                                        key={item.tag}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (!tenantWebsiteText.trim() || tenantWebsiteText === 'www.crematorio.com' || tenantWebsiteText === '@crematorio_pet') {
+                                                                setTenantWebsiteText(item.tag);
+                                                            } else if (tenantWebsiteText.includes(item.tag)) {
+                                                                const next = tenantWebsiteText.replace(item.tag, '').replace(/\s+/g, ' ').trim();
+                                                                setTenantWebsiteText(next);
+                                                            } else {
+                                                                setTenantWebsiteText(`${tenantWebsiteText} ${item.tag}`.trim());
+                                                            }
+                                                        }}
+                                                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-mono font-bold transition-all border cursor-pointer active:scale-95 ${
+                                                            isSelected
+                                                                ? `${item.badgeClass} ring-1 ring-primary/40 shadow-sm`
+                                                                : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white hover:border-white/20'
+                                                        }`}
+                                                        title={`Usar ${item.tag} (${item.label})`}
+                                                    >
+                                                        <Icon size={12} className="shrink-0" />
+                                                        <span>{item.tag}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <input
+                                            type="text"
+                                            value={tenantWebsiteText}
+                                            onChange={(e) => setTenantWebsiteText(e.target.value)}
+                                            placeholder="{sitio_web}"
+                                            maxLength={80}
+                                            className="w-full h-10 bg-black/30 border border-white/10 rounded-lg px-3 text-white text-xs font-mono outline-none focus:border-primary/40"
+                                        />
+                                        <p className="text-[10px] text-white/40 mt-1.5">
+                                            Se reemplazará automáticamente con los datos configurados en las redes sociales del crematorio.
+                                        </p>
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className="text-[10px] font-black text-white/60 uppercase tracking-[0.16em]">Tamaño</label>
+                                                <span className="text-[10px] font-mono text-white/50">{tenantWebsiteFontSize}px</span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min={8}
+                                                max={24}
+                                                step={1}
+                                                value={tenantWebsiteFontSize}
+                                                onChange={(e) => setTenantWebsiteFontSize(Number(e.target.value))}
+                                                className="w-full accent-primary"
+                                            />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className="text-[10px] font-black text-white/60 uppercase tracking-[0.16em]">Posición X</label>
+                                                <span className="text-[10px] font-mono text-white/50">{tenantWebsiteX > 0 ? `+${tenantWebsiteX}` : tenantWebsiteX}px</span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min={-250}
+                                                max={250}
+                                                step={2}
+                                                value={tenantWebsiteX}
+                                                onChange={(e) => setTenantWebsiteX(Number(e.target.value))}
+                                                className="w-full accent-primary"
+                                            />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className="text-[10px] font-black text-white/60 uppercase tracking-[0.16em]">Posición Y</label>
+                                                <span className="text-[10px] font-mono text-white/50">{tenantWebsiteY > 0 ? `+${tenantWebsiteY}` : tenantWebsiteY}px</span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min={-350}
+                                                max={350}
+                                                step={2}
+                                                value={tenantWebsiteY}
+                                                onChange={(e) => setTenantWebsiteY(Number(e.target.value))}
                                                 className="w-full accent-primary"
                                             />
                                         </div>

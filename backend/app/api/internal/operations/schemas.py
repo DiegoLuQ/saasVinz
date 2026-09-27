@@ -345,6 +345,8 @@ class PublicTrackingResponse(BaseModel):
     timeline: List[TrackingTimelineEvent]
     tenant_name: str
     tenant_logo: Optional[str] = None
+    tenant_website: Optional[str] = None
+    tenant_social_media: Optional[dict] = None
     pet_dedication: Optional[str] = None
     farewell_template_config: Optional[dict] = None
     is_ultra_plan: Optional[bool] = False
