@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, B
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.database import get_db
+from app.auth import get_current_creator
 from app.api.internal.common.media_service import MediaService
 from app.api.internal.common.models import MediaLibrary, MediaCategory
 import os
@@ -357,4 +358,132 @@ async def update_media_theme(
         "id": media_item.id,
         "url": media_item.url,
         "theme_config": media_item.theme_config,
+    }
+
+
+# ---------------------------------------------------------------------------
+# ¿Dónde se usa este archivo? (ojo en la biblioteca del SuperAdmin)
+# ---------------------------------------------------------------------------
+
+def _media_key(url: str) -> str:
+    """Ruta del archivo sin dominio: las tablas guardan la URL completa pero el
+    dominio del bucket puede cambiar entre entornos."""
+    from urllib.parse import urlparse
+    path = urlparse(url).path if "://" in url else url
+    return path.lstrip("/")
+
+
+@router.get("/{media_id}/usage")
+async def media_usage(
+    media_id: int,
+    current_creator=Depends(get_current_creator),
+    db: Session = Depends(get_db),
+):
+    """A qué crematorio, mascota, orden, solicitud, memorial o elemento del
+    catálogo pertenece un archivo. Se calcula buscando su ruta en las tablas que
+    guardan imágenes (la biblioteca no guarda esa relación)."""
+    from sqlalchemy import text
+    from app.core.tenant_context import apply_bypass_rls
+
+    item = db.query(MediaLibrary).filter(MediaLibrary.id == media_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Media not found")
+
+    apply_bypass_rls(db)
+    key = _media_key(item.url)
+    like = f"%{key}%"
+    rows = lambda sql: db.execute(text(sql), {"like": like}).mappings().all()  # noqa: E731
+
+    tenant = None
+    if item.tenant_id:
+        t = db.execute(text("SELECT id, name, slug FROM sys_tenants WHERE id = :id"), {"id": item.tenant_id}).mappings().first()
+        tenant = dict(t) if t else None
+
+    usages: list[dict] = []
+
+    # Mascotas (foto principal o galería) + sus órdenes
+    for p in rows("""
+        SELECT p.id, p.name, c.name AS owner, p.tenant_id
+        FROM crm_pets p LEFT JOIN crm_customers c ON c.id = p.customer_id
+        WHERE p.image_url LIKE :like OR p.images::text LIKE :like
+    """):
+        orders = db.execute(text(
+            "SELECT id, oc_number, status FROM oc_cremations WHERE pet_id = :pid ORDER BY id"
+        ), {"pid": p["id"]}).mappings().all()
+        usages.append({
+            "kind": "mascota", "label": p["name"], "detail": f"Tutor: {p['owner']}" if p["owner"] else None,
+            "tenant_id": p["tenant_id"], "pet_id": p["id"],
+            "orders": [{"id": o["id"], "oc_number": o["oc_number"], "status": o["status"]} for o in orders],
+        })
+
+    # Solicitudes web
+    for s in rows("""
+        SELECT id, pet_data->>'name' AS pet, owner_data->>'fullName' AS owner, status, tenant_id
+        FROM web_form_submissions WHERE images::text LIKE :like
+    """):
+        usages.append({"kind": "solicitud", "label": f"Solicitud #{s['id']} · {s['pet'] or 'sin nombre'}",
+                       "detail": f"Tutor: {s['owner']} · {s['status']}" if s["owner"] else s["status"],
+                       "tenant_id": s["tenant_id"], "submission_id": s["id"]})
+
+    # Evidencias del flujo de la orden
+    for e in rows("""
+        SELECT e.cremation_id, o.oc_number, o.tenant_id, w.name AS step
+        FROM ops_order_evidence e
+        JOIN oc_cremations o ON o.id = e.cremation_id
+        LEFT JOIN ops_workflow_steps w ON w.id = e.step_id
+        WHERE e.photo_url LIKE :like
+        UNION ALL
+        SELECT t.cremation_id, o.oc_number, o.tenant_id, 'Evidencia técnica'
+        FROM oc_cremation_technical t JOIN oc_cremations o ON o.id = t.cremation_id
+        WHERE t.evidence_url LIKE :like
+        UNION ALL
+        SELECT d.cremation_id, o.oc_number, o.tenant_id, 'Fotos de la orden'
+        FROM oc_details d JOIN oc_cremations o ON o.id = d.cremation_id
+        WHERE d.images::text LIKE :like
+    """):
+        usages.append({"kind": "orden", "label": f"Orden OC {e['oc_number']}", "detail": e["step"],
+                       "tenant_id": e["tenant_id"], "cremation_id": e["cremation_id"]})
+
+    # Memoriales
+    for m in rows("""
+        SELECT r.id, r.id_recuerdo, p.name AS pet, r.id_tenant AS tenant_id
+        FROM rec_recuerdos r LEFT JOIN crm_pets p ON p.id = r.id_mascota
+        WHERE r.main_image_url LIKE :like OR r.lista_imagenes::text LIKE :like OR r.imagen_ia LIKE :like
+    """):
+        usages.append({"kind": "memorial", "label": f"Memorial de {m['pet'] or 'mascota'}",
+                       "detail": None, "tenant_id": m["tenant_id"], "memorial_uuid": str(m["id_recuerdo"]) if m["id_recuerdo"] else None})
+
+    # Catálogo
+    for c in rows("""
+        SELECT 'Producto' AS what, name, tenant_id FROM inv_products WHERE image_url LIKE :like OR images::text LIKE :like
+        UNION ALL
+        SELECT 'Plan', name, tenant_id FROM srv_plans WHERE image_url LIKE :like
+    """):
+        usages.append({"kind": "catalogo", "label": c["name"], "detail": c["what"], "tenant_id": c["tenant_id"]})
+
+    # Identidad y diseños
+    for d in rows("""
+        SELECT 'Logo del crematorio' AS what, name, id AS tenant_id FROM sys_tenants WHERE logo_url LIKE :like
+        UNION ALL
+        SELECT 'Plantilla de certificado', name, tenant_id FROM ops_certificate_templates
+            WHERE header_logo_url LIKE :like OR background_logo_url LIKE :like
+        UNION ALL
+        SELECT 'Tarjeta de homenaje', name, tenant_id FROM ops_farewell_templates WHERE preview_url LIKE :like
+    """):
+        usages.append({"kind": "diseno", "label": d["name"], "detail": d["what"], "tenant_id": d["tenant_id"]})
+
+    # Nombre del crematorio de cada uso (puede diferir del dueño del archivo)
+    tenant_ids = {u["tenant_id"] for u in usages if u.get("tenant_id")}
+    names = {}
+    if tenant_ids:
+        for t in db.execute(text("SELECT id, name FROM sys_tenants WHERE id = ANY(:ids)"), {"ids": list(tenant_ids)}).mappings():
+            names[t["id"]] = t["name"]
+    for u in usages:
+        u["tenant_name"] = names.get(u.get("tenant_id"))
+
+    return {
+        "media": {"id": item.id, "category": item.category, "description": item.description,
+                  "created_at": item.created_at, "file_size": item.file_size},
+        "tenant": tenant,
+        "usages": usages,
     }

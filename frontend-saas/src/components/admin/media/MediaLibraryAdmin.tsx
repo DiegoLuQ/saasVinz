@@ -25,7 +25,8 @@ import { apiRequest, getImageUrl } from '@/lib/admin/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { authHeader } from '@/lib/auth/token';
 import MediaFilterSelect, { type FilterOption } from './MediaFilterSelect';
-import { Building2, FolderTree } from 'lucide-react';
+import { Building2, FolderTree, Eye } from 'lucide-react';
+import MediaUsagePanel from './MediaUsagePanel';
 
 interface MediaItem {
     id: number;
@@ -92,6 +93,8 @@ export default function MediaLibraryAdmin() {
     // Edit/Delete State
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<MediaItem | null>(null);
+    // Panel "¿Dónde se usa?" (ojo)
+    const [usageItem, setUsageItem] = useState<MediaItem | null>(null);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<MediaItem | null>(null);
 
@@ -543,6 +546,17 @@ export default function MediaLibraryAdmin() {
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
+                                        setUsageItem(item);
+                                    }}
+                                    className="p-1.5 bg-black/60 hover:bg-primary text-white rounded-lg backdrop-blur-sm"
+                                    title="¿Dónde se usa? (crematorio, mascota, orden)"
+                                    aria-label="Ver a qué pertenece"
+                                >
+                                    <Eye size={14} />
+                                </button>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
                                         copyToClipboard(getImageUrl(item.url));
                                     }}
                                     className="p-1.5 bg-black/60 hover:bg-white text-white hover:text-black rounded-lg backdrop-blur-sm"
@@ -980,6 +994,8 @@ export default function MediaLibraryAdmin() {
                     </div>
                 </div>
             )}
+
+            <MediaUsagePanel item={usageItem} onClose={() => setUsageItem(null)} />
         </div>
     );
 }
