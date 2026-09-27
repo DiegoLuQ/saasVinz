@@ -466,3 +466,21 @@ async def submit_public_form(
         "submission_id": submission_id,
         "code": submission_code
     }
+
+
+@router.get("/farewell-messages/random")
+@limiter.limit("30/minute")
+def random_farewell_message(request: Request, exclude: int | None = None, db: Session = Depends(get_db)):
+    """Mensaje de despedida sugerido al azar para la Carta de Despedida del formulario.
+    `exclude` evita repetir el que la familia ya está viendo. 404 si no hay mensajes
+    activos (el formulario oculta el botón)."""
+    from sqlalchemy import func
+    q = db.query(models.FarewellMessage).filter(models.FarewellMessage.is_active.is_(True))
+    if exclude is not None:
+        others = q.filter(models.FarewellMessage.id != exclude)
+        if others.count() > 0:
+            q = others
+    msg = q.order_by(func.random()).first()
+    if not msg:
+        raise HTTPException(status_code=404, detail="No hay mensajes sugeridos")
+    return {"id": msg.id, "text": msg.text}

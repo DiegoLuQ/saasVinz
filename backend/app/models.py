@@ -43,7 +43,7 @@ from app.api.internal.common.models import (
     Notification, NotificationUserState, RecipientType, NotificationPriority,
     FormSubmission, ThemeConfig, LandingConfig, FarewellTemplate,
     TenantAnnouncement, AnnouncementType, AnnouncementDisplayType, UserAnnouncementView,
-    MediaLibrary, MediaCategory
+    MediaLibrary, MediaCategory, FarewellMessage
 )
 # 7. Memorials
 from app.api.internal.memorials.models import (

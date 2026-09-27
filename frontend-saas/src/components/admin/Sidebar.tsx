@@ -18,6 +18,7 @@ import {
     Bell,
     Palette,
     Library,
+    MessageSquareHeart,
     Building2,
     BookOpen,
     Heart,
@@ -116,6 +117,7 @@ export default function Sidebar({ onLogout, isCollapsed: isCollapsedProp, setIsC
                     ]
                 },
                 { href: '/dashboard/biblioteca', icon: Library, label: 'Biblioteca de Medios' },
+                { href: '/dashboard/mensajes-despedida', icon: MessageSquareHeart, label: 'Mensajes de Despedida' },
             ]
         },
         {

@@ -210,6 +210,8 @@ app.include_router(creator_config_router, prefix="/api/internal/creator/config",
 app.include_router(creator_templates_router, prefix="/api/internal/creator/document-templates", tags=["Creator - Plantillas de Documentos"])
 app.include_router(creator_receipts_router, prefix="/api/internal/creator", tags=["Creator - Recibos"])
 app.include_router(creator_farewell_router, prefix="/api/internal/creator/farewell-templates", tags=["Creator - Plantillas de Despedida"])
+from app.api.internal.creator.farewell_messages.router import router as creator_farewell_messages_router
+app.include_router(creator_farewell_messages_router, prefix="/api/internal/creator/farewell-messages", tags=["Creator - Mensajes de Despedida"])
 app.include_router(creator_image_templates_router, prefix="/api/internal/creator/image-templates", tags=["Creator - Plantillas de Imagen"])
 
 from app.api.internal.creator.veterinaries.router import router as creator_vets_router

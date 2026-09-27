@@ -1,5 +1,6 @@
-import React from 'react';
-import { Heart, Sparkles, Feather, ImagePlus } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Heart, Sparkles, Feather, ImagePlus, Wand2, Loader2 } from 'lucide-react';
+import { API_BASE_URL } from '@/lib/api';
 import ImageUploadStep from './ImageUploadStep';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -14,6 +15,16 @@ interface Props {
 
 const DEDICATION_MAX = 500;
 
+type Suggestion = { id: number; text: string };
+
+/** Pide un mensaje sugerido al azar (los administra el creador). null si no hay. */
+async function fetchSuggestion(exclude?: number): Promise<Suggestion | null> {
+    const qs = exclude ? `?exclude=${exclude}` : '';
+    const res = await fetch(`${API_BASE_URL}/api/public/farewell-messages/random${qs}`);
+    if (!res.ok) return null;
+    return res.json();
+}
+
 export default function MemoryStep({
     images,
     setImages,
@@ -24,6 +35,65 @@ export default function MemoryStep({
 }: Props) {
     const displayName = petNickname || petName || 'tu compañero';
     const hasPhotos = images.length > 0;
+
+    // --- Mensaje sugerido (para quien no puede escribir) ---------------------
+    // Se precarga uno para que el primer clic sea inmediato; si no hay mensajes
+    // activos, el botón no se muestra.
+    const [available, setAvailable] = useState<boolean | null>(null);
+    const [suggesting, setSuggesting] = useState(false);
+    const [confirmReplace, setConfirmReplace] = useState(false);
+    const nextRef = useRef<Suggestion | null>(null);
+    const lastIdRef = useRef<number | undefined>(undefined);
+    const [lastText, setLastText] = useState('');
+
+    useEffect(() => {
+        let alive = true;
+        fetchSuggestion().then((s) => {
+            if (!alive) return;
+            nextRef.current = s;
+            setAvailable(!!s);
+        }).catch(() => alive && setAvailable(false));
+        return () => { alive = false; };
+    }, []);
+
+    const personalize = useCallback((text: string) => {
+        const name = (petNickname || petName || '').trim() || 'mi compañero';
+        return text.replace(/\{nombre_mascota\}/gi, name).slice(0, DEDICATION_MAX);
+    }, [petName, petNickname]);
+
+    const applySuggestion = useCallback(async () => {
+        setConfirmReplace(false);
+        setSuggesting(true);
+        try {
+            const s = nextRef.current ?? await fetchSuggestion(lastIdRef.current);
+            nextRef.current = null;
+            if (!s) {
+                setAvailable(false);
+                return;
+            }
+            lastIdRef.current = s.id;
+            const text = personalize(s.text);
+            setLastText(text);
+            onDedicationChange(text);
+            // Precarga el siguiente (distinto) para "Otro mensaje"
+            fetchSuggestion(s.id).then((n) => { nextRef.current = n; }).catch(() => {});
+        } catch {
+            // Sin conexión: el formulario sigue funcionando sin sugerencia
+        } finally {
+            setSuggesting(false);
+        }
+    }, [onDedicationChange, personalize]);
+
+    // Si la familia ya escribió algo propio, se confirma antes de reemplazarlo
+    const ownText = dedication.trim().length > 0 && dedication !== lastText;
+    const handleSuggestClick = () => {
+        if (ownText && !confirmReplace) {
+            setConfirmReplace(true);
+            return;
+        }
+        applySuggestion();
+    };
+    const usingSuggestion = dedication.length > 0 && dedication === lastText;
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -76,6 +146,39 @@ export default function MemoryStep({
                                 {dedication.length} / {DEDICATION_MAX}
                             </span>
                         </div>
+
+                        {/* Mensaje sugerido */}
+                        {available && (
+                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/30 px-4 py-3">
+                                <p className="text-[11px] text-slate-600 dark:text-slate-300 font-medium">
+                                    {confirmReplace
+                                        ? 'Esto reemplazará lo que escribiste. ¿Continuar?'
+                                        : usingSuggestion
+                                            ? 'Puedes editarlo libremente o pedir otro.'
+                                            : '¿No encuentras las palabras? Te sugerimos un mensaje.'}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    {confirmReplace && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setConfirmReplace(false)}
+                                            className="text-[11px] font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 px-2 py-1.5"
+                                        >
+                                            Cancelar
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={handleSuggestClick}
+                                        disabled={suggesting}
+                                        className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold px-3 py-1.5 shadow-sm transition disabled:opacity-60"
+                                    >
+                                        {suggesting ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
+                                        {confirmReplace ? 'Sí, reemplazar' : usingSuggestion ? 'Otro mensaje' : 'Usar un mensaje sugerido'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Área de Escritura Amplia */}
                         <div className="relative rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-950/60 p-4 focus-within:border-amber-400/80 focus-within:ring-2 focus-within:ring-amber-400/20 transition-all">

@@ -207,3 +207,15 @@ class MediaCategory(Base):
     sort_order = Column(Integer, nullable=False, default=0)
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
+
+
+class FarewellMessage(Base):
+    """Mensaje de despedida sugerido (global, lo administra el creador). El formulario
+    público ofrece uno al azar a la familia que no puede escribir su carta.
+    `{nombre_mascota}` se reemplaza por el nombre de la mascota en el cliente."""
+    __tablename__ = "sys_farewell_messages"
+    id = Column(Integer, primary_key=True, index=True)
+    text = Column(String(500), nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), default=tz.get_now)
+    updated_at = Column(DateTime(timezone=True), default=tz.get_now, onupdate=tz.get_now)
