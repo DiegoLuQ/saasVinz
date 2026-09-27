@@ -276,15 +276,17 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
                     <DataRow label="Email" value={ownerData.email} />
                     <DataRow label="Teléfono" value={ownerData.phone} />
                     {ownerData.rut && <DataRow label="RUT" value={ownerData.rut} />}
+                    {/* Retiro y entrega con la misma estructura: dirección, comuna, región */}
                     {ownerData.veterinary && (
-                        <DataRow 
-                            label="Lugar de Retiro" 
-                            value={`${ownerData.veterinary}${ownerData.pickupCommune ? `, ${ownerData.pickupCommune}` : ''}${ownerData.pickupRegion ? `, ${ownerData.pickupRegion}` : ''}`} 
+                        <DataRow
+                            label="Lugar de Retiro"
+                            value={[ownerData.veterinary, ownerData.pickupCommune, ownerData.pickupRegion].filter(Boolean).join(', ')}
                         />
                     )}
-                    <DataRow label="Dirección Entrega" value={ownerData.address} />
-                    <DataRow label="Comuna Entrega" value={ownerData.commune} />
-                    {ownerData.region && <DataRow label="Región Entrega" value={ownerData.region} />}
+                    <DataRow
+                        label="Dirección Entrega"
+                        value={[ownerData.address, ownerData.commune, ownerData.region].filter(Boolean).join(', ')}
+                    />
                     {ownerData.contactPreference && (
                         <DataRow label="Contacto" value={CONTACT_LABELS[ownerData.contactPreference] || ownerData.contactPreference} />
                     )}
