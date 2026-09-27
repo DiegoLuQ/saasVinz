@@ -913,6 +913,18 @@ def _img_parse_date(value):
 # alli, cambialos aqui tambien.
 _TEXT_BG_DEFAULTS = {"color": "#ffffff", "opacity": 0, "padX": 14, "padY": 6, "radius": 8}
 
+# Ancho de referencia con que el admin diseña los certificados de imagen (hoja
+# carta a 96 dpi). Las medidas en px del diseño se expresan relativas al ancho
+# real del certificado (unidades cqw del contenedor .cert-canvas): así se ve
+# igual en el diseñador, en el panel del tenant, en una pestaña completa o al
+# imprimir. Antes eran px fijos y el texto cambiaba de proporción con el ancho.
+_CERT_DESIGN_WIDTH = 816
+
+
+def _cq(px) -> str:
+    """px del diseño -> longitud proporcional al ancho del certificado."""
+    return f"calc({float(px):g}cqw * 100 / {_CERT_DESIGN_WIDTH})"
+
 
 def _img_text_bg_css(field: dict) -> str:
     """CSS del fondo de un campo de texto. Cadena vacia si no tiene fondo."""
@@ -945,7 +957,7 @@ def _img_text_bg_css(field: dict) -> str:
 
     return (
         f"background-color:rgba({r},{g},{b},{alpha:.3f}); "
-        f"padding:{pad_y:g}px {pad_x:g}px; border-radius:{radius:g}px;"
+        f"padding:{_cq(pad_y)} {_cq(pad_x)}; border-radius:{_cq(radius)};"
     )
 
 
@@ -1105,7 +1117,7 @@ def generate_image_certificate_html(
                 continue
             img_src = fix_url(img_src)
             w = field.get("w", 15)
-            radius = "50%" if field.get("shape") == "circle" else "8px"
+            radius = "50%" if field.get("shape") == "circle" else _cq(8)
             # Logo: contain para no recortarlo; foto de mascota: cover.
             object_fit = "contain" if ftype == "logo_tenant" else "cover"
 
@@ -1139,7 +1151,7 @@ def generate_image_certificate_html(
                     bg = f"background:{paint};"
                 else:
                     bg = ""
-                shadow = f"box-shadow:0 0 22px 4px {fc['glow']};" if frame.get("glow") else ""
+                shadow = f"box-shadow:0 0 {_cq(22)} {_cq(4)} {fc['glow']};" if frame.get("glow") else ""
                 layers.append((FIELD_Z,
                     f'<div style="{base_pos} width:{w}%; aspect-ratio:1/1; '
                     f'border-radius:{radius}; {bg} {shadow}">'
@@ -1204,7 +1216,7 @@ def generate_image_certificate_html(
         bg_css = _img_text_bg_css(field)
         layers.append((FIELD_Z,
             f'<div class="cert-field" style="{base_pos} {text_w_css}'
-            f'font-size:{font_size}px; font-family:{font_family}; '
+            f'font-size:{font_size}px; font-size:{_cq(font_size)}; font-family:{font_family}; '
             f'color:{color}; text-align:{align}; font-weight:{weight}; '
             f'{ws_css} {bg_css}">{esc(value)}</div>'
         ))
@@ -1255,6 +1267,8 @@ def generate_image_certificate_html(
             }}
             .cert-canvas {{
                 position: relative;
+                /* Contenedor de consulta: las medidas en cqw escalan con su ancho. */
+                container-type: inline-size;
                 width: 100%;
                 height: 0;
                 padding-bottom: {padding_bottom}%;
