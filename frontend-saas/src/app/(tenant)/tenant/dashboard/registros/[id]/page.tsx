@@ -207,7 +207,8 @@ export default function SubmissionDetailPage() {
             queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
             queryClient.invalidateQueries({ queryKey: ['cremations-simple'] });
             queryClient.invalidateQueries({ queryKey: ['cremations'] });
-            router.push('/dashboard');
+            // Directo al expediente de la orden recién creada (antes volvía al dashboard).
+            router.push(res.cremation_id ? `/dashboard/recepcion-pedidos?orden=${res.cremation_id}` : '/dashboard');
         } catch (err: any) {
             showToast(err.message, 'error');
         } finally {
@@ -272,6 +273,26 @@ export default function SubmissionDetailPage() {
                     </button>
                 )}
             </div>
+
+            {/* La solicitud ya es una orden: acceso a su expediente */}
+            {submission.order && (
+                <div className="p-5 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <p className="text-sm text-emerald-200">
+                        Esta solicitud ya es la orden{' '}
+                        <span className="font-black text-white">
+                            {submission.order.oc_number ? `OC ${submission.order.oc_number}` : `#${submission.order.id}`}
+                        </span>
+                        . Gestiona todo desde su expediente.
+                    </p>
+                    <button
+                        type="button"
+                        onClick={() => router.push(`/dashboard/recepcion-pedidos?orden=${submission.order.id}`)}
+                        className="shrink-0 py-2.5 px-5 rounded-2xl bg-emerald-500 text-[#020617] font-bold text-xs uppercase tracking-wider hover:brightness-110 transition-all flex items-center gap-2"
+                    >
+                        <ExternalLink size={14} /> Abrir expediente
+                    </button>
+                </div>
+            )}
 
             {/* Tracking Link & Code Bar */}
             {submission.code && (

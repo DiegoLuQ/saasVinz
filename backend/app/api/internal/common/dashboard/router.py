@@ -135,7 +135,7 @@ def search_global(
             "id": o.id,
             "name": num_lbl,
             "subtitle": f"{o.cremation_type or 'Cremación'} de {pet_name} (Cliente: {cust_name}) • Estatus: {status_lbl}{tracking_lbl}",
-            "url": f"/dashboard/recepcion-pedidos/registro?id={o.id}"
+            "url": f"/dashboard/recepcion-pedidos?orden={o.id}"  # abre el expediente de la orden
         })
 
     formatted_services = []

@@ -24,7 +24,7 @@ import {
     MessageCircle,
     Building2
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { copyToClipboard } from '@/lib/clipboard';
 import { buildTrackingUrl } from '@/lib/publicUrls';
@@ -96,22 +96,25 @@ export default function CremationsPage() {
     const [slideOverCremation, setSlideOverCremation] = useState<Cremation | null>(null);
     const [isSlideOverOpen, setIsSlideOverOpen] = useState(false);
 
-    // Enlace directo ?orden=<id> (p. ej. desde el dashboard): abre el detalle de esa orden
-    const deepLinkHandled = useRef(false);
+    // Enlace directo ?orden=<id> (dashboard, buscador global, registros): abre el
+    // expediente de esa orden. Reacciona a cada cambio del parámetro, también
+    // cuando ya se está en esta página (p. ej. al buscar otra orden).
+    const searchParams = useSearchParams();
+    const ordenParam = Number(searchParams.get('orden')) || null;
+    const deepLinkHandled = useRef<number | null>(null);
     useEffect(() => {
-        if (deepLinkHandled.current || loadingCremations) return;
-        const id = Number(new URLSearchParams(window.location.search).get('orden'));
-        const found = id ? cremations.find(c => c.id === id) : undefined;
+        if (!ordenParam || deepLinkHandled.current === ordenParam || loadingCremations) return;
+        const found = cremations.find(c => c.id === ordenParam);
         if (!found) return;
-        // El flag se marca dentro del timeout: con StrictMode el efecto corre dos veces
+        // El id se marca dentro del timeout: con StrictMode el efecto corre dos veces
         // y el primer timeout se cancela en el cleanup.
         const t = setTimeout(() => {
-            deepLinkHandled.current = true;
+            deepLinkHandled.current = ordenParam;
             setSlideOverCremation(found);
             setIsSlideOverOpen(true);
         }, 0);
         return () => clearTimeout(t);
-    }, [cremations, loadingCremations]);
+    }, [ordenParam, cremations, loadingCremations]);
 
     // Deletion + cancellation modals
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);

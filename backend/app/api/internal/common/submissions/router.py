@@ -244,9 +244,20 @@ def get_submission_detail(
         "total": total,
         "customer_id": submission.customer_id,
         "pet_id": submission.pet_id,
-        "partner": partner_info
+        "partner": partner_info,
+        "order": None,
     }
-        
+
+    # Orden generada a partir de esta solicitud (misma mascota): permite abrir
+    # su expediente en Recepción de pedidos.
+    if submission.pet_id:
+        order = db.query(models.Cremation).filter(
+            models.Cremation.tenant_id == tenant_id,
+            models.Cremation.pet_id == submission.pet_id,
+        ).order_by(models.Cremation.id.desc()).first()
+        if order:
+            submission_dict["order"] = {"id": order.id, "oc_number": order.oc_number, "status": order.status}
+
     return submission_dict
 
 @router.delete("/{submission_id}")
