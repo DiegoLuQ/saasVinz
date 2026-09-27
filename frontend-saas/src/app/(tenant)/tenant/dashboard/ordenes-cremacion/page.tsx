@@ -429,7 +429,8 @@ export default function OrdersPage() {
                 body: JSON.stringify({
                     cremation_id: cremationId,
                     certificate_type: 'Cremación',
-                    template_id: templateId || (selectedTemplateId !== "" ? Number(selectedTemplateId) : undefined)
+                    template_id: templateId || (selectedTemplateId !== "" ? Number(selectedTemplateId) : undefined),
+                    persist: true,
                 }),
             });
             setCertHtml(response.html_content);

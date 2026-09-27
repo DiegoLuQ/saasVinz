@@ -348,6 +348,10 @@ def generar_certificado(
                 base_url=base_url,
             )
 
+            # persist=False -> solo vista previa (Documentos la pide en vivo sin
+            # crear certificados). Emitir requiere persist=True.
+            if not req.persist:
+                return result
             existing_cert = db.query(models.Certificate).filter(
                 models.Certificate.number == cert_number,
                 models.Certificate.tenant_id == tenant_id
@@ -426,7 +430,9 @@ def generar_certificado(
         base_url = str(request.base_url).rstrip('/')
         result = generate_certificate_json(**data, base_url=base_url)
         
-        # 6. Guardar en DB para historial
+        # 6. Guardar en DB para historial (persist=False -> solo vista previa)
+        if not req.persist:
+            return result
         existing_cert = db.query(models.Certificate).filter(models.Certificate.number == data["cert_number"]).first()
         if existing_cert:
             existing_cert.html_content = result["html_content"]

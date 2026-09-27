@@ -155,7 +155,7 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
             await openCertificateHtml(async () => {
                 const res = await apiRequest('/api/internal/ops-records/generate', {
                     method: 'POST',
-                    body: { cremation_id: cremation.id },
+                    body: { cremation_id: cremation.id, persist: true },
                 });
                 return res.html_content;
             });

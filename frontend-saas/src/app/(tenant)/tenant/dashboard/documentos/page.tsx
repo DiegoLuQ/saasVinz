@@ -18,12 +18,9 @@ import {
 } from 'lucide-react';
 import { apiRequest, getImageUrl } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
-import {
-    CertFrame, FRAME_COLOR_LIST, getFrameColor, frameActive,
-    frameWrapperStyle, frameInnerInsetPct, frameImageMaskStyle,
-    FRAME_BORDER_PCT, FEATHER_INNER_STOP,
-} from '@/lib/certFrame';
-import { TextBg, textBgStyle, renderCanvasText } from '@/lib/certText';
+import { CertFrame, FRAME_COLOR_LIST } from '@/lib/certFrame';
+import { TextBg } from '@/lib/certText';
+import { extractCertSpec, renderCertSpecToCanvas } from '@/lib/certImageDraw';
 
 // --- Tipos compartidos con el editor admin --------------------------------
 interface DesignField extends TextBg {
@@ -66,8 +63,6 @@ interface ImgTemplate {
     tenant_id?: number | null;
 }
 
-// Nivel z de los campos (debe coincidir con el backend y el editor admin).
-const FIELD_Z = 50;
 
 // Etiqueta legible de cada campo para el panel de visibilidad.
 const FIELD_LABELS: Record<DesignField['type'], string> = {
@@ -109,25 +104,6 @@ interface CremationLite {
 }
 
 const ASPECT_PADDING: Record<string, number> = { '16:9': 56.25, '4:3': 75, '3:4': 133.333 };
-const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-
-// Ancho de referencia del diseño (A4 a 96dpi). Los tamaños de fuente que
-// configura el admin se asumen relativos a este ancho; la vista previa los
-// escala proporcionalmente al contenedor real.
-const DESIGN_BASE_WIDTH = 816;
-
-function fmtDate(value: string | null | undefined | Date, fmt?: string): string {
-    if (!value) return '';
-    const d = value instanceof Date ? value : new Date(value);
-    if (isNaN(d.getTime())) return '';
-    const dd = String(d.getDate()).padStart(2, '0');
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    if (fmt === 'long') return `${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
-    if (fmt === 'year') return `${d.getFullYear()}`;
-    if (fmt === 'month_year') return `${MESES[d.getMonth()]} de ${d.getFullYear()}`;
-    return `${dd}/${mm}/${d.getFullYear()}`;
-}
-
 export default function EmitirDocumentosPage() {
     const { showToast } = useToast();
 
@@ -135,7 +111,6 @@ export default function EmitirDocumentosPage() {
     const [loading, setLoading] = useState(true);
     const [tenantLogo, setTenantLogo] = useState<string | null>(null);
     // Datos de la empresa para los campos dinámicos del certificado
-    const [tenantInfo, setTenantInfo] = useState<{ name?: string | null; rut?: string | null; manager?: string | null; managerRut?: string | null; phone?: string | null; address?: string | null }>({});
 
     // Emisión
     const [active, setActive] = useState<ImgTemplate | null>(null);
@@ -157,11 +132,12 @@ export default function EmitirDocumentosPage() {
     const [generating, setGenerating] = useState(false);
     const [downloading, setDownloading] = useState(false);
     const [resultHtml, setResultHtml] = useState<string | null>(null);
-    const previewRef = useRef<HTMLDivElement>(null);
-    // Factor de escala para que el fontSize de los campos se vea proporcional al
-    // ancho real del contenedor de vista previa (vs. el ancho de referencia
-    // ~816px con que el admin diseña).
-    const [previewScale, setPreviewScale] = useState(1);
+    // Vista previa = HTML generado por el backend (sin guardar), el mismo que ve
+    // el diseñador del admin. Antes era una reconstrucción propia en React y el
+    // PDF otra en canvas, y ambas se desalineaban del certificado real.
+    const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+    const [previewLoading, setPreviewLoading] = useState(false);
+    const previewReqRef = useRef(0);
 
     // Cargar las Google Fonts que puede usar el diseño (Cinzel, Playfair, etc.)
     // para que el preview y el PDF rendericen la tipografía correcta y no caigan
@@ -176,20 +152,6 @@ export default function EmitirDocumentosPage() {
             document.head.appendChild(link);
         }
     }, []);
-
-    // Observar el ancho real del contenedor de preview para escalar las fuentes.
-    useEffect(() => {
-        const el = previewRef.current;
-        if (!el) return;
-        const ro = new ResizeObserver((entries) => {
-            for (const entry of entries) {
-                const w = entry.contentRect.width;
-                if (w > 0) setPreviewScale(w / DESIGN_BASE_WIDTH);
-            }
-        });
-        ro.observe(el);
-        return () => ro.disconnect();
-    }, [active, selectedCremId]);
 
     // --- Carga de diseños certificadoImg (globales y exclusivos) ----------
     useEffect(() => {
@@ -216,7 +178,6 @@ export default function EmitirDocumentosPage() {
 
                 setTemplates(merged);
                 if (me?.logo_url) setTenantLogo(me.logo_url);
-                if (me) setTenantInfo({ name: me.name, rut: me.rut, manager: me.legal_rep_name, managerRut: me.legal_rep_rut, phone: me.phone, address: me.address });
             } catch (err: any) {
                 showToast('Error al cargar diseños: ' + (err.message || ''), 'error');
             } finally {
@@ -315,23 +276,6 @@ export default function EmitirDocumentosPage() {
     }, [cremations, search]);
 
     // Valor efectivo de un campo para el preview client-side
-    const fieldValue = (f: DesignField): string => {
-        const pet = selectedCrem?.pet;
-        if (f.type === 'nombre_mascota') return pet?.name || selectedCrem?.pet_name || '';
-        const fmt = dateOverrides[f.id] || f.format;
-        if (f.type === 'fecha_nacimiento') return fmtDate(pet?.birth_date, fmt);
-        if (f.type === 'fecha_fallecimiento') return fmtDate(pet?.death_date, fmt);
-        if (f.type === 'fecha_actual') return fmtDate(new Date(), fmt);
-        if (f.type === 'nombre_empresa') return tenantInfo.name || '';
-        if (f.type === 'rut_tenant') return tenantInfo.rut || '';
-        if (f.type === 'encargado_tenant') return tenantInfo.manager || '';
-        if (f.type === 'rut_encargado') return tenantInfo.managerRut || '';
-        if (f.type === 'celular_tenant') return tenantInfo.phone || '';
-        if (f.type === 'direccion_tenant') return tenantInfo.address || '';
-        if (f.type === 'texto_fijo') return textOverrides[f.id] ?? f.value ?? '';
-        return '';
-    };
-
     const photoForField = (f: DesignField): string | null => {
         if (f.type === 'logo_tenant') return tenantLogo;
         if (f.id in photoOverrides) return photoOverrides[f.id];
@@ -373,6 +317,38 @@ export default function EmitirDocumentosPage() {
         return overrides;
     };
 
+    // Pide la vista previa al backend cada vez que cambia la orden o un ajuste.
+    useEffect(() => {
+        if (!active || !selectedCremId) {
+            setPreviewHtml(null);
+            return;
+        }
+        const reqId = ++previewReqRef.current;
+        const timer = setTimeout(async () => {
+            setPreviewLoading(true);
+            try {
+                const res = await apiRequest('/api/internal/ops-records/generate', {
+                    method: 'POST',
+                    body: {
+                        cremation_id: selectedCremId,
+                        template_id: active.id,
+                        certificate_type: 'Certificado',
+                        image_overrides: buildOverrides(),
+                        persist: false,
+                    },
+                });
+                if (reqId === previewReqRef.current) setPreviewHtml(res.html_content);
+            } catch {
+                if (reqId === previewReqRef.current) setPreviewHtml(null);
+            } finally {
+                if (reqId === previewReqRef.current) setPreviewLoading(false);
+            }
+        }, 400);
+        return () => clearTimeout(timer);
+        // buildOverrides se deriva de estos estados
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [active?.id, selectedCremId, dateOverrides, photoOverrides, textOverrides, elementToggles, fieldToggles, frameOverrides]);
+
     const handleGenerate = async () => {
         if (!active || !selectedCremId) {
             showToast('Selecciona una mascota / orden', 'error');
@@ -391,6 +367,7 @@ export default function EmitirDocumentosPage() {
                 },
             });
             setResultHtml(res.html_content);
+            setPreviewHtml(res.html_content);
             showToast('Certificado generado correctamente', 'success');
         } catch (err: any) {
             showToast('Error al generar: ' + (err.message || ''), 'error');
@@ -399,276 +376,24 @@ export default function EmitirDocumentosPage() {
         }
     };
 
-    const imgFromSrc = (src: string): Promise<HTMLImageElement> =>
-        new Promise((resolve, reject) => {
-            const img = new Image();
-            img.onload = () => resolve(img);
-            img.onerror = reject;
-            img.src = src;
-        });
-
-    // Carga una imagen para dibujarla en canvas sin "tainted". Las imágenes de R2
-    // son cross-origin, así que las traemos vía fetch->blob y las dibujamos desde
-    // un object URL (blob:, same-origin). Fallback a <img crossOrigin> si falla.
-    const loadImg = async (src: string): Promise<HTMLImageElement> => {
-        try {
-            const resp = await fetch(src, { mode: 'cors', cache: 'no-cache' });
-            if (resp.ok) {
-                const blob = await resp.blob();
-                const objUrl = URL.createObjectURL(blob);
-                const img = await imgFromSrc(objUrl);
-                setTimeout(() => URL.revokeObjectURL(objUrl), 10000);
-                return img;
-            }
-        } catch { /* cae al fallback */ }
-        // Fallback: <img crossOrigin> (requiere CORS en el servidor de la imagen)
-        return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.onload = () => resolve(img);
-            img.onerror = reject;
-            img.src = src;
-        });
-    };
-
-    // Genera el PDF dibujando el certificado en un <canvas> (sin leer hojas de
-    // estilo, evitando el error cssRules de html-to-image). Tamaño exacto del
-    // diseño, sin encabezados/pies del navegador, listo para imprimir.
+    // PDF dibujado desde el spec embebido en el HTML del backend (mismo renderer
+    // que el Repositorio): coincide con el certificado emitido.
     const handleDownloadPdf = async () => {
-        const node = previewRef.current;
-        if (!node || !active) return;
+        const html = resultHtml || previewHtml;
+        if (!html) return;
         setDownloading(true);
         try {
-            const jsPdfMod = await import('jspdf');
-            const JsPDF = jsPdfMod.default;
-
-            // Asegurar fuentes cargadas antes de dibujar texto en el canvas.
-            if ((document as any).fonts?.ready) {
-                try { await (document as any).fonts.ready; } catch { /* noop */ }
-            }
-
-            const q = 3; // factor de resolución para nitidez de impresión
-            const W0 = node.offsetWidth;
-            const H0 = node.offsetHeight;
-            const W = Math.round(W0 * q);
-            const H = Math.round(H0 * q);
-
-            const canvas = document.createElement('canvas');
-            canvas.width = W;
-            canvas.height = H;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) throw new Error('No se pudo crear el lienzo');
-
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, W, H);
-
-            const drawCover = (img: HTMLImageElement, dx: number, dy: number, dw: number, dh: number) => {
-                const ir = img.width / img.height;
-                const br = dw / dh;
-                let sx = 0, sy = 0, sw = img.width, sh = img.height;
-                if (ir > br) { sw = img.height * br; sx = (img.width - sw) / 2; }
-                else { sh = img.width / br; sy = (img.height - sh) / 2; }
-                ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
-            };
-            const drawContain = (img: HTMLImageElement, dx: number, dy: number, dw: number, dh: number) => {
-                const ir = img.width / img.height;
-                const br = dw / dh;
-                let rw = dw, rh = dh;
-                if (ir > br) { rh = dw / ir; } else { rw = dh * ir; }
-                ctx.drawImage(img, dx + (dw - rw) / 2, dy + (dh - rh) / 2, rw, rh);
-            };
-            // Foto circular con feather: render en canvas offscreen y máscara radial
-            // (destination-in) opaca al centro y transparente al borde exterior.
-            const makeFeatheredCircle = (img: HTMLImageElement, s: number): HTMLCanvasElement => {
-                const px = Math.max(1, Math.round(s));
-                const off = document.createElement('canvas');
-                off.width = px; off.height = px;
-                const octx = off.getContext('2d')!;
-                // cover
-                const ir = img.width / img.height;
-                let sx = 0, sy = 0, sw = img.width, sh = img.height;
-                if (ir > 1) { sw = img.height; sx = (img.width - sw) / 2; }
-                else { sh = img.width; sy = (img.height - sh) / 2; }
-                octx.drawImage(img, sx, sy, sw, sh, 0, 0, px, px);
-                // máscara radial
-                octx.globalCompositeOperation = 'destination-in';
-                const g = octx.createRadialGradient(px / 2, px / 2, 0, px / 2, px / 2, px / 2);
-                g.addColorStop(FEATHER_INNER_STOP / 100, 'rgba(0,0,0,1)');
-                g.addColorStop(1, 'rgba(0,0,0,0)');
-                octx.fillStyle = g;
-                octx.fillRect(0, 0, px, px);
-                return off;
-            };
-
-            // Traza la forma de la foto (círculo o rect redondeado) en el path actual.
-            const traceShape = (dx: number, dy: number, s: number, circle: boolean) => {
-                ctx.beginPath();
-                if (circle) {
-                    ctx.arc(dx + s / 2, dy + s / 2, s / 2, 0, Math.PI * 2);
-                } else {
-                    const r = s * 0.06;
-                    if ((ctx as any).roundRect) { (ctx as any).roundRect(dx, dy, s, s, r); }
-                    else { ctx.rect(dx, dy, s, s); }
-                }
-                ctx.closePath();
-            };
-
-            // 1. Fondo (cover)
-            if (active.background_logo_url) {
-                try {
-                    const bg = await loadImg(getImageUrl(active.background_logo_url));
-                    drawCover(bg, 0, 0, W, H);
-                } catch { /* sin fondo si falla */ }
-            }
-
-            // 2. Capas (elementos + campos) ordenadas por z. El fondo (ya dibujado)
-            //    es la base; los elementos pueden ir detrás o delante del texto.
-            const drawables: { z: number; draw: () => Promise<void> }[] = [];
-
-            // Elementos decorativos visibles
-            for (const el of elements) {
-                if (!isElementVisible(el)) continue;
-                drawables.push({
-                    z: Math.max(1, el.z || 1),
-                    draw: async () => {
-                        try {
-                            const im = await loadImg(getImageUrl(el.url));
-                            const cx = (el.x / 100) * W;
-                            const cy = (el.y / 100) * H;
-                            const dw = (el.w / 100) * W;
-                            const ir = im.width / im.height;
-                            const dh = dw / (ir || 1);
-                            const rot = ((el.rotation || 0) * Math.PI) / 180;
-                            ctx.save();
-                            ctx.translate(cx, cy);
-                            if (rot) ctx.rotate(rot);
-                            ctx.drawImage(im, -dw / 2, -dh / 2, dw, dh);
-                            ctx.restore();
-                        } catch { /* salta elemento que falle */ }
-                    },
-                });
-            }
-
-            // Campos (nivel FIELD_Z)
-            for (const f of fields) {
-                if (!isFieldVisible(f)) continue;
-                drawables.push({
-                    z: FIELD_Z,
-                    draw: async () => {
-                        const cx = (f.x / 100) * W;
-                        const cy = (f.y / 100) * H;
-                        if (f.type === 'imagen_mascota' || f.type === 'logo_tenant') {
-                            const url = photoForField(f);
-                            if (!url) return;
-                            const size = ((f.w || 18) / 100) * W;
-                            const dx = cx - size / 2;
-                            const dy = cy - size / 2;
-                            const circle = f.shape === 'circle';
-                            const fr = f.type === 'imagen_mascota' ? frameForField(f) : undefined;
-                            const hasFrame = !!fr && frameActive(fr);
-                            try {
-                                const im = await loadImg(getImageUrl(url));
-                                if (hasFrame && fr) {
-                                    const fc = getFrameColor(fr.color);
-                                    const inset = fr.border ? size * (FRAME_BORDER_PCT / 100) : 0;
-                                    // Halo difuminado
-                                    if (fr.glow) {
-                                        ctx.save();
-                                        ctx.shadowColor = fc.glow;
-                                        ctx.shadowBlur = size * 0.18;
-                                        ctx.fillStyle = fr.border ? fc.solid : 'rgba(0,0,0,0.35)';
-                                        traceShape(dx, dy, size, circle);
-                                        ctx.fill();
-                                        ctx.restore();
-                                    }
-                                    // Borde (sólido o degradado)
-                                    if (fr.border) {
-                                        ctx.save();
-                                        traceShape(dx, dy, size, circle);
-                                        if (fr.gradient) {
-                                            const g = ctx.createLinearGradient(dx, dy, dx + size, dy + size);
-                                            g.addColorStop(0, fc.from); g.addColorStop(1, fc.to);
-                                            ctx.fillStyle = g;
-                                        } else {
-                                            ctx.fillStyle = fc.solid;
-                                        }
-                                        ctx.fill();
-                                        ctx.restore();
-                                    }
-                                    // Foto interior (recortada e insertada)
-                                    const inS = size - 2 * inset;
-                                    if (fr.feather && circle) {
-                                        // Feather: borde exterior desvanecido a transparente
-                                        const off = makeFeatheredCircle(im, inS);
-                                        ctx.drawImage(off, dx + inset, dy + inset, inS, inS);
-                                    } else {
-                                        ctx.save();
-                                        traceShape(dx + inset, dy + inset, inS, circle);
-                                        ctx.clip();
-                                        drawCover(im, dx + inset, dy + inset, inS, inS);
-                                        ctx.restore();
-                                    }
-                                } else if (circle) {
-                                    ctx.save();
-                                    traceShape(dx, dy, size, true);
-                                    ctx.clip();
-                                    drawCover(im, dx, dy, size, size);
-                                    ctx.restore();
-                                } else if (f.type === 'logo_tenant') {
-                                    drawContain(im, dx, dy, size, size);
-                                } else {
-                                    drawCover(im, dx, dy, size, size);
-                                }
-                            } catch { /* salta imagen que falle */ }
-                            return;
-                        }
-                        const value = fieldValue(f);
-                        if (!value) return;
-                        const weight = f.bold ? '700' : '400';
-                        // Escalar el fontSize proporcionalmente al ancho del
-                        // canvas respecto al ancho de referencia del diseño.
-                        const fontScale = W / DESIGN_BASE_WIDTH;
-                        const px = (f.fontSize || 32) * fontScale;
-                        ctx.font = `${weight} ${px}px ${f.fontFamily || 'Georgia, serif'}`;
-
-                        const isFreeText = f.type === 'texto_fijo';
-                        const maxWPct = f.w || (isFreeText ? 80 : undefined);
-                        const maxW = maxWPct ? (maxWPct / 100) * W : undefined;
-
-                        renderCanvasText(ctx, value, f, {
-                            cx,
-                            cy,
-                            fontPx: px,
-                            color: f.color,
-                            align: f.align,
-                            scale: fontScale,
-                            maxW,
-                            lineHeightFactor: isFreeText ? 1.4 : 1.2,
-                        });
-                    },
-                });
-            }
-
-            // Orden estable por z y dibujo secuencial (loadImg es async).
-            drawables.sort((a, b) => a.z - b.z);
-            for (const d of drawables) {
-                await d.draw();
-            }
-
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-            const pdf = new JsPDF({
-                unit: 'px',
-                format: [W0, H0],
-                orientation: W0 >= H0 ? 'landscape' : 'portrait',
-            });
-            const pw = pdf.internal.pageSize.getWidth();
-            const ph = pdf.internal.pageSize.getHeight();
-            pdf.addImage(dataUrl, 'JPEG', 0, 0, pw, ph);
-
+            const spec = extractCertSpec(html);
+            if (!spec) throw new Error('El certificado no incluye datos de dibujo');
+            const canvas = await renderCertSpecToCanvas(spec, 816, 3);
+            const { default: JsPDF } = await import('jspdf');
+            const w = canvas.width, h = canvas.height;
+            const pdf = new JsPDF({ unit: 'px', format: [w, h], orientation: w >= h ? 'landscape' : 'portrait' });
+            pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
             const petName = (selectedCrem?.pet?.name || selectedCrem?.pet_name || 'mascota').replace(/[^\w-]/g, '_');
             pdf.save(`certificado_${petName}.pdf`);
-        } catch (err: any) {
-            showToast('Error al generar PDF: ' + (err.message || ''), 'error');
+        } catch (err: unknown) {
+            showToast('Error al generar PDF: ' + (err instanceof Error ? err.message : ''), 'error');
         } finally {
             setDownloading(false);
         }
@@ -1001,110 +726,27 @@ export default function EmitirDocumentosPage() {
                                 ) : (
                                     <div className="w-full max-w-3xl">
                                         <div
-                                            ref={previewRef}
                                             className="relative w-full shadow-2xl rounded-lg overflow-hidden bg-white"
-                                            style={{
-                                                paddingBottom: `${ASPECT_PADDING[aspect]}%`,
-                                                backgroundImage: active.background_logo_url ? `url('${getImageUrl(active.background_logo_url)}')` : undefined,
-                                                backgroundSize: 'cover',
-                                                backgroundPosition: 'center',
-                                            }}
+                                            style={{ paddingBottom: `${ASPECT_PADDING[aspect]}%` }}
                                         >
-                                            {/* Elementos decorativos visibles (z propio) */}
-                                            {elements.map((el) => isElementVisible(el) ? (
-                                                <img
-                                                    key={el.id}
-                                                    src={getImageUrl(el.url)}
-                                                    alt=""
-                                                    style={{
-                                                        position: 'absolute',
-                                                        left: `${el.x}%`,
-                                                        top: `${el.y}%`,
-                                                        width: `${el.w}%`,
-                                                        transform: `translate(-50%, -50%) rotate(${el.rotation || 0}deg)`,
-                                                        zIndex: Math.max(1, el.z || 1),
-                                                        objectFit: 'contain',
-                                                    }}
+                                            {previewHtml ? (
+                                                <iframe
+                                                    title="Vista previa del certificado"
+                                                    srcDoc={previewHtml}
+                                                    className="absolute inset-0 w-full h-full border-0"
+                                                    sandbox="allow-same-origin"
                                                 />
-                                            ) : null)}
-                                            {fields.map((f) => {
-                                                if (!isFieldVisible(f)) return null;
-                                                const common: React.CSSProperties = {
-                                                    position: 'absolute',
-                                                    left: `${f.x}%`,
-                                                    top: `${f.y}%`,
-                                                    transform: 'translate(-50%, -50%)',
-                                                    zIndex: FIELD_Z,
-                                                };
-                                                if (f.type === 'imagen_mascota' || f.type === 'logo_tenant') {
-                                                    const url = photoForField(f);
-                                                    const radius = f.shape === 'circle' ? '50%' : '8px';
-                                                    const isCircle = f.shape === 'circle';
-                                                    const fr = f.type === 'imagen_mascota' ? frameForField(f) : undefined;
-                                                    const hasFrame = !!fr && frameActive(fr);
-                                                    const wrapStyle = hasFrame ? frameWrapperStyle(fr as CertFrame, radius) : {};
-                                                    const insetPct = hasFrame ? frameInnerInsetPct(fr as CertFrame) : 0;
-                                                    const maskStyle = hasFrame ? frameImageMaskStyle(fr, isCircle) : {};
-                                                    return (
-                                                        <div
-                                                            key={f.id}
-                                                            style={{
-                                                                ...common,
-                                                                width: `${f.w || 18}%`,
-                                                                aspectRatio: '1 / 1',
-                                                                borderRadius: radius,
-                                                                background: hasFrame ? undefined : (url ? undefined : 'rgba(0,0,0,0.15)'),
-                                                                ...wrapStyle,
-                                                            }}
-                                                        >
-                                                            <div style={{ position: 'absolute', inset: `${insetPct}%`, borderRadius: radius, overflow: 'hidden', background: url ? undefined : 'rgba(0,0,0,0.15)', ...maskStyle }}>
-                                                                {url && <img src={getImageUrl(url)} className={`w-full h-full ${f.type === 'logo_tenant' ? 'object-contain' : 'object-cover'}`} />}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                }
-                                                const isFreeText = f.type === 'texto_fijo';
-                                                const textWidth = f.w ? `${f.w}%` : (isFreeText ? '80%' : undefined);
-                                                const scaledFontSize = (f.fontSize || 32) * previewScale;
-                                                // Escalar padding/radius del fondo de texto proporcionalmente
-                                                const scaledBgStyle = textBgStyle(f);
-                                                if (scaledBgStyle.padding && previewScale !== 1) {
-                                                    const parts = String(scaledBgStyle.padding).match(/(\d+\.?\d*)px/g);
-                                                    if (parts && parts.length >= 2) {
-                                                        const padY = parseFloat(parts[0]) * previewScale;
-                                                        const padX = parseFloat(parts[1]) * previewScale;
-                                                        scaledBgStyle.padding = `${padY}px ${padX}px`;
-                                                    }
-                                                }
-                                                if (scaledBgStyle.borderRadius && previewScale !== 1) {
-                                                    const rMatch = String(scaledBgStyle.borderRadius).match(/(\d+\.?\d*)/);
-                                                    if (rMatch) scaledBgStyle.borderRadius = `${parseFloat(rMatch[1]) * previewScale}px`;
-                                                }
-                                                return (
-                                                    <div
-                                                        key={f.id}
-                                                        style={{
-                                                            ...common,
-                                                            width: textWidth,
-                                                            maxWidth: isFreeText ? (f.w ? `${f.w}%` : '90%') : undefined,
-                                                            fontSize: `${scaledFontSize}px`,
-                                                            fontFamily: f.fontFamily,
-                                                            color: f.color,
-                                                            textAlign: f.align,
-                                                            fontWeight: f.bold ? 700 : 400,
-                                                            whiteSpace: isFreeText ? 'pre-wrap' : 'nowrap',
-                                                            wordBreak: 'break-word',
-                                                            overflowWrap: 'break-word',
-                                                            lineHeight: isFreeText ? 1.4 : 1.1,
-                                                            ...scaledBgStyle,
-                                                        }}
-                                                    >
-                                                        {fieldValue(f)}
-                                                    </div>
-                                                );
-                                            })}
+                                            ) : (
+                                                <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm gap-2">
+                                                    <Loader2 size={18} className="animate-spin" /> Generando vista previa...
+                                                </div>
+                                            )}
+                                            {previewLoading && previewHtml && (
+                                                <div className="absolute top-2 right-2 bg-black/60 text-white text-[11px] px-2 py-1 rounded-lg flex items-center gap-1.5">
+                                                    <Loader2 size={12} className="animate-spin" /> Actualizando
+                                                </div>
+                                            )}
                                         </div>
-                                        <p className="text-[10px] text-white/20 font-bold uppercase tracking-widest text-center italic mt-3">Vista previa · así se generará el certificado</p>
                                     </div>
                                 )}
                             </div>
