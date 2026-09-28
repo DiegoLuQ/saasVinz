@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ShieldCheck, Lock, Mail, ArrowRight, AlertCircle, PlusCircle } from 'lucide-react';
+import { ShieldCheck, Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
 import { apiRequest } from '@/lib/admin/api';
 import { clearToken } from '@/lib/auth/token';
 import { useRouter } from 'next/navigation';
@@ -61,11 +61,12 @@ export default function CreatorLoginPage() {
 
             <div className="w-full max-w-md relative z-10">
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center gap-2 mb-6">
-                        <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center text-primary">
-                            <PlusCircle size={24} />
+                    <div className="flex flex-col items-center gap-2 mb-6">
+                        <div className="flex items-center gap-3">
+                            <img src="/logo-vinzer.webp" alt="" className="h-12 w-auto object-contain" />
+                            <span className="text-3xl font-black tracking-tight">Vinzer</span>
                         </div>
-                        <span className="text-2xl font-black tracking-tighter">SaaS<span className="text-primary">Creator</span></span>
+                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">Creator · Administración</span>
                     </div>
                     <h1 className="text-3xl font-black mb-2">Acceso Restringido</h1>
                     <p className="text-white/40 text-sm">Panel de Control maestro del sistema.</p>
@@ -90,7 +91,7 @@ export default function CreatorLoginPage() {
                                     onChange={handleChange}
                                     required
                                     className="w-full bg-[#0a192f]/50 border border-white/10 rounded-xl py-3.5 pl-11 pr-4 outline-none focus:border-primary/50 focus:bg-[#0a192f]/80 transition-all text-sm"
-                                    placeholder="creator@saascrematorio.cl"
+                                    placeholder="admin@vinzer.cl"
                                 />
                             </div>
                         </div>

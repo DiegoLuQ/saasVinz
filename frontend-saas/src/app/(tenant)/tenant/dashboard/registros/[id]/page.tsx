@@ -21,9 +21,11 @@ import {
     AlertCircle,
     Copy,
     Check,
-    ExternalLink
+    ExternalLink,
+    Feather
 } from 'lucide-react';
 import { apiRequest, getImageUrl } from '@/lib/tenant/api';
+import { copyToClipboard } from '@/lib/clipboard';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { useDashboardSummary, useCurrentTenant } from '@/hooks/useSessionBootstrap';
 import { useQueryClient } from '@tanstack/react-query';
@@ -247,13 +249,13 @@ export default function SubmissionDetailPage() {
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => router.push('/dashboard')}
-                        className="p-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 text-muted-foreground hover:text-white transition-all active:scale-95"
+                        className="p-3 rounded-2xl bg-card border border-card-border hover:bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-95 shadow-sm"
                     >
                         <ArrowLeft size={20} />
                     </button>
                     <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">Detalle del Registro</h1>
+                            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">Detalle del Registro</h1>
                             <span className="text-xs bg-primary/10 text-primary px-3 py-1 rounded-full font-bold">Pendiente</span>
                             {submission.code && (
                                 <span className="text-xs bg-orange-500/10 text-orange-400 border border-orange-500/20 px-3 py-1 rounded-full font-mono font-bold uppercase tracking-wider">
@@ -267,7 +269,7 @@ export default function SubmissionDetailPage() {
                 {(userRole === 'admin' || userRole === 'recepcion' || userRole === 'creator') && (
                     <button
                         onClick={handleDeleteClick}
-                        className="py-3 px-5 rounded-2xl bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white font-bold text-xs uppercase tracking-wider transition-all border border-red-500/20 flex items-center justify-center gap-2 active:scale-95 self-start sm:self-auto"
+                        className="py-3 px-5 rounded-2xl bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white font-bold text-xs uppercase tracking-wider transition-all border border-red-500/20 flex items-center justify-center gap-2 active:scale-95 self-start sm:self-auto"
                     >
                         <Trash2 size={16} /> Eliminar Registro
                     </button>
@@ -277,9 +279,9 @@ export default function SubmissionDetailPage() {
             {/* La solicitud ya es una orden: acceso a su expediente */}
             {submission.order && (
                 <div className="p-5 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <p className="text-sm text-emerald-200">
+                    <p className="text-sm text-emerald-600 dark:text-emerald-200">
                         Esta solicitud ya es la orden{' '}
-                        <span className="font-black text-white">
+                        <span className="font-black text-foreground">
                             {submission.order.oc_number ? `OC ${submission.order.oc_number}` : `#${submission.order.id}`}
                         </span>
                         . Gestiona todo desde su expediente.
@@ -287,7 +289,7 @@ export default function SubmissionDetailPage() {
                     <button
                         type="button"
                         onClick={() => router.push(`/dashboard/recepcion-pedidos?orden=${submission.order.id}`)}
-                        className="shrink-0 py-2.5 px-5 rounded-2xl bg-emerald-500 text-[#020617] font-bold text-xs uppercase tracking-wider hover:brightness-110 transition-all flex items-center gap-2"
+                        className="shrink-0 py-2.5 px-5 rounded-2xl bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider hover:brightness-110 transition-all flex items-center gap-2"
                     >
                         <ExternalLink size={14} /> Abrir expediente
                     </button>
@@ -302,9 +304,9 @@ export default function SubmissionDetailPage() {
                     const trackingUrl = buildTrackingUrl(tenantSlug, petName, submission.code);
 
                     return (
-                        <div className="p-5 rounded-3xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border border-primary/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg backdrop-blur-md">
+                        <div className="p-5 rounded-3xl bg-primary/5 border border-primary/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm backdrop-blur-md">
                             <div className="flex items-center gap-4 min-w-0">
-                                <div className="w-12 h-12 rounded-2xl bg-primary/20 border border-primary/30 flex items-center justify-center text-primary shrink-0 shadow-inner">
+                                <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0 shadow-inner">
                                     <Shield size={24} />
                                 </div>
                                 <div className="min-w-0">
@@ -324,13 +326,13 @@ export default function SubmissionDetailPage() {
                                 <button
                                     type="button"
                                     onClick={() => handleCopyTracking(trackingUrl)}
-                                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-white/20 text-xs font-bold transition-all active:scale-95 shadow-sm"
+                                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-card hover:bg-muted text-foreground border border-card-border text-xs font-bold transition-all active:scale-95 shadow-sm"
                                     title="Copiar enlace completo de seguimiento"
                                 >
                                     {copiedTracking ? (
                                         <>
-                                            <Check size={14} className="text-emerald-400" />
-                                            <span className="text-emerald-400">¡Copiado!</span>
+                                            <Check size={14} className="text-emerald-500" />
+                                            <span className="text-emerald-500">¡Copiado!</span>
                                         </>
                                     ) : (
                                         <>
@@ -343,7 +345,7 @@ export default function SubmissionDetailPage() {
                                     href={trackingUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 active:scale-95"
+                                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-all shadow-md shadow-primary/20 active:scale-95"
                                     title="Abrir vista de tracking como la ve el tutor"
                                 >
                                     <ExternalLink size={14} />
@@ -362,14 +364,14 @@ export default function SubmissionDetailPage() {
                     {/* Owner & Pet Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Owner Card */}
-                        <div className="bg-[#0b1329] border border-white/5 rounded-3xl p-6 space-y-4">
+                        <div className="bg-card border border-card-border rounded-3xl p-6 space-y-4 shadow-sm">
                             <h3 className="text-sm font-black uppercase tracking-widest text-primary/70 flex items-center gap-2">
                                 <User size={16} /> Información del Dueño
                             </h3>
                             <div className="space-y-4">
                                 {submission.partner && (
                                     <div className="p-4 bg-emerald-500/10 rounded-2xl border border-emerald-500/20">
-                                        <p className="text-[10px] text-emerald-400 uppercase font-black flex items-center gap-1">
+                                        <p className="text-[10px] text-emerald-500 dark:text-emerald-400 uppercase font-black flex items-center gap-1">
                                             <Store size={14} /> Partner Referido
                                         </p>
                                         <p className="text-base font-bold text-foreground mt-1">{submission.partner.name}</p>
@@ -377,16 +379,16 @@ export default function SubmissionDetailPage() {
                                 )}
                                 <div>
                                     <p className="text-[10px] text-muted-foreground uppercase font-black">Nombre Completo</p>
-                                    <p className="text-base font-bold text-white mt-1">{submission.owner_data?.fullName}</p>
+                                    <p className="text-base font-bold text-foreground mt-1">{submission.owner_data?.fullName}</p>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <p className="text-[10px] text-muted-foreground uppercase font-black">RUT</p>
-                                        <p className="text-sm font-semibold text-white/90 mt-1">{submission.owner_data?.rut || 'No especificado'}</p>
+                                        <p className="text-sm font-semibold text-foreground/90 mt-1">{submission.owner_data?.rut || 'No especificado'}</p>
                                     </div>
                                     <div>
                                         <p className="text-[10px] text-muted-foreground uppercase font-black">Teléfono</p>
-                                        <p className="text-sm font-semibold text-white/90 mt-1 flex items-center gap-1.5">
+                                        <p className="text-sm font-semibold text-foreground/90 mt-1 flex items-center gap-1.5">
                                             <Phone size={12} className="text-primary" />
                                             {submission.owner_data?.phone}
                                         </p>
@@ -394,14 +396,14 @@ export default function SubmissionDetailPage() {
                                 </div>
                                 <div>
                                     <p className="text-[10px] text-muted-foreground uppercase font-black">Email</p>
-                                    <p className="text-sm font-semibold text-white/90 mt-1 flex items-center gap-1.5">
+                                    <p className="text-sm font-semibold text-foreground/90 mt-1 flex items-center gap-1.5">
                                         <Mail size={12} className="text-primary" />
                                         {submission.owner_data?.email || 'No especificado'}
                                     </p>
                                 </div>
                                 <div>
                                     <p className="text-[10px] text-muted-foreground uppercase font-black">Dirección de Entrega Cenizas</p>
-                                    <p className="text-sm font-semibold text-white/90 mt-1 flex items-start gap-1.5">
+                                    <p className="text-sm font-semibold text-foreground/90 mt-1 flex items-start gap-1.5">
                                         <MapPin size={12} className="text-primary mt-1 shrink-0" />
                                         <span>
                                             {submission.owner_data?.address ? `${submission.owner_data.address}, ` : ''}
@@ -412,11 +414,11 @@ export default function SubmissionDetailPage() {
                                 {submission.owner_data?.phone && (
                                     <button
                                         onClick={() => {
-                                            const defaultMsg = `Hola ${submission.owner_data.fullName}, te contactamos de ${tenant?.name || 'Vinzer'}.`;
-                                            setWhatsAppMessage(defaultMsg);
-                                            setIsWhatsAppModalOpen(true);
+                                             const defaultMsg = `Hola ${submission.owner_data.fullName}, te contactamos de ${tenant?.name || 'Vinzer'}.`;
+                                             setWhatsAppMessage(defaultMsg);
+                                             setIsWhatsAppModalOpen(true);
                                         }}
-                                        className="w-full flex items-center justify-center gap-2.5 py-3.5 px-4 bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-black rounded-2xl transition-all shadow-lg shadow-emerald-500/20 active:scale-[0.98] cursor-pointer"
+                                        className="w-full flex items-center justify-center gap-2.5 py-3.5 px-4 bg-emerald-500 hover:bg-emerald-400 text-white font-black rounded-2xl transition-all shadow-md shadow-emerald-500/20 active:scale-[0.98] cursor-pointer"
                                     >
                                         <WhatsAppIcon className="w-5 h-5" />
                                         <span className="text-[10px] uppercase tracking-widest">Contactar por WhatsApp</span>
@@ -426,81 +428,106 @@ export default function SubmissionDetailPage() {
                         </div>
 
                         {/* Pet Card */}
-                        <div className="bg-[#0b1329] border border-white/5 rounded-3xl p-6 space-y-4">
-                            <h3 className="text-sm font-black uppercase tracking-widest text-emerald-400/70 flex items-center gap-2">
+                        <div className="bg-card border border-card-border rounded-3xl p-6 space-y-4 shadow-sm">
+                            <h3 className="text-sm font-black uppercase tracking-widest text-emerald-500 dark:text-emerald-400/70 flex items-center gap-2">
                                 <Dog size={16} /> Detalles de la Mascota
                             </h3>
                             <div className="space-y-4">
                                 <div>
                                     <p className="text-[10px] text-muted-foreground uppercase font-black">Nombre Mascota</p>
-                                    <p className="text-base font-bold text-white mt-1">{submission.pet_data?.name}</p>
+                                    <p className="text-base font-bold text-foreground mt-1">{submission.pet_data?.name}</p>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <p className="text-[10px] text-muted-foreground uppercase font-black">Tipo</p>
-                                        <p className="text-sm font-semibold text-white/90 mt-1 capitalize">{submission.pet_data?.type}</p>
+                                        <p className="text-sm font-semibold text-foreground/90 mt-1 capitalize">{submission.pet_data?.type}</p>
                                     </div>
                                     <div>
                                         <p className="text-[10px] text-muted-foreground uppercase font-black">Raza</p>
-                                        <p className="text-sm font-semibold text-white/90 mt-1">{submission.pet_data?.breed || 'N/A'}</p>
+                                        <p className="text-sm font-semibold text-foreground/90 mt-1">{submission.pet_data?.breed || 'N/A'}</p>
                                     </div>
                                 </div>
                                 <div>
                                     <p className="text-[10px] text-muted-foreground uppercase font-black">Tamaño</p>
-                                    <p className="text-sm font-semibold text-white/90 mt-1 capitalize">{submission.pet_data?.size || 'N/A'}</p>
+                                    <p className="text-sm font-semibold text-foreground/90 mt-1 capitalize">{submission.pet_data?.size || 'N/A'}</p>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <p className="text-[10px] text-muted-foreground uppercase font-black">Edad</p>
-                                        <p className="text-sm font-semibold text-white/90 mt-1">{submission.pet_data?.age} años</p>
+                                        <p className="text-sm font-semibold text-foreground/90 mt-1">{submission.pet_data?.age} años</p>
                                     </div>
                                     <div>
                                         <p className="text-[10px] text-muted-foreground uppercase font-black">Nacimiento</p>
-                                        <p className="text-sm font-semibold text-white/90 mt-1">{submission.pet_data?.birthDate || 'N/A'}</p>
+                                        <p className="text-sm font-semibold text-foreground/90 mt-1">{submission.pet_data?.birthDate || 'N/A'}</p>
                                     </div>
                                 </div>
                                 <div>
                                     <p className="text-[10px] text-muted-foreground uppercase font-black">Fallecimiento</p>
-                                    <p className="text-sm font-semibold text-white/90 mt-1">{submission.pet_data?.deathDate || 'N/A'}</p>
+                                    <p className="text-sm font-semibold text-foreground/90 mt-1">{submission.pet_data?.deathDate || 'N/A'}</p>
                                 </div>
                             </div>
                         </div>
                     </div>
 
+                    {/* Carta de despedida escrita por la familia (solo lectura: se edita en el expediente de la orden) */}
+                    <div className="bg-card border border-card-border rounded-3xl p-6 space-y-3 shadow-sm">
+                        <div className="flex items-center justify-between gap-2">
+                            <h3 className="text-sm font-black uppercase tracking-widest text-rose-600 dark:text-rose-400 flex items-center gap-2">
+                                <Feather size={16} /> Carta de despedida
+                            </h3>
+                            {submission.pet_data?.dedication && (
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        if (await copyToClipboard(submission.pet_data.dedication)) showToast('Carta copiada', 'success');
+                                    }}
+                                    className="text-xs font-bold text-slate-600 hover:text-slate-900 dark:text-muted-foreground dark:hover:text-white flex items-center gap-1.5"
+                                >
+                                    <Copy size={13} /> Copiar
+                                </button>
+                            )}
+                        </div>
+                        {submission.pet_data?.dedication ? (
+                            <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-line italic">“{submission.pet_data.dedication}”</p>
+                        ) : (
+                            <p className="text-xs text-muted-foreground">La familia no escribió una carta. Podrás agregarla (o usar un mensaje sugerido) en el expediente de la orden.</p>
+                        )}
+                    </div>
+
                     {/* Selected Services */}
-                    <div className="bg-[#0b1329] border border-white/5 rounded-3xl p-6 space-y-4">
-                        <h3 className="text-sm font-black uppercase tracking-widest text-orange-400/70 flex items-center gap-2">
+                    <div className="bg-card border border-card-border rounded-3xl p-6 space-y-4 shadow-sm">
+                        <h3 className="text-sm font-black uppercase tracking-widest text-amber-500 dark:text-orange-400/70 flex items-center gap-2">
                             <Package size={16} /> Servicios Seleccionados
                         </h3>
-                        <div className="border border-white/5 rounded-2xl overflow-x-auto bg-white/[0.01]">
+                        <div className="border border-card-border rounded-2xl overflow-x-auto bg-muted/30">
                             <table className="w-full text-left text-xs">
                                 <thead>
-                                    <tr className="border-b border-white/5 bg-white/5 text-muted-foreground">
+                                    <tr className="border-b border-card-border bg-muted/50 text-muted-foreground">
                                         <th className="px-5 py-3 font-black uppercase text-[10px] tracking-wider">Concepto</th>
                                         <th className="px-5 py-3 font-black uppercase text-[10px] tracking-wider text-right">Precio</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-white/5">
+                                <tbody className="divide-y divide-card-border">
                                     {(submission.selected_services || submission.resolved_services) && (submission.selected_services || submission.resolved_services).length > 0 ? (
                                         (submission.selected_services || submission.resolved_services).map((item: any, idx: number) => {
                                             if (item.type === 'plan' && item.items && item.items.length > 0) {
                                                 return (
                                                     <React.Fragment key={idx}>
-                                                        <tr className="bg-white/[0.02]">
+                                                        <tr className="bg-card">
                                                             <td className="px-5 py-3.5">
                                                                 <div className="flex items-center gap-2">
-                                                                    <p className="font-bold text-white">{item.name}</p>
-                                                                    <span className="px-1.5 py-0.5 rounded text-[8px] bg-yellow-500/10 text-yellow-500 font-bold uppercase border border-yellow-500/20">PLAN</span>
+                                                                    <p className="font-bold text-foreground">{item.name}</p>
+                                                                    <span className="px-1.5 py-0.5 rounded text-[8px] bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 font-bold uppercase border border-yellow-500/20">PLAN</span>
                                                                 </div>
                                                             </td>
-                                                            <td className="px-5 py-3.5 text-right font-black text-orange-400 text-sm">
+                                                            <td className="px-5 py-3.5 text-right font-black text-amber-600 dark:text-orange-400 text-sm">
                                                                 ${(item.price || 0).toLocaleString()}
                                                             </td>
                                                         </tr>
                                                         {item.items.map((sub: any, sIdx: number) => (
-                                                            <tr key={`${idx}-${sIdx}`} className="hover:bg-white/[0.02] transition-colors">
-                                                                <td className="px-5 py-2 pl-10 border-l-2 border-primary/20">
-                                                                    <p className="text-white/70 text-xs font-semibold">{sub.name}</p>
+                                                            <tr key={`${idx}-${sIdx}`} className="hover:bg-muted/40 transition-colors">
+                                                                <td className="px-5 py-2 pl-10 border-l-2 border-primary/40">
+                                                                    <p className="text-foreground/80 text-xs font-semibold">{sub.name}</p>
                                                                     <p className="text-[9px] text-muted-foreground uppercase tracking-wider">{sub.type}</p>
                                                                 </td>
                                                                 <td className="px-5 py-2 text-right font-bold text-muted-foreground/60 text-[10px]">
@@ -513,12 +540,12 @@ export default function SubmissionDetailPage() {
                                             }
 
                                             return (
-                                                <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
+                                                <tr key={idx} className="hover:bg-muted/40 transition-colors">
                                                     <td className="px-5 py-3.5">
-                                                        <p className="font-bold text-white">{item.name}</p>
+                                                        <p className="font-bold text-foreground">{item.name}</p>
                                                         <p className="text-[9px] text-muted-foreground uppercase">{item.type || 'Servicio'}</p>
                                                     </td>
-                                                    <td className="px-5 py-3.5 text-right font-black text-orange-400 text-sm">
+                                                    <td className="px-5 py-3.5 text-right font-black text-amber-600 dark:text-orange-400 text-sm">
                                                         ${(item.price || 0).toLocaleString()}
                                                     </td>
                                                 </tr>
@@ -534,9 +561,9 @@ export default function SubmissionDetailPage() {
                                 </tbody>
                                 {submission.total > 0 && (
                                     <tfoot>
-                                        <tr className="bg-orange-500/10 font-black border-t-2 border-orange-500/20">
-                                            <td className="px-5 py-4 text-orange-400 uppercase tracking-wider text-xs">Total a Pagar</td>
-                                            <td className="px-5 py-4 text-right text-orange-400 text-base">
+                                        <tr className="bg-amber-500/10 font-black border-t-2 border-amber-500/20">
+                                            <td className="px-5 py-4 text-amber-600 dark:text-orange-400 uppercase tracking-wider text-xs">Total a Pagar</td>
+                                            <td className="px-5 py-4 text-right text-amber-600 dark:text-orange-400 text-base">
                                                 ${submission.total.toLocaleString()}
                                             </td>
                                         </tr>
@@ -550,8 +577,8 @@ export default function SubmissionDetailPage() {
                 {/* Right Column - Actions & Details */}
                 <div className="space-y-8">
                     {/* Workflow Actions Card */}
-                    <div className="bg-[#0b1329] border border-white/5 rounded-3xl p-6 space-y-6">
-                        <h3 className="text-sm font-black uppercase tracking-widest text-white flex items-center gap-2">
+                    <div className="bg-card border border-card-border rounded-3xl p-6 space-y-6 shadow-sm">
+                        <h3 className="text-sm font-black uppercase tracking-widest text-foreground flex items-center gap-2">
                             <CheckCircle size={16} className="text-primary" /> Procesar Registro
                         </h3>
                         <p className="text-xs text-muted-foreground leading-relaxed">
@@ -564,17 +591,17 @@ export default function SubmissionDetailPage() {
                                 <div className={`p-3.5 rounded-2xl border transition-all ${
                                     workflowStep.customer_id 
                                         ? 'bg-emerald-500/10 border-emerald-500/30 shadow-sm' 
-                                        : 'bg-primary/5 border-primary/30 ring-2 ring-primary/20 shadow-md'
+                                        : 'bg-primary/5 border-primary/30 ring-2 ring-primary/20 shadow-sm'
                                 }`}>
                                     <div className="flex items-center justify-between mb-2">
                                         <span className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 ${
-                                            workflowStep.customer_id ? 'text-emerald-400' : 'text-primary'
+                                            workflowStep.customer_id ? 'text-emerald-500 dark:text-emerald-400' : 'text-primary'
                                         }`}>
                                             <span className="w-5 h-5 rounded-full bg-foreground/10 flex items-center justify-center text-[10px]">1</span>
                                             Paso 1: Tutor / Cliente
                                         </span>
                                         {workflowStep.customer_id && (
-                                            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-md flex items-center gap-1">
                                                 <CheckCircle size={10} /> Registrado
                                             </span>
                                         )}
@@ -582,12 +609,12 @@ export default function SubmissionDetailPage() {
                                     <button
                                         onClick={handleAddCustomer}
                                         disabled={!!workflowStep.customer_id || processingAction === 'customer' || isCustomerLimitReached}
-                                        className={`w-full py-3.5 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md ${
+                                        className={`w-full py-3.5 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-sm ${
                                             workflowStep.customer_id
-                                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 cursor-not-allowed'
+                                                ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 cursor-not-allowed'
                                                 : isCustomerLimitReached 
-                                                    ? 'bg-red-500/15 text-red-400 border border-red-500/30 cursor-not-allowed' 
-                                                    : 'bg-primary text-primary-foreground hover:opacity-95 shadow-primary/30 hover:scale-[1.01] active:scale-[0.98]'
+                                                    ? 'bg-red-500/15 text-red-500 border border-red-500/30 cursor-not-allowed' 
+                                                    : 'bg-primary text-white hover:opacity-95 shadow-primary/30 hover:scale-[1.01] active:scale-[0.98]'
                                         }`}
                                     >
                                         {processingAction === 'customer' ? (
@@ -606,18 +633,18 @@ export default function SubmissionDetailPage() {
                                     workflowStep.pet_id 
                                         ? 'bg-emerald-500/10 border-emerald-500/30' 
                                         : workflowStep.customer_id 
-                                            ? 'bg-cyan-500/10 border-cyan-500/40 ring-2 ring-cyan-500/20 shadow-md' 
-                                            : 'bg-foreground/[0.02] border-foreground/5 opacity-50'
+                                            ? 'bg-cyan-500/10 border-cyan-500/40 ring-2 ring-cyan-500/20 shadow-sm' 
+                                            : 'bg-muted/40 border-card-border opacity-50'
                                 }`}>
                                     <div className="flex items-center justify-between mb-2">
                                         <span className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 ${
-                                            workflowStep.pet_id ? 'text-emerald-400' : workflowStep.customer_id ? 'text-cyan-400' : 'text-muted-foreground'
+                                            workflowStep.pet_id ? 'text-emerald-500 dark:text-emerald-400' : workflowStep.customer_id ? 'text-cyan-600 dark:text-cyan-400' : 'text-muted-foreground'
                                         }`}>
                                             <span className="w-5 h-5 rounded-full bg-foreground/10 flex items-center justify-center text-[10px]">2</span>
                                             Paso 2: Mascota
                                         </span>
                                         {workflowStep.pet_id && (
-                                            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-md flex items-center gap-1">
                                                 <CheckCircle size={10} /> Registrada
                                             </span>
                                         )}
@@ -625,13 +652,13 @@ export default function SubmissionDetailPage() {
                                     <button
                                         onClick={handleAddPet}
                                         disabled={!workflowStep.customer_id || !!workflowStep.pet_id || processingAction === 'pet' || isPetLimitReached}
-                                        className={`w-full py-3.5 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md ${
+                                        className={`w-full py-3.5 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-sm ${
                                             workflowStep.pet_id
-                                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 cursor-not-allowed'
+                                                ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 cursor-not-allowed'
                                                 : isPetLimitReached && workflowStep.customer_id 
-                                                    ? 'bg-red-500/15 text-red-400 border border-red-500/30 cursor-not-allowed' 
+                                                    ? 'bg-red-500/15 text-red-500 border border-red-500/30 cursor-not-allowed' 
                                                     : !workflowStep.customer_id 
-                                                        ? 'bg-foreground/5 text-muted-foreground border border-foreground/5 cursor-not-allowed' 
+                                                        ? 'bg-muted text-muted-foreground border border-card-border cursor-not-allowed' 
                                                         : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-cyan-500/30 hover:scale-[1.01] active:scale-[0.98]'
                                         }`}
                                     >
@@ -655,12 +682,12 @@ export default function SubmissionDetailPage() {
                                 {/* Step 3: Services & Finalize */}
                                 <div className={`p-3.5 rounded-2xl border transition-all ${
                                     workflowStep.pet_id 
-                                        ? 'bg-emerald-500/15 border-emerald-500/40 ring-2 ring-emerald-500/30 shadow-lg' 
-                                        : 'bg-foreground/[0.02] border-foreground/5 opacity-50'
+                                        ? 'bg-emerald-500/15 border-emerald-500/40 ring-2 ring-emerald-500/30 shadow-md' 
+                                        : 'bg-muted/40 border-card-border opacity-50'
                                 }`}>
                                     <div className="flex items-center justify-between mb-2">
                                         <span className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 ${
-                                            workflowStep.pet_id ? 'text-emerald-400' : 'text-muted-foreground'
+                                            workflowStep.pet_id ? 'text-emerald-500 dark:text-emerald-400' : 'text-muted-foreground'
                                         }`}>
                                             <span className="w-5 h-5 rounded-full bg-foreground/10 flex items-center justify-center text-[10px]">3</span>
                                             Paso 3: Orden Operativa
@@ -669,11 +696,11 @@ export default function SubmissionDetailPage() {
                                     <button
                                         onClick={handleAddServices}
                                         disabled={!workflowStep.pet_id || processingAction === 'services' || (isOrderLimitReached && !workflowStep.pet_id)}
-                                        className={`w-full py-4 px-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-2.5 ${
+                                        className={`w-full py-4 px-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2.5 ${
                                             !workflowStep.pet_id
-                                                ? 'bg-foreground/5 text-muted-foreground cursor-not-allowed border border-foreground/5'
+                                                ? 'bg-muted text-muted-foreground cursor-not-allowed border border-card-border'
                                                 : isOrderLimitReached 
-                                                    ? 'bg-red-500/20 text-red-400 border border-red-500/30 cursor-not-allowed' 
+                                                    ? 'bg-red-500/20 text-red-500 border border-red-500/30 cursor-not-allowed' 
                                                     : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:brightness-110 active:scale-[0.98] shadow-emerald-500/30 animate-pulse'
                                         }`}
                                     >
@@ -701,8 +728,8 @@ export default function SubmissionDetailPage() {
 
                     {/* Logistics & Locations (Retiro, Entrega, Comentarios) */}
                     {(submission.owner_data?.veterinary || submission.owner_data?.address || submission.owner_data?.comments) && (
-                        <div className="bg-[#0b1329] border border-white/5 rounded-3xl p-6 space-y-4">
-                            <h3 className="text-sm font-black uppercase tracking-widest text-indigo-400/70 flex items-center gap-2">
+                        <div className="bg-card border border-card-border rounded-3xl p-6 space-y-4 shadow-sm">
+                            <h3 className="text-sm font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-400/70 flex items-center gap-2">
                                 <MapPin size={16} /> Logística y Direcciones
                             </h3>
                             <div className="space-y-4">
@@ -712,7 +739,7 @@ export default function SubmissionDetailPage() {
                                         <span className="w-2 h-2 rounded-full bg-amber-400"></span>
                                         Dirección / Lugar de Retiro
                                     </p>
-                                    <p className="text-sm font-semibold text-white/95 mt-1">
+                                    <p className="text-sm font-semibold text-foreground mt-1">
                                         {submission.owner_data?.veterinary
                                             ? `${submission.owner_data.veterinary}${submission.owner_data?.pickupCommune ? `, ${submission.owner_data.pickupCommune}` : ''}${submission.owner_data?.pickupRegion ? `, ${submission.owner_data.pickupRegion}` : ''}`
                                             : (submission.owner_data?.pickupCommune || submission.owner_data?.pickupRegion 
@@ -727,7 +754,7 @@ export default function SubmissionDetailPage() {
                                         <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
                                         Dirección de Entrega (Cenizas)
                                     </p>
-                                    <p className="text-sm font-semibold text-white/95 mt-1">
+                                    <p className="text-sm font-semibold text-foreground mt-1">
                                         {submission.owner_data?.address
                                             ? `${submission.owner_data.address}${submission.owner_data?.commune ? `, ${submission.owner_data.commune}` : ''}${submission.owner_data?.region ? `, ${submission.owner_data.region}` : ''}`
                                             : (submission.owner_data?.commune || submission.owner_data?.region ? `${submission.owner_data?.commune || ''}, ${submission.owner_data?.region || ''}` : 'Misma del retiro / A coordinar')}
@@ -738,7 +765,7 @@ export default function SubmissionDetailPage() {
                                 {submission.owner_data?.comments && (
                                     <div>
                                         <p className="text-[10px] text-muted-foreground uppercase font-black">Comentarios / Referencias</p>
-                                        <p className="text-sm font-semibold text-white/90 mt-1 whitespace-pre-wrap leading-relaxed">{submission.owner_data.comments}</p>
+                                        <p className="text-sm font-semibold text-foreground/90 mt-1 whitespace-pre-wrap leading-relaxed">{submission.owner_data.comments}</p>
                                     </div>
                                 )}
                             </div>
@@ -746,14 +773,14 @@ export default function SubmissionDetailPage() {
                     )}
 
                     {/* Images Card */}
-                    <div className="bg-[#0b1329] border border-white/5 rounded-3xl p-6 space-y-4">
-                        <h3 className="text-sm font-black uppercase tracking-widest text-blue-400/70 flex items-center gap-2">
+                    <div className="bg-card border border-card-border rounded-3xl p-6 space-y-4 shadow-sm">
+                        <h3 className="text-sm font-black uppercase tracking-widest text-sky-500 dark:text-blue-400/70 flex items-center gap-2">
                             📸 Fotos de Recuerdo
                         </h3>
                         {submission.images && submission.images.length > 0 ? (
                             <div className="grid grid-cols-2 gap-4">
                                 {submission.images.map((img: string, idx: number) => (
-                                    <div key={idx} className="aspect-square rounded-2xl overflow-hidden border border-white/10 ring-4 ring-white/5 relative group">
+                                    <div key={idx} className="aspect-square rounded-2xl overflow-hidden border border-card-border ring-4 ring-muted/50 relative group">
                                         <img
                                             src={img}
                                             className="w-full h-full object-cover transition-transform hover:scale-110 duration-500"
@@ -766,7 +793,7 @@ export default function SubmissionDetailPage() {
                                 ))}
                             </div>
                         ) : (
-                            <p className="text-xs text-muted-foreground italic py-4 text-center bg-white/[0.01] rounded-2xl border border-dashed border-white/10">No se adjuntaron fotos.</p>
+                            <p className="text-xs text-muted-foreground italic py-4 text-center bg-muted/30 rounded-2xl border border-dashed border-card-border">No se adjuntaron fotos.</p>
                         )}
                     </div>
                 </div>

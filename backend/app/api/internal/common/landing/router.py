@@ -81,3 +81,25 @@ def update_landing_config(
     db.commit()
     db.refresh(config)
     return config
+
+
+@router.get("/platform-info")
+def get_platform_info(db: Session = Depends(get_db)):
+    """Datos públicos de la plataforma Vinzer (Configuración global del admin) para
+    las pantallas de inicio de sesión: nombre, eslogan, logo y canales de contacto.
+    Sin RUT ni dirección."""
+    cfg = db.query(models.SaaSConfig).first()
+    if not cfg:
+        return {"name": "Vinzer", "eslogan": None, "logo": None, "whatsapp": None, "correo": None, "redes_sociales": []}
+    redes = cfg.redes_sociales if isinstance(cfg.redes_sociales, list) else []
+    return {
+        "name": cfg.name or "Vinzer",
+        "eslogan": cfg.eslogan,
+        "logo": cfg.logo,
+        "whatsapp": cfg.whatsapp,
+        "correo": cfg.correo,
+        "redes_sociales": [
+            {"name": r.get("name"), "link": r.get("link")}
+            for r in redes if isinstance(r, dict) and r.get("link")
+        ],
+    }

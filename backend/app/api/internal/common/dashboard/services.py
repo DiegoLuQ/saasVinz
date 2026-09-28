@@ -160,7 +160,14 @@ def build_dashboard_summary(
     # Mes anterior hasta el mismo punto del mes (comparación justa mes-a-la-fecha)
     prev_start = _month_start(now.year, now.month - 1)
     prev_cutoff = min(prev_start + (now - month_start), month_start)
-    _, previous_month_revenue = delivered_between(db, tenant_id, prev_start, prev_cutoff)
+    cremations_previous_month, previous_month_revenue = delivered_between(db, tenant_id, prev_start, prev_cutoff)
+
+    def _created_between(model, start, end) -> int:
+        return db.query(func.count(model.id)).filter(
+            model.tenant_id == tenant_id, model.created_at >= start, model.created_at < end
+        ).scalar() or 0
+
+    month_end = now + timedelta(seconds=1)
 
     usage = {name: LimitChecker.get_usage(db, tenant_id, name) for name in LimitChecker.RESOURCE_CONFIG}
 
@@ -216,6 +223,11 @@ def build_dashboard_summary(
             monthly_revenue=monthly_revenue,
             pending_revenue=pending_revenue(db, tenant_id),
             previous_month_revenue=previous_month_revenue,
+            new_pets_this_month=_created_between(models.Pet, month_start, month_end),
+            new_pets_previous_month=_created_between(models.Pet, prev_start, prev_cutoff),
+            new_customers_this_month=_created_between(models.Customer, month_start, month_end),
+            new_customers_previous_month=_created_between(models.Customer, prev_start, prev_cutoff),
+            cremations_previous_month=cremations_previous_month,
         ),
         limits=schemas.DashboardLimitsData(
             pets=limit("pets"),

@@ -196,6 +196,9 @@ class CremationDetails(Base):
     service_code = Column(String, nullable=True) # Código de servicio ingresado por el usuario
     tracking_token = Column(String, unique=True, index=True, default=lambda: str(uuid.uuid4()))
     additional_services = Column(JSON, default=[])
+    # Carta de despedida de la familia (máx. 500). Se copia desde la solicitud web
+    # al convertirla y se edita en el expediente (también en órdenes sin formulario).
+    dedication = Column(String(500), nullable=True)
 
     cremation = relationship("CremationOC", back_populates="details")
 

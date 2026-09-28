@@ -21,7 +21,9 @@ import {
     Clock,
     Globe,
     Store,
-    ShieldCheck
+    ShieldCheck,
+    Sun,
+    Moon
 } from 'lucide-react';
 import Modal from '@/components/tenant/Modal';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -52,7 +54,7 @@ export default function Navbar() {
     const { collapsed, setCollapsed, toggleMobile } = useSidebar();
     const bootstrapNotifications = useInitialNotifications();
     const queryClient = useQueryClient();
-    const { colorScheme, setColorScheme } = useTheme();
+    const { activeTheme, toggleTheme } = useTheme();
     const { showToast } = useToast();
     const router = useRouter();
     const [showPalette, setShowPalette] = useState(false);
@@ -271,29 +273,30 @@ export default function Navbar() {
 
     return (
         <>
-            <header className="h-16 sm:h-20 sticky top-0 z-30 flex-shrink-0 flex items-center justify-between px-3 sm:px-6 lg:px-10 bg-background/70 backdrop-blur-md border-b border-white/5 gap-2">
+            <header className="h-16 sm:h-20 sticky top-0 z-30 flex-shrink-0 flex items-center justify-between px-3 sm:px-6 lg:px-8 bg-[#F4F7FC]/80 dark:bg-[#080E1A]/80 backdrop-blur-md gap-3">
                 <div className="flex items-center gap-2 sm:gap-3 relative z-30 shrink-0">
                     {/* Hamburger — mobile/tablet only */}
                     <button
                         onClick={toggleMobile}
-                        className="lg:hidden p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-foreground transition-colors"
+                        className="lg:hidden p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 transition-colors shadow-2xs"
                         aria-label="Abrir menú de navegación"
                     >
                         <Menu size={20} aria-hidden="true" />
                     </button>
                 </div>
 
-                <div className="flex-1 max-w-xs md:max-w-sm hidden sm:block relative z-30 ml-4">
+                {/* Buscador grande y redondeado como en la imagen */}
+                <div className="flex-1 max-w-md hidden sm:block relative z-30 ml-2">
                     <button
                         type="button"
                         onClick={() => setIsSearchOpen(true)}
-                        className="w-full flex items-center justify-between px-4 py-2.5 bg-white/[0.02] hover:bg-white/[0.06] border border-white/5 hover:border-white/10 rounded-2xl text-muted-foreground transition-all cursor-pointer text-xs font-bold"
+                        className="w-full flex items-center justify-between px-5 py-2.5 bg-white dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200/90 dark:border-slate-700/80 rounded-full text-slate-400 dark:text-slate-400 transition-all cursor-pointer text-xs font-medium shadow-xs"
                     >
-                        <div className="flex items-center gap-2">
-                            <Search size={14} className="text-muted-foreground/60" />
-                            <span>Buscar...</span>
+                        <div className="flex items-center gap-2.5">
+                            <Search size={16} className="text-slate-400" />
+                            <span>Buscar mascota, cliente o código...</span>
                         </div>
-                        <div className="flex items-center gap-0.5 bg-white/5 border border-white/5 px-1.5 py-0.5 rounded-md font-mono text-[9px] text-muted-foreground/60">
+                        <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-700/70 border border-slate-200 dark:border-slate-600 px-2 py-0.5 rounded-full font-mono text-[9px] text-slate-400">
                             <span>⌘</span>
                             <span>K</span>
                         </div>
@@ -303,67 +306,36 @@ export default function Navbar() {
                 <div className="flex-1" />
 
                 {/* Actions */}
-                <div className="flex items-center gap-1 sm:gap-3 lg:gap-5 shrink-0">
+                <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                     {/* Mobile Search Button */}
                     <button
                         type="button"
                         onClick={() => setIsSearchOpen(true)}
-                        className="sm:hidden p-2.5 rounded-full hover:bg-foreground/5 text-muted-foreground relative transition-colors"
+                        className="sm:hidden p-2.5 rounded-full hover:bg-white dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 relative transition-colors"
                         aria-label="Buscar"
                     >
                         <Search size={20} />
                     </button>
-                    {/* Theme Toggle — hidden on smallest screens */}
-                    <div className="relative hidden sm:block" ref={paletteRef}>
-                        <button
-                            onClick={() => setShowPalette(!showPalette)}
-                            className="p-2.5 sm:p-3 rounded-full hover:bg-foreground/5 text-muted-foreground hover:text-primary transition-colors relative"
-                            aria-label="Cambiar paleta de tema"
-                        >
-                            <Palette size={20} aria-hidden="true" />
-                            <motion.div
-                                layoutId="active-theme"
-                                className="absolute bottom-1 right-1 w-2 h-2 rounded-full bg-primary"
-                            />
-                        </button>
 
-                        <AnimatePresence>
-                            {showPalette && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                    className="absolute right-0 mt-3 p-3 w-48 glass-card rounded-2xl shadow-2xl z-60 border border-foreground/10"
-                                >
-                                    <p className="text-xs font-semibold text-muted-foreground px-2 mb-3 uppercase tracking-wider">Paleta de Temas</p>
-                                    <div className="grid grid-cols-1 gap-1">
-                                        {themes.map((t) => (
-                                            <button
-                                                key={t.id}
-                                                onClick={() => {
-                                                    setColorScheme(t.id);
-                                                    setShowPalette(false);
-                                                }}
-                                                className={`flex items-center justify-between p-2 rounded-xl transition-all ${colorScheme === t.id ? 'bg-primary/10 text-primary' : 'hover:bg-foreground/5'}`}
-                                            >
-                                                <div className="flex items-center">
-                                                    <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: t.color }} />
-                                                    <span className="text-sm font-bold text-foreground">{t.name}</span>
-                                                </div>
-                                                {colorScheme === t.id && <Check size={14} />}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
+                    {/* Toggle Único: Light / Dark Mode */}
+                    <button
+                        onClick={toggleTheme}
+                        className="p-2.5 sm:p-3 rounded-full bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-emerald-500 transition-all shadow-2xs hover:scale-105"
+                        title={activeTheme === 'light' ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro'}
+                        aria-label="Cambiar modo claro / oscuro"
+                    >
+                        {activeTheme === 'light' ? (
+                            <Moon size={18} className="transition-transform hover:-rotate-12" />
+                        ) : (
+                            <Sun size={18} className="text-amber-400 transition-transform hover:rotate-45" />
+                        )}
+                    </button>
 
                     {/* Share Link Button */}
                     {(userData?.role === 'admin' || userData?.role === 'recepcion' || userData?.role === 'creator') && !isRegistrarBloqueado && (
                         <button
                             onClick={handleShareLink}
-                            className="inline-flex p-2.5 sm:p-3 rounded-full hover:bg-foreground/5 text-muted-foreground hover:text-primary transition-colors relative"
+                            className="inline-flex p-2.5 sm:p-3 rounded-full hover:bg-slate-100 text-slate-600 hover:text-[#19B5FE] transition-colors relative dark:hover:bg-slate-800 dark:text-slate-300"
                             title="Compartir enlace de formulario"
                             aria-label="Compartir enlace de formulario"
                         >
@@ -376,11 +348,11 @@ export default function Navbar() {
                         <div className="relative" ref={notificationsRef}>
                             <button
                                 onClick={() => setShowNotifications(!showNotifications)}
-                                className="p-2.5 sm:p-3 rounded-full hover:bg-foreground/5 text-muted-foreground relative transition-colors"
+                                className="p-2.5 sm:p-3 rounded-full hover:bg-slate-100 text-slate-600 hover:text-[#19B5FE] relative transition-colors dark:hover:bg-slate-800 dark:text-slate-300"
                             >
                                 <Bell size={20} />
                                 {notifications.length > 0 && (
-                                    <span className="absolute top-2 right-2 sm:top-2.5 sm:right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-background" />
+                                    <span className="absolute top-2 right-2 sm:top-2.5 sm:right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
                                 )}
                             </button>
 
@@ -390,28 +362,28 @@ export default function Navbar() {
                                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                         animate={{ opacity: 1, y: 0, scale: 1 }}
                                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                        className="fixed sm:absolute left-1/2 sm:left-auto -translate-x-1/2 sm:translate-x-0 sm:right-0 top-[4.5rem] sm:top-auto sm:mt-3 p-0 w-[calc(100vw-1.5rem)] sm:w-[400px] max-w-[400px] bg-[#1a1f2e] rounded-3xl shadow-2xl z-[100] border border-white/10 overflow-hidden"
+                                        className="fixed sm:absolute left-1/2 sm:left-auto -translate-x-1/2 sm:translate-x-0 sm:right-0 top-[4.5rem] sm:top-auto sm:mt-3 p-0 w-[calc(100vw-1.5rem)] sm:w-[400px] max-w-[400px] bg-white rounded-3xl shadow-2xl z-[100] border border-slate-200 overflow-hidden dark:bg-slate-900 dark:border-slate-800"
                                     >
-                                        <div className="p-5 border-b border-white/5 flex items-center justify-between bg-[#1a1f2e]">
-                                            <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Notificaciones</p>
-                                            <span className="text-xs bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full font-bold">{notifications.length}</span>
+                                        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white dark:border-slate-800 dark:bg-slate-900">
+                                            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Notificaciones</p>
+                                            <span className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full font-bold">{notifications.length}</span>
                                         </div>
-                                        <div className="max-h-[60vh] overflow-y-auto p-3 space-y-3 custom-scrollbar">
+                                        <div className="max-h-[60vh] overflow-y-auto p-3 space-y-2.5 custom-scrollbar">
                                             {notifications.length > 0 ? (
                                                 notifications.map((n) => (
                                                     <div
                                                         key={n.id}
-                                                        className="p-4 rounded-2xl bg-[#0f1219] hover:bg-[#131720] transition-all group flex flex-col gap-3 border border-white/5 relative overflow-hidden"
+                                                        className="p-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100/80 transition-all group flex flex-col gap-2.5 border border-slate-100 relative overflow-hidden dark:bg-slate-800/50 dark:border-slate-800"
                                                     >
                                                         {/* Accent decoration */}
-                                                        <div className="absolute top-0 right-0 w-1 h-full bg-emerald-500/50 rounded-r-lg opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                        <div className="absolute top-0 right-0 w-1 h-full bg-[#10B981] rounded-r-lg opacity-0 group-hover:opacity-100 transition-opacity" />
 
-                                                        <div className="flex items-start gap-4">
-                                                            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 flex-shrink-0 mt-1">
-                                                                <Bell size={18} />
+                                                        <div className="flex items-start gap-3">
+                                                            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 flex-shrink-0 mt-0.5">
+                                                                <Bell size={16} />
                                                             </div>
-                                                            <div className="flex-1 min-w-0 space-y-1.5">
-                                                                <p className="text-base font-bold truncate text-white group-hover:text-emerald-400 transition-colors">
+                                                            <div className="flex-1 min-w-0 space-y-1">
+                                                                <p className="text-sm font-bold truncate text-slate-900 group-hover:text-[#19B5FE] transition-colors dark:text-white">
                                                                     {n.title || 'Notificación del Sistema'}
                                                                 </p>
 
@@ -449,7 +421,7 @@ export default function Navbar() {
                                                                 <p className="text-xs text-slate-400 leading-relaxed line-clamp-2">
                                                                     {n.message}
                                                                 </p>
-                                                                <p className="text-[10px] text-slate-600 font-bold uppercase tracking-wider pt-1">
+                                                                <p className="text-[10px] text-slate-600 font-bold uppercase tracking-wider pt-1 dark:text-slate-300">
                                                                     {formatChileTime(n.created_at)} • {formatChileDate(n.created_at)}
                                                                 </p>
                                                             </div>
@@ -492,24 +464,24 @@ export default function Navbar() {
                     <div className="relative" ref={userMenuRef}>
                         <div
                             onClick={() => setShowUserMenu(!showUserMenu)}
-                            className="flex items-center sm:pl-3 lg:pl-5 sm:border-l border-foreground/10 cursor-pointer group"
+                            className="flex items-center sm:pl-3 lg:pl-4 sm:border-l border-slate-200 cursor-pointer group dark:border-slate-800"
                         >
-                            <div className="text-right mr-4 hidden lg:block">
-                                <p className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">
+                            <div className="text-right mr-3 hidden lg:block">
+                                <p className="text-xs font-bold text-[#020210] group-hover:text-[#0284c7] transition-colors dark:text-white">
                                     {tenantData?.name || 'Cargando...'}
                                 </p>
-                                <div className="flex items-center justify-end gap-2 mt-0.5">
+                                <div className="flex items-center justify-end gap-1.5 mt-0.5">
                                     {isOwnerRole(userData?.role) && (
-                                        <span className="text-[9px] px-1.5 py-0.5 rounded border border-primary/20 bg-primary/10 text-primary font-black uppercase tracking-wider">
+                                        <span className="text-[9px] px-1.5 py-0.5 rounded-full border border-emerald-300 bg-emerald-50 text-emerald-700 font-black uppercase tracking-wider">
                                             Plan {planNames[tenantData?.subscription_plan?.name || 'FREE'] || tenantData?.subscription_plan?.name || '...'}
                                         </span>
                                     )}
-                                    <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider opacity-60">
+                                    <span className="text-[9px] text-slate-400 uppercase font-bold tracking-wider">
                                         {userData?.role ? (roleNames[userData.role] || userData.role) : '...'}
                                     </span>
                                 </div>
                             </div>
-                            <div className="w-9 h-9 sm:w-10 sm:h-10 lg:w-11 lg:h-11 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-tr from-[#19B5FE] to-[#10B981] flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-all duration-200">
                                 <User size={18} aria-hidden="true" />
                             </div>
                         </div>
@@ -520,19 +492,19 @@ export default function Navbar() {
                                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                     animate={{ opacity: 1, y: 0, scale: 1 }}
                                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                    className="absolute right-0 mt-3 p-2 w-56 glass-card rounded-2xl shadow-2xl z-60 border border-foreground/10"
+                                    className="absolute right-0 mt-3 p-2 w-56 bg-white rounded-2xl shadow-xl z-60 border border-slate-200 dark:bg-slate-900 dark:border-slate-800"
                                 >
-                                    <div className="p-3 border-b border-foreground/5 mb-2">
-                                        <p className="text-sm font-bold truncate">{userData?.email}</p>
-                                        <p className="text-[10px] text-muted-foreground mt-0.5">Socio Premium</p>
+                                    <div className="p-3 border-b border-slate-100 mb-1 dark:border-slate-800">
+                                        <p className="text-xs font-bold truncate text-[#020210] dark:text-white">{userData?.email}</p>
+                                        <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Socio Premium</p>
                                     </div>
-                                    <div className="space-y-1">
+                                    <div className="space-y-0.5">
                                         <Link
                                             href="/dashboard/perfil"
                                             onClick={() => setShowUserMenu(false)}
-                                            className="flex items-center w-full p-3 rounded-xl hover:bg-foreground/5 text-sm font-medium transition-all"
+                                            className="flex items-center w-full p-2.5 rounded-xl hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-all dark:hover:bg-slate-800 dark:text-slate-200"
                                         >
-                                            <User size={16} className="mr-3 text-muted-foreground" />
+                                            <User size={15} className="mr-2.5 text-slate-400" />
                                             Mi Perfil
                                         </Link>
                                         {(userData?.role === 'admin' || userData?.role === 'creator') && (
@@ -541,18 +513,18 @@ export default function Navbar() {
                                                     router.push('/dashboard/configuracion');
                                                     setShowUserMenu(false);
                                                 }}
-                                                className="flex items-center w-full p-3 rounded-xl hover:bg-foreground/5 text-sm font-medium transition-all"
+                                                className="flex items-center w-full p-2.5 rounded-xl hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-all dark:hover:bg-slate-800 dark:text-slate-200"
                                             >
-                                                <Palette size={16} className="mr-3 text-muted-foreground" />
+                                                <Palette size={15} className="mr-2.5 text-slate-400" />
                                                 Configuración
                                             </button>
                                         )}
-                                        <div className="h-px bg-foreground/5 my-2" />
+                                        <div className="h-px bg-slate-100 my-1 dark:bg-slate-800" />
                                         <button
                                             onClick={handleLogout}
-                                            className="flex items-center w-full p-3 rounded-xl hover:bg-red-500/10 text-red-500 text-sm font-bold transition-all"
+                                            className="flex items-center w-full p-2.5 rounded-xl hover:bg-red-50 text-red-600 text-xs font-bold transition-all"
                                         >
-                                            <LogOut size={16} className="mr-3" />
+                                            <LogOut size={15} className="mr-2.5" />
                                             Cerrar Sesión
                                         </button>
                                     </div>

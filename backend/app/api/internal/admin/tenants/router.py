@@ -105,6 +105,24 @@ def update_my_tenant(
             )
             db.add(billing_info)
 
+    # social_media se FUSIONA: Configuración solo envía {website} y antes borraba
+    # Instagram, Facebook, etc. El enlace de reseñas de Google se valida.
+    if 'social_media' in update_data:
+        merged = dict(tenant.social_media or {}) if isinstance(tenant.social_media, dict) else {}
+        merged.update(update_data['social_media'] or {})
+        review = (merged.get('google_review') or '').strip()
+        if review:
+            from urllib.parse import urlparse
+            u = urlparse(review)
+            host = (u.hostname or '').lower()
+            allowed = host in ('g.page', 'search.google.com', 'maps.app.goo.gl', 'goo.gl') or                 (host in ('google.com', 'www.google.com', 'maps.google.com') and ('/maps' in u.path or 'review' in review))
+            if u.scheme != 'https' or not allowed:
+                raise HTTPException(status_code=400, detail="El enlace de reseñas debe ser de Google (ej: https://g.page/r/.../review)")
+            merged['google_review'] = review
+        else:
+            merged.pop('google_review', None)
+        update_data['social_media'] = merged
+
     for key, value in update_data.items():
         setattr(tenant, key, value)
     

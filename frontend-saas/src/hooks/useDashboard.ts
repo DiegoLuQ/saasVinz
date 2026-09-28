@@ -37,6 +37,12 @@ export interface DashboardSummary {
         pending_revenue: number;
         /** Mes anterior hasta el mismo día/hora (mes a la fecha) */
         previous_month_revenue: number;
+        /** Altas y entregas mes a la fecha vs. mes anterior a la misma fecha */
+        new_pets_this_month?: number;
+        new_pets_previous_month?: number;
+        new_customers_this_month?: number;
+        new_customers_previous_month?: number;
+        cremations_previous_month?: number;
     };
     limits: Record<'pets' | 'customers' | 'orders' | 'services' | 'products' | 'plans' | 'partners' | 'users', DashboardLimitItem>;
     /** Órdenes abiertas que NO están programadas para hoy */

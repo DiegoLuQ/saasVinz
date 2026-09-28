@@ -30,7 +30,8 @@ import {
     Stamp,
     Lock,
     CreditCard as CreditCardIcon,
-    HelpCircle
+    HelpCircle,
+    Sparkles
 } from 'lucide-react';
 import { getSubscriptionInfo, isModuleAllowedWhenLocked } from '@/lib/tenant/subscription';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -51,19 +52,34 @@ interface NavItem {
     icon: any;
     moduleKey?: string; // Nuevo: clave del módulo asociado
     featureKey?: string; // Feature flag granular del plan
-    children?: NavItem[];
+    children?: NavChild[];
     allowedRoles?: string[]; // Opcional: restringir visibilidad por rol
+    group: NavGroup;
 }
 
+type NavChild = Omit<NavItem, 'group' | 'children'>;
+
+type NavGroup = 'principal' | 'operacion' | 'clientes' | 'catalogo' | 'configuracion';
+
+// Orden y títulos de los grupos del menú
+const NAV_GROUPS: { key: NavGroup; label: string }[] = [
+    { key: 'principal', label: 'Principal' },
+    { key: 'operacion', label: 'Operación' },
+    { key: 'clientes', label: 'Clientes' },
+    { key: 'catalogo', label: 'Catálogo y documentos' },
+    { key: 'configuracion', label: 'Configuración' },
+];
+
 const navItems: NavItem[] = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, moduleKey: 'dashboard' },
-    { name: 'Clientes', href: '/dashboard/clientes', icon: Users, moduleKey: 'clientes' },
-    { name: 'Mascotas', href: '/dashboard/mascotas', icon: Dog, moduleKey: 'mascotas' },
-    { name: 'Catálogo de Servicios', href: '/dashboard/gestion-servicios', icon: Palette, moduleKey: 'servicios' },
-    { name: 'Recepción y Pedidos', href: '/dashboard/recepcion-pedidos', icon: Flame, moduleKey: 'ordenes' },
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, moduleKey: 'dashboard', group: 'principal' },
+    { name: 'Clientes', href: '/dashboard/clientes', icon: Users, moduleKey: 'clientes', group: 'clientes' },
+    { name: 'Mascotas', href: '/dashboard/mascotas', icon: Dog, moduleKey: 'mascotas', group: 'clientes' },
+    { name: 'Catálogo de Servicios', href: '/dashboard/gestion-servicios', icon: Palette, moduleKey: 'servicios', group: 'catalogo' },
+    { name: 'Recepción y Pedidos', href: '/dashboard/recepcion-pedidos', icon: Flame, moduleKey: 'ordenes', group: 'operacion' },
     {
         name: 'Inventario',
         href: '#',
+        group: 'catalogo',
         icon: ShoppingBag,
         moduleKey: 'inventario',
         children: [
@@ -75,6 +91,7 @@ const navItems: NavItem[] = [
     {
         name: 'Documentos',
         href: '#',
+        group: 'catalogo',
         icon: FileText,
         moduleKey: 'certificados',
         children: [
@@ -86,6 +103,7 @@ const navItems: NavItem[] = [
     {
         name: 'Operaciones',
         href: '#',
+        group: 'operacion',
         icon: Briefcase,
         moduleKey: 'operaciones',
         children: [
@@ -93,10 +111,11 @@ const navItems: NavItem[] = [
             { name: 'Iniciar Nuevo Tracking', href: '/dashboard/operaciones/crear-seguimiento', icon: Compass, moduleKey: 'operaciones', featureKey: 'operaciones:seguimiento:crear' },
         ]
     },
-    { name: 'Historial y Cobros', href: '/dashboard/ordenes-cremacion', icon: CreditCard, moduleKey: 'pagos', featureKey: 'pagos:ver_historial' },
+    { name: 'Historial y Cobros', href: '/dashboard/ordenes-cremacion', icon: CreditCard, moduleKey: 'pagos', featureKey: 'pagos:ver_historial', group: 'operacion' },
     {
         name: 'Veterinarios',
         href: '#',
+        group: 'clientes',
         icon: Store,
         moduleKey: 'veterinarios',
         children: [
@@ -104,8 +123,8 @@ const navItems: NavItem[] = [
             { name: 'Comisiones', href: '/dashboard/partners/comisiones', icon: DollarSign, featureKey: 'veterinarios:comisiones:ver' },
         ]
     },
-    { name: 'Roles y Módulos', href: '/dashboard/roles-modulos', icon: ShieldCheck, moduleKey: 'configuracion', featureKey: 'configuracion:roles' }, // Nuevo
-    { name: 'Ayuda y Tutoriales', href: '/dashboard/ayuda', icon: HelpCircle },
+    { name: 'Roles y Módulos', href: '/dashboard/roles-modulos', icon: ShieldCheck, moduleKey: 'configuracion', featureKey: 'configuracion:roles', group: 'configuracion' }, // Nuevo
+    { name: 'Ayuda y Tutoriales', href: '/dashboard/ayuda', icon: HelpCircle, group: 'configuracion' },
 ];
 
 export default function Sidebar() {
@@ -201,7 +220,7 @@ export default function Sidebar() {
             <aside
                 aria-label="Navegación principal"
                 className={cn(
-                    "fixed top-0 bottom-0 z-50 flex flex-col glass-card border-r border-white/5 overflow-hidden",
+                    "fixed top-0 bottom-0 z-50 flex flex-col overflow-hidden bg-white text-slate-700 border-r border-slate-200 shadow-sm dark:bg-[#0A192F] dark:text-white dark:border-[#15233A] dark:shadow-xl",
                     "transition-[transform,width] duration-300 ease-out will-change-transform",
                     // Mobile: slide in/out
                     mobileOpen ? "translate-x-0" : "-translate-x-full",
@@ -213,60 +232,70 @@ export default function Sidebar() {
             >
                 {/* Logo Section */}
                 <div className={cn(
-                    "h-20 flex items-center border-b border-white/5 transition-all duration-300",
+                    "h-20 flex items-center border-b border-slate-100 dark:border-white/5 transition-all duration-300",
                     collapsed ? "justify-center px-0" : "px-6"
                 )}>
-                    <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 overflow-hidden relative shadow-lg shadow-black/20">
-                        {tenant?.logo_url ? (
-                            <img
-                                src={tenant.logo_url.startsWith('http') ? tenant.logo_url : `${API_URL}${tenant.logo_url}`}
-                                alt="Logo"
-                                className="w-full h-full object-cover"
-                            />
-                        ) : (
-                            <div className="w-full h-full bg-primary flex items-center justify-center">
-                                <Flame className="text-primary-foreground" size={24} />
-                            </div>
-                        )}
-                    </div>
+                    {tenant?.logo_url ? (
+                        // Logo del crematorio tal cual: sin fondo ni recorte, así un PNG
+                        // transparente se ve limpio en ambos modos.
+                        <img
+                            src={tenant.logo_url.startsWith('http') ? tenant.logo_url : `${API_URL}${tenant.logo_url}`}
+                            alt={tenant?.short_name || 'Logo'}
+                            className="w-10 h-10 object-contain shrink-0"
+                        />
+                    ) : (
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20 bg-gradient-to-tr from-[#0EA5E9] to-[#10B981]">
+                            <Heart size={18} className="fill-white text-white" />
+                        </div>
+                    )}
                     {!collapsed && (
-                        <motion.span
+                        <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            className="ml-3 font-bold text-xl tracking-tight truncate max-w-[160px] text-foreground"
+                            className="ml-3 truncate"
                         >
-                            {tenant?.short_name || 'SaaSCrem'}
-                            {!tenant?.short_name && <span className="text-primary">.</span>}
-                        </motion.span>
+                            <span className="font-black text-xl tracking-tight text-slate-900 dark:text-white block truncate">
+                                {tenant?.short_name || 'Vinzer'}
+                            </span>
+                        </motion.div>
                     )}
                 </div>
 
                 {/* Nav Items */}
-                <nav className="flex-1 py-6 px-3 space-y-2 overflow-y-auto overflow-x-hidden">
+                <nav className="flex-1 py-5 px-3 overflow-y-auto overflow-x-hidden">
                     {loadingModules ? (
-                        <div className="flex flex-col gap-4 px-4">
+                        <div className="flex flex-col gap-3 px-3">
                             {[1, 2, 3, 4, 5].map(i => (
-                                <div key={i} className="h-10 w-full bg-white/5 animate-pulse rounded-xl" />
+                                <div key={i} className="h-10 w-full bg-slate-100 dark:bg-white/5 animate-pulse rounded-xl" />
                             ))}
                         </div>
                     ) : error ? (
                         <div className="px-4 py-6 text-center">
                             <AlertCircle className="mx-auto text-red-400 mb-2" size={24} />
-                            <p className="text-xs text-muted-foreground mb-4">{error}</p>
+                            <p className="text-xs text-slate-400 mb-4">{error}</p>
                             <button
                                 onClick={() => window.location.reload()}
-                                className="text-xs bg-primary/10 text-primary px-3 py-1.5 rounded-lg hover:bg-primary/20 transition-colors"
+                                className="text-xs bg-primary/15 text-primary px-3 py-1.5 rounded-lg hover:bg-primary/25 transition-colors font-bold"
                             >
                                 Reintentar
                             </button>
                         </div>
-                    ) : filteredNavItems.map((item) => {
+                    ) : NAV_GROUPS.map((group, gi) => {
+                        const groupItems = filteredNavItems.filter((it) => it.group === group.key);
+                        if (groupItems.length === 0) return null;
+                        return (
+                            <div key={group.key} className={cn(gi > 0 && "pt-4")}>
+                                {collapsed ? (
+                                    gi > 0 && <div className="mx-3 mb-3 border-t border-slate-200 dark:border-white/10" />
+                                ) : (
+                                    <p className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                                        {group.label}
+                                    </p>
+                                )}
+                                <div className="space-y-1">
+                    {groupItems.map((item) => {
                         const hasChildren = item.children && item.children.length > 0;
                         const isExpanded = expandedItem === item.name;
-                        // Coincidencia por prefijo: una ruta es activa si es exacta o es una
-                        // subruta (href + '/...'). Para padres con href '#' derivamos la base
-                        // de la sección desde el primer hijo (p. ej. /dashboard/documentos),
-                        // así rutas hermanas no listadas (como .../disenos) marcan el módulo.
                         const matchesPath = (href?: string) =>
                             !!href && href !== '#' && (
                                 href === '/dashboard'
@@ -284,8 +313,6 @@ export default function Sidebar() {
                         const isActive = matchesPath(sectionBase) ||
                             (hasChildren && item.children?.some(child => matchesPath(child.href)));
 
-                        // Módulo bloqueado por suscripción vencida (post-gracia):
-                        // se muestra con candado y, al hacer clic, avisa de regularizar pago.
                         const itemLocked = subscriptionLocked && !isModuleAllowedWhenLocked(item.moduleKey);
                         if (itemLocked) {
                             return (
@@ -294,22 +321,17 @@ export default function Sidebar() {
                                         onClick={() => setLockedNotice(true)}
                                         title="Bloqueado: regulariza tu pago para reactivar este módulo"
                                         className={cn(
-                                            "w-full flex items-center p-3 rounded-xl transition-all duration-200 group relative select-none cursor-not-allowed text-muted-foreground/40 hover:bg-white/[0.03]",
+                                            "w-full flex items-center p-2.5 rounded-xl transition-all duration-200 group relative select-none cursor-not-allowed text-slate-400 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-white/[0.02]",
                                             collapsed ? "justify-center" : "justify-between"
                                         )}
                                     >
                                         <div className="flex items-center min-w-0">
-                                            <item.icon size={22} className="shrink-0 opacity-50" />
+                                            <item.icon size={19} className="shrink-0 opacity-40" />
                                             {!collapsed && (
-                                                <span className="ml-3 font-medium whitespace-nowrap truncate">{item.name}</span>
+                                                <span className="ml-3 font-semibold text-xs whitespace-nowrap truncate">{item.name}</span>
                                             )}
                                         </div>
-                                        {!collapsed && <Lock size={14} className="shrink-0 opacity-70" />}
-                                        {collapsed && (
-                                            <div className="absolute left-full ml-2 px-2 py-1 bg-card border border-white/10 rounded-md text-xs opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-60 flex items-center gap-1.5 text-muted-foreground">
-                                                <Lock size={12} /> {item.name}
-                                            </div>
-                                        )}
+                                        {!collapsed && <Lock size={13} className="shrink-0 opacity-40" />}
                                     </button>
                                 </div>
                             );
@@ -321,18 +343,18 @@ export default function Sidebar() {
                                     <button
                                         onClick={() => !collapsed && toggleSubmenu(item.name)}
                                         className={cn(
-                                            "w-full flex items-center p-3 rounded-xl transition-all duration-200 group relative select-none",
-                                            (isActive || isExpanded) ? "text-foreground bg-white/5" : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                                            "w-full flex items-center p-2.5 rounded-xl transition-all duration-200 group relative select-none text-xs",
+                                            (isActive || isExpanded) ? "text-white bg-primary font-bold shadow-md shadow-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-300 dark:shadow-none" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white font-medium",
                                             collapsed ? "justify-center" : "justify-between"
                                         )}
                                     >
                                         <div className="flex items-center">
-                                            <item.icon size={22} className={cn("shrink-0", (isActive || isExpanded) ? "text-primary" : "group-hover:scale-110 transition-transform")} />
+                                            <item.icon size={19} className={cn("shrink-0 transition-colors", (isActive || isExpanded) ? "text-white dark:text-emerald-300" : "text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white")} />
                                             {!collapsed && (
                                                 <motion.span
-                                                    initial={{ opacity: 0, x: -10 }}
+                                                    initial={{ opacity: 0, x: -6 }}
                                                     animate={{ opacity: 1, x: 0 }}
-                                                    className="ml-3 font-medium whitespace-nowrap"
+                                                    className="ml-3 font-semibold whitespace-nowrap"
                                                 >
                                                     {item.name}
                                                 </motion.span>
@@ -340,8 +362,8 @@ export default function Sidebar() {
                                         </div>
                                         {!collapsed && (
                                             <ChevronDown
-                                                size={16}
-                                                className={cn("transition-transform duration-200", isExpanded ? "rotate-180" : "")}
+                                                size={14}
+                                                className={cn("transition-transform duration-200", (isActive || isExpanded) ? "text-white dark:text-emerald-300" : "text-slate-400", isExpanded ? "rotate-180" : "")}
                                             />
                                         )}
                                     </button>
@@ -349,27 +371,22 @@ export default function Sidebar() {
                                     <Link
                                         href={item.href}
                                         className={cn(
-                                            "flex items-center p-3 rounded-xl transition-all duration-200 group relative",
+                                            "flex items-center p-2.5 rounded-xl transition-all duration-200 group relative text-xs",
                                             isActive
-                                                ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                                                : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                                                ? "bg-primary text-white font-bold shadow-md shadow-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-300 dark:shadow-none"
+                                                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white font-medium",
                                             collapsed ? "justify-center" : ""
                                         )}
                                     >
-                                        <item.icon size={22} className={cn("shrink-0", isActive ? "" : "group-hover:scale-110 transition-transform")} />
+                                        <item.icon size={19} className={cn("shrink-0 transition-colors", isActive ? "text-white dark:text-emerald-300" : "text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white")} />
                                         {!collapsed && (
                                             <motion.span
-                                                initial={{ opacity: 0, x: -10 }}
+                                                initial={{ opacity: 0, x: -6 }}
                                                 animate={{ opacity: 1, x: 0 }}
-                                                className="ml-3 font-medium whitespace-nowrap"
+                                                className="ml-3 font-semibold whitespace-nowrap"
                                             >
                                                 {item.name}
                                             </motion.span>
-                                        )}
-                                        {collapsed && (
-                                            <div className="absolute left-full ml-2 px-2 py-1 bg-card border border-white/10 rounded-md text-xs opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-nowrap z-60">
-                                                {item.name}
-                                            </div>
                                         )}
                                     </Link>
                                 )}
@@ -383,11 +400,8 @@ export default function Sidebar() {
                                             exit={{ height: 0, opacity: 0 }}
                                             className="overflow-hidden"
                                         >
-                                            <div className="pl-10 pr-2 py-1 space-y-1">
+                                            <div className="pl-6 pr-2 py-1 space-y-1 border-l-2 border-slate-200 dark:border-white/10 ml-5 my-1">
                                                 {item.children?.map((child) => {
-                                                    // El hijo-índice (ruta = base de sección) es prefijo de sus
-                                                    // hermanos; para él usamos match exacto y evitamos que se marque
-                                                    // activo en las subrutas hermanas.
                                                     const isChildActive = child.href === sectionBase
                                                         ? pathname === child.href
                                                         : matchesPath(child.href);
@@ -396,13 +410,13 @@ export default function Sidebar() {
                                                             key={child.href}
                                                             href={child.href}
                                                             className={cn(
-                                                                "flex items-center py-2 px-3 rounded-lg text-sm transition-colors",
+                                                                "flex items-center py-1.5 px-2.5 rounded-lg text-xs transition-colors",
                                                                 isChildActive
-                                                                    ? "text-primary font-medium bg-primary/10"
-                                                                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
-                                                            )}
+                                                                    ? "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-white/5 font-bold"
+                                                                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-white/5 font-medium"
+                                                                )}
                                                         >
-                                                            <child.icon size={16} className="mr-2 opacity-70" />
+                                                            <child.icon size={14} className={cn("mr-2 shrink-0", isChildActive ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400")} />
                                                             {child.name}
                                                         </Link>
                                                     );
@@ -414,19 +428,25 @@ export default function Sidebar() {
                             </div>
                         );
                     })}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </nav>
 
-                {/* Footer / Toggle */}
-                <div className="p-4 border-t border-white/5">
-                    <button
-                        onClick={toggleSidebar}
-                        className={cn(
-                            "w-full flex items-center p-2 rounded-lg hover:bg-white/5 text-muted-foreground hidden lg:flex transition-all",
-                            collapsed ? "justify-center" : "justify-center"
+                {/* Footer Perfil de Usuario como en la imagen */}
+                <div className="p-3 border-t border-slate-100 bg-slate-50 dark:border-white/5 dark:bg-[#081527]">
+                    <div className={cn("flex items-center gap-2.5", collapsed ? "justify-center" : "px-2 py-1")}>
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#19B5FE] to-[#10B981] flex items-center justify-center text-white text-xs font-black shrink-0 shadow-xs">
+                            {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
+                        </div>
+                        {!collapsed && (
+                            <div className="min-w-0 flex-1 truncate">
+                                <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{user?.name || 'Administrador'}</p>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate capitalize">{user?.role || 'Admin'}</p>
+                            </div>
                         )}
-                    >
-                        {collapsed ? <ChevronRight size={20} /> : <div className="flex items-center"><ChevronLeft size={20} /> <span className="ml-2 text-sm italic">Contraer</span></div>}
-                    </button>
+                    </div>
                 </div>
             </aside>
 

@@ -16,6 +16,7 @@ import { copyToClipboard } from '@/lib/clipboard';
 import { buildTrackingUrl } from '@/lib/publicUrls';
 import { regions } from '@/lib/tenant/chile-data';
 import { useOrderForm } from '@/hooks/tenant/useOrderForm';
+import { resolveTimeZone, nowZonedInputValue } from '@/lib/zonedTime';
 
 // Item unificado seleccionable (servicio o plan) en "Servicio de Seguimiento"
 type CatalogItem = {
@@ -164,8 +165,8 @@ export default function CrearSeguimientoPage() {
     const handleNewAnother = () => {
         setCurrentCremation({
             pet_id: 0,
-            status: 'received',
-            scheduled_at: new Date().toISOString().slice(0, 16),
+            status: 'pendiente',
+            scheduled_at: nowZonedInputValue(resolveTimeZone()),
             notes: '',
             discount: 0,
             weight_price: 0,

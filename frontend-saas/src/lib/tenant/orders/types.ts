@@ -81,6 +81,7 @@ export interface Pet {
     customer_id: number;
     birth_date?: string;
     death_date?: string;
+    image_url?: string | null;
     images?: string[];
 }
 
@@ -150,10 +151,25 @@ export const statusLabels: Record<string, string> = {
     'coordinado': 'Coordinado',
 };
 
+/** Estados que se pueden elegir en el formulario de la orden (el resto es legado). */
+export const EDITABLE_STATUSES = ['pendiente', 'en_proceso', 'entregado', 'cancelado'] as const;
+
+/** Pliega estados legados/en inglés al estado editable equivalente (solo para mostrar). */
+export function normalizeOrderStatus(raw?: string | null): string {
+    const v = (raw || '').trim().toLowerCase();
+    if (['entregado', 'completado', 'completed', 'delivered'].includes(v)) return 'entregado';
+    if (['cancelado', 'canceled', 'cancelled'].includes(v)) return 'cancelado';
+    if (['en_proceso', 'processing', 'in_progress', 'ready'].includes(v)) return 'en_proceso';
+    return 'pendiente'; // pendiente, received, coordinado, vacío
+}
+
+export const statusOptions = EDITABLE_STATUSES.map((key) => ({ value: key, label: statusLabels[key] }));
+
 export const statusColors: Record<string, string> = {
     'pendiente': 'bg-yellow-500/10 text-yellow-500',
     'en_proceso': 'bg-blue-500/10 text-blue-500',
-    'entregado': 'bg-[#FFD700]/10 text-[#FFD700]',
+    // Dorado en oscuro; en claro el #FFD700 quedaba ilegible (1.3:1)
+    'entregado': 'bg-amber-100 text-amber-800 dark:bg-[#FFD700]/10 dark:text-[#FFD700]',
     'completado': 'bg-green-500/10 text-green-500',
     'cancelado': 'bg-red-500/10 text-red-500',
     'coordinado': 'bg-indigo-500/10 text-indigo-500',

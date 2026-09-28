@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { apiRequest, API_BASE_URL } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
+    Star,
     CheckCircle2,
     PawPrint,
     Camera,
@@ -298,6 +299,8 @@ export default function TrackingPage() {
 
     const isDelivered = data?.service_status === 'delivered' || data?.service_status === 'entregado';
     const isUltraDelivered = Boolean(data?.is_ultra_plan && isDelivered);
+    // Enlace de reseñas de Google del crematorio (solo https de Google; lo valida el backend al guardarlo)
+    const reviewUrl: string | undefined = (data?.tenant_social_media as { google_review?: string } | undefined)?.google_review || undefined;
 
     return (
         <div className={`min-h-screen font-sans transition-colors duration-500 selection:bg-emerald-500/30 relative overflow-hidden ${theme.bg} ${theme.text}`}>
@@ -1249,6 +1252,30 @@ export default function TrackingPage() {
 
                 {/* Footer */}
                 <div className="mt-20 text-center space-y-5">
+                    {/* Invitación a reseña en Google: solo con el servicio concluido y el enlace
+                        configurado por el crematorio. Tono suave: es un momento de duelo. */}
+                    {isDelivered && reviewUrl && (
+                        <div className={`mx-auto max-w-md rounded-3xl border px-6 py-5 text-center transition-colors duration-500 ${isDarkMode ? 'bg-white/[0.03] border-white/10' : 'bg-white/80 border-gray-200 shadow-sm'}`}>
+                            <div className="flex justify-center gap-0.5 mb-2" aria-hidden="true">
+                                {[0, 1, 2, 3, 4].map((i) => <Star key={i} size={14} className="text-amber-400 fill-amber-400" />)}
+                            </div>
+                            <p className={`text-sm font-semibold ${isDarkMode ? 'text-neutral-100' : 'text-gray-800'}`}>
+                                ¿Nos ayudas con tu opinión?
+                            </p>
+                            <p className={`mt-1 text-xs leading-relaxed ${isDarkMode ? 'text-neutral-400' : 'text-gray-500'}`}>
+                                Si nuestro acompañamiento te fue de ayuda, tu opinión puede orientar a otras familias en un momento difícil.
+                            </p>
+                            <a
+                                href={reviewUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`mt-4 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-xs font-bold transition-colors ${isDarkMode ? 'bg-white text-neutral-900 hover:bg-neutral-200' : 'bg-gray-900 text-white hover:bg-gray-700'}`}
+                            >
+                                <Star size={13} /> Dejar reseña en Google
+                            </a>
+                        </div>
+                    )}
+
                     <div className={`inline-flex items-center gap-2 px-5 py-2 rounded-full border shadow-sm transition-colors duration-500 ${theme.footerTag}`}>
                         <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                         <span className="text-[11px] font-black uppercase tracking-widest">

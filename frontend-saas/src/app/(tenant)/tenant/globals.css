@@ -1,9 +1,14 @@
 @import "tailwindcss";
 
+/* `dark:` sigue al selector de tema de la app (data-mode en <html>), no a la
+   preferencia del sistema operativo. Sin esto, con Windows en oscuro las clases
+   dark: se activaban aunque el usuario eligiera el modo claro. */
+@custom-variant dark (&:where([data-mode="dark"], [data-mode="dark"] *));
+
 @theme {
   --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
 
-  /* Colores base por defecto (Esmeralda) */
+  /* Colores base Vinzer */
   --color-primary: var(--primary-color);
   --color-primary-foreground: var(--primary-foreground);
   --color-background: var(--background-color);
@@ -17,96 +22,35 @@
 }
 
 @layer base {
-  :root {
-    /* Tema Esmeralda (Default) */
-    --primary-color: #10b981;
-    --primary-foreground: #ffffff;
-    --background-color: #0f172a;
-    --foreground-color: #f8fafc;
-    --muted-color: #1e293b;
-    --muted-foreground: #94a3b8;
-    --accent-color: #059669;
-    --accent-foreground: #ffffff;
-    --card-color: #1e293b;
-    --card-border-color: #334155;
+  :root, [data-mode='light'] {
+    /* Modo Claro Vinzer: Sereno, Humano, Pulcro.
+       Primario esmeralda 700: el 500 (#10B981) daba 2.4:1 con texto blanco
+       en botones; el 700 da 5.5:1 (AA). */
+    --primary-color: #047857;
+    --primary-foreground: #FFFFFF;
+    --background-color: #F4F7FC;
+    --foreground-color: #0A192F;
+    --muted-color: #FFFFFF;
+    /* Gris secundario: #64748B quedaba en 4.3:1 sobre los fondos grises claros */
+    --muted-foreground: #52607A;
+    --accent-color: #0EA5E9;
+    --accent-foreground: #FFFFFF;
+    --card-color: #FFFFFF;
+    --card-border-color: #E2E8F0;
   }
 
-  [data-theme='oceano'] {
-    --primary-color: #0ea5e9;
-    --primary-foreground: #ffffff;
-    --background-color: #082f49;
-    --foreground-color: #f0f9ff;
-    --muted-color: #0c4a6e;
-    --muted-foreground: #7dd3fc;
-    --accent-color: #0284c7;
-    --accent-foreground: #ffffff;
-    --card-color: #0c4a6e;
-    --card-border-color: #075985;
-  }
-
-  [data-theme='atardecer'] {
-    --primary-color: #fb923c;
-    --primary-foreground: #ffffff;
-    --background-color: #2e1065;
-    --foreground-color: #faf5ff;
-    --muted-color: #4c1d95;
-    --muted-foreground: #c084fc;
-    --accent-color: #f97316;
-    --accent-foreground: #ffffff;
-    --card-color: #4c1d95;
-    --card-border-color: #5b21b6;
-  }
-
-  [data-theme='oro'] {
-    --primary-color: #eab308;
-    --primary-foreground: #0c0a09;
-    --background-color: #0c0a09;
-    --foreground-color: #f5f5f4;
-    --muted-color: #1c1917;
-    --muted-foreground: #a8a29e;
-    --accent-color: #ca8a04;
-    --accent-foreground: #0c0a09;
-    --card-color: #141210;
-    --card-border-color: #2e2a24;
-  }
-
-  [data-theme='monocromo'] {
-    --primary-color: #ffffff;
-    --primary-foreground: #000000;
-    --background-color: #000000;
-    --foreground-color: #ffffff;
-    --muted-color: #1a1a1a;
-    --muted-foreground: #a3a3a3;
-    --accent-color: #404040;
-    --accent-foreground: #ffffff;
-    --card-color: #121212;
-    --card-border-color: #262626;
-  }
-
-  [data-theme='turquesa'] {
-    --primary-color: #14b8a6;
-    --primary-foreground: #ffffff;
-    --background-color: #06101e;
-    --foreground-color: #f0f9ff;
-    --muted-color: #0d1e36;
-    --muted-foreground: #8fa4c3;
-    --accent-color: #0d9488;
-    --accent-foreground: #ffffff;
-    --card-color: #0b1a2f;
-    --card-border-color: #182c47;
-  }
-
-  [data-theme='light'] {
-    --primary-color: #059669;
-    --primary-foreground: #ffffff;
-    --background-color: #f8fafc;
-    --foreground-color: #0f172a;
-    --muted-color: #f1f5f9;
-    --muted-foreground: #475569;
-    --accent-color: #047857;
-    --accent-foreground: #ffffff;
-    --card-color: #ffffff;
-    --card-border-color: #cbd5e1;
+  [data-mode='dark'] {
+    /* Modo Oscuro Vinzer: Noche profunda y elegante */
+    --primary-color: #10B981;
+    --primary-foreground: #FFFFFF;
+    --background-color: #080E1A;
+    --foreground-color: #F8FAFC;
+    --muted-color: #0F172A;
+    --muted-foreground: #94A3B8;
+    --accent-color: #0EA5E9;
+    --accent-foreground: #FFFFFF;
+    --card-color: #0F172A;
+    --card-border-color: #1E293B;
   }
 
   * {
@@ -117,22 +61,25 @@
     background-color: var(--background-color);
     color: var(--foreground-color);
     font-family: var(--font-sans);
-    transition: background-color 0.3s ease, color 0.3s ease;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 }
 
 @layer utilities {
   .glass {
-    background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--card-border-color);
+  }
+  [data-mode='dark'] .glass {
+    background: rgba(8, 14, 26, 0.85);
   }
 
   .glass-card {
     background: var(--card-color);
     border: 1px solid var(--card-border-color);
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04);
   }
 
   /* Global Scrollbar */
@@ -146,12 +93,20 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: var(--primary-color);
+    background: #CBD5E1;
     border-radius: 3px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    opacity: 0.8;
+    background: #94A3B8;
+  }
+
+  [data-mode='dark'] ::-webkit-scrollbar-thumb {
+    background: #334155;
+  }
+
+  [data-mode='dark'] ::-webkit-scrollbar-thumb:hover {
+    background: #475569;
   }
 
   .no-scrollbar {
@@ -162,8 +117,6 @@
     display: none;
   }
 
-  /* Filas deslizables (pestañas): difumina el borde derecho en móvil para
-     indicar que hay más contenido. Desde md suelen caber y no se aplica. */
   @media (max-width: 767px) {
     .scroll-fade-x {
       -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
@@ -173,94 +126,1468 @@
   }
 }
 
-/* ==========================================================================
-   Paleta "Light": correcciones de contraste avanzadas.
-   Ajusta automáticamente el contraste para títulos, párrafos, tarjetas,
-   bordes e inputs en modo claro.
-   ========================================================================== */
+/* ========================================================
+   GLOBAL LIGHT MODE HARMONIZATION
+   Guarantees pristine contrast, clean white cards,
+   and dark typography across all modules in light mode.
+   ======================================================== */
+[data-mode='light'] {
+  /* Legacy dark card containers become clean white cards */
+  .bg-\[\#0b1329\],
+  .bg-\[\#0b1220\],
+  .bg-\[\#0f172a\],
+  .bg-\[\#0f1117\],
+  .bg-\[\#080e1a\],
+  .bg-\[\#080E1A\],
+  .bg-\[\#020210\],
+  .bg-\[\#020617\],
+  .glass-card {
+    background-color: #FFFFFF !important;
+    border-color: #E2E8F0 !important;
+    color: #0A192F !important;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+  }
 
-[data-theme='light'] {
-  color-scheme: light;
-  --muted-foreground: #475569; /* slate-600 */
+  /* Headings inside main content inherit dark navy text */
+  main h1,
+  main h2,
+  main h3,
+  main h4,
+  main h5,
+  main h6 {
+    color: #0A192F !important;
+  }
+
+  /* Direct text-white elements inside main content (excluding primary/accent buttons and badges) */
+  main :not(
+    button, 
+    button *, 
+    a.bg-primary, 
+    a.bg-primary *, 
+    [class*="bg-primary"], 
+    [class*="bg-primary"] *, 
+    [class*="bg-emerald-"], 
+    [class*="bg-emerald-"] *, 
+    [class*="bg-red-500"], 
+    [class*="bg-red-500"] *,
+    [class*="bg-cyan-600"],
+    [class*="bg-cyan-600"] *,
+    [class*="badge"],
+    [class*="badge"] *
+  ).text-white,
+  main :not(
+    button, 
+    button *, 
+    a.bg-primary, 
+    a.bg-primary *, 
+    [class*="bg-primary"], 
+    [class*="bg-primary"] *, 
+    [class*="bg-emerald-"], 
+    [class*="bg-emerald-"] *, 
+    [class*="bg-red-500"], 
+    [class*="bg-red-500"] *,
+    [class*="bg-cyan-600"],
+    [class*="bg-cyan-600"] *,
+    [class*="badge"],
+    [class*="badge"] *
+  ).text-white\/90,
+  main :not(
+    button, 
+    button *, 
+    a.bg-primary, 
+    a.bg-primary *, 
+    [class*="bg-primary"], 
+    [class*="bg-primary"] *, 
+    [class*="bg-emerald-"], 
+    [class*="bg-emerald-"] *, 
+    [class*="bg-red-500"], 
+    [class*="bg-red-500"] *,
+    [class*="bg-cyan-600"],
+    [class*="bg-cyan-600"] *,
+    [class*="badge"],
+    [class*="badge"] *
+  ).text-white\/95,
+  main :not(
+    button, 
+    button *, 
+    a.bg-primary, 
+    a.bg-primary *, 
+    [class*="bg-primary"], 
+    [class*="bg-primary"] *, 
+    [class*="bg-emerald-"], 
+    [class*="bg-emerald-"] *, 
+    [class*="bg-red-500"], 
+    [class*="bg-red-500"] *,
+    [class*="bg-cyan-600"],
+    [class*="bg-cyan-600"] *,
+    [class*="badge"],
+    [class*="badge"] *
+  ).text-white\/80 {
+    color: #0A192F !important;
+  }
+
+  /* Form inputs in light mode */
+  input.bg-white\/5,
+  input.bg-white\/10,
+  select.bg-white\/5,
+  select.bg-white\/10,
+  textarea.bg-white\/5,
+  textarea.bg-white\/10 {
+    background-color: #FFFFFF !important;
+    border-color: #CBD5E1 !important;
+    color: #0A192F !important;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #94A3B8 !important;
+  }
+
+  /* Borders and dividers */
+  main .border-white\/5,
+  main .border-white\/10,
+  main .border-white\/20,
+  main .border-white\/\[0\.06\],
+  main .border-white\/\[0\.1\] {
+    border-color: #E2E8F0 !important;
+  }
+
+  main .divide-white\/5 > :not([hidden]) ~ :not([hidden]),
+  main .divide-white\/10 > :not([hidden]) ~ :not([hidden]) {
+    border-color: #E2E8F0 !important;
+  }
+
+  /* Table headers and rows */
+  main thead tr.bg-white\/5,
+  main tr.bg-white\/5 {
+    background-color: #F8FAFC !important;
+  }
+
+  main tr.hover\:bg-white\/\[0\.02\]:hover,
+  main tr.hover\:bg-white\/5:hover {
+    background-color: #F1F5F9 !important;
+  }
+
+  /* Subtle transparent backgrounds */
+  main .bg-white\/5:not(input):not(select):not(textarea):not(button):not(tr):not(thead *) {
+    background-color: #F1F5F9 !important;
+  }
+
+  main .bg-white\/\[0\.01\],
+  main .bg-white\/\[0\.02\] {
+    background-color: #FAFAFA !important;
+  }
+
+  /* Secondary icon/back buttons */
+  main button.bg-white\/5 {
+    background-color: #FFFFFF !important;
+    border-color: #CBD5E1 !important;
+    color: #0A192F !important;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  }
+  main button.bg-white\/5:hover {
+    background-color: #F1F5F9 !important;
+    color: #0A192F !important;
+  }
 }
 
-/* Headings & Títulos */
-[data-theme='light'] h1,
-[data-theme='light'] h2,
-[data-theme='light'] h3,
-[data-theme='light'] h4,
-[data-theme='light'] h5,
-[data-theme='light'] h6 {
-  color: #0f172a !important; /* slate-900 */
+/* ===== CAPA DE CONTRASTE MODO CLARO (generada) ===== */
+/* El panel se diseñó primero en oscuro: sus tonos 300/400, el verde primario
+   como texto y los grises con opacidad no alcanzan contraste legible sobre
+   fondos claros (medido: 1.4–2.5:1). En modo claro se sustituyen por el tono 700
+   de su misma paleta (>= 4.5:1). El modo oscuro no cambia. */
+
+[data-mode="light"] .text-emerald-300,
+[data-mode="light"] .text-emerald-300\/5,
+[data-mode="light"] .text-emerald-300\/10,
+[data-mode="light"] .text-emerald-300\/15,
+[data-mode="light"] .text-emerald-300\/20,
+[data-mode="light"] .text-emerald-300\/25,
+[data-mode="light"] .text-emerald-300\/30,
+[data-mode="light"] .text-emerald-300\/35,
+[data-mode="light"] .text-emerald-300\/40,
+[data-mode="light"] .text-emerald-300\/45,
+[data-mode="light"] .text-emerald-300\/50,
+[data-mode="light"] .text-emerald-300\/55,
+[data-mode="light"] .text-emerald-300\/60,
+[data-mode="light"] .text-emerald-300\/65,
+[data-mode="light"] .text-emerald-300\/70,
+[data-mode="light"] .text-emerald-300\/75,
+[data-mode="light"] .text-emerald-300\/80,
+[data-mode="light"] .text-emerald-300\/85,
+[data-mode="light"] .text-emerald-300\/90,
+[data-mode="light"] .text-emerald-300\/95,
+[data-mode="light"] .text-emerald-400,
+[data-mode="light"] .text-emerald-400\/5,
+[data-mode="light"] .text-emerald-400\/10,
+[data-mode="light"] .text-emerald-400\/15,
+[data-mode="light"] .text-emerald-400\/20,
+[data-mode="light"] .text-emerald-400\/25,
+[data-mode="light"] .text-emerald-400\/30,
+[data-mode="light"] .text-emerald-400\/35,
+[data-mode="light"] .text-emerald-400\/40,
+[data-mode="light"] .text-emerald-400\/45,
+[data-mode="light"] .text-emerald-400\/50,
+[data-mode="light"] .text-emerald-400\/55,
+[data-mode="light"] .text-emerald-400\/60,
+[data-mode="light"] .text-emerald-400\/65,
+[data-mode="light"] .text-emerald-400\/70,
+[data-mode="light"] .text-emerald-400\/75,
+[data-mode="light"] .text-emerald-400\/80,
+[data-mode="light"] .text-emerald-400\/85,
+[data-mode="light"] .text-emerald-400\/90,
+[data-mode="light"] .text-emerald-400\/95,
+[data-mode="light"] .text-emerald-500,
+[data-mode="light"] .text-emerald-500\/30,
+[data-mode="light"] .text-emerald-500\/40,
+[data-mode="light"] .text-emerald-500\/50,
+[data-mode="light"] .text-emerald-500\/60,
+[data-mode="light"] .text-emerald-500\/70,
+[data-mode="light"] .text-emerald-500\/80,
+[data-mode="light"] .text-emerald-500\/85,
+[data-mode="light"] .text-emerald-500\/90,
+[data-mode="light"] .text-emerald-600,
+[data-mode="light"] .text-emerald-600\/30,
+[data-mode="light"] .text-emerald-600\/40,
+[data-mode="light"] .text-emerald-600\/50,
+[data-mode="light"] .text-emerald-600\/60,
+[data-mode="light"] .text-emerald-600\/70,
+[data-mode="light"] .text-emerald-600\/80,
+[data-mode="light"] .text-emerald-600\/85,
+[data-mode="light"] .text-emerald-600\/90 {
+  color: #047857;
 }
 
-/* Párrafos, Etiquetas y Contenidos */
-[data-theme='light'] p,
-[data-theme='light'] label,
-[data-theme='light'] dt {
-  color: #334155; /* slate-700 */
+[data-mode="light"] .text-green-300,
+[data-mode="light"] .text-green-300\/5,
+[data-mode="light"] .text-green-300\/10,
+[data-mode="light"] .text-green-300\/15,
+[data-mode="light"] .text-green-300\/20,
+[data-mode="light"] .text-green-300\/25,
+[data-mode="light"] .text-green-300\/30,
+[data-mode="light"] .text-green-300\/35,
+[data-mode="light"] .text-green-300\/40,
+[data-mode="light"] .text-green-300\/45,
+[data-mode="light"] .text-green-300\/50,
+[data-mode="light"] .text-green-300\/55,
+[data-mode="light"] .text-green-300\/60,
+[data-mode="light"] .text-green-300\/65,
+[data-mode="light"] .text-green-300\/70,
+[data-mode="light"] .text-green-300\/75,
+[data-mode="light"] .text-green-300\/80,
+[data-mode="light"] .text-green-300\/85,
+[data-mode="light"] .text-green-300\/90,
+[data-mode="light"] .text-green-300\/95,
+[data-mode="light"] .text-green-400,
+[data-mode="light"] .text-green-400\/5,
+[data-mode="light"] .text-green-400\/10,
+[data-mode="light"] .text-green-400\/15,
+[data-mode="light"] .text-green-400\/20,
+[data-mode="light"] .text-green-400\/25,
+[data-mode="light"] .text-green-400\/30,
+[data-mode="light"] .text-green-400\/35,
+[data-mode="light"] .text-green-400\/40,
+[data-mode="light"] .text-green-400\/45,
+[data-mode="light"] .text-green-400\/50,
+[data-mode="light"] .text-green-400\/55,
+[data-mode="light"] .text-green-400\/60,
+[data-mode="light"] .text-green-400\/65,
+[data-mode="light"] .text-green-400\/70,
+[data-mode="light"] .text-green-400\/75,
+[data-mode="light"] .text-green-400\/80,
+[data-mode="light"] .text-green-400\/85,
+[data-mode="light"] .text-green-400\/90,
+[data-mode="light"] .text-green-400\/95,
+[data-mode="light"] .text-green-500,
+[data-mode="light"] .text-green-500\/30,
+[data-mode="light"] .text-green-500\/40,
+[data-mode="light"] .text-green-500\/50,
+[data-mode="light"] .text-green-500\/60,
+[data-mode="light"] .text-green-500\/70,
+[data-mode="light"] .text-green-500\/80,
+[data-mode="light"] .text-green-500\/85,
+[data-mode="light"] .text-green-500\/90,
+[data-mode="light"] .text-green-600,
+[data-mode="light"] .text-green-600\/30,
+[data-mode="light"] .text-green-600\/40,
+[data-mode="light"] .text-green-600\/50,
+[data-mode="light"] .text-green-600\/60,
+[data-mode="light"] .text-green-600\/70,
+[data-mode="light"] .text-green-600\/80,
+[data-mode="light"] .text-green-600\/85,
+[data-mode="light"] .text-green-600\/90 {
+  color: #15803d;
 }
 
-/* Texto blanco hardcodeado -> slate-900 oscuro en Light mode */
-[data-theme='light'] [class*="text-white"] {
-  color: #0f172a !important; /* slate-900 */
+[data-mode="light"] .text-lime-300,
+[data-mode="light"] .text-lime-300\/5,
+[data-mode="light"] .text-lime-300\/10,
+[data-mode="light"] .text-lime-300\/15,
+[data-mode="light"] .text-lime-300\/20,
+[data-mode="light"] .text-lime-300\/25,
+[data-mode="light"] .text-lime-300\/30,
+[data-mode="light"] .text-lime-300\/35,
+[data-mode="light"] .text-lime-300\/40,
+[data-mode="light"] .text-lime-300\/45,
+[data-mode="light"] .text-lime-300\/50,
+[data-mode="light"] .text-lime-300\/55,
+[data-mode="light"] .text-lime-300\/60,
+[data-mode="light"] .text-lime-300\/65,
+[data-mode="light"] .text-lime-300\/70,
+[data-mode="light"] .text-lime-300\/75,
+[data-mode="light"] .text-lime-300\/80,
+[data-mode="light"] .text-lime-300\/85,
+[data-mode="light"] .text-lime-300\/90,
+[data-mode="light"] .text-lime-300\/95,
+[data-mode="light"] .text-lime-400,
+[data-mode="light"] .text-lime-400\/5,
+[data-mode="light"] .text-lime-400\/10,
+[data-mode="light"] .text-lime-400\/15,
+[data-mode="light"] .text-lime-400\/20,
+[data-mode="light"] .text-lime-400\/25,
+[data-mode="light"] .text-lime-400\/30,
+[data-mode="light"] .text-lime-400\/35,
+[data-mode="light"] .text-lime-400\/40,
+[data-mode="light"] .text-lime-400\/45,
+[data-mode="light"] .text-lime-400\/50,
+[data-mode="light"] .text-lime-400\/55,
+[data-mode="light"] .text-lime-400\/60,
+[data-mode="light"] .text-lime-400\/65,
+[data-mode="light"] .text-lime-400\/70,
+[data-mode="light"] .text-lime-400\/75,
+[data-mode="light"] .text-lime-400\/80,
+[data-mode="light"] .text-lime-400\/85,
+[data-mode="light"] .text-lime-400\/90,
+[data-mode="light"] .text-lime-400\/95,
+[data-mode="light"] .text-lime-500,
+[data-mode="light"] .text-lime-500\/30,
+[data-mode="light"] .text-lime-500\/40,
+[data-mode="light"] .text-lime-500\/50,
+[data-mode="light"] .text-lime-500\/60,
+[data-mode="light"] .text-lime-500\/70,
+[data-mode="light"] .text-lime-500\/80,
+[data-mode="light"] .text-lime-500\/85,
+[data-mode="light"] .text-lime-500\/90,
+[data-mode="light"] .text-lime-600,
+[data-mode="light"] .text-lime-600\/30,
+[data-mode="light"] .text-lime-600\/40,
+[data-mode="light"] .text-lime-600\/50,
+[data-mode="light"] .text-lime-600\/60,
+[data-mode="light"] .text-lime-600\/70,
+[data-mode="light"] .text-lime-600\/80,
+[data-mode="light"] .text-lime-600\/85,
+[data-mode="light"] .text-lime-600\/90 {
+  color: #4d7c0f;
 }
 
-/* Grises claros hardcodeados (100-500) -> gris oscuro legible */
-[data-theme='light'] [class*="text-slate-1"],
-[data-theme='light'] [class*="text-slate-2"],
-[data-theme='light'] [class*="text-slate-3"],
-[data-theme='light'] [class*="text-slate-4"],
-[data-theme='light'] [class*="text-gray-1"],
-[data-theme='light'] [class*="text-gray-2"],
-[data-theme='light'] [class*="text-gray-3"],
-[data-theme='light'] [class*="text-gray-4"] {
-  color: #475569 !important; /* slate-600 */
+[data-mode="light"] .text-teal-300,
+[data-mode="light"] .text-teal-300\/5,
+[data-mode="light"] .text-teal-300\/10,
+[data-mode="light"] .text-teal-300\/15,
+[data-mode="light"] .text-teal-300\/20,
+[data-mode="light"] .text-teal-300\/25,
+[data-mode="light"] .text-teal-300\/30,
+[data-mode="light"] .text-teal-300\/35,
+[data-mode="light"] .text-teal-300\/40,
+[data-mode="light"] .text-teal-300\/45,
+[data-mode="light"] .text-teal-300\/50,
+[data-mode="light"] .text-teal-300\/55,
+[data-mode="light"] .text-teal-300\/60,
+[data-mode="light"] .text-teal-300\/65,
+[data-mode="light"] .text-teal-300\/70,
+[data-mode="light"] .text-teal-300\/75,
+[data-mode="light"] .text-teal-300\/80,
+[data-mode="light"] .text-teal-300\/85,
+[data-mode="light"] .text-teal-300\/90,
+[data-mode="light"] .text-teal-300\/95,
+[data-mode="light"] .text-teal-400,
+[data-mode="light"] .text-teal-400\/5,
+[data-mode="light"] .text-teal-400\/10,
+[data-mode="light"] .text-teal-400\/15,
+[data-mode="light"] .text-teal-400\/20,
+[data-mode="light"] .text-teal-400\/25,
+[data-mode="light"] .text-teal-400\/30,
+[data-mode="light"] .text-teal-400\/35,
+[data-mode="light"] .text-teal-400\/40,
+[data-mode="light"] .text-teal-400\/45,
+[data-mode="light"] .text-teal-400\/50,
+[data-mode="light"] .text-teal-400\/55,
+[data-mode="light"] .text-teal-400\/60,
+[data-mode="light"] .text-teal-400\/65,
+[data-mode="light"] .text-teal-400\/70,
+[data-mode="light"] .text-teal-400\/75,
+[data-mode="light"] .text-teal-400\/80,
+[data-mode="light"] .text-teal-400\/85,
+[data-mode="light"] .text-teal-400\/90,
+[data-mode="light"] .text-teal-400\/95,
+[data-mode="light"] .text-teal-500,
+[data-mode="light"] .text-teal-500\/30,
+[data-mode="light"] .text-teal-500\/40,
+[data-mode="light"] .text-teal-500\/50,
+[data-mode="light"] .text-teal-500\/60,
+[data-mode="light"] .text-teal-500\/70,
+[data-mode="light"] .text-teal-500\/80,
+[data-mode="light"] .text-teal-500\/85,
+[data-mode="light"] .text-teal-500\/90,
+[data-mode="light"] .text-teal-600,
+[data-mode="light"] .text-teal-600\/30,
+[data-mode="light"] .text-teal-600\/40,
+[data-mode="light"] .text-teal-600\/50,
+[data-mode="light"] .text-teal-600\/60,
+[data-mode="light"] .text-teal-600\/70,
+[data-mode="light"] .text-teal-600\/80,
+[data-mode="light"] .text-teal-600\/85,
+[data-mode="light"] .text-teal-600\/90 {
+  color: #0f766e;
 }
 
-/* Color para text-muted-foreground */
-[data-theme='light'] .text-muted-foreground {
-  color: #475569 !important; /* slate-600 */
+[data-mode="light"] .text-cyan-300,
+[data-mode="light"] .text-cyan-300\/5,
+[data-mode="light"] .text-cyan-300\/10,
+[data-mode="light"] .text-cyan-300\/15,
+[data-mode="light"] .text-cyan-300\/20,
+[data-mode="light"] .text-cyan-300\/25,
+[data-mode="light"] .text-cyan-300\/30,
+[data-mode="light"] .text-cyan-300\/35,
+[data-mode="light"] .text-cyan-300\/40,
+[data-mode="light"] .text-cyan-300\/45,
+[data-mode="light"] .text-cyan-300\/50,
+[data-mode="light"] .text-cyan-300\/55,
+[data-mode="light"] .text-cyan-300\/60,
+[data-mode="light"] .text-cyan-300\/65,
+[data-mode="light"] .text-cyan-300\/70,
+[data-mode="light"] .text-cyan-300\/75,
+[data-mode="light"] .text-cyan-300\/80,
+[data-mode="light"] .text-cyan-300\/85,
+[data-mode="light"] .text-cyan-300\/90,
+[data-mode="light"] .text-cyan-300\/95,
+[data-mode="light"] .text-cyan-400,
+[data-mode="light"] .text-cyan-400\/5,
+[data-mode="light"] .text-cyan-400\/10,
+[data-mode="light"] .text-cyan-400\/15,
+[data-mode="light"] .text-cyan-400\/20,
+[data-mode="light"] .text-cyan-400\/25,
+[data-mode="light"] .text-cyan-400\/30,
+[data-mode="light"] .text-cyan-400\/35,
+[data-mode="light"] .text-cyan-400\/40,
+[data-mode="light"] .text-cyan-400\/45,
+[data-mode="light"] .text-cyan-400\/50,
+[data-mode="light"] .text-cyan-400\/55,
+[data-mode="light"] .text-cyan-400\/60,
+[data-mode="light"] .text-cyan-400\/65,
+[data-mode="light"] .text-cyan-400\/70,
+[data-mode="light"] .text-cyan-400\/75,
+[data-mode="light"] .text-cyan-400\/80,
+[data-mode="light"] .text-cyan-400\/85,
+[data-mode="light"] .text-cyan-400\/90,
+[data-mode="light"] .text-cyan-400\/95,
+[data-mode="light"] .text-cyan-500,
+[data-mode="light"] .text-cyan-500\/30,
+[data-mode="light"] .text-cyan-500\/40,
+[data-mode="light"] .text-cyan-500\/50,
+[data-mode="light"] .text-cyan-500\/60,
+[data-mode="light"] .text-cyan-500\/70,
+[data-mode="light"] .text-cyan-500\/80,
+[data-mode="light"] .text-cyan-500\/85,
+[data-mode="light"] .text-cyan-500\/90,
+[data-mode="light"] .text-cyan-600,
+[data-mode="light"] .text-cyan-600\/30,
+[data-mode="light"] .text-cyan-600\/40,
+[data-mode="light"] .text-cyan-600\/50,
+[data-mode="light"] .text-cyan-600\/60,
+[data-mode="light"] .text-cyan-600\/70,
+[data-mode="light"] .text-cyan-600\/80,
+[data-mode="light"] .text-cyan-600\/85,
+[data-mode="light"] .text-cyan-600\/90 {
+  color: #0e7490;
 }
 
-/* Fondos oscuros / translúcidos hardcodeados -> tarjetas blancas limpias */
-[data-theme='light'] [class*="bg-[#0f172a]"],
-[data-theme='light'] [class*="bg-[#1e293b]"],
-[data-theme='light'] [class*="bg-[#0a192f]"],
-[data-theme='light'] [class*="bg-[#0b1a2f]"],
-[data-theme='light'] [class*="bg-black/"],
-[data-theme='light'] [class*="bg-white/[0.01]"],
-[data-theme='light'] [class*="bg-white/[0.02]"],
-[data-theme='light'] [class*="bg-white/[0.03]"],
-[data-theme='light'] [class*="bg-white/[0.05]"],
-[data-theme='light'] [class*="bg-white/5"],
-[data-theme='light'] [class*="bg-white/10"] {
-  background-color: #ffffff !important;
+[data-mode="light"] .text-sky-300,
+[data-mode="light"] .text-sky-300\/5,
+[data-mode="light"] .text-sky-300\/10,
+[data-mode="light"] .text-sky-300\/15,
+[data-mode="light"] .text-sky-300\/20,
+[data-mode="light"] .text-sky-300\/25,
+[data-mode="light"] .text-sky-300\/30,
+[data-mode="light"] .text-sky-300\/35,
+[data-mode="light"] .text-sky-300\/40,
+[data-mode="light"] .text-sky-300\/45,
+[data-mode="light"] .text-sky-300\/50,
+[data-mode="light"] .text-sky-300\/55,
+[data-mode="light"] .text-sky-300\/60,
+[data-mode="light"] .text-sky-300\/65,
+[data-mode="light"] .text-sky-300\/70,
+[data-mode="light"] .text-sky-300\/75,
+[data-mode="light"] .text-sky-300\/80,
+[data-mode="light"] .text-sky-300\/85,
+[data-mode="light"] .text-sky-300\/90,
+[data-mode="light"] .text-sky-300\/95,
+[data-mode="light"] .text-sky-400,
+[data-mode="light"] .text-sky-400\/5,
+[data-mode="light"] .text-sky-400\/10,
+[data-mode="light"] .text-sky-400\/15,
+[data-mode="light"] .text-sky-400\/20,
+[data-mode="light"] .text-sky-400\/25,
+[data-mode="light"] .text-sky-400\/30,
+[data-mode="light"] .text-sky-400\/35,
+[data-mode="light"] .text-sky-400\/40,
+[data-mode="light"] .text-sky-400\/45,
+[data-mode="light"] .text-sky-400\/50,
+[data-mode="light"] .text-sky-400\/55,
+[data-mode="light"] .text-sky-400\/60,
+[data-mode="light"] .text-sky-400\/65,
+[data-mode="light"] .text-sky-400\/70,
+[data-mode="light"] .text-sky-400\/75,
+[data-mode="light"] .text-sky-400\/80,
+[data-mode="light"] .text-sky-400\/85,
+[data-mode="light"] .text-sky-400\/90,
+[data-mode="light"] .text-sky-400\/95,
+[data-mode="light"] .text-sky-500,
+[data-mode="light"] .text-sky-500\/30,
+[data-mode="light"] .text-sky-500\/40,
+[data-mode="light"] .text-sky-500\/50,
+[data-mode="light"] .text-sky-500\/60,
+[data-mode="light"] .text-sky-500\/70,
+[data-mode="light"] .text-sky-500\/80,
+[data-mode="light"] .text-sky-500\/85,
+[data-mode="light"] .text-sky-500\/90,
+[data-mode="light"] .text-sky-600,
+[data-mode="light"] .text-sky-600\/30,
+[data-mode="light"] .text-sky-600\/40,
+[data-mode="light"] .text-sky-600\/50,
+[data-mode="light"] .text-sky-600\/60,
+[data-mode="light"] .text-sky-600\/70,
+[data-mode="light"] .text-sky-600\/80,
+[data-mode="light"] .text-sky-600\/85,
+[data-mode="light"] .text-sky-600\/90 {
+  color: #0369a1;
 }
 
-/* Bordes blancos translúcidos hardcodeados -> bordes slate-200/300 nítidos */
-[data-theme='light'] [class*="border-white/"],
-[data-theme='light'] [class*="border-white\\["] {
-  border-color: #e2e8f0 !important; /* slate-200 */
+[data-mode="light"] .text-blue-300,
+[data-mode="light"] .text-blue-300\/5,
+[data-mode="light"] .text-blue-300\/10,
+[data-mode="light"] .text-blue-300\/15,
+[data-mode="light"] .text-blue-300\/20,
+[data-mode="light"] .text-blue-300\/25,
+[data-mode="light"] .text-blue-300\/30,
+[data-mode="light"] .text-blue-300\/35,
+[data-mode="light"] .text-blue-300\/40,
+[data-mode="light"] .text-blue-300\/45,
+[data-mode="light"] .text-blue-300\/50,
+[data-mode="light"] .text-blue-300\/55,
+[data-mode="light"] .text-blue-300\/60,
+[data-mode="light"] .text-blue-300\/65,
+[data-mode="light"] .text-blue-300\/70,
+[data-mode="light"] .text-blue-300\/75,
+[data-mode="light"] .text-blue-300\/80,
+[data-mode="light"] .text-blue-300\/85,
+[data-mode="light"] .text-blue-300\/90,
+[data-mode="light"] .text-blue-300\/95,
+[data-mode="light"] .text-blue-400,
+[data-mode="light"] .text-blue-400\/5,
+[data-mode="light"] .text-blue-400\/10,
+[data-mode="light"] .text-blue-400\/15,
+[data-mode="light"] .text-blue-400\/20,
+[data-mode="light"] .text-blue-400\/25,
+[data-mode="light"] .text-blue-400\/30,
+[data-mode="light"] .text-blue-400\/35,
+[data-mode="light"] .text-blue-400\/40,
+[data-mode="light"] .text-blue-400\/45,
+[data-mode="light"] .text-blue-400\/50,
+[data-mode="light"] .text-blue-400\/55,
+[data-mode="light"] .text-blue-400\/60,
+[data-mode="light"] .text-blue-400\/65,
+[data-mode="light"] .text-blue-400\/70,
+[data-mode="light"] .text-blue-400\/75,
+[data-mode="light"] .text-blue-400\/80,
+[data-mode="light"] .text-blue-400\/85,
+[data-mode="light"] .text-blue-400\/90,
+[data-mode="light"] .text-blue-400\/95,
+[data-mode="light"] .text-blue-500,
+[data-mode="light"] .text-blue-500\/30,
+[data-mode="light"] .text-blue-500\/40,
+[data-mode="light"] .text-blue-500\/50,
+[data-mode="light"] .text-blue-500\/60,
+[data-mode="light"] .text-blue-500\/70,
+[data-mode="light"] .text-blue-500\/80,
+[data-mode="light"] .text-blue-500\/85,
+[data-mode="light"] .text-blue-500\/90,
+[data-mode="light"] .text-blue-600,
+[data-mode="light"] .text-blue-600\/30,
+[data-mode="light"] .text-blue-600\/40,
+[data-mode="light"] .text-blue-600\/50,
+[data-mode="light"] .text-blue-600\/60,
+[data-mode="light"] .text-blue-600\/70,
+[data-mode="light"] .text-blue-600\/80,
+[data-mode="light"] .text-blue-600\/85,
+[data-mode="light"] .text-blue-600\/90 {
+  color: #1d4ed8;
 }
 
-/* Botones neutros / grises en light mode */
-[data-theme='light'] button[class*="bg-white/"],
-[data-theme='light'] a[class*="bg-white/"] {
-  background-color: #f1f5f9 !important; /* slate-100 */
-  color: #0f172a !important;
-  border-color: #cbd5e1 !important;
+[data-mode="light"] .text-indigo-300,
+[data-mode="light"] .text-indigo-300\/5,
+[data-mode="light"] .text-indigo-300\/10,
+[data-mode="light"] .text-indigo-300\/15,
+[data-mode="light"] .text-indigo-300\/20,
+[data-mode="light"] .text-indigo-300\/25,
+[data-mode="light"] .text-indigo-300\/30,
+[data-mode="light"] .text-indigo-300\/35,
+[data-mode="light"] .text-indigo-300\/40,
+[data-mode="light"] .text-indigo-300\/45,
+[data-mode="light"] .text-indigo-300\/50,
+[data-mode="light"] .text-indigo-300\/55,
+[data-mode="light"] .text-indigo-300\/60,
+[data-mode="light"] .text-indigo-300\/65,
+[data-mode="light"] .text-indigo-300\/70,
+[data-mode="light"] .text-indigo-300\/75,
+[data-mode="light"] .text-indigo-300\/80,
+[data-mode="light"] .text-indigo-300\/85,
+[data-mode="light"] .text-indigo-300\/90,
+[data-mode="light"] .text-indigo-300\/95,
+[data-mode="light"] .text-indigo-400,
+[data-mode="light"] .text-indigo-400\/5,
+[data-mode="light"] .text-indigo-400\/10,
+[data-mode="light"] .text-indigo-400\/15,
+[data-mode="light"] .text-indigo-400\/20,
+[data-mode="light"] .text-indigo-400\/25,
+[data-mode="light"] .text-indigo-400\/30,
+[data-mode="light"] .text-indigo-400\/35,
+[data-mode="light"] .text-indigo-400\/40,
+[data-mode="light"] .text-indigo-400\/45,
+[data-mode="light"] .text-indigo-400\/50,
+[data-mode="light"] .text-indigo-400\/55,
+[data-mode="light"] .text-indigo-400\/60,
+[data-mode="light"] .text-indigo-400\/65,
+[data-mode="light"] .text-indigo-400\/70,
+[data-mode="light"] .text-indigo-400\/75,
+[data-mode="light"] .text-indigo-400\/80,
+[data-mode="light"] .text-indigo-400\/85,
+[data-mode="light"] .text-indigo-400\/90,
+[data-mode="light"] .text-indigo-400\/95,
+[data-mode="light"] .text-indigo-500,
+[data-mode="light"] .text-indigo-500\/30,
+[data-mode="light"] .text-indigo-500\/40,
+[data-mode="light"] .text-indigo-500\/50,
+[data-mode="light"] .text-indigo-500\/60,
+[data-mode="light"] .text-indigo-500\/70,
+[data-mode="light"] .text-indigo-500\/80,
+[data-mode="light"] .text-indigo-500\/85,
+[data-mode="light"] .text-indigo-500\/90,
+[data-mode="light"] .text-indigo-600,
+[data-mode="light"] .text-indigo-600\/30,
+[data-mode="light"] .text-indigo-600\/40,
+[data-mode="light"] .text-indigo-600\/50,
+[data-mode="light"] .text-indigo-600\/60,
+[data-mode="light"] .text-indigo-600\/70,
+[data-mode="light"] .text-indigo-600\/80,
+[data-mode="light"] .text-indigo-600\/85,
+[data-mode="light"] .text-indigo-600\/90 {
+  color: #4338ca;
 }
 
-[data-theme='light'] button[class*="bg-white/"]:hover,
-[data-theme='light'] a[class*="bg-white/"]:hover {
-  background-color: #e2e8f0 !important; /* slate-200 */
+[data-mode="light"] .text-violet-300,
+[data-mode="light"] .text-violet-300\/5,
+[data-mode="light"] .text-violet-300\/10,
+[data-mode="light"] .text-violet-300\/15,
+[data-mode="light"] .text-violet-300\/20,
+[data-mode="light"] .text-violet-300\/25,
+[data-mode="light"] .text-violet-300\/30,
+[data-mode="light"] .text-violet-300\/35,
+[data-mode="light"] .text-violet-300\/40,
+[data-mode="light"] .text-violet-300\/45,
+[data-mode="light"] .text-violet-300\/50,
+[data-mode="light"] .text-violet-300\/55,
+[data-mode="light"] .text-violet-300\/60,
+[data-mode="light"] .text-violet-300\/65,
+[data-mode="light"] .text-violet-300\/70,
+[data-mode="light"] .text-violet-300\/75,
+[data-mode="light"] .text-violet-300\/80,
+[data-mode="light"] .text-violet-300\/85,
+[data-mode="light"] .text-violet-300\/90,
+[data-mode="light"] .text-violet-300\/95,
+[data-mode="light"] .text-violet-400,
+[data-mode="light"] .text-violet-400\/5,
+[data-mode="light"] .text-violet-400\/10,
+[data-mode="light"] .text-violet-400\/15,
+[data-mode="light"] .text-violet-400\/20,
+[data-mode="light"] .text-violet-400\/25,
+[data-mode="light"] .text-violet-400\/30,
+[data-mode="light"] .text-violet-400\/35,
+[data-mode="light"] .text-violet-400\/40,
+[data-mode="light"] .text-violet-400\/45,
+[data-mode="light"] .text-violet-400\/50,
+[data-mode="light"] .text-violet-400\/55,
+[data-mode="light"] .text-violet-400\/60,
+[data-mode="light"] .text-violet-400\/65,
+[data-mode="light"] .text-violet-400\/70,
+[data-mode="light"] .text-violet-400\/75,
+[data-mode="light"] .text-violet-400\/80,
+[data-mode="light"] .text-violet-400\/85,
+[data-mode="light"] .text-violet-400\/90,
+[data-mode="light"] .text-violet-400\/95,
+[data-mode="light"] .text-violet-500,
+[data-mode="light"] .text-violet-500\/30,
+[data-mode="light"] .text-violet-500\/40,
+[data-mode="light"] .text-violet-500\/50,
+[data-mode="light"] .text-violet-500\/60,
+[data-mode="light"] .text-violet-500\/70,
+[data-mode="light"] .text-violet-500\/80,
+[data-mode="light"] .text-violet-500\/85,
+[data-mode="light"] .text-violet-500\/90,
+[data-mode="light"] .text-violet-600,
+[data-mode="light"] .text-violet-600\/30,
+[data-mode="light"] .text-violet-600\/40,
+[data-mode="light"] .text-violet-600\/50,
+[data-mode="light"] .text-violet-600\/60,
+[data-mode="light"] .text-violet-600\/70,
+[data-mode="light"] .text-violet-600\/80,
+[data-mode="light"] .text-violet-600\/85,
+[data-mode="light"] .text-violet-600\/90 {
+  color: #6d28d9;
 }
 
-/* Dropdown menus & Popovers */
-[data-theme='light'] [class*="glass-card"],
-[data-theme='light'] [class*="glass"] {
-  background: #ffffff !important;
-  border-color: #cbd5e1 !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04) !important;
+[data-mode="light"] .text-purple-300,
+[data-mode="light"] .text-purple-300\/5,
+[data-mode="light"] .text-purple-300\/10,
+[data-mode="light"] .text-purple-300\/15,
+[data-mode="light"] .text-purple-300\/20,
+[data-mode="light"] .text-purple-300\/25,
+[data-mode="light"] .text-purple-300\/30,
+[data-mode="light"] .text-purple-300\/35,
+[data-mode="light"] .text-purple-300\/40,
+[data-mode="light"] .text-purple-300\/45,
+[data-mode="light"] .text-purple-300\/50,
+[data-mode="light"] .text-purple-300\/55,
+[data-mode="light"] .text-purple-300\/60,
+[data-mode="light"] .text-purple-300\/65,
+[data-mode="light"] .text-purple-300\/70,
+[data-mode="light"] .text-purple-300\/75,
+[data-mode="light"] .text-purple-300\/80,
+[data-mode="light"] .text-purple-300\/85,
+[data-mode="light"] .text-purple-300\/90,
+[data-mode="light"] .text-purple-300\/95,
+[data-mode="light"] .text-purple-400,
+[data-mode="light"] .text-purple-400\/5,
+[data-mode="light"] .text-purple-400\/10,
+[data-mode="light"] .text-purple-400\/15,
+[data-mode="light"] .text-purple-400\/20,
+[data-mode="light"] .text-purple-400\/25,
+[data-mode="light"] .text-purple-400\/30,
+[data-mode="light"] .text-purple-400\/35,
+[data-mode="light"] .text-purple-400\/40,
+[data-mode="light"] .text-purple-400\/45,
+[data-mode="light"] .text-purple-400\/50,
+[data-mode="light"] .text-purple-400\/55,
+[data-mode="light"] .text-purple-400\/60,
+[data-mode="light"] .text-purple-400\/65,
+[data-mode="light"] .text-purple-400\/70,
+[data-mode="light"] .text-purple-400\/75,
+[data-mode="light"] .text-purple-400\/80,
+[data-mode="light"] .text-purple-400\/85,
+[data-mode="light"] .text-purple-400\/90,
+[data-mode="light"] .text-purple-400\/95,
+[data-mode="light"] .text-purple-500,
+[data-mode="light"] .text-purple-500\/30,
+[data-mode="light"] .text-purple-500\/40,
+[data-mode="light"] .text-purple-500\/50,
+[data-mode="light"] .text-purple-500\/60,
+[data-mode="light"] .text-purple-500\/70,
+[data-mode="light"] .text-purple-500\/80,
+[data-mode="light"] .text-purple-500\/85,
+[data-mode="light"] .text-purple-500\/90,
+[data-mode="light"] .text-purple-600,
+[data-mode="light"] .text-purple-600\/30,
+[data-mode="light"] .text-purple-600\/40,
+[data-mode="light"] .text-purple-600\/50,
+[data-mode="light"] .text-purple-600\/60,
+[data-mode="light"] .text-purple-600\/70,
+[data-mode="light"] .text-purple-600\/80,
+[data-mode="light"] .text-purple-600\/85,
+[data-mode="light"] .text-purple-600\/90 {
+  color: #7e22ce;
+}
+
+[data-mode="light"] .text-fuchsia-300,
+[data-mode="light"] .text-fuchsia-300\/5,
+[data-mode="light"] .text-fuchsia-300\/10,
+[data-mode="light"] .text-fuchsia-300\/15,
+[data-mode="light"] .text-fuchsia-300\/20,
+[data-mode="light"] .text-fuchsia-300\/25,
+[data-mode="light"] .text-fuchsia-300\/30,
+[data-mode="light"] .text-fuchsia-300\/35,
+[data-mode="light"] .text-fuchsia-300\/40,
+[data-mode="light"] .text-fuchsia-300\/45,
+[data-mode="light"] .text-fuchsia-300\/50,
+[data-mode="light"] .text-fuchsia-300\/55,
+[data-mode="light"] .text-fuchsia-300\/60,
+[data-mode="light"] .text-fuchsia-300\/65,
+[data-mode="light"] .text-fuchsia-300\/70,
+[data-mode="light"] .text-fuchsia-300\/75,
+[data-mode="light"] .text-fuchsia-300\/80,
+[data-mode="light"] .text-fuchsia-300\/85,
+[data-mode="light"] .text-fuchsia-300\/90,
+[data-mode="light"] .text-fuchsia-300\/95,
+[data-mode="light"] .text-fuchsia-400,
+[data-mode="light"] .text-fuchsia-400\/5,
+[data-mode="light"] .text-fuchsia-400\/10,
+[data-mode="light"] .text-fuchsia-400\/15,
+[data-mode="light"] .text-fuchsia-400\/20,
+[data-mode="light"] .text-fuchsia-400\/25,
+[data-mode="light"] .text-fuchsia-400\/30,
+[data-mode="light"] .text-fuchsia-400\/35,
+[data-mode="light"] .text-fuchsia-400\/40,
+[data-mode="light"] .text-fuchsia-400\/45,
+[data-mode="light"] .text-fuchsia-400\/50,
+[data-mode="light"] .text-fuchsia-400\/55,
+[data-mode="light"] .text-fuchsia-400\/60,
+[data-mode="light"] .text-fuchsia-400\/65,
+[data-mode="light"] .text-fuchsia-400\/70,
+[data-mode="light"] .text-fuchsia-400\/75,
+[data-mode="light"] .text-fuchsia-400\/80,
+[data-mode="light"] .text-fuchsia-400\/85,
+[data-mode="light"] .text-fuchsia-400\/90,
+[data-mode="light"] .text-fuchsia-400\/95,
+[data-mode="light"] .text-fuchsia-500,
+[data-mode="light"] .text-fuchsia-500\/30,
+[data-mode="light"] .text-fuchsia-500\/40,
+[data-mode="light"] .text-fuchsia-500\/50,
+[data-mode="light"] .text-fuchsia-500\/60,
+[data-mode="light"] .text-fuchsia-500\/70,
+[data-mode="light"] .text-fuchsia-500\/80,
+[data-mode="light"] .text-fuchsia-500\/85,
+[data-mode="light"] .text-fuchsia-500\/90,
+[data-mode="light"] .text-fuchsia-600,
+[data-mode="light"] .text-fuchsia-600\/30,
+[data-mode="light"] .text-fuchsia-600\/40,
+[data-mode="light"] .text-fuchsia-600\/50,
+[data-mode="light"] .text-fuchsia-600\/60,
+[data-mode="light"] .text-fuchsia-600\/70,
+[data-mode="light"] .text-fuchsia-600\/80,
+[data-mode="light"] .text-fuchsia-600\/85,
+[data-mode="light"] .text-fuchsia-600\/90 {
+  color: #a21caf;
+}
+
+[data-mode="light"] .text-pink-300,
+[data-mode="light"] .text-pink-300\/5,
+[data-mode="light"] .text-pink-300\/10,
+[data-mode="light"] .text-pink-300\/15,
+[data-mode="light"] .text-pink-300\/20,
+[data-mode="light"] .text-pink-300\/25,
+[data-mode="light"] .text-pink-300\/30,
+[data-mode="light"] .text-pink-300\/35,
+[data-mode="light"] .text-pink-300\/40,
+[data-mode="light"] .text-pink-300\/45,
+[data-mode="light"] .text-pink-300\/50,
+[data-mode="light"] .text-pink-300\/55,
+[data-mode="light"] .text-pink-300\/60,
+[data-mode="light"] .text-pink-300\/65,
+[data-mode="light"] .text-pink-300\/70,
+[data-mode="light"] .text-pink-300\/75,
+[data-mode="light"] .text-pink-300\/80,
+[data-mode="light"] .text-pink-300\/85,
+[data-mode="light"] .text-pink-300\/90,
+[data-mode="light"] .text-pink-300\/95,
+[data-mode="light"] .text-pink-400,
+[data-mode="light"] .text-pink-400\/5,
+[data-mode="light"] .text-pink-400\/10,
+[data-mode="light"] .text-pink-400\/15,
+[data-mode="light"] .text-pink-400\/20,
+[data-mode="light"] .text-pink-400\/25,
+[data-mode="light"] .text-pink-400\/30,
+[data-mode="light"] .text-pink-400\/35,
+[data-mode="light"] .text-pink-400\/40,
+[data-mode="light"] .text-pink-400\/45,
+[data-mode="light"] .text-pink-400\/50,
+[data-mode="light"] .text-pink-400\/55,
+[data-mode="light"] .text-pink-400\/60,
+[data-mode="light"] .text-pink-400\/65,
+[data-mode="light"] .text-pink-400\/70,
+[data-mode="light"] .text-pink-400\/75,
+[data-mode="light"] .text-pink-400\/80,
+[data-mode="light"] .text-pink-400\/85,
+[data-mode="light"] .text-pink-400\/90,
+[data-mode="light"] .text-pink-400\/95,
+[data-mode="light"] .text-pink-500,
+[data-mode="light"] .text-pink-500\/30,
+[data-mode="light"] .text-pink-500\/40,
+[data-mode="light"] .text-pink-500\/50,
+[data-mode="light"] .text-pink-500\/60,
+[data-mode="light"] .text-pink-500\/70,
+[data-mode="light"] .text-pink-500\/80,
+[data-mode="light"] .text-pink-500\/85,
+[data-mode="light"] .text-pink-500\/90,
+[data-mode="light"] .text-pink-600,
+[data-mode="light"] .text-pink-600\/30,
+[data-mode="light"] .text-pink-600\/40,
+[data-mode="light"] .text-pink-600\/50,
+[data-mode="light"] .text-pink-600\/60,
+[data-mode="light"] .text-pink-600\/70,
+[data-mode="light"] .text-pink-600\/80,
+[data-mode="light"] .text-pink-600\/85,
+[data-mode="light"] .text-pink-600\/90 {
+  color: #be185d;
+}
+
+[data-mode="light"] .text-rose-300,
+[data-mode="light"] .text-rose-300\/5,
+[data-mode="light"] .text-rose-300\/10,
+[data-mode="light"] .text-rose-300\/15,
+[data-mode="light"] .text-rose-300\/20,
+[data-mode="light"] .text-rose-300\/25,
+[data-mode="light"] .text-rose-300\/30,
+[data-mode="light"] .text-rose-300\/35,
+[data-mode="light"] .text-rose-300\/40,
+[data-mode="light"] .text-rose-300\/45,
+[data-mode="light"] .text-rose-300\/50,
+[data-mode="light"] .text-rose-300\/55,
+[data-mode="light"] .text-rose-300\/60,
+[data-mode="light"] .text-rose-300\/65,
+[data-mode="light"] .text-rose-300\/70,
+[data-mode="light"] .text-rose-300\/75,
+[data-mode="light"] .text-rose-300\/80,
+[data-mode="light"] .text-rose-300\/85,
+[data-mode="light"] .text-rose-300\/90,
+[data-mode="light"] .text-rose-300\/95,
+[data-mode="light"] .text-rose-400,
+[data-mode="light"] .text-rose-400\/5,
+[data-mode="light"] .text-rose-400\/10,
+[data-mode="light"] .text-rose-400\/15,
+[data-mode="light"] .text-rose-400\/20,
+[data-mode="light"] .text-rose-400\/25,
+[data-mode="light"] .text-rose-400\/30,
+[data-mode="light"] .text-rose-400\/35,
+[data-mode="light"] .text-rose-400\/40,
+[data-mode="light"] .text-rose-400\/45,
+[data-mode="light"] .text-rose-400\/50,
+[data-mode="light"] .text-rose-400\/55,
+[data-mode="light"] .text-rose-400\/60,
+[data-mode="light"] .text-rose-400\/65,
+[data-mode="light"] .text-rose-400\/70,
+[data-mode="light"] .text-rose-400\/75,
+[data-mode="light"] .text-rose-400\/80,
+[data-mode="light"] .text-rose-400\/85,
+[data-mode="light"] .text-rose-400\/90,
+[data-mode="light"] .text-rose-400\/95,
+[data-mode="light"] .text-rose-500,
+[data-mode="light"] .text-rose-500\/30,
+[data-mode="light"] .text-rose-500\/40,
+[data-mode="light"] .text-rose-500\/50,
+[data-mode="light"] .text-rose-500\/60,
+[data-mode="light"] .text-rose-500\/70,
+[data-mode="light"] .text-rose-500\/80,
+[data-mode="light"] .text-rose-500\/85,
+[data-mode="light"] .text-rose-500\/90,
+[data-mode="light"] .text-rose-600,
+[data-mode="light"] .text-rose-600\/30,
+[data-mode="light"] .text-rose-600\/40,
+[data-mode="light"] .text-rose-600\/50,
+[data-mode="light"] .text-rose-600\/60,
+[data-mode="light"] .text-rose-600\/70,
+[data-mode="light"] .text-rose-600\/80,
+[data-mode="light"] .text-rose-600\/85,
+[data-mode="light"] .text-rose-600\/90 {
+  color: #be123c;
+}
+
+[data-mode="light"] .text-red-300,
+[data-mode="light"] .text-red-300\/5,
+[data-mode="light"] .text-red-300\/10,
+[data-mode="light"] .text-red-300\/15,
+[data-mode="light"] .text-red-300\/20,
+[data-mode="light"] .text-red-300\/25,
+[data-mode="light"] .text-red-300\/30,
+[data-mode="light"] .text-red-300\/35,
+[data-mode="light"] .text-red-300\/40,
+[data-mode="light"] .text-red-300\/45,
+[data-mode="light"] .text-red-300\/50,
+[data-mode="light"] .text-red-300\/55,
+[data-mode="light"] .text-red-300\/60,
+[data-mode="light"] .text-red-300\/65,
+[data-mode="light"] .text-red-300\/70,
+[data-mode="light"] .text-red-300\/75,
+[data-mode="light"] .text-red-300\/80,
+[data-mode="light"] .text-red-300\/85,
+[data-mode="light"] .text-red-300\/90,
+[data-mode="light"] .text-red-300\/95,
+[data-mode="light"] .text-red-400,
+[data-mode="light"] .text-red-400\/5,
+[data-mode="light"] .text-red-400\/10,
+[data-mode="light"] .text-red-400\/15,
+[data-mode="light"] .text-red-400\/20,
+[data-mode="light"] .text-red-400\/25,
+[data-mode="light"] .text-red-400\/30,
+[data-mode="light"] .text-red-400\/35,
+[data-mode="light"] .text-red-400\/40,
+[data-mode="light"] .text-red-400\/45,
+[data-mode="light"] .text-red-400\/50,
+[data-mode="light"] .text-red-400\/55,
+[data-mode="light"] .text-red-400\/60,
+[data-mode="light"] .text-red-400\/65,
+[data-mode="light"] .text-red-400\/70,
+[data-mode="light"] .text-red-400\/75,
+[data-mode="light"] .text-red-400\/80,
+[data-mode="light"] .text-red-400\/85,
+[data-mode="light"] .text-red-400\/90,
+[data-mode="light"] .text-red-400\/95,
+[data-mode="light"] .text-red-500,
+[data-mode="light"] .text-red-500\/30,
+[data-mode="light"] .text-red-500\/40,
+[data-mode="light"] .text-red-500\/50,
+[data-mode="light"] .text-red-500\/60,
+[data-mode="light"] .text-red-500\/70,
+[data-mode="light"] .text-red-500\/80,
+[data-mode="light"] .text-red-500\/85,
+[data-mode="light"] .text-red-500\/90,
+[data-mode="light"] .text-red-600,
+[data-mode="light"] .text-red-600\/30,
+[data-mode="light"] .text-red-600\/40,
+[data-mode="light"] .text-red-600\/50,
+[data-mode="light"] .text-red-600\/60,
+[data-mode="light"] .text-red-600\/70,
+[data-mode="light"] .text-red-600\/80,
+[data-mode="light"] .text-red-600\/85,
+[data-mode="light"] .text-red-600\/90 {
+  color: #b91c1c;
+}
+
+[data-mode="light"] .text-orange-300,
+[data-mode="light"] .text-orange-300\/5,
+[data-mode="light"] .text-orange-300\/10,
+[data-mode="light"] .text-orange-300\/15,
+[data-mode="light"] .text-orange-300\/20,
+[data-mode="light"] .text-orange-300\/25,
+[data-mode="light"] .text-orange-300\/30,
+[data-mode="light"] .text-orange-300\/35,
+[data-mode="light"] .text-orange-300\/40,
+[data-mode="light"] .text-orange-300\/45,
+[data-mode="light"] .text-orange-300\/50,
+[data-mode="light"] .text-orange-300\/55,
+[data-mode="light"] .text-orange-300\/60,
+[data-mode="light"] .text-orange-300\/65,
+[data-mode="light"] .text-orange-300\/70,
+[data-mode="light"] .text-orange-300\/75,
+[data-mode="light"] .text-orange-300\/80,
+[data-mode="light"] .text-orange-300\/85,
+[data-mode="light"] .text-orange-300\/90,
+[data-mode="light"] .text-orange-300\/95,
+[data-mode="light"] .text-orange-400,
+[data-mode="light"] .text-orange-400\/5,
+[data-mode="light"] .text-orange-400\/10,
+[data-mode="light"] .text-orange-400\/15,
+[data-mode="light"] .text-orange-400\/20,
+[data-mode="light"] .text-orange-400\/25,
+[data-mode="light"] .text-orange-400\/30,
+[data-mode="light"] .text-orange-400\/35,
+[data-mode="light"] .text-orange-400\/40,
+[data-mode="light"] .text-orange-400\/45,
+[data-mode="light"] .text-orange-400\/50,
+[data-mode="light"] .text-orange-400\/55,
+[data-mode="light"] .text-orange-400\/60,
+[data-mode="light"] .text-orange-400\/65,
+[data-mode="light"] .text-orange-400\/70,
+[data-mode="light"] .text-orange-400\/75,
+[data-mode="light"] .text-orange-400\/80,
+[data-mode="light"] .text-orange-400\/85,
+[data-mode="light"] .text-orange-400\/90,
+[data-mode="light"] .text-orange-400\/95,
+[data-mode="light"] .text-orange-500,
+[data-mode="light"] .text-orange-500\/30,
+[data-mode="light"] .text-orange-500\/40,
+[data-mode="light"] .text-orange-500\/50,
+[data-mode="light"] .text-orange-500\/60,
+[data-mode="light"] .text-orange-500\/70,
+[data-mode="light"] .text-orange-500\/80,
+[data-mode="light"] .text-orange-500\/85,
+[data-mode="light"] .text-orange-500\/90,
+[data-mode="light"] .text-orange-600,
+[data-mode="light"] .text-orange-600\/30,
+[data-mode="light"] .text-orange-600\/40,
+[data-mode="light"] .text-orange-600\/50,
+[data-mode="light"] .text-orange-600\/60,
+[data-mode="light"] .text-orange-600\/70,
+[data-mode="light"] .text-orange-600\/80,
+[data-mode="light"] .text-orange-600\/85,
+[data-mode="light"] .text-orange-600\/90 {
+  color: #c2410c;
+}
+
+[data-mode="light"] .text-amber-300,
+[data-mode="light"] .text-amber-300\/5,
+[data-mode="light"] .text-amber-300\/10,
+[data-mode="light"] .text-amber-300\/15,
+[data-mode="light"] .text-amber-300\/20,
+[data-mode="light"] .text-amber-300\/25,
+[data-mode="light"] .text-amber-300\/30,
+[data-mode="light"] .text-amber-300\/35,
+[data-mode="light"] .text-amber-300\/40,
+[data-mode="light"] .text-amber-300\/45,
+[data-mode="light"] .text-amber-300\/50,
+[data-mode="light"] .text-amber-300\/55,
+[data-mode="light"] .text-amber-300\/60,
+[data-mode="light"] .text-amber-300\/65,
+[data-mode="light"] .text-amber-300\/70,
+[data-mode="light"] .text-amber-300\/75,
+[data-mode="light"] .text-amber-300\/80,
+[data-mode="light"] .text-amber-300\/85,
+[data-mode="light"] .text-amber-300\/90,
+[data-mode="light"] .text-amber-300\/95,
+[data-mode="light"] .text-amber-400,
+[data-mode="light"] .text-amber-400\/5,
+[data-mode="light"] .text-amber-400\/10,
+[data-mode="light"] .text-amber-400\/15,
+[data-mode="light"] .text-amber-400\/20,
+[data-mode="light"] .text-amber-400\/25,
+[data-mode="light"] .text-amber-400\/30,
+[data-mode="light"] .text-amber-400\/35,
+[data-mode="light"] .text-amber-400\/40,
+[data-mode="light"] .text-amber-400\/45,
+[data-mode="light"] .text-amber-400\/50,
+[data-mode="light"] .text-amber-400\/55,
+[data-mode="light"] .text-amber-400\/60,
+[data-mode="light"] .text-amber-400\/65,
+[data-mode="light"] .text-amber-400\/70,
+[data-mode="light"] .text-amber-400\/75,
+[data-mode="light"] .text-amber-400\/80,
+[data-mode="light"] .text-amber-400\/85,
+[data-mode="light"] .text-amber-400\/90,
+[data-mode="light"] .text-amber-400\/95,
+[data-mode="light"] .text-amber-500,
+[data-mode="light"] .text-amber-500\/30,
+[data-mode="light"] .text-amber-500\/40,
+[data-mode="light"] .text-amber-500\/50,
+[data-mode="light"] .text-amber-500\/60,
+[data-mode="light"] .text-amber-500\/70,
+[data-mode="light"] .text-amber-500\/80,
+[data-mode="light"] .text-amber-500\/85,
+[data-mode="light"] .text-amber-500\/90,
+[data-mode="light"] .text-amber-600,
+[data-mode="light"] .text-amber-600\/30,
+[data-mode="light"] .text-amber-600\/40,
+[data-mode="light"] .text-amber-600\/50,
+[data-mode="light"] .text-amber-600\/60,
+[data-mode="light"] .text-amber-600\/70,
+[data-mode="light"] .text-amber-600\/80,
+[data-mode="light"] .text-amber-600\/85,
+[data-mode="light"] .text-amber-600\/90 {
+  color: #b45309;
+}
+
+[data-mode="light"] .text-yellow-300,
+[data-mode="light"] .text-yellow-300\/5,
+[data-mode="light"] .text-yellow-300\/10,
+[data-mode="light"] .text-yellow-300\/15,
+[data-mode="light"] .text-yellow-300\/20,
+[data-mode="light"] .text-yellow-300\/25,
+[data-mode="light"] .text-yellow-300\/30,
+[data-mode="light"] .text-yellow-300\/35,
+[data-mode="light"] .text-yellow-300\/40,
+[data-mode="light"] .text-yellow-300\/45,
+[data-mode="light"] .text-yellow-300\/50,
+[data-mode="light"] .text-yellow-300\/55,
+[data-mode="light"] .text-yellow-300\/60,
+[data-mode="light"] .text-yellow-300\/65,
+[data-mode="light"] .text-yellow-300\/70,
+[data-mode="light"] .text-yellow-300\/75,
+[data-mode="light"] .text-yellow-300\/80,
+[data-mode="light"] .text-yellow-300\/85,
+[data-mode="light"] .text-yellow-300\/90,
+[data-mode="light"] .text-yellow-300\/95,
+[data-mode="light"] .text-yellow-400,
+[data-mode="light"] .text-yellow-400\/5,
+[data-mode="light"] .text-yellow-400\/10,
+[data-mode="light"] .text-yellow-400\/15,
+[data-mode="light"] .text-yellow-400\/20,
+[data-mode="light"] .text-yellow-400\/25,
+[data-mode="light"] .text-yellow-400\/30,
+[data-mode="light"] .text-yellow-400\/35,
+[data-mode="light"] .text-yellow-400\/40,
+[data-mode="light"] .text-yellow-400\/45,
+[data-mode="light"] .text-yellow-400\/50,
+[data-mode="light"] .text-yellow-400\/55,
+[data-mode="light"] .text-yellow-400\/60,
+[data-mode="light"] .text-yellow-400\/65,
+[data-mode="light"] .text-yellow-400\/70,
+[data-mode="light"] .text-yellow-400\/75,
+[data-mode="light"] .text-yellow-400\/80,
+[data-mode="light"] .text-yellow-400\/85,
+[data-mode="light"] .text-yellow-400\/90,
+[data-mode="light"] .text-yellow-400\/95,
+[data-mode="light"] .text-yellow-500,
+[data-mode="light"] .text-yellow-500\/30,
+[data-mode="light"] .text-yellow-500\/40,
+[data-mode="light"] .text-yellow-500\/50,
+[data-mode="light"] .text-yellow-500\/60,
+[data-mode="light"] .text-yellow-500\/70,
+[data-mode="light"] .text-yellow-500\/80,
+[data-mode="light"] .text-yellow-500\/85,
+[data-mode="light"] .text-yellow-500\/90,
+[data-mode="light"] .text-yellow-600,
+[data-mode="light"] .text-yellow-600\/30,
+[data-mode="light"] .text-yellow-600\/40,
+[data-mode="light"] .text-yellow-600\/50,
+[data-mode="light"] .text-yellow-600\/60,
+[data-mode="light"] .text-yellow-600\/70,
+[data-mode="light"] .text-yellow-600\/80,
+[data-mode="light"] .text-yellow-600\/85,
+[data-mode="light"] .text-yellow-600\/90 {
+  color: #a16207;
+}
+
+[data-mode="light"] .text-primary,
+[data-mode="light"] .text-primary\/5,
+[data-mode="light"] .text-primary\/10,
+[data-mode="light"] .text-primary\/15,
+[data-mode="light"] .text-primary\/20,
+[data-mode="light"] .text-primary\/25,
+[data-mode="light"] .text-primary\/30,
+[data-mode="light"] .text-primary\/35,
+[data-mode="light"] .text-primary\/40,
+[data-mode="light"] .text-primary\/45,
+[data-mode="light"] .text-primary\/50,
+[data-mode="light"] .text-primary\/55,
+[data-mode="light"] .text-primary\/60,
+[data-mode="light"] .text-primary\/65,
+[data-mode="light"] .text-primary\/70,
+[data-mode="light"] .text-primary\/75,
+[data-mode="light"] .text-primary\/80,
+[data-mode="light"] .text-primary\/85,
+[data-mode="light"] .text-primary\/90,
+[data-mode="light"] .text-primary\/95 {
+  color: #047857;
+}
+
+[data-mode="light"] .text-muted-foreground\/5,
+[data-mode="light"] .text-muted-foreground\/10,
+[data-mode="light"] .text-muted-foreground\/15,
+[data-mode="light"] .text-muted-foreground\/20,
+[data-mode="light"] .text-muted-foreground\/25,
+[data-mode="light"] .text-muted-foreground\/30,
+[data-mode="light"] .text-muted-foreground\/35,
+[data-mode="light"] .text-muted-foreground\/40,
+[data-mode="light"] .text-muted-foreground\/45,
+[data-mode="light"] .text-muted-foreground\/50,
+[data-mode="light"] .text-muted-foreground\/55,
+[data-mode="light"] .text-muted-foreground\/60,
+[data-mode="light"] .text-muted-foreground\/65,
+[data-mode="light"] .text-muted-foreground\/70,
+[data-mode="light"] .text-muted-foreground\/75,
+[data-mode="light"] .text-muted-foreground\/80,
+[data-mode="light"] .text-muted-foreground\/85,
+[data-mode="light"] .text-muted-foreground\/90,
+[data-mode="light"] .text-muted-foreground\/95 {
+  color: #52607a;
+}
+
+[data-mode="light"] .text-gray-300,
+[data-mode="light"] .text-gray-300\/5,
+[data-mode="light"] .text-gray-300\/10,
+[data-mode="light"] .text-gray-300\/15,
+[data-mode="light"] .text-gray-300\/20,
+[data-mode="light"] .text-gray-300\/25,
+[data-mode="light"] .text-gray-300\/30,
+[data-mode="light"] .text-gray-300\/35,
+[data-mode="light"] .text-gray-300\/40,
+[data-mode="light"] .text-gray-300\/45,
+[data-mode="light"] .text-gray-300\/50,
+[data-mode="light"] .text-gray-300\/55,
+[data-mode="light"] .text-gray-300\/60,
+[data-mode="light"] .text-gray-300\/65,
+[data-mode="light"] .text-gray-300\/70,
+[data-mode="light"] .text-gray-300\/75,
+[data-mode="light"] .text-gray-300\/80,
+[data-mode="light"] .text-gray-300\/85,
+[data-mode="light"] .text-gray-300\/90,
+[data-mode="light"] .text-gray-300\/95,
+[data-mode="light"] .text-gray-400,
+[data-mode="light"] .text-gray-400\/5,
+[data-mode="light"] .text-gray-400\/10,
+[data-mode="light"] .text-gray-400\/15,
+[data-mode="light"] .text-gray-400\/20,
+[data-mode="light"] .text-gray-400\/25,
+[data-mode="light"] .text-gray-400\/30,
+[data-mode="light"] .text-gray-400\/35,
+[data-mode="light"] .text-gray-400\/40,
+[data-mode="light"] .text-gray-400\/45,
+[data-mode="light"] .text-gray-400\/50,
+[data-mode="light"] .text-gray-400\/55,
+[data-mode="light"] .text-gray-400\/60,
+[data-mode="light"] .text-gray-400\/65,
+[data-mode="light"] .text-gray-400\/70,
+[data-mode="light"] .text-gray-400\/75,
+[data-mode="light"] .text-gray-400\/80,
+[data-mode="light"] .text-gray-400\/85,
+[data-mode="light"] .text-gray-400\/90,
+[data-mode="light"] .text-gray-400\/95,
+[data-mode="light"] .text-slate-300,
+[data-mode="light"] .text-slate-300\/5,
+[data-mode="light"] .text-slate-300\/10,
+[data-mode="light"] .text-slate-300\/15,
+[data-mode="light"] .text-slate-300\/20,
+[data-mode="light"] .text-slate-300\/25,
+[data-mode="light"] .text-slate-300\/30,
+[data-mode="light"] .text-slate-300\/35,
+[data-mode="light"] .text-slate-300\/40,
+[data-mode="light"] .text-slate-300\/45,
+[data-mode="light"] .text-slate-300\/50,
+[data-mode="light"] .text-slate-300\/55,
+[data-mode="light"] .text-slate-300\/60,
+[data-mode="light"] .text-slate-300\/65,
+[data-mode="light"] .text-slate-300\/70,
+[data-mode="light"] .text-slate-300\/75,
+[data-mode="light"] .text-slate-300\/80,
+[data-mode="light"] .text-slate-300\/85,
+[data-mode="light"] .text-slate-300\/90,
+[data-mode="light"] .text-slate-300\/95,
+[data-mode="light"] .text-slate-400,
+[data-mode="light"] .text-slate-400\/5,
+[data-mode="light"] .text-slate-400\/10,
+[data-mode="light"] .text-slate-400\/15,
+[data-mode="light"] .text-slate-400\/20,
+[data-mode="light"] .text-slate-400\/25,
+[data-mode="light"] .text-slate-400\/30,
+[data-mode="light"] .text-slate-400\/35,
+[data-mode="light"] .text-slate-400\/40,
+[data-mode="light"] .text-slate-400\/45,
+[data-mode="light"] .text-slate-400\/50,
+[data-mode="light"] .text-slate-400\/55,
+[data-mode="light"] .text-slate-400\/60,
+[data-mode="light"] .text-slate-400\/65,
+[data-mode="light"] .text-slate-400\/70,
+[data-mode="light"] .text-slate-400\/75,
+[data-mode="light"] .text-slate-400\/80,
+[data-mode="light"] .text-slate-400\/85,
+[data-mode="light"] .text-slate-400\/90,
+[data-mode="light"] .text-slate-400\/95,
+[data-mode="light"] .text-zinc-300,
+[data-mode="light"] .text-zinc-300\/5,
+[data-mode="light"] .text-zinc-300\/10,
+[data-mode="light"] .text-zinc-300\/15,
+[data-mode="light"] .text-zinc-300\/20,
+[data-mode="light"] .text-zinc-300\/25,
+[data-mode="light"] .text-zinc-300\/30,
+[data-mode="light"] .text-zinc-300\/35,
+[data-mode="light"] .text-zinc-300\/40,
+[data-mode="light"] .text-zinc-300\/45,
+[data-mode="light"] .text-zinc-300\/50,
+[data-mode="light"] .text-zinc-300\/55,
+[data-mode="light"] .text-zinc-300\/60,
+[data-mode="light"] .text-zinc-300\/65,
+[data-mode="light"] .text-zinc-300\/70,
+[data-mode="light"] .text-zinc-300\/75,
+[data-mode="light"] .text-zinc-300\/80,
+[data-mode="light"] .text-zinc-300\/85,
+[data-mode="light"] .text-zinc-300\/90,
+[data-mode="light"] .text-zinc-300\/95,
+[data-mode="light"] .text-zinc-400,
+[data-mode="light"] .text-zinc-400\/5,
+[data-mode="light"] .text-zinc-400\/10,
+[data-mode="light"] .text-zinc-400\/15,
+[data-mode="light"] .text-zinc-400\/20,
+[data-mode="light"] .text-zinc-400\/25,
+[data-mode="light"] .text-zinc-400\/30,
+[data-mode="light"] .text-zinc-400\/35,
+[data-mode="light"] .text-zinc-400\/40,
+[data-mode="light"] .text-zinc-400\/45,
+[data-mode="light"] .text-zinc-400\/50,
+[data-mode="light"] .text-zinc-400\/55,
+[data-mode="light"] .text-zinc-400\/60,
+[data-mode="light"] .text-zinc-400\/65,
+[data-mode="light"] .text-zinc-400\/70,
+[data-mode="light"] .text-zinc-400\/75,
+[data-mode="light"] .text-zinc-400\/80,
+[data-mode="light"] .text-zinc-400\/85,
+[data-mode="light"] .text-zinc-400\/90,
+[data-mode="light"] .text-zinc-400\/95,
+[data-mode="light"] .text-neutral-300,
+[data-mode="light"] .text-neutral-300\/5,
+[data-mode="light"] .text-neutral-300\/10,
+[data-mode="light"] .text-neutral-300\/15,
+[data-mode="light"] .text-neutral-300\/20,
+[data-mode="light"] .text-neutral-300\/25,
+[data-mode="light"] .text-neutral-300\/30,
+[data-mode="light"] .text-neutral-300\/35,
+[data-mode="light"] .text-neutral-300\/40,
+[data-mode="light"] .text-neutral-300\/45,
+[data-mode="light"] .text-neutral-300\/50,
+[data-mode="light"] .text-neutral-300\/55,
+[data-mode="light"] .text-neutral-300\/60,
+[data-mode="light"] .text-neutral-300\/65,
+[data-mode="light"] .text-neutral-300\/70,
+[data-mode="light"] .text-neutral-300\/75,
+[data-mode="light"] .text-neutral-300\/80,
+[data-mode="light"] .text-neutral-300\/85,
+[data-mode="light"] .text-neutral-300\/90,
+[data-mode="light"] .text-neutral-300\/95,
+[data-mode="light"] .text-neutral-400,
+[data-mode="light"] .text-neutral-400\/5,
+[data-mode="light"] .text-neutral-400\/10,
+[data-mode="light"] .text-neutral-400\/15,
+[data-mode="light"] .text-neutral-400\/20,
+[data-mode="light"] .text-neutral-400\/25,
+[data-mode="light"] .text-neutral-400\/30,
+[data-mode="light"] .text-neutral-400\/35,
+[data-mode="light"] .text-neutral-400\/40,
+[data-mode="light"] .text-neutral-400\/45,
+[data-mode="light"] .text-neutral-400\/50,
+[data-mode="light"] .text-neutral-400\/55,
+[data-mode="light"] .text-neutral-400\/60,
+[data-mode="light"] .text-neutral-400\/65,
+[data-mode="light"] .text-neutral-400\/70,
+[data-mode="light"] .text-neutral-400\/75,
+[data-mode="light"] .text-neutral-400\/80,
+[data-mode="light"] .text-neutral-400\/85,
+[data-mode="light"] .text-neutral-400\/90,
+[data-mode="light"] .text-neutral-400\/95 {
+  color: #52607a;
+}
+
+[data-mode="light"] .hover\:text-white:not([class*="hover:bg-"]):not([class*="bg-primary"]):not([class*="bg-emerald-"]):not([class*="bg-red-"]):hover {
+  color: #0a192f;
+}
+
+[data-mode="light"] main :is(.text-white\/5, .text-white\/10, .text-white\/15, .text-white\/20, .text-white\/25, .text-white\/30, .text-white\/35, .text-white\/40, .text-white\/45, .text-white\/50, .text-white\/55, .text-white\/60, .text-white\/65, .text-white\/70):not(button *, [class*="bg-primary"] *, [class*="bg-emerald-"] *, [class*="bg-red-"] *, [class*="bg-gradient"] *, [class*="badge"] *) {
+  color: #52607a;
+}
+
+[data-mode="light"] main button:is(.bg-white\/5, .bg-white\/10) :is(.text-white, .text-white\/70, .text-white\/80) {
+  color: #0a192f;
+}
+
+[data-mode="light"] main :is(.bg-black\/20, .bg-black\/30, .bg-black\/40, .bg-black\/50):not(.fixed, .absolute, [class*="bg-gradient"] *, [class*="bg-primary"] *) {
+  background-color: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+[data-mode="light"] main .bg-white\/10.text-white:not([class*="bg-gradient"] *, [class*="bg-primary"] *) {
+  background-color: #ffffff;
+  color: #0a192f;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.08);
+}
+
+[data-mode="light"] .text-\[\#00C985\],
+[data-mode="light"] .text-\[\#00C985\]\/40,
+[data-mode="light"] .text-\[\#00C985\]\/50,
+[data-mode="light"] .text-\[\#00C985\]\/60,
+[data-mode="light"] .text-\[\#00C985\]\/70,
+[data-mode="light"] .text-\[\#00C985\]\/80 {
+  color: #047857;
+}
+
+[data-mode="light"] .text-\[\#25D366\],
+[data-mode="light"] .text-\[\#25D366\]\/40,
+[data-mode="light"] .text-\[\#25D366\]\/50,
+[data-mode="light"] .text-\[\#25D366\]\/60,
+[data-mode="light"] .text-\[\#25D366\]\/70,
+[data-mode="light"] .text-\[\#25D366\]\/80 {
+  color: #128c4b;
+}
+
+[data-mode="light"] .text-\[\#FFD700\],
+[data-mode="light"] .text-\[\#FFD700\]\/40,
+[data-mode="light"] .text-\[\#FFD700\]\/50,
+[data-mode="light"] .text-\[\#FFD700\]\/60,
+[data-mode="light"] .text-\[\#FFD700\]\/70,
+[data-mode="light"] .text-\[\#FFD700\]\/80 {
+  color: #a16207;
 }

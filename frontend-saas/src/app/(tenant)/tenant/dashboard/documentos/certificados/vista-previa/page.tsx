@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { apiRequest } from '@/lib/tenant/api';
-import { Loader2, ArrowLeft, Printer, AlertCircle } from 'lucide-react';
+import { Loader2, ArrowLeft, Download, AlertCircle } from 'lucide-react';
+import { extractCertSpec, renderCertSpecToCanvas } from '@/lib/certImageDraw';
 
 export default function CertificatePreviewPage() {
     const searchParams = useSearchParams();
@@ -14,6 +15,8 @@ export default function CertificatePreviewPage() {
     const [htmlContent, setHtmlContent] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [downloading, setDownloading] = useState(false);
+    const [frameHeight, setFrameHeight] = useState(1100);
 
     useEffect(() => {
         const fetchPreview = async () => {
@@ -46,11 +49,51 @@ export default function CertificatePreviewPage() {
         fetchPreview();
     }, [id]);
 
-    const handlePrint = () => {
-        const iframe = document.getElementById('preview-frame') as HTMLIFrameElement;
-        if (iframe && iframe.contentWindow) {
-            iframe.contentWindow.print();
+    // PDF con el diseño tal cual (sin encabezado/pie ni márgenes del navegador que
+    // agregaba "Imprimir"). Certificados con imagen: se dibuja desde el spec embebido,
+    // el mismo renderer de Documentos y del Repositorio. Otros diseños: captura del
+    // contenido de la vista previa.
+    const handleDownloadPdf = async () => {
+        if (!htmlContent) return;
+        setDownloading(true);
+        try {
+            let canvas: HTMLCanvasElement;
+            const spec = extractCertSpec(htmlContent);
+            if (spec) {
+                canvas = await renderCertSpecToCanvas(spec, 816, 3);
+            } else {
+                const iframe = document.getElementById('preview-frame') as HTMLIFrameElement | null;
+                const doc = iframe?.contentDocument;
+                if (!doc?.body) throw new Error('La vista previa aún no está lista');
+                const { default: html2canvas } = await import('html2canvas');
+                const root = (doc.body.firstElementChild as HTMLElement) || doc.body;
+                canvas = await html2canvas(root, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    windowWidth: doc.documentElement.scrollWidth,
+                    windowHeight: doc.documentElement.scrollHeight,
+                });
+            }
+            const { default: JsPDF } = await import('jspdf');
+            const w = canvas.width, h = canvas.height;
+            const pdf = new JsPDF({ unit: 'px', format: [w, h], orientation: w >= h ? 'landscape' : 'portrait', hotfixes: ['px_scaling'] });
+            pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
+            pdf.save(`diseno_${type === 'farewell' ? 'homenaje' : 'certificado'}_${id}.pdf`);
+        } catch (err: unknown) {
+            setError('No se pudo generar el PDF: ' + (err instanceof Error ? err.message : ''));
+        } finally {
+            setDownloading(false);
         }
+    };
+
+    // La vista previa se ajusta al alto real del diseño (antes era fija: 1100 px)
+    const fitFrame = (e: React.SyntheticEvent<HTMLIFrameElement>) => {
+        const doc = e.currentTarget.contentDocument;
+        // Alto real del contenido (el documento mide al menos el alto visible del iframe)
+        const root = (doc?.body?.firstElementChild as HTMLElement | null) || doc?.body;
+        const hgt = root ? Math.ceil(root.getBoundingClientRect().bottom + (doc?.defaultView?.scrollY || 0)) : 0;
+        if (hgt) setFrameHeight(Math.max(300, hgt));
     };
 
     if (loading) {
@@ -94,29 +137,31 @@ export default function CertificatePreviewPage() {
                     </button>
                     <div>
                         <h1 className="text-sm font-bold text-white uppercase tracking-widest">Vista Previa de Diseño</h1>
-                        <p className="text-xs text-slate-500">Formato de impresión profesional</p>
+                        <p className="text-xs text-slate-500">Revisa el diseño y descárgalo en PDF</p>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-3">
                     <button
-                        onClick={handlePrint}
-                        className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-lg transition-all shadow-lg shadow-emerald-500/20"
+                        onClick={handleDownloadPdf}
+                        disabled={downloading}
+                        className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-lg transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-60"
                     >
-                        <Printer size={18} />
-                        Probar Impresión
+                        {downloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                        {downloading ? 'Generando PDF…' : 'Descargar PDF'}
                     </button>
                 </div>
             </div>
 
             {/* Preview Area */}
             <div className="flex-1 p-4 md:p-8 bg-slate-900 overflow-auto flex justify-center">
-                <div className="bg-white shadow-2xl rounded-sm overflow-hidden w-full max-w-[850px] min-h-[1100px] h-fit">
+                <div className="bg-white shadow-2xl rounded-sm overflow-hidden w-full max-w-[850px] h-fit">
                     <iframe
                         id="preview-frame"
                         srcDoc={htmlContent || ''}
-                        className="w-full h-full border-none pointer-events-auto"
-                        style={{ minHeight: '1100px' }}
+                        onLoad={fitFrame}
+                        className="w-full border-none pointer-events-auto block"
+                        style={{ height: `${frameHeight}px` }}
                         title="Vista previa del certificado"
                     />
                 </div>
@@ -125,7 +170,7 @@ export default function CertificatePreviewPage() {
             {/* Hint */}
             <div className="p-4 text-center bg-slate-950/20">
                 <p className="text-xs text-slate-500">
-                    * Esta es una previsualización con datos de prueba para verificar márgenes, colores y logos.
+                    * Previsualización con datos de prueba. &quot;Descargar PDF&quot; genera el archivo con el diseño, márgenes y elementos tal como están configurados.
                 </p>
             </div>
         </div>

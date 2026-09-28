@@ -488,7 +488,7 @@ export default function FinancialTicketCard({
                             transition-all active:scale-95 flex items-center justify-center overflow-hidden shadow-lg
                             ${allSectionsComplete
                                 ? 'bg-gradient-to-r from-primary via-emerald-600 to-primary shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-0.5'
-                                : 'bg-primary/50 cursor-default opacity-80'
+                                : 'bg-slate-200 !text-slate-600 dark:bg-primary/50 dark:!text-white cursor-default dark:opacity-80'
                             }
                             disabled:opacity-50 disabled:translate-y-0
                         `}

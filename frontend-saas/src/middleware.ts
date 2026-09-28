@@ -190,7 +190,9 @@ export default async function middleware(req: NextRequest) {
 
     // Root (Vinzer) -> /vinzer
     if (currentHost === undefined) {
-        url.pathname = `/vinzer${url.pathname}`;
+        if (!url.pathname.startsWith('/vinzer')) {
+            url.pathname = `/vinzer${url.pathname}`;
+        }
         return NextResponse.rewrite(url);
     }
 

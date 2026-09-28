@@ -566,9 +566,9 @@ export default function FarewellPickerPage() {
                                             setPendingTemplate(template);
                                             setIsPetModalOpen(true);
                                         }}
-                                        className="group text-left bg-slate-900/30 backdrop-blur-xl border border-white/[0.05] hover:border-primary/50 transition-all duration-500 rounded-[2rem] overflow-hidden flex flex-col hover:shadow-[0_20px_50px_rgba(16,185,129,0.12)] hover:-translate-y-1.5 shadow-2xl relative cursor-pointer"
+                                        className="group text-left bg-white border border-slate-200 shadow-sm dark:shadow-none dark:bg-slate-900/30 dark:backdrop-blur-xl dark:border-white/[0.05] hover:border-primary/50 transition-all duration-500 rounded-[2rem] overflow-hidden flex flex-col hover:shadow-[0_20px_50px_rgba(16,185,129,0.12)] hover:-translate-y-1.5 shadow-2xl relative cursor-pointer"
                                     >
-                                        <div className="aspect-square relative overflow-hidden border-b border-white/[0.05] bg-[#0c101b]">
+                                        <div className="aspect-square relative overflow-hidden border-b border-slate-200 bg-slate-100 dark:border-white/[0.05] dark:bg-[#0c101b]">
                                             {previewUrl ? (
                                                 <img
                                                     src={previewUrl.startsWith('data:') ? previewUrl : getImageUrl(previewUrl)}
@@ -576,7 +576,7 @@ export default function FarewellPickerPage() {
                                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
                                                 />
                                             ) : (
-                                                <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-white bg-slate-950/50">
+                                                <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-slate-800 bg-slate-100 dark:text-white dark:bg-slate-950/50">
                                                     <span
                                                         className="text-6xl mb-3 drop-shadow-lg transition-transform duration-500 group-hover:scale-110"
                                                         role="img"

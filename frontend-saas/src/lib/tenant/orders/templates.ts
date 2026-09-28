@@ -67,7 +67,6 @@ export const ORDER_TEMPLATES: OrderTemplate[] = [
             cremation: {
                 status: 'pendiente',
                 notes: 'URGENTE — Servicio mismo día. Confirmar disponibilidad con equipo operativo.',
-                scheduled_at: new Date().toISOString().slice(0, 16),
             },
             autoAddPlan: 'Individual',
             autoAddServices: ['Retiro Urgente'],

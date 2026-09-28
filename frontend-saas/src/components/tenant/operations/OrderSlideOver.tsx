@@ -5,16 +5,19 @@ import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     Activity, User, Dog, Copy, Check, FileText, ExternalLink, Loader2, Edit, Building2,
-    MessageCircle, Compass, ArrowRight, CheckCircle2, Circle, CircleDot, Image as ImageIcon,
+    MessageCircle, Compass, ArrowRight, CircleDot,
     BookHeart, Receipt, AlertCircle, Lock,
 } from 'lucide-react';
 import SlideOver from '@/components/tenant/SlideOver';
 import type { Cremation } from '@/hooks/useCremations';
 import { apiRequest, getImageUrl } from '@/lib/tenant/api';
 import { copyToClipboard } from '@/lib/clipboard';
-import { buildTrackingUrl, buildMemorialUrl } from '@/lib/publicUrls';
+import { buildTrackingUrl } from '@/lib/publicUrls';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import FarewellCardSection from './expediente/FarewellCardSection';
+import DedicationSection from './expediente/DedicationSection';
+import StageTimeline, { type Stage } from './expediente/StageTimeline';
+import { usePermissions } from '@/app/(tenant)/tenant/context/PermissionContext';
 
 // --- Tipos de GET /api/internal/cremations/{id}/expediente ---------------------
 interface Expediente {
@@ -24,11 +27,11 @@ interface Expediente {
         cremation_type?: string | null; created_at?: string | null;
         verification_code?: string | null; current_step?: string | null;
     };
-    pet: { id?: number | null; name?: string | null; species?: string | null; breed?: string | null; dedication?: string | null; photos: string[] };
+    pet: { id?: number | null; name?: string | null; species?: string | null; breed?: string | null; dedication?: string | null; dedication_source?: 'orden' | 'formulario' | null; photos: string[] };
     customer: { name?: string | null; phone?: string | null; email?: string | null };
     items: { tipo: string; nombre: string; cantidad: number; precio: number }[];
     financial: { total: number; discount?: number };
-    timeline: { step_id: number; name: string; state: 'completado' | 'en_curso' | 'pendiente'; photo_url?: string | null; comments: string[]; at?: string | null }[];
+    timeline: (Stage & { photo_url?: string | null; comments: string[]; at?: string | null })[];
     partner: { name: string; commission: { amount: number; status: string; paid_at?: string | null } | null } | null;
     deliverables: {
         tracking: { tenant_slug?: string | null; token?: string | null };
@@ -76,6 +79,7 @@ interface OrderSlideOverProps {
 export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateStatus, isUpdatingStatus }: OrderSlideOverProps) {
     const { showToast } = useToast();
     const queryClient = useQueryClient();
+    const { canEdit } = usePermissions();
     const [copied, setCopied] = useState<string | null>(null);
     const [acting, setActing] = useState(false);
 
@@ -109,9 +113,6 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
     const tenantSlug = exp?.deliverables.tracking.tenant_slug || '';
     const trackingUrl = exp && tenantSlug && exp.deliverables.tracking.token
         ? buildTrackingUrl(tenantSlug, petName, exp.deliverables.tracking.token)
-        : '';
-    const memorialUrl = exp?.deliverables.memorial && tenantSlug
-        ? buildMemorialUrl(tenantSlug, petName, exp.deliverables.memorial.uuid)
         : '';
     const phoneDigits = (exp?.customer.phone || '').replace(/\D/g, '');
     const whatsappUrl = phoneDigits
@@ -322,26 +323,7 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                         {/* Etapas */}
                         {exp.timeline.length > 0 && (
                             <Section title="Etapas del servicio" icon={<CircleDot size={14} />}>
-                                <ol className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
-                                    {exp.timeline.map((st) => (
-                                        <li key={st.step_id} className="flex gap-3 text-xs">
-                                            <span className="mt-0.5 shrink-0">
-                                                {st.state === 'completado' ? <CheckCircle2 size={16} className="text-emerald-400" />
-                                                    : st.state === 'en_curso' ? <CircleDot size={16} className="text-blue-400" />
-                                                    : <Circle size={16} className="text-white/20" />}
-                                            </span>
-                                            <div className="min-w-0 flex-1">
-                                                <p className={st.state === 'pendiente' ? 'text-muted-foreground' : 'text-white font-semibold'}>{st.name}</p>
-                                                {st.comments[0] && <p className="text-muted-foreground mt-0.5 line-clamp-2">{st.comments[0]}</p>}
-                                            </div>
-                                            {st.photo_url && (
-                                                <a href={getImageUrl(st.photo_url) || '#'} target="_blank" rel="noopener noreferrer" className="shrink-0 text-muted-foreground hover:text-white" title="Ver evidencia">
-                                                    <ImageIcon size={16} />
-                                                </a>
-                                            )}
-                                        </li>
-                                    ))}
-                                </ol>
+                                <StageTimeline stages={exp.timeline} />
                             </Section>
                         )}
 
@@ -371,6 +353,16 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                     </div>
                                 )}
                             </div>
+
+                            {/* Carta de despedida (editable; también en órdenes sin formulario) */}
+                            <DedicationSection
+                                orderId={exp.order.id}
+                                petName={petName}
+                                dedication={exp.pet.dedication}
+                                source={exp.pet.dedication_source}
+                                canEdit={canEdit('ordenes')}
+                                onSaved={() => queryClient.invalidateQueries({ queryKey: ['expediente', orderId] })}
+                            />
 
                             {/* Tarjeta de homenaje */}
                             <FarewellCardSection
@@ -414,28 +406,19 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                             </div>
 
                             {/* Memorial */}
-                            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex flex-wrap items-center justify-between gap-3">
+                            {/* Memorial online: en desarrollo. Se muestra deshabilitado con "Próximamente"
+                                (el enlace del memorial se retomará cuando el módulo esté terminado). */}
+                            <div className="p-4 rounded-2xl bg-slate-50 border border-dashed border-slate-300 dark:bg-white/[0.02] dark:border-white/10 flex flex-wrap items-center justify-between gap-3 opacity-80" aria-disabled="true">
                                 <div className="flex items-center gap-2">
-                                    <BookHeart size={16} className="text-rose-300" />
+                                    <BookHeart size={16} className="text-slate-400 dark:text-slate-500" />
                                     <div>
-                                        <p className="text-xs font-bold text-white">Memorial online</p>
-                                        <p className="text-[11px] text-muted-foreground">{memorialUrl ? 'Publicado' : 'Aún no se ha creado'}</p>
+                                        <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Memorial online</p>
+                                        <p className="text-[11px] text-slate-500 dark:text-muted-foreground">Un espacio para recordar a la mascota. Disponible pronto.</p>
                                     </div>
                                 </div>
-                                {memorialUrl && (
-                                    <div className="flex gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => copy('memorial', memorialUrl, 'Enlace del memorial copiado')}
-                                            className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition flex items-center gap-1.5"
-                                        >
-                                            {copied === 'memorial' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />} Copiar
-                                        </button>
-                                        <a href={memorialUrl} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition flex items-center gap-1.5">
-                                            <ExternalLink size={14} /> Ver
-                                        </a>
-                                    </div>
-                                )}
+                                <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 bg-slate-100 border border-slate-200 dark:text-slate-400 dark:bg-white/5 dark:border-white/10 px-2 py-1 rounded-lg">
+                                    Próximamente
+                                </span>
                             </div>
                         </Section>
 

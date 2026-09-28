@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from pydantic import BaseModel
 from app.database import get_db
 from app import schemas
 from app.api.deps import get_tenant_id
@@ -68,6 +69,39 @@ def _status_group(raw: Optional[str]) -> str:
     return "pendiente"
 
 
+class DedicationUpdate(BaseModel):
+    dedication: Optional[str] = None
+
+
+@router.put("/{cremation_id}/dedication")
+def actualizar_carta_despedida(
+    cremation_id: int,
+    body: DedicationUpdate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    _: bool = Depends(check_permission("ordenes", "edit")),
+):
+    """Carta de despedida de la orden (máx. 500). Sirve también para órdenes
+    creadas sin formulario. Vacía = sin carta."""
+    from fastapi import HTTPException
+    from app import models
+
+    text_ = (body.dedication or "").strip()
+    if len(text_) > 500:
+        raise HTTPException(status_code=400, detail="La carta de despedida admite hasta 500 caracteres")
+    oc = db.query(models.Cremation).filter(
+        models.Cremation.id == cremation_id, models.Cremation.tenant_id == tenant_id
+    ).first()
+    if not oc:
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
+    if not oc.details:
+        oc.details = models.CremationDetails(cremation_id=oc.id, tenant_id=tenant_id)
+    # "" (no None) marca que la carta se vació a propósito: no se vuelve a tomar la del formulario
+    oc.details.dedication = text_
+    db.commit()
+    return {"cremation_id": oc.id, "dedication": text_ or None}
+
+
 @router.get("/{cremation_id}/expediente")
 def obtener_expediente(
     cremation_id: int,
@@ -121,9 +155,26 @@ def obtener_expediente(
     steps = db.query(models.WorkflowStep).filter(
         models.WorkflowStep.tenant_id == tenant_id, models.WorkflowStep.is_active == True  # noqa: E712
     ).order_by(models.WorkflowStep.order_index).all()
-    evidence_by_step = {e.step_id: e for e in (oc.evidence or [])}
+    # Todas las evidencias de cada etapa (antes un dict dejaba solo la última)
+    evidence_by_step: dict = {}
+    for e in sorted(oc.evidence or [], key=lambda x: (x.created_at is None, x.created_at)):
+        evidence_by_step.setdefault(e.step_id, []).append(e)
     current_id = oc.technical.step_id if oc.technical else None
     current_idx = next((i for i, st in enumerate(steps) if st.id == current_id), -1)
+
+    # Fecha/hora y responsable de cada etapa completada: oc_cremation_technical.timeline
+    # = {"<step_id>": {"completed_at": iso, "updated_by": user_id}}
+    raw_tl = (oc.technical.timeline if oc.technical and isinstance(oc.technical.timeline, dict) else {}) or {}
+    user_ids = {v.get("updated_by") for v in raw_tl.values() if isinstance(v, dict) and v.get("updated_by")}
+    user_names = {}
+    if user_ids:
+        for uid, uname in db.query(models.User.id, models.User.name).filter(models.User.id.in_(user_ids)).all():
+            user_names[uid] = uname
+
+    def _completed(step_id):
+        v = raw_tl.get(str(step_id)) if isinstance(raw_tl, dict) else None
+        return v if isinstance(v, dict) else {}
+
     timeline = []
     for i, st in enumerate(steps):
         if group == "entregado" or (current_idx >= 0 and i < current_idx):
@@ -132,13 +183,28 @@ def obtener_expediente(
             state = "en_curso"
         else:
             state = "pendiente"
-        ev = evidence_by_step.get(st.id)
-        comments = ev.comments if ev and isinstance(ev.comments, list) else ([ev.comments] if ev and ev.comments else [])
+        evs = evidence_by_step.get(st.id, [])
+        evidence = []
+        for ev in evs:
+            comments = ev.comments if isinstance(ev.comments, list) else ([ev.comments] if ev.comments else [])
+            evidence.append({"photo_url": ev.photo_url, "comments": [c for c in comments if c], "at": ev.created_at})
+        done = _completed(st.id)
+        # En curso: desde que se completó la etapa anterior (o desde que se creó la orden)
+        started_at = None
+        if state == "en_curso":
+            prev = _completed(steps[i - 1].id) if i > 0 else {}
+            started_at = prev.get("completed_at") or oc.created_at
+        last = evidence[-1] if evidence else None
         timeline.append({
             "step_id": st.id, "name": st.name, "state": state,
-            "photo_url": ev.photo_url if ev else None,
-            "comments": [c for c in comments if c],
-            "at": ev.created_at if ev else None,
+            "completed_at": done.get("completed_at") if state == "completado" else None,
+            "completed_by": user_names.get(done.get("updated_by")) if state == "completado" else None,
+            "started_at": started_at,
+            "evidence": evidence,
+            # Compatibilidad: última evidencia plana
+            "photo_url": next((e["photo_url"] for e in reversed(evidence) if e["photo_url"]), None),
+            "comments": [c for e in evidence for c in e["comments"]],
+            "at": last["at"] if last else None,
         })
 
     # Veterinaria y comisión (solo si la comisión es de este mismo vínculo).
@@ -185,7 +251,12 @@ def obtener_expediente(
         "pet": {
             "id": pet.id if pet else None, "name": pet.name if pet else None,
             "species": pet.species if pet else None, "breed": pet.breed if pet else None,
-            "dedication": pet_data.get("dedication") or None, "photos": photos,
+            # La de la orden manda; la solicitud es solo el respaldo (órdenes antiguas)
+            "dedication": ((oc.details.dedication or None) if oc.details and oc.details.dedication is not None
+                           else (pet_data.get("dedication") or None)),
+            "dedication_source": ("orden" if oc.details and oc.details.dedication is not None
+                                  else ("formulario" if pet_data.get("dedication") else None)),
+            "photos": photos,
         },
         "customer": {
             "name": customer.name if customer else None,

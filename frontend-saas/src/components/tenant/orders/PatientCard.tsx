@@ -5,7 +5,7 @@ import { CheckCircle2, Camera, AlertTriangle, Hospital, MapPin, Phone } from 'lu
 import { motion } from 'framer-motion';
 import { API_URL } from '@/lib/tenant/api';
 import SearchableSelect from '@/components/tenant/SearchableSelect';
-import { statusLabels, statusColors } from '@/lib/tenant/orders/types';
+import { statusColors, statusOptions, normalizeOrderStatus } from '@/lib/tenant/orders/types';
 import type { Cremation, Pet, Customer, Partner } from '@/lib/tenant/orders/types';
 
 interface PatientCardProps {
@@ -77,14 +77,12 @@ export default function PatientCard({
                             Estado Operativo
                         </label>
                         <SearchableSelect
-                            options={Object.entries(statusLabels).map(([key, label]) => ({
-                                value: key,
-                                label: label,
-                            }))}
-                            value={currentCremation?.status || 'pendiente'}
+                            // Solo estados vigentes; los legados se muestran como su equivalente
+                            options={statusOptions}
+                            value={normalizeOrderStatus(currentCremation?.status)}
                             onChange={onStatusChange}
                             placeholder="Seleccionar estado..."
-                            triggerClassName={`${statusColors[currentCremation?.status || 'pendiente'] || ''} font-bold`}
+                            triggerClassName={`${statusColors[normalizeOrderStatus(currentCremation?.status)] || ''} font-bold`}
                         />
                     </div>
                 </div>

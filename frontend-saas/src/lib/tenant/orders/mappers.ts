@@ -3,6 +3,7 @@
 // ==========================================
 import type { Service, Plan, Product, Cremation, SelectedProduct, SelectedService, SelectedPlan } from './types';
 import { regions } from '@/lib/tenant/chile-data';
+import { resolveTimeZone, toZonedInputValue } from '@/lib/zonedTime';
 
 /**
  * Normalize raw services from API to ensure unit_price/unit_cost always exist.
@@ -76,13 +77,13 @@ function normalizeRegion(rawRegion?: string | null): string {
  */
 export function mapCremationToFormState(
     cremationData: any,
-    petsData: any[]
+    petsData: any[],
+    timeZone: string = resolveTimeZone(),
 ): Partial<Cremation> {
     return {
         ...cremationData,
-        scheduled_at: cremationData.scheduled_at
-            ? cremationData.scheduled_at.slice(0, 16)
-            : '',
+        // El backend guarda UTC sin zona; el input trabaja en hora local del crematorio
+        scheduled_at: toZonedInputValue(cremationData.scheduled_at, timeZone),
         pet_id: cremationData.pet_id,
         plan_id:
             cremationData.planes && cremationData.planes.length > 0
@@ -165,7 +166,9 @@ export function mapCremationPlans(
         return {
             plan_id: p.plan_id,
             unit_price: p.unit_price ?? p.precio_venta ?? 0,
-            unit_cost: p.unit_cost ?? 0,
+            // El backend envía el costo congelado como precio_costo (igual que servicios y
+            // productos). Antes solo se leía unit_cost: el costo del plan quedaba en 0 al editar.
+            unit_cost: p.unit_cost ?? p.precio_costo ?? original?.cost ?? 0,
             name: original?.name || 'Plan Eliminado',
             es_principal: p.es_principal ?? true,
         };

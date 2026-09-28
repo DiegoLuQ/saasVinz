@@ -635,7 +635,8 @@ def create_services_from_submission(
             images=pet.images or [],
             notes=f"Generado desde formulario público. Plan: {plan_name}. [RETIRO: {pickup_loc}]",
             service_code=owner.get("service_code"),
-            tracking_token=submission.code
+            tracking_token=submission.code,
+            dedication=((submission.pet_data or {}).get("dedication") or "").strip()[:500] or None,
         ))
         
         # 5. Partitioned: Scheduling

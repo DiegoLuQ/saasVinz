@@ -272,7 +272,8 @@ def get_tracking_info(
         tenant_logo=tenant.logo_url,
         tenant_website=tenant_website,
         tenant_social_media=tenant.social_media if isinstance(tenant.social_media, dict) else None,
-        pet_dedication=getattr(pet, "dedication", None) or getattr(pet, "notes", None),
+        # Carta de despedida de la orden (oc_details.dedication; la mascota no tiene ese campo)
+        pet_dedication=((cremation.details.dedication if cremation.details else None) or None),
         farewell_template_config=farewell_tpl.config if farewell_tpl else None,
         is_ultra_plan="ULTRA" in ((getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper()),
         tenant_plan=(getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper()

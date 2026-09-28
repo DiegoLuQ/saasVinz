@@ -56,10 +56,12 @@ export const useDeletePet = () => {
 
     return useMutation({
         mutationFn: (id: number) => apiRequest(`/api/internal/pets/${id}`, { method: 'DELETE' }),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['pets'] });
-            queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
-            showToast('Mascota eliminada', 'success');
+        onSuccess: (res: { orders?: number; images_deleted?: number } | undefined) => {
+            // Se borran también sus órdenes: refrescar listados que las muestran
+            ['pets', 'session-bootstrap', 'cremations', 'cremations-simple', 'dashboard-summary', 'customers']
+                .forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
+            const extra = res?.orders ? ` junto con ${res.orders} orden(es)` : '';
+            showToast(`Mascota eliminada${extra}`, 'success');
         },
         onError: (err: any) => {
             showToast(err.message || 'Error al eliminar mascota', 'error');

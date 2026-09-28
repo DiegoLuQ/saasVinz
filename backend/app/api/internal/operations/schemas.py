@@ -383,6 +383,12 @@ class DashboardStatData(BaseModel):
     monthly_revenue: float
     pending_revenue: float
     previous_month_revenue: float = 0.0
+    # Comparación mes a la fecha (este mes vs. mes anterior hasta el mismo día/hora)
+    new_pets_this_month: int = 0
+    new_pets_previous_month: int = 0
+    new_customers_this_month: int = 0
+    new_customers_previous_month: int = 0
+    cremations_previous_month: int = 0
 
 class DashboardLimitItem(BaseModel):
     usage: int

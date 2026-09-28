@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+    Star,
     Plus,
     AlertCircle,
     Loader2,
@@ -31,6 +32,7 @@ import { buildTrackingUrl } from '@/lib/publicUrls';
 import { motion, AnimatePresence } from 'framer-motion';
 import Modal from '@/components/tenant/Modal';
 import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
+import { normalizeOrderStatus } from '@/lib/tenant/orders/types';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import CancellationModal from '@/components/tenant/CancellationModal';
 import { useCremations, useUpdateCremationStatus, useDeleteCremation, type Cremation } from '@/hooks/useCremations';
@@ -44,16 +46,9 @@ import { PlanLimitModal } from '@/components/tenant/PlanLimitModal';
 // ==========================================
 // Status normalization
 // ==========================================
-const normalizeStatus = (v: string): string => {
-    if (!v) return 'pendiente';
-    v = v.toLowerCase();
-    if (['draft', 'pending'].includes(v)) return 'pendiente';
-    if (['processing', 'ready'].includes(v)) return 'en_proceso';
-    // Estado final único = entregado. 'completado'/'completed' quedan retirados → entregado
-    if (['delivered', 'completed', 'completado'].includes(v)) return 'entregado';
-    if (['canceled'].includes(v)) return 'cancelado';
-    return v;
-};
+// Estados legados/en inglés (received, coordinado, completado, delivered…) se pliegan
+// al estado vigente; antes "received" no calzaba en ninguna columna y la orden no se veía.
+const normalizeStatus = (v: string): string => normalizeOrderStatus(v);
 
 const getPartnerShortName = (name?: string): string => {
     if (!name) return '';
@@ -73,6 +68,8 @@ const isToday = (dateStr?: string): boolean => {
 export default function CremationsPage() {
     const { showToast } = useToast();
     const { tenantData, formatLimit } = useTenant();
+    // Enlace de reseñas de Google del crematorio (Perfil de Empresa)
+    const reviewUrl: string | undefined = (tenantData as { social_media?: { google_review?: string } } | null)?.social_media?.google_review || undefined;
     const router = useRouter();
 
     // ==========================================
@@ -442,6 +439,27 @@ export default function CremationsPage() {
                                 >
                                     <MessageCircle size={11} />
                                     <span className="hidden sm:inline font-bold">WhatsApp</span>
+                                </button>
+                            )}
+
+                            {/* Reseña en Google: solo con el servicio entregado y el enlace configurado en Perfil de Empresa */}
+                            {isCompleted && reviewUrl && item.pet?.customer?.phone && (
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        const cleanPhone = (item.pet?.customer?.phone || '').replace(/\D/g, '');
+                                        const msg = encodeURIComponent(
+                                            `Hola ${item.pet?.customer?.name || ''}, gracias por confiarnos la despedida de ${item.pet?.name || 'tu mascota'}. ` +
+                                            `Si nuestro acompañamiento te fue de ayuda, nos alegraría mucho que compartieras tu experiencia: ${reviewUrl}`
+                                        );
+                                        window.open(`https://wa.me/${cleanPhone}?text=${msg}`, '_blank');
+                                    }}
+                                    className="p-1 rounded-md bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/25 transition flex items-center gap-1 text-[10px]"
+                                    title="Pedir reseña en Google por WhatsApp"
+                                >
+                                    <Star size={11} />
+                                    <span className="hidden sm:inline font-bold">Reseña</span>
                                 </button>
                             )}
                         </div>

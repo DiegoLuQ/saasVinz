@@ -36,6 +36,8 @@ import type {
     SelectedService,
     SelectedPlan,
 } from '@/lib/tenant/orders/types';
+import { resolveTimeZone, nowZonedInputValue, zonedInputToUtcISO } from '@/lib/zonedTime';
+import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
 
 export interface UseOrderFormOptions {
     /** 'full' = formulario completo (registro). 'express' = creación rápida (crear-seguimiento). */
@@ -55,6 +57,9 @@ export interface UseOrderFormOptions {
 }
 
 export function useOrderForm(options: UseOrderFormOptions = {}) {
+    // Zona horaria de la programación: la del crematorio (por país) o, si no, la del navegador
+    const { tenantData } = useTenant();
+    const timeZone = resolveTimeZone((tenantData as { timezone?: string | null } | null)?.timezone);
     const {
         mode = 'full',
         requireImages = mode !== 'express',
@@ -96,7 +101,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
     const [currentCremation, setCurrentCremation] = useState<Partial<Cremation>>({
         pet_id: 0,
         status: 'en_proceso',
-        scheduled_at: new Date().toISOString().slice(0, 16),
+        scheduled_at: nowZonedInputValue(resolveTimeZone()),
         notes: '',
         discount: 0,
         weight_price: 0,
@@ -112,6 +117,17 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
     const [showCropper, setShowCropper] = useState(false);
     const [cropSource, setCropSource] = useState<string | null>(null);
     const [isDirty, setIsDirty] = useState(false);
+    // Foto de la mascota recortada pero AÚN NO subida: se sube a Cloudflare recién al
+    // guardar la orden (Actualizar/Confirmar). Así un error o un arrepentimiento no deja
+    // archivos huérfanos en el almacenamiento.
+    const [pendingPetPhoto, setPendingPetPhotoState] = useState<{ petId: number; blob: Blob; preview: string } | null>(null);
+    const setPendingPetPhoto = useCallback((petId: number, blob: Blob | null) => {
+        setPendingPetPhotoState((prev) => {
+            if (prev) URL.revokeObjectURL(prev.preview);
+            return blob ? { petId, blob, preview: URL.createObjectURL(blob) } : null;
+        });
+        if (blob) setIsDirty(true);
+    }, []);
     const [replacementPending, setReplacementPending] = useState<{
         type: 'plan' | 'service' | 'product';
         currentName: string;
@@ -196,7 +212,9 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
         const hasAddress = !!currentCremation.address && currentCremation.address.trim().length > 0;
         const hasLogistics = hasSchedule && hasAddress;
         const hasServiceOrPlan = selectedServices.length > 0 || selectedPlans.length > 0;
-        const hasImages = (currentCremation.images?.length || 0) + localPreviews.length > 0;
+        // La foto pendiente de la mascota también cuenta: al guardar se agrega como imagen de la orden
+        const hasPendingPetPhoto = !!pendingPetPhoto && pendingPetPhoto.petId === currentCremation.pet_id;
+        const hasImages = (currentCremation.images?.length || 0) + localPreviews.length > 0 || hasPendingPetPhoto;
 
         return {
             patient: { complete: hasPet, label: 'Mascota' },
@@ -207,7 +225,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
     }, [
         currentCremation.pet_id, currentCremation.scheduled_at,
         currentCremation.address, currentCremation.images,
-        selectedServices.length, selectedPlans.length, localPreviews.length,
+        selectedServices.length, selectedPlans.length, localPreviews.length, pendingPetPhoto,
     ]);
 
     const allSectionsComplete = useMemo(
@@ -352,7 +370,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
             // Load existing cremation if editing
             if (editId) {
                 const cremationData = await apiRequest(`/api/internal/cremations/${editId}`);
-                const formState = mapCremationToFormState(cremationData, petsData);
+                const formState = mapCremationToFormState(cremationData, petsData, timeZone);
                 setCurrentCremation(formState);
                 setOriginalCremation({ ...formState }); // Snapshot for diff tracking
 
@@ -987,7 +1005,8 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
             return;
         }
 
-        if (requireImages && selectedImages.length === 0 && (!currentCremation.images || currentCremation.images.length === 0)) {
+        const pendingPhotoForThisPet = !!pendingPetPhoto && pendingPetPhoto.petId === currentCremation.pet_id;
+        if (requireImages && selectedImages.length === 0 && (!currentCremation.images || currentCremation.images.length === 0) && !pendingPhotoForThisPet) {
             showToast('Para guardar o actualizar el registro debe subir al menos 1 imagen obligatoria de evidencia o mascota', 'error');
             return;
         }
@@ -1026,8 +1045,10 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
                 pickup_address: currentCremation.pickup_address || null,
                 cremation_type: processType,
                 status: currentCremation.status,
+                // Hora de pared en la zona del crematorio → instante UTC (antes se interpretaba
+                // en la zona del navegador sobre un valor que ya venía en UTC: +4 h por guardado)
                 scheduled_at: currentCremation.scheduled_at
-                    ? new Date(currentCremation.scheduled_at).toISOString()
+                    ? zonedInputToUtcISO(currentCremation.scheduled_at, timeZone)
                     : null,
                 notes: currentCremation.notes,
                 images: currentCremation.images || [],
@@ -1087,7 +1108,37 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
                 });
             }
 
-            showToast(`Servicio ${isEdit ? 'actualizado' : 'registrado'} con éxito`, 'success');
+            // Foto pendiente de la mascota: solo si corresponde a la mascota de esta orden
+            let petPhotoFailed = false;
+            if (pendingPetPhoto && pendingPetPhoto.petId === currentCremation.pet_id) {
+                try {
+                    const pet = pets.find((pp) => pp.id === pendingPetPhoto.petId);
+                    const fd = new FormData();
+                    fd.append('file', pendingPetPhoto.blob, `${pet?.name || 'mascota'}.jpg`);
+                    const qs = new URLSearchParams({ pet_name: pet?.name || 'mascota', customer_id: String(pet?.customer_id ?? 0) });
+                    const up = await apiRequest(`/api/internal/pets/upload-image?${qs}`, { method: 'POST', body: fd });
+                    const images = [up.image_url, ...((pet?.images || []).filter((u: string) => u !== up.image_url))];
+                    await apiRequest(`/api/internal/pets/${pendingPetPhoto.petId}`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({ image_url: up.image_url, images }),
+                    });
+                    setPets((prev) => prev.map((pp) => (pp.id === pendingPetPhoto.petId ? { ...pp, image_url: up.image_url, images } : pp)));
+                    // Orden sin imágenes: la foto de la mascota queda como su imagen (igual que "Cargar desde Mascota")
+                    if (!(currentCremation.images?.length) && selectedImages.length === 0) {
+                        await apiRequest(`/api/internal/cremations/${targetId}`, {
+                            method: 'PATCH',
+                            body: JSON.stringify({ images: [up.image_url] }),
+                        });
+                        setCurrentCremation((prev) => ({ ...prev, images: [up.image_url] }));
+                    }
+                    setPendingPetPhoto(pendingPetPhoto.petId, null);
+                } catch (photoErr: any) {
+                    petPhotoFailed = true;
+                    showToast(`La orden se guardó, pero la foto no se pudo subir: ${photoErr?.message || ''}. Queda pendiente para reintentar.`, 'error');
+                }
+            }
+
+            if (!petPhotoFailed) showToast(`Servicio ${isEdit ? 'actualizado' : 'registrado'} con éxito`, 'success');
             if (enableDraft) clearDraft();  // Remove localStorage draft on success
             setIsDirty(false);  // Prevent beforeunload on navigation
             setJustSaved(true);  // Evita re-crear el borrador al salir tras guardar
@@ -1106,7 +1157,8 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
     }, [
         currentCremation, selectedServices, selectedPlans, selectedProducts,
         selectedImages, grandTotal, grandTotalCost, editId, products, router, showToast,
-        requireImages, cremationTypeOverride, enableDraft, redirectAfterSave, onSaveSuccess, clearDraft
+        requireImages, cremationTypeOverride, enableDraft, redirectAfterSave, onSaveSuccess, clearDraft,
+        pendingPetPhoto, pets, setPendingPetPhoto, timeZone
     ]);
 
     // ==========================================
@@ -1198,6 +1250,8 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
         // Catalog data
         pets,
         setPets,
+        pendingPetPhoto,
+        setPendingPetPhoto,
         customers,
         setCustomers,
         services,

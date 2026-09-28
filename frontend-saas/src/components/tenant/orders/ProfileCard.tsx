@@ -5,7 +5,9 @@ import { Camera, AlertTriangle, Hospital, MapPin, Phone, Mail, IdCard, User } fr
 import { motion } from 'framer-motion';
 import { API_URL } from '@/lib/tenant/api';
 import SearchableSelect from '@/components/tenant/SearchableSelect';
-import { statusLabels, statusColors } from '@/lib/tenant/orders/types';
+import PetPhotoUploader from './PetPhotoUploader';
+import PetDatesEditor from './PetDatesEditor';
+import { statusColors, statusOptions, normalizeOrderStatus } from '@/lib/tenant/orders/types';
 import type { Cremation, Pet, Customer, Partner } from '@/lib/tenant/orders/types';
 
 interface ProfileCardProps {
@@ -17,6 +19,12 @@ interface ProfileCardProps {
     onPetChange: (val: string | number) => void;
     onStatusChange: (val: string | number) => void;
     onNewPetClick?: () => void;
+    /** Fechas editadas desde la orden: refresca la mascota en el formulario */
+    onPetPhotoSaved?: (pet: Pet) => void;
+    /** Foto recortada pendiente (se sube al guardar la orden) */
+    pendingPhotoPreview?: string | null;
+    onPetPhotoPicked?: (blob: Blob) => void;
+    onPetPhotoDiscard?: () => void;
 }
 
 export default function ProfileCard({
@@ -28,8 +36,13 @@ export default function ProfileCard({
     onPetChange,
     onStatusChange,
     onNewPetClick,
+    onPetPhotoSaved,
+    pendingPhotoPreview,
+    onPetPhotoPicked,
+    onPetPhotoDiscard,
 }: ProfileCardProps) {
     const hasPet = !!currentCremation?.pet_id && !!selectedPet;
+    const petPhoto = selectedPet?.images?.[0] || selectedPet?.image_url || null;
 
     return (
         <section className="bg-white/[0.02] rounded-3xl border border-white/[0.06] overflow-hidden">
@@ -63,11 +76,12 @@ export default function ProfileCard({
                             Estado Operativo
                         </label>
                         <SearchableSelect
-                            options={Object.entries(statusLabels).map(([key, label]) => ({ value: key, label }))}
-                            value={currentCremation?.status || 'pendiente'}
+                            // Solo estados vigentes; los legados se muestran como su equivalente
+                            options={statusOptions}
+                            value={normalizeOrderStatus(currentCremation?.status)}
                             onChange={onStatusChange}
                             placeholder="Seleccionar estado..."
-                            triggerClassName={`${statusColors[currentCremation?.status || 'pendiente'] || ''} font-bold`}
+                            triggerClassName={`${statusColors[normalizeOrderStatus(currentCremation?.status)] || ''} font-bold`}
                         />
                     </div>
                 </div>
@@ -83,32 +97,48 @@ export default function ProfileCard({
                             aria-label={`Perfil de ${selectedPet.name}`}
                         >
                             {/* Round Avatar */}
-                            <div className="w-24 h-24 rounded-full overflow-hidden bg-black/30 border-2 border-primary/20 ring-4 ring-primary/[0.05] mb-4 shrink-0">
-                                {selectedPet.images && selectedPet.images.length > 0 ? (
+                            <div className="w-24 h-24 rounded-full overflow-hidden bg-slate-100 dark:bg-black/30 border-2 border-primary/20 ring-4 ring-primary/[0.05] shrink-0">
+                                {pendingPhotoPreview || petPhoto ? (
                                     <img
-                                        src={selectedPet.images[0].startsWith('http') ? selectedPet.images[0] : `${API_URL}${selectedPet.images[0]}`}
+                                        src={pendingPhotoPreview || (petPhoto!.startsWith('http') ? petPhoto! : `${API_URL}${petPhoto}`)}
                                         alt={`Foto de ${selectedPet.name}`}
                                         className="w-full h-full object-cover"
                                     />
                                 ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-muted-foreground/40" aria-hidden="true">
+                                    <div className="w-full h-full flex items-center justify-center text-slate-400 dark:text-muted-foreground/40" aria-hidden="true">
                                         <Camera size={28} />
                                     </div>
                                 )}
                             </div>
+                            {onPetPhotoPicked && onPetPhotoDiscard && (
+                                <PetPhotoUploader
+                                    petName={selectedPet.name}
+                                    hasPhoto={!!petPhoto}
+                                    pending={!!pendingPhotoPreview}
+                                    onPicked={onPetPhotoPicked}
+                                    onDiscard={onPetPhotoDiscard}
+                                />
+                            )}
+                            <div className="mb-4" />
 
                             <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.22em] mb-1">Angelito</p>
                             <h3 className="text-xl font-black text-white tracking-tight mb-3 truncate max-w-full">{selectedPet.name}</h3>
 
                             <dl className="grid grid-cols-2 gap-3 w-full text-left">
-                                <div>
-                                    <dt className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Nacimiento</dt>
-                                    <dd className="text-[11px] font-mono text-white mt-0.5">{selectedPet.birth_date?.split('T')[0] || '—'}</dd>
-                                </div>
-                                <div>
-                                    <dt className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Fallecimiento</dt>
-                                    <dd className="text-[11px] font-mono text-red-400/80 mt-0.5">{selectedPet.death_date?.split('T')[0] || '—'}</dd>
-                                </div>
+                                {onPetPhotoSaved ? (
+                                    <PetDatesEditor pet={selectedPet} onSaved={onPetPhotoSaved} />
+                                ) : (
+                                    <>
+                                        <div>
+                                            <dt className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Nacimiento</dt>
+                                            <dd className="text-[11px] font-mono text-slate-900 dark:text-white mt-0.5">{selectedPet.birth_date?.split('T')[0] || '—'}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Fallecimiento</dt>
+                                            <dd className="text-[11px] font-mono text-red-700 dark:text-red-400/80 mt-0.5">{selectedPet.death_date?.split('T')[0] || '—'}</dd>
+                                        </div>
+                                    </>
+                                )}
                                 {currentCremation?.weight ? (
                                     <div className="col-span-2 pt-2 border-t border-white/[0.05]">
                                         <dt className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Peso</dt>

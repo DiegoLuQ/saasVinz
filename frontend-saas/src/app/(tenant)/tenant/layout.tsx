@@ -23,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className={`${outfit.variable} antialiased min-h-screen text-slate-100`}>
+    <div className={`${outfit.variable} antialiased min-h-screen text-foreground`}>
       <QueryClientProvider client={queryClient}>
         <TenantProvider>
           <ThemeProvider>

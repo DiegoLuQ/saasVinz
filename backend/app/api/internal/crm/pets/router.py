@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 import os
 from sqlalchemy.orm import Session
 from app.database import get_db
+from app.auth import get_current_user
 from app import models
 from app import schemas
 from app.api.deps import get_tenant_id
@@ -191,56 +192,44 @@ def delete_image(
 
     return {"status": "deleted"}
 
-@router.delete("/{pet_id}")
-def delete_pet(
+@router.get("/{pet_id}/delete-preview")
+def preview_delete_pet(
     pet_id: int,
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
     _: bool = Depends(check_permission("mascotas", "delete"))
 ):
-    """Elimina una mascota si no tiene servicios asociados."""
-    # 1. Verificar existencia
-    db_pet = db.query(models.Pet).filter(
-        models.Pet.id == pet_id,
-        models.Pet.tenant_id == tenant_id
-    ).first()
-    
+    """Qué se eliminará junto con la mascota (para el modal de confirmación)."""
+    from app.api.internal.crm.pets import purge
+    db_pet = db.query(models.Pet).filter(models.Pet.id == pet_id, models.Pet.tenant_id == tenant_id).first()
+    if not db_pet:
+        raise HTTPException(status_code=404, detail="Mascota no encontrada")
+    return purge.preview(db, tenant_id, db_pet)
+
+
+@router.delete("/{pet_id}")
+def delete_pet(
+    pet_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    current_user: models.User = Depends(get_current_user),
+    _: bool = Depends(check_permission("mascotas", "delete"))
+):
+    """Elimina la mascota y TODO lo asociado: órdenes (con evidencias, certificados,
+    comisión, etc.), memoriales, solicitudes web e imágenes en Cloudflare R2.
+    Si tiene órdenes, además exige permiso para eliminar órdenes."""
+    from app.api.internal.crm.pets import purge
+    db_pet = db.query(models.Pet).filter(models.Pet.id == pet_id, models.Pet.tenant_id == tenant_id).first()
     if not db_pet:
         raise HTTPException(status_code=404, detail="Mascota no encontrada")
 
-    # 2. Verificar dependencias (Cremaciones)
-    cremation_exists = db.query(models.Cremation).filter(
-        models.Cremation.pet_id == pet_id,
-        models.Cremation.tenant_id == tenant_id
-    ).first()
+    has_orders = db.query(models.Cremation.id).filter(
+        models.Cremation.pet_id == pet_id, models.Cremation.tenant_id == tenant_id
+    ).first() is not None
+    if has_orders:
+        # Misma regla que el resto de la app para borrar órdenes
+        check_permission("ordenes", "delete")(db=db, current_user=current_user)
 
-    if cremation_exists:
-        raise HTTPException(
-            status_code=409, 
-            detail="No se puede eliminar la mascota porque tiene servicios asociados."
-        )
-
-    # 3. Eliminar imágenes (soporta R2 y MediaLibrary)
-    from app.api.internal.common.models import MediaLibrary
-    
-    # Imagen principal
-    if db_pet.image_url:
-        m_item = db.query(MediaLibrary).filter(MediaLibrary.url == db_pet.image_url).first()
-        if m_item: MediaService.delete_media(db, m_item)
-        else:
-            MediaService.delete_media_by_url(db, db_pet.image_url)
-        
-    # Galería
-    if db_pet.images:
-        for image_path in db_pet.images:
-            m_item = db.query(MediaLibrary).filter(MediaLibrary.url == image_path).first()
-            if m_item: MediaService.delete_media(db, m_item)
-            else:
-                from app.utils.images import delete_physical_file
-                delete_physical_file(image_path)
-
-    # 4. Eliminar registro
-    db.delete(db_pet)
-    db.commit()
-
-    return {"status": "deleted", "message": f"Mascota {db_pet.name} eliminada correctamente"}
+    name = db_pet.name
+    summary = purge.purge(db, tenant_id, db_pet)
+    return {"status": "deleted", "message": f"Mascota {name} eliminada correctamente", **summary}

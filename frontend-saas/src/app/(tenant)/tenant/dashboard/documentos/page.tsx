@@ -482,7 +482,7 @@ export default function EmitirDocumentosPage() {
                                     <div className="flex items-center gap-2">
                                         <h3 className="text-lg font-bold text-white truncate">{active.name}</h3>
                                         {(active.is_locked || (active.tenant_id && active.tenant_id > 0)) ? (
-                                            <span className="text-[9px] text-amber-300 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded font-black uppercase flex items-center gap-1">
+                                            <span className="text-[9px] text-amber-800 bg-amber-100 border border-amber-300 dark:text-amber-300 dark:bg-amber-500/20 dark:border-amber-500/30 px-1.5 py-0.5 rounded font-black uppercase flex items-center gap-1">
                                                 <Lock size={9} /> Exclusiva
                                             </span>
                                         ) : (
@@ -525,14 +525,14 @@ export default function EmitirDocumentosPage() {
                                                 <button
                                                     key={c.id}
                                                     onClick={() => { setSelectedCremId(c.id); setPhotoOverrides({}); }}
-                                                    className={`w-full flex items-center gap-3 p-2.5 rounded-xl border text-left transition-all ${selectedCremId === c.id ? 'bg-primary/15 border-primary/40' : 'bg-white/[0.02] border-white/5 hover:bg-white/5'}`}
+                                                    className={`w-full flex items-center gap-3 p-2.5 rounded-xl border text-left transition-all ${selectedCremId === c.id ? 'bg-emerald-50 border-emerald-300 dark:bg-primary/15 dark:border-primary/40' : 'bg-white border-slate-200 hover:bg-slate-50 dark:bg-white/[0.02] dark:border-white/5 dark:hover:bg-white/5'}`}
                                                 >
                                                     <div className="w-9 h-9 rounded-lg bg-black/40 overflow-hidden shrink-0">
                                                         {(c.pet?.image_url) ? <img src={getImageUrl(c.pet.image_url)} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><PawPrint size={14} className="text-white/20" /></div>}
                                                     </div>
                                                     <div className="min-w-0">
-                                                        <p className="text-xs font-bold text-white truncate">{c.pet_name || c.pet?.name || 'Mascota'}</p>
-                                                        <p className="text-[10px] text-white/30 truncate">{c.customer_name ? `${c.customer_name} · ` : ''}Orden #{c.id}</p>
+                                                        <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{c.pet_name || c.pet?.name || 'Mascota'}</p>
+                                                        <p className="text-[10px] text-slate-500 dark:text-white/40 truncate">{c.customer_name ? `${c.customer_name} · ` : ''}Orden #{c.id}</p>
                                                     </div>
                                                 </button>
                                             ))

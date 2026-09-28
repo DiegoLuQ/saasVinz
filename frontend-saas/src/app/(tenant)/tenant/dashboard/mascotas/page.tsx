@@ -58,7 +58,7 @@ interface Pet {
 
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import Modal from '@/components/tenant/Modal';
-import DeleteConfirmationModal from '@/components/tenant/DeleteConfirmationModal';
+import PetDeleteModal from '@/components/tenant/pets/PetDeleteModal';
 
 interface Customer {
     id: number;
@@ -299,8 +299,8 @@ export default function PetsPage() {
         try {
             await deletePetMutation.mutateAsync(petToDelete.id);
             setPetToDelete(null);
-        } catch (err) {
-            setPetToDelete(null);
+        } catch {
+            // El hook ya muestra el error; el modal queda abierto para reintentar
         }
     };
 
@@ -623,7 +623,8 @@ export default function PetsPage() {
                                                 e.stopPropagation();
                                                 setActiveDropdown(activeDropdown === pet.id ? null : pet.id);
                                             }}
-                                            className="p-2.5 rounded-xl bg-white/5 text-muted-foreground hover:text-foreground hover:bg-white/10 transition-all"
+                                            className="p-2.5 rounded-xl bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200 dark:bg-white/5 dark:text-muted-foreground dark:hover:text-foreground dark:hover:bg-white/10 transition-all"
+                                            aria-label={`Acciones de ${pet.name}`}
                                         >
                                             <MoreVertical size={16} />
                                         </button>
@@ -639,14 +640,14 @@ export default function PetsPage() {
                                                         initial={{ opacity: 0, scale: 0.95, y: -10 }}
                                                         animate={{ opacity: 1, scale: 1, y: 0 }}
                                                         exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                                        className="absolute right-0 mt-2 w-48 bg-[#1a1f2e] border border-white/10 rounded-2xl shadow-2xl z-20 overflow-hidden"
+                                                        className="absolute right-0 mt-2 w-52 bg-white border border-slate-200 text-slate-800 dark:bg-[#1a1f2e] dark:border-white/10 dark:text-slate-100 rounded-2xl shadow-xl z-20 overflow-hidden"
                                                     >
                                                         <button
                                                             onClick={() => {
                                                                 handleOpenModal(pet);
                                                                 setActiveDropdown(null);
                                                             }}
-                                                            className="w-full px-4 py-3 text-left text-sm hover:bg-white/5 flex items-center gap-3 transition-colors"
+                                                            className="w-full px-4 py-3 text-left text-sm font-medium hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors"
                                                         >
                                                             <Edit2 size={14} className="text-primary" />
                                                             Editar Mascota
@@ -660,9 +661,9 @@ export default function PetsPage() {
                                                                     setIsMemorialModalOpen(true);
                                                                     setActiveDropdown(null);
                                                                 }}
-                                                                className="w-full px-4 py-3 text-left text-sm hover:bg-white/5 flex items-center gap-3 transition-colors border-t border-white/5"
+                                                                className="w-full px-4 py-3 text-left text-sm font-medium hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors border-t border-slate-100 dark:border-white/5"
                                                             >
-                                                                <Heart size={14} className="text-pink-400" />
+                                                                <Heart size={14} className="text-pink-600 dark:text-pink-400" />
                                                                 Configurar Memorial
                                                             </button>
                                                         )}
@@ -673,7 +674,7 @@ export default function PetsPage() {
                                                                     handleDelete(pet);
                                                                     setActiveDropdown(null);
                                                                 }}
-                                                                className="w-full px-4 py-3 text-left text-sm hover:bg-red-500/10 text-red-400 flex items-center gap-3 transition-colors border-t border-white/5"
+                                                                className="w-full px-4 py-3 text-left text-sm font-medium hover:bg-red-50 dark:hover:bg-red-500/10 text-red-700 dark:text-red-400 flex items-center gap-3 transition-colors border-t border-slate-100 dark:border-white/5"
                                                             >
                                                                 <Trash2 size={14} />
                                                                 Eliminar
@@ -1086,12 +1087,11 @@ export default function PetsPage() {
                 )
             }
             {/* Modal de Confirmación para eliminar Mascota */}
-            <DeleteConfirmationModal
-                isOpen={!!petToDelete}
+            <PetDeleteModal
+                pet={petToDelete}
                 onClose={() => setPetToDelete(null)}
                 onConfirm={handleConfirmDeletePet}
-                title="¿Eliminar Mascota?"
-                description={`Estás a punto de eliminar a la mascota "${petToDelete?.name}". Esta acción no se puede deshacer.`}
+                isDeleting={deletePetMutation.isPending}
             />
             {/* Modal de Límite */}
             <PlanLimitModal

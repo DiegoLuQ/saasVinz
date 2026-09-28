@@ -63,10 +63,10 @@ export default function SlideOver({
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                        className={`relative w-full ${width} h-full flex flex-col bg-zinc-950 border-l border-white/[0.08] shadow-2xl shadow-black/50`}
+                        className={`relative w-full ${width} h-full flex flex-col bg-slate-50 border-l border-slate-200 shadow-2xl shadow-black/20 dark:bg-zinc-950 dark:border-white/[0.08] dark:shadow-black/50`}
                     >
                         {/* Header */}
-                        <header className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06] bg-black/30 shrink-0">
+                        <header className="flex items-center justify-between px-6 py-5 border-b border-slate-200 bg-white dark:border-white/[0.06] dark:bg-black/30 shrink-0">
                             <div className="flex items-center gap-3 min-w-0">
                                 {icon && (
                                     <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center text-primary shrink-0">
@@ -74,7 +74,7 @@ export default function SlideOver({
                                     </div>
                                 )}
                                 <div className="min-w-0">
-                                    <h2 className="text-sm font-black text-white tracking-tight uppercase truncate">
+                                    <h2 className="text-sm font-black text-slate-900 dark:text-white tracking-tight uppercase truncate">
                                         {title}
                                     </h2>
                                     {subtitle && (
@@ -87,7 +87,7 @@ export default function SlideOver({
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="p-2.5 rounded-xl hover:bg-white/5 text-muted-foreground hover:text-white transition-all shrink-0"
+                                className="p-2.5 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-slate-900 dark:hover:bg-white/5 dark:text-muted-foreground dark:hover:text-white transition-all shrink-0"
                                 aria-label="Cerrar panel"
                             >
                                 <X size={20} />

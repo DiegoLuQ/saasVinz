@@ -49,6 +49,9 @@ export default function RegisterServicePage() {
     } | null>(null);
 
     const {
+        setPets,
+        pendingPetPhoto,
+        setPendingPetPhoto,
         // Route
         editId,
         router,
@@ -295,8 +298,8 @@ export default function RegisterServicePage() {
                                         className={`
                                             w-full flex items-center gap-3 px-4 py-3.5 text-left transition-all border-l-2
                                             ${isActive
-                                                ? 'bg-primary/10 border-l-primary text-white'
-                                                : 'border-l-transparent text-muted-foreground hover:text-white hover:bg-white/[0.03]'
+                                                ? 'bg-emerald-50 border-l-primary text-emerald-900 dark:bg-primary/10 dark:text-white'
+                                                : 'border-l-transparent text-muted-foreground hover:text-slate-900 hover:bg-slate-50 dark:hover:text-white dark:hover:bg-white/[0.03]'
                                             }
                                         `}
                                         aria-selected={isActive}
@@ -356,7 +359,7 @@ export default function RegisterServicePage() {
                                             transition-all active:scale-[0.97] flex items-center justify-center gap-2
                                             ${allSectionsComplete
                                                 ? 'bg-primary text-white hover:brightness-110 shadow-lg shadow-primary/20'
-                                                : 'bg-primary/40 text-white/70 cursor-default'
+                                                : 'bg-slate-200 text-slate-600 dark:bg-primary/40 dark:text-white/70 cursor-default'
                                             }
                                             disabled:opacity-50
                                         `}
@@ -410,6 +413,10 @@ export default function RegisterServicePage() {
                                     onPetChange={handlePetChange}
                                     onStatusChange={handleStatusChange}
                                     onNewPetClick={() => setIsQuickPetModalOpen(true)}
+                                    onPetPhotoSaved={(updated) => setPets((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)))}
+                                    pendingPhotoPreview={pendingPetPhoto && pendingPetPhoto.petId === currentCremation?.pet_id ? pendingPetPhoto.preview : null}
+                                    onPetPhotoPicked={(blob) => currentCremation?.pet_id && setPendingPetPhoto(currentCremation.pet_id, blob)}
+                                    onPetPhotoDiscard={() => currentCremation?.pet_id && setPendingPetPhoto(currentCremation.pet_id, null)}
                                 />
                                 <div className="flex justify-end pt-2">
                                     <button

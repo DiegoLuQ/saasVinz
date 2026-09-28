@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import {
+    Star,
     User,
     Mail,
     Shield,
@@ -504,6 +505,21 @@ export default function ProfilePage() {
                                             placeholder="@tiktok"
                                         />
                                     </div>
+                                </div>
+
+                                {/* Reseñas de Google: se ofrece a la familia al entregar las cenizas */}
+                                <div className="mt-4 space-y-1">
+                                    <div className="flex items-center text-xs text-muted-foreground mb-1"><Star size={12} className="mr-1" /> Enlace de reseñas de Google</div>
+                                    <input
+                                        type="url"
+                                        value={tenant?.social_media?.google_review || ''}
+                                        onChange={(e) => setTenant({ ...tenant, social_media: { ...tenant.social_media, google_review: e.target.value } })}
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-xs"
+                                        placeholder="https://g.page/r/XXXXXXXX/review"
+                                    />
+                                    <p className="text-[11px] text-muted-foreground">
+                                        Lo encuentras en tu Perfil de Empresa de Google → &quot;Pedir reseñas&quot;. Se muestra a la familia al entregar las cenizas (seguimiento y WhatsApp). Déjalo vacío para no mostrarlo.
+                                    </p>
                                 </div>
                             </div>
 
