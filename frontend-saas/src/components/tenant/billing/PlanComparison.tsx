@@ -67,7 +67,7 @@ export function PlanComparison({ plans, currentPlanId, onSelectPlan }: PlanCompa
                     onCheckedChange={setIsAnnual}
                 />
                 <span className={cn("text-sm font-medium", isAnnual && "text-primary")}>
-                    Anual <span className="text-xs text-green-500 font-bold ml-1">(20% de descuento)</span>
+                    Anual <span className="text-xs text-emerald-700 dark:text-green-500 font-bold ml-1">(20% de descuento)</span>
                 </span>
             </div>
 
@@ -110,13 +110,13 @@ export function PlanComparison({ plans, currentPlanId, onSelectPlan }: PlanCompa
                         <Card
                             key={plan.id}
                             className={cn(
-                                "flex flex-col relative transition-all duration-300 border-2 bg-[#0a192f]/40 backdrop-blur-xl",
+                                "flex flex-col relative transition-all duration-300 border-2 bg-white text-slate-900 shadow-sm dark:bg-[#0a192f]/40 dark:text-white dark:shadow-none backdrop-blur-xl",
                                 isCurrent ?
-                                    (isUltraCurrent ? "border-amber-400 bg-amber-400/5 shadow-lg shadow-amber-400/10" : "border-primary bg-primary/5 shadow-lg shadow-primary/10")
-                                    : "border-white/5",
+                                    (isUltraCurrent ? "border-amber-400 bg-amber-50 dark:bg-amber-400/5 shadow-lg shadow-amber-400/10" : "border-primary bg-primary/5 shadow-lg shadow-primary/10")
+                                    : "border-slate-200 dark:border-white/5",
 
                                 // PRO Highlight (Specially styled to stand out premiumly)
-                                isPro ? "border-blue-500/80 bg-gradient-to-b from-blue-950/20 to-[#0a192f]/60 shadow-[0_0_35px_-5px_rgba(59,130,246,0.3)] md:scale-[1.03] hover:md:scale-[1.06] z-10" : "hover:md:scale-[1.02]",
+                                isPro ? "border-blue-500/80 bg-gradient-to-b from-blue-50 to-white dark:from-blue-950/20 dark:to-[#0a192f]/60 shadow-[0_0_35px_-5px_rgba(59,130,246,0.3)] md:scale-[1.03] hover:md:scale-[1.06] z-10" : "hover:md:scale-[1.02]",
 
                                 // Ultra Upsell Highlight (User is on Pro)
                                 isUltraUpsell ? "border-amber-400 shadow-[0_0_25px_-5px_rgba(251,191,36,0.5)] scale-102 z-20 overflow-visible ring-1 ring-amber-400/50" : "",
@@ -154,11 +154,11 @@ export function PlanComparison({ plans, currentPlanId, onSelectPlan }: PlanCompa
                             <CardHeader className="text-center pb-2 pt-8">
                                 <CardTitle className={cn(
                                     "text-2xl font-black tracking-tight uppercase",
-                                    isPro ? "text-blue-400" : (isUltraUpsell || isUltraCurrent) ? "text-amber-400 drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]" : "text-white"
+                                    isPro ? "text-blue-700 dark:text-blue-400" : (isUltraUpsell || isUltraCurrent) ? "text-amber-700 dark:text-amber-400 dark:drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]" : "text-slate-900 dark:text-white"
                                 )}>
                                     {plan.name}
                                 </CardTitle>
-                                <CardDescription className="text-[10px] h-10 line-clamp-2 mt-2 text-white/40 font-medium">
+                                <CardDescription className="text-[10px] h-10 line-clamp-2 mt-2 text-slate-600 dark:text-white/40 font-medium">
                                     {plan.description || "Potencia tu negocio con nuestras herramientas avanzadas."}
                                 </CardDescription>
                             </CardHeader>
@@ -168,15 +168,15 @@ export function PlanComparison({ plans, currentPlanId, onSelectPlan }: PlanCompa
                                     <div className="flex items-baseline justify-center gap-1 transition-all duration-300 transform">
                                         <span className={cn(
                                             "text-4xl font-black transition-colors duration-300",
-                                            isAnnual ? "text-green-400 drop-shadow-[0_0_8px_rgba(74,222,128,0.3)]" :
-                                                (isUltraUpsell || isUltraCurrent) ? "text-amber-100" : "text-white"
+                                            isAnnual ? "text-emerald-700 dark:text-green-400 dark:drop-shadow-[0_0_8px_rgba(74,222,128,0.3)]" :
+                                                (isUltraUpsell || isUltraCurrent) ? "text-amber-800 dark:text-amber-100" : "text-slate-900 dark:text-white"
                                         )}>
                                             {formatPrice(price)}
                                         </span>
-                                        <span className="text-white/40 text-xs font-bold">/mes</span>
+                                        <span className="text-slate-500 dark:text-white/40 text-xs font-bold">/mes</span>
                                     </div>
                                     {isAnnual && plan.monthly_price > 0 && (
-                                        <p className="text-[9px] font-black text-primary/60 mt-2 uppercase tracking-[0.15em] animate-fade-in bg-primary/5 py-1 px-2 rounded-lg border border-primary/10 inline-block">
+                                        <p className="text-[9px] font-black text-primary dark:text-primary/60 mt-2 uppercase tracking-[0.15em] animate-fade-in bg-primary/5 py-1 px-2 rounded-lg border border-primary/10 inline-block">
                                             FACTURADO {formatPrice(displayAnnualPrice)} ANUALMENTE
                                         </p>
                                     )}
@@ -184,21 +184,21 @@ export function PlanComparison({ plans, currentPlanId, onSelectPlan }: PlanCompa
                                     {/* +100 Cremaciones Highlight (Show on Upsell OR Current Ultra) */}
                                     {(isUltraUpsell || isUltraCurrent) && (
                                         <div className="mt-2 bg-amber-500/10 border border-amber-500/20 rounded-md py-1 px-2.5 inline-block">
-                                            <span className="text-[10px] font-black text-amber-400 animate-pulse">+100 Cremaciones</span>
+                                            <span className="text-[10px] font-black text-amber-800 dark:text-amber-400 animate-pulse">+100 Cremaciones</span>
                                         </div>
                                     )}
                                 </div>
 
-                                <div className="space-y-4 mb-6 pt-4 border-t border-white/5">
+                                <div className="space-y-4 mb-6 pt-4 border-t border-slate-200 dark:border-white/5">
                                     <p className="text-[9px] font-black text-primary uppercase tracking-[0.2em] mb-4 text-center">Ventajas Disponibles</p>
                                     <ul className="space-y-2.5">
                                         {/* Standard Limits */}
                                         {plan.max_pets && plan.max_pets !== -1 && (
-                                            <li className="flex items-center gap-2.5 text-white/80">
+                                            <li className="flex items-center gap-2.5 text-slate-800 dark:text-white/80">
                                                 <div className={cn("w-4 h-4 rounded-full flex items-center justify-center shrink-0", (isUltraUpsell || isUltraCurrent) ? "bg-amber-500/20" : "bg-emerald-500/20")}>
                                                     <Check className={cn("h-2.5 w-2.5", (isUltraUpsell || isUltraCurrent) ? "text-amber-500" : "text-emerald-500")} />
                                                 </div>
-                                                <span className={cn("text-[11px] font-bold", (isUltraUpsell || isUltraCurrent) ? "text-white" : "")}>Mascotas & Clientes Ilimitados</span>
+                                                <span className={cn("text-[11px] font-bold", (isUltraUpsell || isUltraCurrent) ? "text-slate-900 dark:text-white" : "")}>Mascotas & Clientes Ilimitados</span>
                                             </li>
                                         )}
                                         {/* Dynamic Features or fallback advantages */}
@@ -214,14 +214,14 @@ export function PlanComparison({ plans, currentPlanId, onSelectPlan }: PlanCompa
                                                         <div className={cn("w-4 h-4 rounded-full flex items-center justify-center shrink-0", (isUltraUpsell || isUltraCurrent) ? "bg-amber-500/20" : "bg-emerald-500/20")}>
                                                             <Check className={cn("h-2.5 w-2.5", (isUltraUpsell || isUltraCurrent) ? "text-amber-500" : "text-emerald-500")} />
                                                         </div>
-                                                        <span className="text-[11px] font-bold text-white/80">{feature.name}</span>
+                                                        <span className="text-[11px] font-bold text-slate-800 dark:text-white/80">{feature.name}</span>
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <div className="w-4 h-4 rounded-full bg-white/5 flex items-center justify-center shrink-0">
-                                                            <X className="h-2.5 w-2.5 text-white/20" />
+                                                        <div className="w-4 h-4 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center shrink-0">
+                                                            <X className="h-2.5 w-2.5 text-slate-400 dark:text-white/20" />
                                                         </div>
-                                                        <span className="text-[11px] font-medium text-white/20 line-through decoration-white/10">{feature.name}</span>
+                                                        <span className="text-[11px] font-medium text-slate-400 dark:text-white/20 line-through decoration-slate-300 dark:decoration-white/10">{feature.name}</span>
                                                     </>
                                                 )}
                                             </li>
@@ -234,10 +234,10 @@ export function PlanComparison({ plans, currentPlanId, onSelectPlan }: PlanCompa
                                 <Button
                                     className={cn(
                                         "w-full py-6 rounded-2xl font-black transition-all active:scale-95",
-                                        isCurrent ? "bg-white/5 text-white/40 border border-white/10 cursor-not-allowed" :
+                                        isCurrent ? "bg-slate-100 text-slate-500 border border-slate-200 dark:bg-white/5 dark:text-white/40 dark:border-white/10 cursor-not-allowed" :
                                             isUltraUpsell ? "bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black shadow-lg shadow-amber-500/30 border-none" :
                                                 isPro ? "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/30" :
-                                                    "bg-white/10 hover:bg-white/20 text-white"
+                                                    "bg-slate-900 hover:bg-slate-800 text-white dark:bg-white/10 dark:hover:bg-white/20"
                                     )}
                                     disabled={isCurrent || isFree}
                                     onClick={() => onSelectPlan(plan.id, isAnnual ? 'annual' : 'monthly')}
@@ -251,28 +251,28 @@ export function PlanComparison({ plans, currentPlanId, onSelectPlan }: PlanCompa
             </div>
 
             {/* Comparison Table */}
-            <div className="mt-20 pt-10 border-t border-white/5">
+            <div className="mt-20 pt-10 border-t border-slate-200 dark:border-white/5">
                 <div className="text-center mb-10">
-                    <h3 className="text-xl font-black text-white uppercase tracking-widest mb-2">Comparativa Detallada</h3>
-                    <p className="text-white/40 text-sm">Analiza a fondo las capacidades de cada nivel de suscripción.</p>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-widest mb-2">Comparativa Detallada</h3>
+                    <p className="text-slate-600 dark:text-white/40 text-sm">Analiza a fondo las capacidades de cada nivel de suscripción.</p>
                 </div>
 
-                <div className="overflow-x-auto rounded-[2rem] border border-white/5 bg-[#0a192f]/20 backdrop-blur-md">
+                <div className="overflow-x-auto rounded-[2rem] border border-slate-200 bg-white dark:border-white/5 dark:bg-[#0a192f]/20 backdrop-blur-md">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="border-b border-white/5">
-                                <th className="p-6 text-[10px] font-black text-white/30 uppercase tracking-[0.2em] w-1/4">Característica</th>
+                            <tr className="border-b border-slate-200 dark:border-white/5">
+                                <th className="p-6 text-[10px] font-black text-slate-500 dark:text-white/30 uppercase tracking-[0.2em] w-1/4">Característica</th>
                                 {sortedPlans.map(plan => (
                                     <th key={plan.id} className="p-6 text-center">
                                         <div className="flex flex-col items-center gap-1">
                                             <span className={cn(
                                                 "text-sm font-black uppercase tracking-tight",
-                                                plan.id === currentPlanId ? "text-emerald-400" :
-                                                    plan.name.toLowerCase().includes('pro') ? "text-blue-400" : "text-white"
+                                                plan.id === currentPlanId ? "text-emerald-700 dark:text-emerald-400" :
+                                                    plan.name.toLowerCase().includes('pro') ? "text-blue-700 dark:text-blue-400" : "text-slate-900 dark:text-white"
                                             )}>
                                                 {plan.name}
                                             </span>
-                                            {plan.id === currentPlanId && <span className="text-[8px] font-black bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded-full">ACTUAL</span>}
+                                            {plan.id === currentPlanId && <span className="text-[8px] font-black bg-emerald-500/10 text-emerald-700 dark:text-emerald-500 px-2 py-0.5 rounded-full">ACTUAL</span>}
                                         </div>
                                     </th>
                                 ))}
@@ -298,28 +298,28 @@ export function PlanComparison({ plans, currentPlanId, onSelectPlan }: PlanCompa
                                 { label: "Logística y Operaciones", module: "operaciones" },
                                 { label: "Soporte Prioritario", custom: true, values: sortedPlans.map(p => p.name.toLowerCase().includes('pro') || p.name.toLowerCase().includes('ultra')) },
                             ].map((row, idx) => (
-                                <tr key={idx} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                                    <td className="p-6 font-bold text-white/60 text-xs">{row.label}</td>
+                                <tr key={idx} className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
+                                    <td className="p-6 font-bold text-slate-700 dark:text-white/60 text-xs">{row.label}</td>
                                     {sortedPlans.map(plan => (
                                         <td key={plan.id} className="p-6 text-center">
                                             {row.module ? (
                                                 <div className="flex justify-center">
                                                     {plan.allowed_modules?.includes(row.module) ? (
-                                                        <Check className="h-4 w-4 text-emerald-500" />
+                                                        <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-500" />
                                                     ) : (
-                                                        <X className="h-4 w-4 text-white/10" />
+                                                        <X className="h-4 w-4 text-slate-300 dark:text-white/10" />
                                                     )}
                                                 </div>
                                             ) : row.custom ? (
                                                 <div className="flex justify-center">
                                                     {(row.values as any)[sortedPlans.indexOf(plan)] ? (
-                                                        <Check className="h-4 w-4 text-emerald-500" />
+                                                        <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-500" />
                                                     ) : (
-                                                        <X className="h-4 w-4 text-white/10" />
+                                                        <X className="h-4 w-4 text-slate-300 dark:text-white/10" />
                                                     )}
                                                 </div>
                                             ) : (
-                                                <span className="font-black text-white/80">
+                                                <span className="font-black text-slate-800 dark:text-white/80">
                                                     {(row.format ? row.format((plan as any)[row.key!]) : (plan as any)[row.key!])}
                                                 </span>
                                             )}

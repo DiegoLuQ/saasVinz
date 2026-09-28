@@ -182,7 +182,7 @@ export function GeneralTab({ bootstrapTenant, billingInfo, onNavigateToBilling, 
 
                     <p className="text-[11px] text-muted-foreground ml-1 flex items-center gap-1.5">
                         <FileCheck size={12} className="text-primary/60" />
-                        El RUT y los datos para el certificado se editan en la pestaña <strong className="text-white/70">Certificados</strong>.
+                        El RUT y los datos para el certificado se editan en la pestaña <strong className="text-slate-800 dark:text-white/70">Certificados</strong>.
                     </p>
                 </div>
 
@@ -196,12 +196,12 @@ export function GeneralTab({ bootstrapTenant, billingInfo, onNavigateToBilling, 
                     </div>
 
                     <div className="space-y-3">
-                        <label className="text-[10px] uppercase font-black text-white/40 tracking-[0.2em] ml-1">Estado de Cuenta</label>
+                        <label className="text-[10px] uppercase font-black text-slate-600 dark:text-white/40 tracking-[0.2em] ml-1">Estado de Cuenta</label>
                         <div className="flex items-center">
-                            <div className={`px-6 py-4 rounded-2xl border font-bold text-lg w-full bg-[#0a192f]/50 border-white/5 flex items-center justify-between shadow-inner ${generalInfo.status === 'active' ? 'text-emerald-400 border-emerald-500/20' :
-                                generalInfo.status === 'pending' ? 'text-yellow-400 border-yellow-500/20' :
-                                    generalInfo.status === 'suspended' ? 'text-red-400 border-red-500/20' :
-                                        'text-white/40 border-white/10'
+                            <div className={`px-6 py-4 rounded-2xl border font-bold text-lg w-full bg-slate-50 dark:bg-[#0a192f]/50 flex items-center justify-between shadow-inner ${generalInfo.status === 'active' ? 'text-emerald-700 border-emerald-200 dark:text-emerald-400 dark:border-emerald-500/20' :
+                                generalInfo.status === 'pending' ? 'text-amber-700 border-amber-200 dark:text-yellow-400 dark:border-yellow-500/20' :
+                                    generalInfo.status === 'suspended' ? 'text-red-700 border-red-200 dark:text-red-400 dark:border-red-500/20' :
+                                        'text-slate-500 border-slate-200 dark:text-white/40 dark:border-white/10'
                                 }`}>
                                 <span>
                                     {generalInfo.status === 'active' ? 'Activo ✅' :
@@ -209,36 +209,36 @@ export function GeneralTab({ bootstrapTenant, billingInfo, onNavigateToBilling, 
                                             generalInfo.status === 'suspended' ? 'Suspendido ⚠️' :
                                                 'Inactivo ❌'}
                                 </span>
-                                <span className="text-[10px] uppercase tracking-widest opacity-40 font-black">Sólo Lectura</span>
+                                <span className="text-[10px] uppercase tracking-widest text-slate-500 dark:text-white/40 font-black">Sólo Lectura</span>
                             </div>
                         </div>
                     </div>
 
                     <div className="space-y-3">
-                        <label className="text-[10px] uppercase font-black text-white/40 tracking-[0.2em] ml-1">Plan Actual</label>
+                        <label className="text-[10px] uppercase font-black text-slate-600 dark:text-white/40 tracking-[0.2em] ml-1">Plan Actual</label>
                         <div className="glass-card p-6 rounded-3xl border border-white/5 flex items-center justify-between group hover:border-primary/20 transition-all">
                             <div className="flex flex-col">
                                 <span className={`text-2xl font-black tracking-tighter ${(() => {
                                     const plan = billingInfo?.subscription_plan?.name?.toUpperCase() || 'FREE';
-                                    if (plan.includes('FREE')) return 'text-yellow-400';
-                                    if (plan.includes('NORMAL')) return 'text-blue-400';
-                                    if (plan.includes('PRO')) return 'text-orange-400';
-                                    if (plan.includes('ULTRA')) return 'text-emerald-400';
-                                    return 'text-white';
+                                    if (plan.includes('FREE')) return 'text-amber-600 dark:text-yellow-400';
+                                    if (plan.includes('NORMAL')) return 'text-blue-700 dark:text-blue-400';
+                                    if (plan.includes('PRO')) return 'text-orange-700 dark:text-orange-400';
+                                    if (plan.includes('ULTRA')) return 'text-emerald-700 dark:text-emerald-400';
+                                    return 'text-slate-900 dark:text-white';
                                 })()}`}>
                                     {billingInfo?.subscription_plan?.name || 'FREE'}
                                 </span>
                                 <div className="flex items-center gap-1.5 mt-1">
                                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                                    <span className="text-[10px] font-bold text-emerald-500/80 uppercase tracking-widest">Suscripción Activa</span>
+                                    <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-500/80 uppercase tracking-widest">Suscripción Activa</span>
                                 </div>
                             </div>
                             <button
                                 onClick={onNavigateToBilling}
-                                className="flex items-center gap-2 px-5 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all group-hover:bg-primary group-hover:border-primary"
+                                className="flex items-center gap-2 px-5 py-2.5 bg-white border-slate-300 hover:bg-slate-50 dark:bg-white/5 dark:hover:bg-white/10 border dark:border-white/10 rounded-xl transition-all group-hover:bg-primary group-hover:border-primary"
                             >
-                                <Settings size={14} className="group-hover:rotate-90 transition-transform duration-500 text-white" />
-                                <span className="text-xs font-black uppercase tracking-wider text-white">Gestionar</span>
+                                <Settings size={14} className="group-hover:rotate-90 transition-transform duration-500 text-slate-700 dark:text-white group-hover:text-white" />
+                                <span className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-white group-hover:text-white">Gestionar</span>
                             </button>
                         </div>
                     </div>
@@ -350,7 +350,7 @@ export function GeneralTab({ bootstrapTenant, billingInfo, onNavigateToBilling, 
                         </div>
 
                         <div className="text-center">
-                            <p className="font-bold text-white mb-1">Logo Corporativo</p>
+                            <p className="font-bold text-slate-900 dark:text-white mb-1">Logo Corporativo</p>
                             <p className="text-[10px] text-white/40 uppercase tracking-widest">Fondo transparente recomendado</p>
                         </div>
 
@@ -378,22 +378,22 @@ export function GeneralTab({ bootstrapTenant, billingInfo, onNavigateToBilling, 
 
                             <div className="space-y-3">
                                 <label className="text-[10px] font-bold text-muted-foreground ml-1">Modo de Pantalla</label>
-                                <div className="grid grid-cols-3 gap-2 p-1 bg-black/20 rounded-xl font-bold">
+                                <div className="grid grid-cols-3 gap-2 p-1 bg-slate-100 dark:bg-black/20 rounded-xl font-bold">
                                     <button
                                         onClick={() => setThemeMode('auto')}
-                                        className={`py-2 px-3 rounded-lg text-[10px] transition-all cursor-pointer ${themeMode === 'auto' ? 'bg-primary text-white font-black' : 'text-white/40 hover:bg-white/5'}`}
+                                        className={`py-2 px-3 rounded-lg text-[10px] transition-all cursor-pointer ${themeMode === 'auto' ? 'bg-primary text-white font-black' : 'text-slate-600 hover:bg-white dark:text-white/40 dark:hover:bg-white/5'}`}
                                     >
                                         AUTO
                                     </button>
                                     <button
                                         onClick={() => setThemeMode('light')}
-                                        className={`py-2 px-3 rounded-lg text-[10px] transition-all cursor-pointer ${themeMode === 'light' ? 'bg-primary text-white font-black' : 'text-white/40 hover:bg-white/5'}`}
+                                        className={`py-2 px-3 rounded-lg text-[10px] transition-all cursor-pointer ${themeMode === 'light' ? 'bg-primary text-white font-black' : 'text-slate-600 hover:bg-white dark:text-white/40 dark:hover:bg-white/5'}`}
                                     >
                                         CLARO
                                     </button>
                                     <button
                                         onClick={() => setThemeMode('dark')}
-                                        className={`py-2 px-3 rounded-lg text-[10px] transition-all cursor-pointer ${themeMode === 'dark' ? 'bg-primary text-white font-black' : 'text-white/40 hover:bg-white/5'}`}
+                                        className={`py-2 px-3 rounded-lg text-[10px] transition-all cursor-pointer ${themeMode === 'dark' ? 'bg-primary text-white font-black' : 'text-slate-600 hover:bg-white dark:text-white/40 dark:hover:bg-white/5'}`}
                                     >
                                         OSCURO
                                     </button>
@@ -416,12 +416,12 @@ export function GeneralTab({ bootstrapTenant, billingInfo, onNavigateToBilling, 
                                             onClick={() => setColorScheme(scheme.id as any)}
                                             className={`p-2.5 rounded-xl border transition-all flex flex-col items-center gap-1.5 cursor-pointer text-center ${
                                                 colorScheme === scheme.id
-                                                    ? 'bg-primary/10 border-primary text-white'
-                                                    : 'bg-black/10 border-white/5 text-white/40 hover:text-white hover:bg-white/5'
+                                                    ? 'bg-primary/10 border-primary text-slate-900 dark:text-white'
+                                                    : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:bg-black/10 dark:border-white/5 dark:text-white/40 dark:hover:text-white dark:hover:bg-white/5'
                                             }`}
                                         >
                                             <div
-                                                className="w-4.5 h-4.5 rounded-full border border-white/10 shadow-sm"
+                                                className="w-4.5 h-4.5 rounded-full border border-slate-300 dark:border-white/10 shadow-sm"
                                                 style={{ backgroundColor: scheme.color }}
                                             />
                                             <span className="text-[9px] font-extrabold uppercase tracking-wider">{scheme.name}</span>
@@ -464,14 +464,14 @@ export function GeneralTab({ bootstrapTenant, billingInfo, onNavigateToBilling, 
                                     onNavigateToBilling();
                                 }
                             }}
-                            className="px-6 py-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-2xl font-bold text-[10px] tracking-widest hover:bg-emerald-500 hover:text-white transition-all flex items-center gap-2 whitespace-nowrap">
+                            className="px-6 py-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded-2xl font-bold text-[10px] tracking-widest hover:bg-emerald-500 hover:text-white transition-all flex items-center gap-2 whitespace-nowrap">
                             <RefreshCcw size={14} />
                             GESTIONAR / REACTIVAR
                         </button>
                     ) : (
                         <button
                             onClick={() => setDeactivateModalOpen(true)}
-                            className="px-6 py-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl font-bold text-[10px] tracking-widest hover:bg-red-500 hover:text-white transition-all whitespace-nowrap">
+                            className="px-6 py-3 bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-500 rounded-2xl font-bold text-[10px] tracking-widest hover:bg-red-500 hover:text-white transition-all whitespace-nowrap">
                             DESACTIVAR MI CUENTA
                         </button>
                     )}

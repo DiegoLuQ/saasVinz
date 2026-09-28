@@ -99,7 +99,7 @@ export function NotificationsTab() {
                             placeholder="Buscar mensaje..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full bg-black/20 border border-white/10 rounded-xl py-2 pl-10 pr-3 text-sm outline-none focus:border-primary/50 transition-all"
+                            className="w-full bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 dark:bg-black/20 dark:border-white/10 dark:text-white dark:placeholder:text-white/30 rounded-xl py-2 pl-10 pr-3 text-sm outline-none focus:border-primary/50 transition-all"
                         />
                     </div>
 
@@ -108,11 +108,11 @@ export function NotificationsTab() {
                         <select
                             value={filterType}
                             onChange={(e) => setFilterType(e.target.value)}
-                            className="w-full bg-black/20 border border-white/10 rounded-xl py-2 pl-3 pr-10 text-sm outline-none focus:border-primary/50 transition-all appearance-none cursor-pointer hover:bg-black/30 text-white"
+                            className="w-full bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 dark:bg-black/20 dark:border-white/10 dark:text-white dark:placeholder:text-white/30 rounded-xl py-2 pl-3 pr-10 text-sm outline-none focus:border-primary/50 transition-all appearance-none cursor-pointer dark:hover:bg-black/30"
                         >
-                            <option value="all" className="bg-[#1a1f2e] text-white">Todos los tipos</option>
-                            <option value="new_submission" className="bg-[#1a1f2e] text-white">Nueva Solicitud</option>
-                            <option value="system" className="bg-[#1a1f2e] text-white">Sistema</option>
+                            <option value="all" className="bg-white text-slate-900 dark:bg-[#1a1f2e] dark:text-white">Todos los tipos</option>
+                            <option value="new_submission" className="bg-white text-slate-900 dark:bg-[#1a1f2e] dark:text-white">Nueva Solicitud</option>
+                            <option value="system" className="bg-white text-slate-900 dark:bg-[#1a1f2e] dark:text-white">Sistema</option>
                         </select>
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                             <svg width="12" height="8" viewBox="0 0 12 8" fill="none" className="text-muted-foreground">
@@ -127,7 +127,7 @@ export function NotificationsTab() {
                         value={filterDateFrom}
                         onChange={(e) => setFilterDateFrom(e.target.value)}
                         placeholder="Desde"
-                        className="w-full bg-black/20 border border-white/10 rounded-xl py-2 px-3 text-sm outline-none focus:border-primary/50 transition-all"
+                        className="w-full bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 dark:bg-black/20 dark:border-white/10 dark:text-white dark:placeholder:text-white/30 rounded-xl py-2 px-3 text-sm outline-none focus:border-primary/50 transition-all"
                         style={{ colorScheme: 'dark' }}
                     />
 
@@ -137,7 +137,7 @@ export function NotificationsTab() {
                         value={filterDateTo}
                         onChange={(e) => setFilterDateTo(e.target.value)}
                         placeholder="Hasta"
-                        className="w-full bg-black/20 border border-white/10 rounded-xl py-2 px-3 text-sm outline-none focus:border-primary/50 transition-all"
+                        className="w-full bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 dark:bg-black/20 dark:border-white/10 dark:text-white dark:placeholder:text-white/30 rounded-xl py-2 px-3 text-sm outline-none focus:border-primary/50 transition-all"
                         style={{ colorScheme: 'dark' }}
                     />
                 </div>
@@ -183,7 +183,7 @@ export function NotificationsTab() {
                                                     <h4 className="font-bold text-white text-base">{notif.title}</h4>
                                                     {!notif.is_read && <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_10px_rgba(255,107,0,0.5)]"></span>}
                                                 </div>
-                                                <p className="text-sm text-white/60 line-clamp-1">{notif.message}</p>
+                                                <p className="text-sm text-slate-600 dark:text-white/60 line-clamp-1">{notif.message}</p>
 
                                                 {/* Detalle compacto de cliente/mascota/servicio */}
                                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2">
@@ -248,25 +248,25 @@ export function NotificationsTab() {
                     {/* Pagination Footer */}
                     <div className="flex items-center justify-between px-2 py-4 border-t border-white/5 mt-4">
                         <p className="text-sm text-muted-foreground">
-                            Mostrando <span className="font-bold text-white">{notifications.length}</span> de <span className="font-bold text-white">{notificationsTotal}</span> notificaciones
+                            Mostrando <span className="font-bold text-slate-900 dark:text-white">{notifications.length}</span> de <span className="font-bold text-slate-900 dark:text-white">{notificationsTotal}</span> notificaciones
                         </p>
                         <div className="flex items-center gap-2">
                             <button
                                 onClick={() => setNotificationsPage(prev => Math.max(0, prev - 1))}
                                 disabled={notificationsPage === 0}
-                                className="p-2 rounded-xl bg-white/5 border border-white/10 text-muted-foreground hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                className="p-2 rounded-xl bg-white border border-slate-300 dark:bg-white/5 dark:border-white/10 text-muted-foreground hover:bg-slate-50 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                             >
                                 <ChevronLeft size={20} />
                             </button>
                             <div className="flex items-center gap-1 mx-2">
                                 <span className="text-sm font-bold text-primary">{notificationsPage + 1}</span>
                                 <span className="text-sm text-muted-foreground">de</span>
-                                <span className="text-sm font-bold text-white">{Math.ceil(notificationsTotal / notificationsLimit) || 1}</span>
+                                <span className="text-sm font-bold text-slate-900 dark:text-white">{Math.ceil(notificationsTotal / notificationsLimit) || 1}</span>
                             </div>
                             <button
                                 onClick={() => setNotificationsPage(prev => prev + 1)}
                                 disabled={(notificationsPage + 1) * notificationsLimit >= notificationsTotal}
-                                className="p-2 rounded-xl bg-white/5 border border-white/10 text-muted-foreground hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                className="p-2 rounded-xl bg-white border border-slate-300 dark:bg-white/5 dark:border-white/10 text-muted-foreground hover:bg-slate-50 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                             >
                                 <ChevronRight size={20} />
                             </button>

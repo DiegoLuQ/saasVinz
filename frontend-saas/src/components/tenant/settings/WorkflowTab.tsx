@@ -107,7 +107,7 @@ export function WorkflowTab() {
                         {workflowSteps.map((step) => (
                             <div key={step.id} className={`glass-card p-4 rounded-2xl flex items-center justify-between transition-all ${!step.is_active ? 'opacity-50' : ''}`}>
                                 <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center font-black text-lg text-white/50">
+                                    <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/5 flex items-center justify-center font-black text-lg text-slate-600 dark:text-white/50">
                                         {step.order_index}
                                     </div>
                                     <div>

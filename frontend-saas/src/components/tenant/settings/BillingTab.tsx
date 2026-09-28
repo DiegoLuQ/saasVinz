@@ -142,8 +142,8 @@ export function BillingTab({ bootstrapTenant, bootstrapData, bootstrapUser }: Bi
 
                 {/* Quick Actions Panel */}
                 <div className="space-y-8">
-                    <div className="bg-[#1a1f2e] border border-white/5 rounded-[2.5rem] p-6">
-                        <h4 className="font-bold mb-4 flex items-center gap-2 text-sm uppercase tracking-wider text-white/40">
+                    <div className="bg-white border border-slate-200 dark:bg-[#1a1f2e] dark:border-white/5 rounded-[2.5rem] p-6">
+                        <h4 className="font-bold mb-4 flex items-center gap-2 text-sm uppercase tracking-wider text-slate-600 dark:text-white/40">
                             <Zap size={16} className="text-primary" /> Acciones Rápidas
                         </h4>
                         <div className="space-y-3">
@@ -159,7 +159,7 @@ export function BillingTab({ bootstrapTenant, bootstrapData, bootstrapUser }: Bi
                                 className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 rounded-2xl transition-all group"
                             >
                                 <span className="font-bold text-sm">Reportar un Pago</span>
-                                <ChevronRight className="text-white/20 group-hover:translate-x-1 transition-transform" size={18} />
+                                <ChevronRight className="text-slate-400 dark:text-white/20 group-hover:translate-x-1 transition-transform" size={18} />
                             </button>
 
                             {bootstrapTenant?.polar_customer_id && (
@@ -186,8 +186,8 @@ export function BillingTab({ bootstrapTenant, bootstrapData, bootstrapUser }: Bi
                                 <AlertCircle size={20} />
                             </div>
                             <div>
-                                <h4 className="font-bold text-sm text-white">Método Manual</h4>
-                                <p className="text-xs text-white/40 mt-1 leading-relaxed">
+                                <h4 className="font-bold text-sm text-slate-900 dark:text-white">Método Manual</h4>
+                                <p className="text-xs text-slate-600 dark:text-white/40 mt-1 leading-relaxed">
                                     Tu cuenta está en modalidad de pago por transferencia. Para activar planes Pro contacta a soporte.
                                 </p>
                             </div>
@@ -255,7 +255,7 @@ export function BillingTab({ bootstrapTenant, bootstrapData, bootstrapUser }: Bi
                         <motion.div
                             initial={{ scale: 0.9, y: 20 }}
                             animate={{ scale: 1, y: 0 }}
-                            className="bg-[#1a1f2e] border border-primary/20 p-10 rounded-[3rem] max-w-lg w-full text-center shadow-2xl relative overflow-hidden"
+                            className="bg-white dark:bg-[#1a1f2e] border border-primary/20 p-10 rounded-[3rem] max-w-lg w-full text-center shadow-2xl relative overflow-hidden"
                         >
                             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary to-transparent" />
 
@@ -264,7 +264,7 @@ export function BillingTab({ bootstrapTenant, bootstrapData, bootstrapUser }: Bi
                             </div>
 
                             <h2 className="text-3xl font-bold mb-4">¡Felicidades!</h2>
-                            <p className="text-white/60 mb-8 leading-relaxed">
+                            <p className="text-slate-600 dark:text-white/60 mb-8 leading-relaxed">
                                 Tu suscripción ha sido actualizada correctamente. Ahora tienes acceso a todas las herramientas premium de tu nuevo plan.
                             </p>
 

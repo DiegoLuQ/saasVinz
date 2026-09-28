@@ -5,9 +5,9 @@ type Variant = 'default' | 'compact';
 
 const variantBase: Record<Variant, string> = {
     default:
-        'w-full bg-[#0a192f] border border-white/10 rounded-2xl py-4 outline-none focus:border-primary/50 transition-all font-bold text-lg',
+        'w-full bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm rounded-2xl py-4 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all font-bold text-lg dark:bg-[#0a192f] dark:border-white/10 dark:text-white dark:placeholder:text-white/30 dark:shadow-none dark:focus:border-primary/50 dark:focus:ring-0',
     compact:
-        'w-full bg-white/5 border border-white/10 rounded-xl py-3 outline-none focus:border-primary/50 transition-all text-sm',
+        'w-full bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 rounded-xl py-3 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all text-sm dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-white/30 dark:focus:border-primary/50 dark:focus:ring-0',
 };
 
 const variantPad = {
@@ -16,7 +16,7 @@ const variantPad = {
 };
 
 const iconPos = {
-    default: { left: 'left-6', right: 'right-6', size: 20 as const, prefixLeft: 'left-6', color: 'text-white/20' },
+    default: { left: 'left-6', right: 'right-6', size: 20 as const, prefixLeft: 'left-6', color: 'text-slate-400 dark:text-white/20' },
     compact: { left: 'left-3', right: 'right-3', size: 16 as const, prefixLeft: 'left-3', color: 'text-muted-foreground' },
 };
 
@@ -31,7 +31,7 @@ function FormFieldShell({ label, children, variant }: FormFieldShellProps) {
     const labelClass =
         variant === 'compact'
             ? 'text-xs font-bold text-muted-foreground ml-1'
-            : 'text-[10px] uppercase font-black text-white/40 tracking-[0.2em] ml-1';
+            : 'text-[10px] uppercase font-black text-slate-600 dark:text-white/40 tracking-[0.2em] ml-1';
     return (
         <div className="space-y-2">
             <label className={labelClass}>{label}</label>
@@ -70,7 +70,7 @@ export function FormInput({
     const padX = Icon ? pads.icon : prefix ? pads.prefix : pads.plain;
     const readOnlyClasses = readOnly
         ? variant === 'default'
-            ? 'bg-[#0a192f]/50 border-white/5 opacity-80 cursor-not-allowed shadow-inner'
+            ? '!bg-slate-100 !border-slate-200 !text-slate-600 cursor-not-allowed shadow-inner dark:!bg-[#0a192f]/50 dark:!border-white/5 dark:!text-white/70'
             : 'opacity-70 cursor-not-allowed'
         : '';
 
@@ -84,7 +84,7 @@ export function FormInput({
                     />
                 )}
                 {prefix && (
-                    <div className={`absolute ${pos.prefixLeft} top-1/2 -translate-y-1/2 text-white/30 font-bold`}>
+                    <div className={`absolute ${pos.prefixLeft} top-1/2 -translate-y-1/2 text-slate-500 dark:text-white/30 font-bold`}>
                         {prefix}
                     </div>
                 )}
@@ -132,7 +132,7 @@ export function FormSelect({
     const pos = iconPos[variant];
     const padX = Icon ? pads.icon : pads.select;
     const disabledClass = disabled ? 'opacity-50' : '';
-    const optionBg = variant === 'compact' ? 'bg-[#1a1f2e]' : 'bg-[#0a192f]';
+    const optionBg = variant === 'compact' ? 'bg-white text-slate-900 dark:bg-[#1a1f2e] dark:text-white' : 'bg-white text-slate-900 dark:bg-[#0a192f] dark:text-white';
 
     return (
         <FormFieldShell label={label} variant={variant}>
@@ -150,12 +150,12 @@ export function FormSelect({
                     className={`${variantBase[variant]} ${padX} appearance-none cursor-pointer ${disabledClass}`.trim()}
                 >
                     {placeholder && (
-                        <option value="" className={`${optionBg} text-white`}>
+                        <option value="" className={optionBg}>
                             {placeholder}
                         </option>
                     )}
                     {options.map((opt) => (
-                        <option key={opt.value} value={opt.value} className={`${optionBg} text-white`}>
+                        <option key={opt.value} value={opt.value} className={optionBg}>
                             {opt.label}
                         </option>
                     ))}

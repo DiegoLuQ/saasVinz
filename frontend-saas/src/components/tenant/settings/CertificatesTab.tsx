@@ -166,7 +166,7 @@ export function CertificatesTab({ bootstrapTenant }: CertificatesTabProps) {
                         </div>
                         <div>
                             <p className="font-bold text-sm">Plantilla de Certificados</p>
-                            <p className="text-[10px] text-white/40">Formato predeterminado al generar certificados</p>
+                            <p className="text-[10px] text-slate-500 dark:text-white/40">Formato predeterminado al generar certificados</p>
                         </div>
                     </div>
 
@@ -175,28 +175,28 @@ export function CertificatesTab({ bootstrapTenant }: CertificatesTabProps) {
                         <select
                             value={selectedTemplateId ?? ''}
                             onChange={(e) => setSelectedTemplateId(e.target.value ? Number(e.target.value) : null)}
-                            className="w-full px-4 py-3 bg-black/30 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all appearance-none cursor-pointer"
+                            className="w-full px-4 py-3 bg-white border border-slate-300 text-slate-900 dark:bg-black/30 dark:border-white/10 rounded-xl text-sm dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all appearance-none cursor-pointer"
                         >
-                            <option value="" className="bg-[#0d1b2a] text-white/60">— Automática (predeterminada del sistema) —</option>
+                            <option value="" className="bg-white text-slate-600 dark:bg-[#0d1b2a] dark:text-white/60">— Automática (predeterminada del sistema) —</option>
                             {templates.filter((t) => !t.isGlobal).length > 0 && (
-                                <optgroup label="Mis Plantillas" className="bg-[#0d1b2a]">
+                                <optgroup label="Mis Plantillas" className="bg-white dark:bg-[#0d1b2a]">
                                     {templates.filter((t) => !t.isGlobal).map((t) => (
-                                        <option key={t.id} value={t.id} className="bg-[#0d1b2a] text-white">{t.name}</option>
+                                        <option key={t.id} value={t.id} className="bg-white text-slate-900 dark:bg-[#0d1b2a] dark:text-white">{t.name}</option>
                                     ))}
                                 </optgroup>
                             )}
                             {templates.filter((t) => t.isGlobal).length > 0 && (
-                                <optgroup label="Plantillas Globales (Premium)" className="bg-[#0d1b2a]">
+                                <optgroup label="Plantillas Globales (Premium)" className="bg-white dark:bg-[#0d1b2a]">
                                     {templates.filter((t) => t.isGlobal).map((t) => (
-                                        <option key={t.id} value={t.id} className="bg-[#0d1b2a] text-white">🌐 {t.name}</option>
+                                        <option key={t.id} value={t.id} className="bg-white text-slate-900 dark:bg-[#0d1b2a] dark:text-white">🌐 {t.name}</option>
                                     ))}
                                 </optgroup>
                             )}
                         </select>
                         {selectedTemplate && (
-                            <p className="text-[10px] text-amber-400/60 ml-1 flex items-center gap-1">
+                            <p className="text-[10px] text-amber-800 dark:text-amber-400/60 ml-1 flex items-center gap-1">
                                 <FileCheck size={10} />
-                                Plantilla seleccionada: <strong className="text-amber-400">{selectedTemplate.name}</strong>
+                                Plantilla seleccionada: <strong className="text-amber-800 dark:text-amber-400">{selectedTemplate.name}</strong>
                             </p>
                         )}
                     </div>
