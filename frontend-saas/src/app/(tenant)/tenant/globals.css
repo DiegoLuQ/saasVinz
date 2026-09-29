@@ -1546,6 +1546,24 @@
   color: #0a192f;
 }
 
+/* Hover "fantasma" del diseño oscuro: hover:text-white + hover:bg-white/N.
+   En claro el fondo translúcido blanco no se ve y el texto quedaba blanco sobre
+   blanco. Se fuerza texto oscuro y un gris suave, salvo dentro de superficies
+   que son oscuras en ambos modos (login, bloqueo, modales #0a192f). Solo se
+   miran clases sin prefijo, así que `dark:hover:...` no dispara la regla. */
+[data-mode="light"] [class*=" hover:text-white"][class*=" hover:bg-white/"]:hover,
+[data-mode="light"] [class^="hover:text-white"][class*=" hover:bg-white/"]:hover,
+[data-mode="light"] [class*=" hover:text-white"][class^="hover:bg-white/"]:hover {
+  color: #0a192f;
+  background-color: #f1f5f9;
+}
+
+[data-mode="light"] [class*="bg-[#0a192f]"] [class*=" hover:text-white"][class*=" hover:bg-white/"]:hover,
+[data-mode="light"] [class*="bg-[#0A192F]"] [class*=" hover:text-white"][class*=" hover:bg-white/"]:hover {
+  color: #ffffff;
+  background-color: rgb(255 255 255 / 0.08);
+}
+
 [data-mode="light"] main :is(.text-white\/5, .text-white\/10, .text-white\/15, .text-white\/20, .text-white\/25, .text-white\/30, .text-white\/35, .text-white\/40, .text-white\/45, .text-white\/50, .text-white\/55, .text-white\/60, .text-white\/65, .text-white\/70):not(button *, [class*="bg-primary"] *, [class*="bg-emerald-"] *, [class*="bg-red-"] *, [class*="bg-gradient"] *, [class*="badge"] *) {
   color: #52607a;
 }

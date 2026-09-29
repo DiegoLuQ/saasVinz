@@ -10,32 +10,27 @@ import {
     XCircle,
     Edit2,
     Trash2,
-    Package,
     Loader2,
     Layers,
-    TrendingUp,
     X,
     FolderTree,
     Diamond,
     Info,
     Lock,
-    BookOpen
+    BookOpen,
+    Share2
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { apiRequest, API_URL } from '@/lib/tenant/api';
-import { motion, AnimatePresence } from 'framer-motion';
+import { API_URL } from '@/lib/tenant/api';
+import { motion } from 'framer-motion';
 
 const PlansDownloadLink = dynamic(() => import('@/components/tenant/catalog/PDFPlansDownloadButton'), { ssr: false });
-import PlanImageUploader from '@/components/tenant/catalog/PlanImageUploader';
 import {
     useCatalogServices,
     useCatalogPlans,
     useSaveService,
     useDeleteService,
-    useSavePlan,
-    useDeletePlan,
-    useCatalogProducts,
-    useSaveProduct
+    useDeletePlan
 } from '@/hooks/useCatalog';
 import { usePermissions } from '@/app/(tenant)/tenant/context/PermissionContext';
 import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
@@ -44,6 +39,7 @@ import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import Modal from '@/components/tenant/Modal';
 import DeleteConfirmationModal from '@/components/tenant/DeleteConfirmationModal';
 import SearchableSelect from '@/components/tenant/SearchableSelect';
+import ShareCatalogModal from '@/components/tenant/catalog/ShareCatalogModal';
 
 interface Service {
     id: number;
@@ -54,12 +50,6 @@ interface Service {
     is_active: boolean;
 }
 
-interface Product {
-    id: number;
-    name: string;
-    sale_price: number;
-    cost_price: number;
-}
 
 interface Plan {
     id: number;
@@ -86,33 +76,25 @@ export default function ServicesPage() {
 
     const { data: services = [], isLoading: loadingServices } = useCatalogServices();
     const { data: plans = [], isLoading: loadingPlans } = useCatalogPlans();
-    const { data: products = [] } = useCatalogProducts();
 
     const saveServiceMutation = useSaveService();
     const deleteServiceMutation = useDeleteService();
-    const savePlanMutation = useSavePlan();
     const deletePlanMutation = useDeletePlan();
-    const saveProductMutation = useSaveProduct();
 
     const [isSaving, setIsSaving] = useState(false);
     const [activeTab, setActiveTab] = useState<'servicios' | 'planes'>('servicios');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentService, setCurrentService] = useState<Partial<Service> | null>(null);
-    const [currentPlan, setCurrentPlan] = useState<Partial<Plan> | null>(null);
     const [itemToDelete, setItemToDelete] = useState<{ type: 'service' | 'plan'; id: number; name: string } | null>(null);
     const [showLimitModal, setShowLimitModal] = useState(false);
     const [modalResource, setModalResource] = useState('Servicios');
-
-    const [showQuickProduct, setShowQuickProduct] = useState(false);
-    const [quickProduct, setQuickProduct] = useState({ name: '', cost_price: 0, sale_price: 0 });
-    // Imagen del plan pendiente de subir (se sube al guardar el formulario)
-    const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
 
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
     const [marginInfoId, setMarginInfoId] = useState<number | null>(null);
 
     const [showPlansCatalogModal, setShowPlansCatalogModal] = useState(false);
+    const [showSharePlansModal, setShowSharePlansModal] = useState(false);
     const [catalogPlansOnlyActive, setCatalogPlansOnlyActive] = useState(false);
     const [catalogPlansShowPrices, setCatalogPlansShowPrices] = useState(true);
     const [catalogPlansShowImages, setCatalogPlansShowImages] = useState(true);
@@ -159,21 +141,6 @@ export default function ServicesPage() {
             return;
         }
         setCurrentService(service || { name: '', description: '', price: 0, cost: 0, is_active: true });
-        setCurrentPlan(null);
-        setIsModalOpen(true);
-    };
-
-    const handleOpenPlanModal = (plan?: Plan) => {
-        if (!plan && isPlanLimitReached) {
-            setModalResource('Planes Comerciales');
-            setShowLimitModal(true);
-            return;
-        }
-        const service_ids = plan?.services?.map(s => s.id) || [];
-        const product_ids = plan?.products?.map(p => p.id) || [];
-        setCurrentPlan(plan ? { ...plan, service_ids, product_ids } : { name: '', description: '', price: 0, cost: 0, is_active: true, service_ids: [], product_ids: [] });
-        setCurrentService(null);
-        setSelectedImageFile(null); // limpiar archivo pendiente al abrir el modal
         setIsModalOpen(true);
     };
 
@@ -193,36 +160,6 @@ export default function ServicesPage() {
         }
     };
 
-    const handleSavePlan = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsSaving(true);
-        try {
-            const isEdit = !!currentPlan?.id;
-
-            // Subir la imagen pendiente (recortada 1:1) antes de guardar el plan
-            let finalImageUrl = currentPlan?.image_url;
-            if (selectedImageFile) {
-                const formData = new FormData();
-                formData.append('file', selectedImageFile);
-                const uploadRes = await apiRequest('/api/internal/plans/upload-image', {
-                    method: 'POST',
-                    body: formData,
-                });
-                finalImageUrl = uploadRes.image_url;
-            }
-
-            await savePlanMutation.mutateAsync({
-                isEdit,
-                plan: { ...currentPlan, image_url: finalImageUrl }
-            });
-            setSelectedImageFile(null);
-            setIsModalOpen(false);
-        } catch (err: any) {
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
     const handleConfirmDelete = async () => {
         if (!itemToDelete) return;
         try {
@@ -232,24 +169,6 @@ export default function ServicesPage() {
                 await deletePlanMutation.mutateAsync(itemToDelete.id);
             }
             setItemToDelete(null);
-        } catch (error) {
-            console.error(error);
-        }
-    };
-
-    const handleQuickProductCreate = async () => {
-        if (!quickProduct.name) return;
-        try {
-            const newProd = await saveProductMutation.mutateAsync({
-                product: { ...quickProduct, code: `AUTO_${Date.now()}` },
-                isEdit: false
-            });
-            if (currentPlan) {
-                const product_ids = [...(currentPlan.product_ids || []), newProd.id];
-                setCurrentPlan({ ...currentPlan, product_ids });
-            }
-            setQuickProduct({ name: '', cost_price: 0, sale_price: 0 });
-            setShowQuickProduct(false);
         } catch (error) {
             console.error(error);
         }
@@ -294,6 +213,16 @@ export default function ServicesPage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
+                        {activeTab === 'planes' && (
+                            <button
+                                onClick={() => setShowSharePlansModal(true)}
+                                className="border border-white/10 font-bold py-3.5 px-6 rounded-2xl flex items-center justify-center transition-all text-sm bg-white/5 text-white hover:bg-white/10 hover:border-amber-500/30 active:scale-95"
+                                title="Generar enlace para compartir el catálogo de planes online"
+                            >
+                                <Share2 className="mr-2" size={18} />
+                                Compartir
+                            </button>
+                        )}
                         {activeTab === 'planes' && (
                             <button
                                 onClick={() => setShowPlansCatalogModal(true)}
@@ -609,16 +538,6 @@ export default function ServicesPage() {
                                         ? 'Intenta con otros términos de búsqueda o cambia el filtro de estado.'
                                         : 'Agrupa servicios y productos en un plan para ofrecer paquetes completos a las familias.'}
                                 </p>
-                                {!searchTerm && statusFilter === 'all' && canCreate('servicios') && (
-                                    <button
-                                        onClick={() => handleOpenPlanModal()}
-                                        disabled={isPlanLimitReached}
-                                        className="mt-6 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold py-3 px-7 rounded-2xl shadow-lg shadow-amber-500/20 hover:shadow-amber-500/30 transition-all text-sm"
-                                    >
-                                        <Plus className="inline mr-2" size={16} />
-                                        Crear Plan
-                                    </button>
-                                )}
                             </div>
                         )
                     )}
@@ -647,9 +566,9 @@ export default function ServicesPage() {
             <Modal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                title={currentService ? (currentService.id ? 'Editar Servicio' : 'Nuevo Servicio') : (currentPlan?.id ? 'Editar Plan' : 'Nuevo Plan')}
+                title={currentService?.id ? 'Editar Servicio' : 'Nuevo Servicio'}
             >
-                {currentService ? (
+                {currentService && (
                     <form onSubmit={handleSaveService} className="space-y-6">
                         <div className="bg-white/[0.03] rounded-3xl p-6 border border-white/[0.04] space-y-6">
                             <div className="flex items-center gap-3 pb-3 border-b border-white/[0.04]">
@@ -728,306 +647,6 @@ export default function ServicesPage() {
                             <button type="submit" disabled={isSaving} className="bg-gradient-to-r from-primary to-[#00B377] text-white px-8 py-3 rounded-2xl font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:-translate-y-0.5 active:scale-95 transition-all text-sm flex items-center">
                                 {isSaving && <Loader2 className="animate-spin mr-2" size={18} />}
                                 {currentService?.id ? 'Guardar Cambios' : 'Crear Servicio'}
-                            </button>
-                        </div>
-                    </form>
-                ) : (
-                    <form onSubmit={handleSavePlan} className="space-y-6">
-                        {/* Section 1: General Information */}
-                        <div className="bg-white/[0.03] rounded-3xl p-6 border border-white/[0.04] space-y-5">
-                            <div className="flex items-center gap-3 pb-3 border-b border-white/[0.04]">
-                                <div className="p-2 rounded-xl bg-gradient-to-br from-amber-500/15 to-amber-600/5 border border-amber-500/10">
-                                    <Layers className="text-amber-400" size={16} />
-                                </div>
-                                <div>
-                                    <h3 className="text-xs font-black uppercase tracking-widest text-white">Información General</h3>
-                                    <p className="text-[9px] text-muted-foreground/50">Datos principales del plan</p>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-                                <div className="md:col-span-3 space-y-2">
-                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Nombre del Plan</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={currentPlan?.name || ''}
-                                        onChange={(e) => setCurrentPlan({ ...currentPlan, name: e.target.value })}
-                                        className="w-full bg-black/20 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-amber-500/40 transition-all text-sm font-medium"
-                                        placeholder="Ej: Plan Premium"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Estado</label>
-                                    <SearchableSelect
-                                        options={[
-                                            { value: 'true', label: 'Activo' },
-                                            { value: 'false', label: 'Inactivo' }
-                                        ]}
-                                        value={currentPlan?.is_active ? 'true' : 'false'}
-                                        onChange={(val) => setCurrentPlan({ ...currentPlan, is_active: val === 'true' })}
-                                        placeholder="Seleccionar..."
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Descripción</label>
-                                <textarea
-                                    value={currentPlan?.description || ''}
-                                    onChange={(e) => setCurrentPlan({ ...currentPlan, description: e.target.value })}
-                                    className="w-full bg-black/20 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-amber-500/40 transition-all min-h-[60px] max-h-[120px] text-sm font-medium resize-none"
-                                    placeholder="Describe brevemente lo que incluye este plan..."
-                                />
-                            </div>
-
-                            <PlanImageUploader
-                                imageUrl={currentPlan?.image_url}
-                                onChange={(file) => setSelectedImageFile(file)}
-                                onClearUrl={() => setCurrentPlan({ ...currentPlan, image_url: null })}
-                            />
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <div className="space-y-2">
-                                    <div className="flex justify-between items-center ml-1">
-                                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Precio Venta</label>
-                                    </div>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">$</span>
-                                        <input
-                                            type="number"
-                                            required
-                                            value={currentPlan?.price || 0}
-                                            onChange={(e) => setCurrentPlan({ ...currentPlan, price: Number(e.target.value) })}
-                                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-3 pl-8 pr-4 outline-none focus:border-amber-500/40 transition-all text-sm font-bold"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <div className="flex justify-between items-center ml-1">
-                                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Costo</label>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const totalSvcCost = services.filter((s: Service) => currentPlan?.service_ids?.includes(s.id)).reduce((acc: number, curr: Service) => acc + (curr.cost || 0), 0);
-                                                const totalProdCost = products.filter((p: Product) => currentPlan?.product_ids?.includes(p.id)).reduce((acc: number, curr: Product) => acc + (curr.cost_price || 0), 0);
-                                                const totalSvcPrice = services.filter((s: Service) => currentPlan?.service_ids?.includes(s.id)).reduce((acc: number, curr: Service) => acc + (curr.price || 0), 0);
-                                                const totalProdPrice = products.filter((p: Product) => currentPlan?.product_ids?.includes(p.id)).reduce((acc: number, curr: Product) => acc + (curr.sale_price || 0), 0);
-                                                setCurrentPlan({ ...currentPlan, cost: totalSvcCost + totalProdCost, price: totalSvcPrice + totalProdPrice });
-                                            }}
-                                            className="text-[9px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 transition-colors uppercase tracking-wider"
-                                        >
-                                            <TrendingUp size={11} /> Auto-Calcular
-                                        </button>
-                                    </div>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">$</span>
-                                        <input
-                                            type="number"
-                                            required
-                                            value={currentPlan?.cost || 0}
-                                            onChange={(e) => setCurrentPlan({ ...currentPlan, cost: Number(e.target.value) })}
-                                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-3 pl-8 pr-4 outline-none focus:border-amber-500/40 transition-all text-sm font-bold"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Section 2: Composition */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Services Column */}
-                            <div className="bg-white/[0.03] rounded-3xl p-6 border border-white/[0.04] flex flex-col min-h-[280px]">
-                                <div className="flex items-center gap-3 pb-3 border-b border-white/[0.04] mb-4">
-                                    <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500/15 to-blue-600/5 border border-blue-500/10">
-                                        <Package className="text-blue-400" size={16} />
-                                    </div>
-                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-white">Servicios Incluidos</h3>
-                                </div>
-
-                                <SearchableSelect
-                                    isMulti
-                                    options={services.map(s => ({ value: s.id, label: s.name }))}
-                                    value={currentPlan?.service_ids || []}
-                                    onChange={(val) => setCurrentPlan({ ...currentPlan, service_ids: val })}
-                                    placeholder="Agregar servicios..."
-                                />
-
-                                <div className="mt-4 flex-1 space-y-1.5 overflow-y-auto max-h-[180px] pr-1 scrollbar-hide">
-                                    <AnimatePresence>
-                                        {currentPlan?.service_ids?.map(svcId => {
-                                            const service = services.find((s: Service) => s.id === svcId);
-                                            if (!service) return null;
-                                            return (
-                                                <motion.div
-                                                    key={svcId}
-                                                    initial={{ opacity: 0, x: -10 }}
-                                                    animate={{ opacity: 1, x: 0 }}
-                                                    exit={{ opacity: 0, x: 10 }}
-                                                    className="flex justify-between items-center bg-black/30 px-3.5 py-2.5 rounded-xl border border-white/[0.04] hover:border-blue-500/20 transition-all group/item"
-                                                >
-                                                    <div className="flex items-center gap-2.5 min-w-0">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-blue-400/40 shrink-0" />
-                                                        <span className="text-xs font-medium text-white/80 truncate">{service.name}</span>
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setCurrentPlan({ ...currentPlan, service_ids: currentPlan.service_ids?.filter(id => id !== svcId) })}
-                                                        className="text-red-500/30 hover:text-red-400 hover:bg-red-500/10 p-1.5 rounded-lg transition-all opacity-0 group-hover/item:opacity-100"
-                                                    >
-                                                        <X size={12} />
-                                                    </button>
-                                                </motion.div>
-                                            );
-                                        })}
-                                    </AnimatePresence>
-                                    {(currentPlan?.service_ids?.length || 0) === 0 && (
-                                        <div className="h-full flex flex-col items-center justify-center text-muted-foreground/30 py-8">
-                                            <Package size={28} className="mb-2" />
-                                            <span className="text-[9px] font-bold uppercase tracking-widest">Sin servicios</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Products Column */}
-                            <div className="bg-white/[0.03] rounded-3xl p-6 border border-white/[0.04] flex flex-col min-h-[280px]">
-                                <div className="flex items-center justify-between pb-3 border-b border-white/[0.04] mb-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 rounded-xl bg-gradient-to-br from-orange-500/15 to-orange-600/5 border border-orange-500/10">
-                                            <Plus className="text-orange-400" size={16} />
-                                        </div>
-                                        <h3 className="text-[10px] font-black uppercase tracking-widest text-white">Productos</h3>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowQuickProduct(!showQuickProduct)}
-                                        className="text-[9px] font-bold text-orange-400 hover:text-orange-300 flex items-center gap-1 transition-colors uppercase tracking-wider"
-                                    >
-                                        <Plus size={11} /> {showQuickProduct ? 'Cerrar' : 'Nuevo'}
-                                    </button>
-                                </div>
-
-                                <SearchableSelect
-                                    isMulti
-                                    options={products.map((p: Product) => ({ value: p.id, label: p.name }))}
-                                    value={currentPlan?.product_ids || []}
-                                    onChange={(val) => setCurrentPlan({ ...currentPlan, product_ids: val })}
-                                    placeholder="Agregar productos..."
-                                />
-
-                                <div className="mt-4 flex-1 space-y-1.5 overflow-y-auto max-h-[180px] pr-1 scrollbar-hide">
-                                    <AnimatePresence>
-                                        {currentPlan?.product_ids?.map(prodId => {
-                                            const product = products.find((p: Product) => p.id === prodId);
-                                            if (!product) return null;
-                                            return (
-                                                <motion.div
-                                                    key={prodId}
-                                                    initial={{ opacity: 0, x: -10 }}
-                                                    animate={{ opacity: 1, x: 0 }}
-                                                    exit={{ opacity: 0, x: 10 }}
-                                                    className="flex justify-between items-center bg-black/30 px-3.5 py-2.5 rounded-xl border border-white/[0.04] hover:border-orange-500/20 transition-all group/item"
-                                                >
-                                                    <div className="flex items-center gap-2.5 min-w-0">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-orange-400/40 shrink-0" />
-                                                        <span className="text-xs font-medium text-white/80 truncate">{product.name}</span>
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setCurrentPlan({ ...currentPlan, product_ids: currentPlan.product_ids?.filter(id => id !== prodId) })}
-                                                        className="text-red-500/30 hover:text-red-400 hover:bg-red-500/10 p-1.5 rounded-lg transition-all opacity-0 group-hover/item:opacity-100"
-                                                    >
-                                                        <X size={12} />
-                                                    </button>
-                                                </motion.div>
-                                            );
-                                        })}
-                                    </AnimatePresence>
-                                    {(currentPlan?.product_ids?.length || 0) === 0 && (
-                                        <div className="h-full flex flex-col items-center justify-center text-muted-foreground/30 py-8">
-                                            <Plus size={28} className="mb-2" />
-                                            <span className="text-[9px] font-bold uppercase tracking-widest">Sin productos</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Quick Product Creation */}
-                        <AnimatePresence>
-                            {showQuickProduct && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: -20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -20 }}
-                                    className="bg-gradient-to-br from-orange-500/5 to-orange-600/5 border border-orange-500/15 rounded-3xl p-6 space-y-4"
-                                >
-                                    <div className="flex items-center gap-3 pb-2 border-b border-orange-500/10">
-                                        <div className="p-2 rounded-xl bg-gradient-to-br from-orange-500/15 to-orange-600/5 border border-orange-500/10">
-                                            <Plus className="text-orange-400" size={16} />
-                                        </div>
-                                        <h3 className="text-[10px] font-black uppercase tracking-widest text-orange-400">Creación Rápida de Producto</h3>
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-[9px] font-bold uppercase text-orange-400/60 tracking-wider ml-1">Nombre</label>
-                                            <input
-                                                value={quickProduct.name}
-                                                onChange={(e) => setQuickProduct({ ...quickProduct, name: e.target.value })}
-                                                className="w-full bg-black/20 border border-orange-500/20 rounded-2xl py-2.5 px-4 text-sm outline-none focus:border-orange-500/40 text-white font-medium transition-all"
-                                                placeholder="Nombre del producto..."
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[9px] font-bold uppercase text-orange-400/60 tracking-wider ml-1">Precio Costo</label>
-                                            <input
-                                                type="number"
-                                                value={quickProduct.cost_price}
-                                                onChange={(e) => setQuickProduct({ ...quickProduct, cost_price: Number(e.target.value) })}
-                                                className="w-full bg-black/20 border border-orange-500/20 rounded-2xl py-2.5 px-4 text-sm outline-none focus:border-orange-500/40 text-white font-bold transition-all"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[9px] font-bold uppercase text-orange-400/60 tracking-wider ml-1">Precio Venta</label>
-                                            <input
-                                                type="number"
-                                                value={quickProduct.sale_price}
-                                                onChange={(e) => setQuickProduct({ ...quickProduct, sale_price: Number(e.target.value) })}
-                                                className="w-full bg-black/20 border border-orange-500/20 rounded-2xl py-2.5 px-4 text-sm outline-none focus:border-orange-500/40 text-white font-bold transition-all"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-end">
-                                        <button
-                                            type="button"
-                                            onClick={handleQuickProductCreate}
-                                            disabled={!quickProduct.name || saveProductMutation.isPending}
-                                            className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:shadow-lg hover:shadow-orange-500/20 disabled:opacity-50 transition-all flex items-center gap-2 shadow-md"
-                                        >
-                                            {saveProductMutation.isPending && <Loader2 size={16} className="animate-spin" />}
-                                            Registrar e Incluir
-                                        </button>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        <div className="flex justify-end gap-4 pt-4 border-t border-white/[0.04]">
-                            <button
-                                type="button"
-                                onClick={() => setIsModalOpen(false)}
-                                className="px-8 py-3.5 rounded-2xl bg-white/5 text-white/70 font-black uppercase text-[10px] tracking-widest hover:bg-white/10 transition-all border border-white/5"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={isSaving}
-                                className="bg-gradient-to-r from-primary to-[#00B377] text-white px-10 py-3.5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 hover:shadow-primary/30 hover:-translate-y-0.5 active:scale-95 transition-all flex items-center"
-                            >
-                                {isSaving && <Loader2 className="animate-spin mr-3" size={18} />}
-                                {currentPlan?.id ? 'Actualizar Plan' : 'Crear Nuevo Plan'}
                             </button>
                         </div>
                     </form>
@@ -1233,6 +852,15 @@ export default function ServicesPage() {
                     </div>
                 </div>
             </Modal>
+
+            {/* Enlace público del catálogo de planes (portada + servicios de cada plan) */}
+            <ShareCatalogModal
+                isOpen={showSharePlansModal}
+                onClose={() => setShowSharePlansModal(false)}
+                tenantSlug={tenantData?.slug || ''}
+                tenantName={tenantData?.name || ''}
+                catalogType="plans"
+            />
         </div>
     );
 }

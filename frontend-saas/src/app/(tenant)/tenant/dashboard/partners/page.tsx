@@ -20,14 +20,14 @@ export default function PartnersPage() {
                 <div className="flex items-center gap-2 bg-white/5 p-1 rounded-2xl border border-white/10 shrink-0">
                     <button
                         type="button"
-                        className="px-4 py-2 rounded-xl text-xs font-black bg-primary text-black shadow-lg shadow-primary/20 flex items-center gap-2"
+                        className="px-4 py-2 rounded-xl text-xs font-black bg-primary text-white dark:text-black shadow-lg shadow-primary/20 flex items-center gap-2"
                     >
                         <Store size={14} />
                         Listado de Partners
                     </button>
                     <Link
                         href="/dashboard/partners/comisiones"
-                        className="px-4 py-2 rounded-xl text-xs font-bold text-muted-foreground hover:text-white hover:bg-white/5 transition-all flex items-center gap-2"
+                        className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/5 transition-all flex items-center gap-2"
                     >
                         <DollarSign size={14} />
                         Liquidación de Comisiones

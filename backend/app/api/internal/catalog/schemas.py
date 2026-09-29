@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional, List
+from typing import Literal, Optional, List
 from datetime import datetime
 
 
@@ -168,15 +168,19 @@ class WeightPricingInDB(WeightPricingBase):
     model_config = {"from_attributes": True}
 
 # Tokens de Compartir Catálogo Online
+CatalogType = Literal["products", "plans"]
+
 class CatalogShareTokenCreate(BaseModel):
     name: Optional[str] = None
     expires_in_hours: Optional[int] = None # None o 0 = permanente
+    catalog_type: CatalogType = "products"
 
 class CatalogShareTokenInDB(BaseModel):
     id: int
     tenant_id: int
     token: str
     name: Optional[str] = None
+    catalog_type: CatalogType = "products"
     expires_at: Optional[datetime] = None
     is_active: bool
     views_count: int = 0
@@ -200,7 +204,22 @@ class PublicCatalogProduct(BaseModel):
     images: Optional[List[str]] = []
     category_name: Optional[str] = None
 
+class PublicCatalogPlanItem(BaseModel):
+    name: str
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+
+class PublicCatalogPlan(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    price: float
+    image_url: Optional[str] = None  # portada del plan
+    services: List[PublicCatalogPlanItem] = []
+    products: List[PublicCatalogPlanItem] = []
+
 class PublicCatalogResponse(BaseModel):
+    catalog_type: CatalogType = "products"
     is_expired: bool = False
     tenant_name: str
     tenant_slug: str
@@ -209,4 +228,5 @@ class PublicCatalogResponse(BaseModel):
     whatsapp: Optional[str] = None
     expires_at: Optional[datetime] = None
     products: List[PublicCatalogProduct] = []
+    plans: List[PublicCatalogPlan] = []
 

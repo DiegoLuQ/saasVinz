@@ -131,7 +131,7 @@ export default function ReceiptPage() {
                     <button
                         onClick={handleDownload}
                         disabled={exporting}
-                        className="px-6 py-2 bg-primary text-black rounded-xl font-bold text-xs flex items-center gap-2 hover:opacity-90 transition-all shadow-lg shadow-primary/10"
+                        className="px-6 py-2 bg-primary text-white dark:text-black rounded-xl font-bold text-xs flex items-center gap-2 hover:opacity-90 transition-all shadow-lg shadow-primary/10"
                     >
                         {exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
                         {exporting ? 'Generando...' : 'Descargar Recibo'}

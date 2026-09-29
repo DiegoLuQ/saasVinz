@@ -152,7 +152,7 @@ export function BillingHistory({ transactions }: BillingHistoryProps) {
                                             size="sm"
                                             onClick={() => setCurrentPage(pageNum)}
                                             className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${currentPage === pageNum
-                                                ? 'bg-primary text-black hover:bg-primary shadow-lg shadow-primary/20'
+                                                ? 'bg-primary text-white dark:text-black hover:bg-primary shadow-lg shadow-primary/20'
                                                 : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
                                                 }`}
                                         >

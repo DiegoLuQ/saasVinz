@@ -21,7 +21,7 @@ from app.api.internal.catalog.schemas import (
     PlanBase, PlanCreate, PlanUpdate, PlanInDB,
     WeightPricingBase, WeightPricingCreate, WeightPricingInDB,
     CatalogShareTokenCreate, CatalogShareTokenInDB,
-    PublicCatalogProduct, PublicCatalogResponse
+    PublicCatalogProduct, PublicCatalogResponse, PublicCatalogPlan, PublicCatalogPlanItem
 )
 
 # 3. Operations Module (Cremations, Orders, Logistics)

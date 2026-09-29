@@ -22,6 +22,7 @@ import {
     ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import PublicPlansCatalog, { type PublicPlan } from '@/components/public/catalog/PublicPlansCatalog';
 
 interface ProductItem {
     id: number;
@@ -38,6 +39,7 @@ interface ProductItem {
 }
 
 interface PublicCatalogData {
+    catalog_type?: 'products' | 'plans';
     is_expired: boolean;
     tenant_name: string;
     tenant_slug: string;
@@ -46,6 +48,7 @@ interface PublicCatalogData {
     whatsapp?: string | null;
     expires_at?: string | null;
     products: ProductItem[];
+    plans?: PublicPlan[];
 }
 
 export default function PublicCatalogPage() {
@@ -246,7 +249,7 @@ export default function PublicCatalogPage() {
 
                     <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-4 text-left">
                         <p className="text-xs text-neutral-400 font-medium">
-                            Si deseas ver los modelos de urnas, relicarios y accesorios vigentes de <strong className="text-white">{data.tenant_name}</strong>, puedes solicitar un nuevo enlace con un solo toque:
+                            {data.catalog_type === 'plans' ? 'Si deseas ver los planes vigentes de' : 'Si deseas ver los modelos de urnas, relicarios y accesorios vigentes de'} <strong className="text-white">{data.tenant_name}</strong>, puedes solicitar un nuevo enlace con un solo toque:
                         </p>
                     </div>
 
@@ -282,7 +285,23 @@ export default function PublicCatalogPage() {
         );
     }
 
-    // 4. Valid Active Catalog
+    // 4a. Catálogo de planes (portada + servicios de cada plan)
+    if (data.catalog_type === 'plans') {
+        return (
+            <PublicPlansCatalog
+                tenantName={data.tenant_name}
+                tenantLogo={data.tenant_logo}
+                whatsapp={data.whatsapp}
+                expiresAt={data.expires_at}
+                plans={data.plans ?? []}
+                getImageUrl={getImageUrl}
+                onShare={handleShareLink}
+                copiedLink={copiedLink}
+            />
+        );
+    }
+
+    // 4b. Valid Active Catalog (productos)
     return (
         <div className="min-h-screen bg-[#0a0d14] text-white flex flex-col selection:bg-amber-500 selection:text-black">
             {/* Top Branding & Expiration Banner */}

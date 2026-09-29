@@ -315,7 +315,7 @@ export function PaymentReportModal({ isOpen, onClose, onSuccess, amountToPay }: 
                                                         key={ratio.l}
                                                         onClick={() => setAspect(ratio.v)}
                                                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border ${Math.abs(aspect - ratio.v) < 0.01
-                                                            ? 'bg-primary text-black border-primary'
+                                                            ? 'bg-primary text-white dark:text-black border-primary'
                                                             : 'bg-white/5 text-white/60 border-white/5 hover:bg-white/10'
                                                             }`}
                                                     >
@@ -379,7 +379,7 @@ export function PaymentReportModal({ isOpen, onClose, onSuccess, amountToPay }: 
                         {step === 1 && (
                             <button
                                 onClick={() => { if (amount && date) setStep(2); else showToast('Completa monto y fecha', 'error'); }}
-                                className="flex-1 py-3 rounded-xl font-bold bg-primary hover:bg-primary-dark text-black transition-colors flex items-center justify-center gap-2"
+                                className="flex-1 py-3 rounded-xl font-bold bg-primary hover:bg-primary-dark text-white dark:text-black transition-colors flex items-center justify-center gap-2"
                             >
                                 Siguiente <ArrowRight size={18} />
                             </button>
@@ -388,7 +388,7 @@ export function PaymentReportModal({ isOpen, onClose, onSuccess, amountToPay }: 
                         {step === 2 && (
                             <button
                                 onClick={processCrop}
-                                className="flex-1 py-3 rounded-xl font-bold bg-primary hover:bg-primary-dark text-black transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex-1 py-3 rounded-xl font-bold bg-primary hover:bg-primary-dark text-white dark:text-black transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 disabled={!imageSrc && !file} // If PDF, file is set, imageSrc null
                             >
                                 {imageSrc ? 'Recortar y Continuar' : 'Continuar'} <ArrowRight size={18} />

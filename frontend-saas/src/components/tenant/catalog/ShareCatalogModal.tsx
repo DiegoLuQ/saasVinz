@@ -34,12 +34,33 @@ interface CatalogLink {
     is_expired: boolean;
 }
 
+export type CatalogType = 'products' | 'plans';
+
+const COPY: Record<CatalogType, { title: string; expiredHint: string; empty: string; defaultName: string; whatsapp: string }> = {
+    products: {
+        title: 'Compartir Catálogo Online',
+        expiredHint: 'Los enlaces expirados no permitirán ver productos',
+        empty: 'Aún no has generado enlaces de catálogo.',
+        defaultName: 'Catálogo General',
+        whatsapp: 'el catálogo conmemorativo',
+    },
+    plans: {
+        title: 'Compartir Catálogo de Planes',
+        expiredHint: 'Los enlaces expirados no permitirán ver los planes',
+        empty: 'Aún no has generado enlaces del catálogo de planes.',
+        defaultName: 'Catálogo de Planes',
+        whatsapp: 'nuestros planes de cremación',
+    },
+};
+
 interface ShareCatalogModalProps {
     isOpen: boolean;
     onClose: () => void;
     tenantSlug: string;
     tenantName: string;
     zIndex?: string;
+    /** Qué catálogo comparte el enlace: productos (Inventario) o planes (Gestión de Servicios). */
+    catalogType?: CatalogType;
 }
 
 const EXPIRATION_OPTIONS = [
@@ -56,7 +77,9 @@ export default function ShareCatalogModal({
     tenantSlug,
     tenantName,
     zIndex = 'z-[400]',
+    catalogType = 'products',
 }: ShareCatalogModalProps) {
+    const copy = COPY[catalogType];
     const { showToast } = useToast();
     const [selectedHours, setSelectedHours] = useState<number | null>(24);
     const [linkLabel, setLinkLabel] = useState('');
@@ -69,7 +92,7 @@ export default function ShareCatalogModal({
     const fetchLinks = async () => {
         try {
             setLoadingLinks(true);
-            const res = await apiRequest('/api/internal/catalog/links');
+            const res = await apiRequest(`/api/internal/catalog/links?type=${catalogType}`);
             if (Array.isArray(res)) {
                 setLinks(res);
             }
@@ -86,7 +109,7 @@ export default function ShareCatalogModal({
             setRecentCreatedUrl(null);
             setLinkLabel('');
         }
-    }, [isOpen]);
+    }, [isOpen, catalogType]);
 
     if (!isOpen) return null;
 
@@ -99,6 +122,7 @@ export default function ShareCatalogModal({
                 body: JSON.stringify({
                     name: linkLabel.trim() || undefined,
                     expires_in_hours: selectedHours,
+                    catalog_type: catalogType,
                 }),
             });
 
@@ -158,7 +182,7 @@ export default function ShareCatalogModal({
                         </div>
                         <div>
                             <h3 className="text-lg font-bold text-white leading-tight">
-                                Compartir Catálogo Online
+                                {copy.title}
                             </h3>
                             <p className="text-xs text-muted-foreground mt-0.5">
                                 Genera enlaces privados con fecha de vencimiento y botón de WhatsApp
@@ -182,7 +206,7 @@ export default function ShareCatalogModal({
                                 Vigencia del Enlace
                             </label>
                             <span className="text-[11px] text-amber-400 font-medium">
-                                Los enlaces expirados no permitirán ver productos
+                                {copy.expiredHint}
                             </span>
                         </div>
 
@@ -282,7 +306,7 @@ export default function ShareCatalogModal({
                             </div>
                             <div className="flex items-center gap-2 pt-1">
                                 <a
-                                    href={`https://wa.me/?text=${encodeURIComponent(`Hola, te comparto el catálogo conmemorativo de ${tenantName}: ${recentCreatedUrl}`)}`}
+                                    href={`https://wa.me/?text=${encodeURIComponent(`Hola, te comparto ${copy.whatsapp} de ${tenantName}: ${recentCreatedUrl}`)}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="inline-flex items-center gap-2 py-2 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
@@ -315,7 +339,7 @@ export default function ShareCatalogModal({
                             </div>
                         ) : links.length === 0 ? (
                             <div className="py-8 text-center text-xs text-muted-foreground bg-white/[0.01] rounded-2xl border border-white/5">
-                                Aún no has generado enlaces de catálogo.
+                                {copy.empty}
                             </div>
                         ) : (
                             <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
@@ -335,7 +359,7 @@ export default function ShareCatalogModal({
                                             <div className="min-w-0 flex-1 space-y-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-xs font-bold text-white truncate">
-                                                        {link.name || 'Catálogo General'}
+                                                        {link.name || copy.defaultName}
                                                     </span>
                                                     {link.is_expired ? (
                                                         <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-500/10 text-rose-400 border border-rose-500/20">

@@ -178,35 +178,35 @@ export default function ComisionesPage() {
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-8 space-y-8">
             {/* Header & Tabs */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-white/10">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-white/10">
                 <div>
-                    <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-muted-foreground uppercase tracking-wider mb-1">
                         <Link href="/dashboard/partners" className="hover:text-primary transition-colors flex items-center gap-1">
                             <Store size={14} /> Partners
                         </Link>
                         <span>/</span>
                         <span className="text-foreground">Liquidación de Comisiones</span>
                     </div>
-                    <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2.5">
+                    <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
                         <DollarSign className="text-emerald-400" />
                         Comisiones a Veterinarias
                     </h1>
-                    <p className="mt-1 text-sm text-muted-foreground">
+                    <p className="mt-1 text-sm text-slate-600 dark:text-muted-foreground">
                         Gestiona, audita y liquida las comisiones derivadas por clínicas veterinarias en convenio.
                     </p>
                 </div>
 
-                <div className="flex items-center gap-2 bg-white/5 p-1 rounded-2xl border border-white/10 shrink-0">
+                <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/5 p-1 rounded-2xl border border-slate-200 dark:border-white/10 shrink-0">
                     <Link
                         href="/dashboard/partners"
-                        className="px-4 py-2 rounded-xl text-xs font-bold text-muted-foreground hover:text-white hover:bg-white/5 transition-all flex items-center gap-2"
+                        className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/5 transition-all flex items-center gap-2"
                     >
                         <Store size={14} />
                         Listado de Partners
                     </Link>
                     <button
                         type="button"
-                        className="px-4 py-2 rounded-xl text-xs font-black bg-primary text-black shadow-lg shadow-primary/20 flex items-center gap-2"
+                        className="px-4 py-2 rounded-xl text-xs font-black bg-primary text-white dark:text-black shadow-lg shadow-primary/20 flex items-center gap-2"
                     >
                         <DollarSign size={14} />
                         Liquidación de Comisiones
@@ -217,7 +217,7 @@ export default function ComisionesPage() {
             {/* KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                 {/* Total Pendiente */}
-                <div className="bg-[#0f172a] border border-amber-500/20 hover:border-amber-500/40 rounded-3xl p-6 relative overflow-hidden shadow-xl transition-all group">
+                <div className="bg-white dark:bg-[#0f172a] border border-amber-500/20 hover:border-amber-500/40 rounded-3xl p-6 relative overflow-hidden shadow-sm dark:shadow-xl transition-all group">
                     <div className="absolute top-0 right-0 p-5 opacity-10 group-hover:opacity-20 transition-opacity">
                         <Clock size={80} className="text-amber-400" />
                     </div>
@@ -225,16 +225,16 @@ export default function ComisionesPage() {
                         <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
                         Por Pagar (Pendientes)
                     </div>
-                    <h3 className="text-3xl sm:text-4xl font-black text-white font-mono">
+                    <h3 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white font-mono">
                         {formatCLP(stats.total_pending)}
                     </h3>
-                    <p className="text-xs text-muted-foreground mt-2 font-medium">
+                    <p className="text-xs text-slate-600 dark:text-muted-foreground mt-2 font-medium">
                         {stats.count_pending} {stats.count_pending === 1 ? 'comisión pendiente' : 'comisiones pendientes'}
                     </p>
                 </div>
 
                 {/* Total Pagado */}
-                <div className="bg-[#0f172a] border border-emerald-500/20 hover:border-emerald-500/40 rounded-3xl p-6 relative overflow-hidden shadow-xl transition-all group">
+                <div className="bg-white dark:bg-[#0f172a] border border-emerald-500/20 hover:border-emerald-500/40 rounded-3xl p-6 relative overflow-hidden shadow-sm dark:shadow-xl transition-all group">
                     <div className="absolute top-0 right-0 p-5 opacity-10 group-hover:opacity-20 transition-opacity">
                         <CheckCircle2 size={80} className="text-emerald-400" />
                     </div>
@@ -242,36 +242,36 @@ export default function ComisionesPage() {
                         <CheckCircle2 size={13} />
                         Total Liquidado (Pagado)
                     </div>
-                    <h3 className="text-3xl sm:text-4xl font-black text-white font-mono">
+                    <h3 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white font-mono">
                         {formatCLP(stats.total_paid)}
                     </h3>
-                    <p className="text-xs text-muted-foreground mt-2 font-medium">
+                    <p className="text-xs text-slate-600 dark:text-muted-foreground mt-2 font-medium">
                         {stats.count_paid} {stats.count_paid === 1 ? 'comisión liquidada' : 'comisiones liquidadas'}
                     </p>
                 </div>
 
                 {/* Total General */}
-                <div className="bg-[#0f172a] border border-white/10 hover:border-white/20 rounded-3xl p-6 relative overflow-hidden shadow-xl transition-all group">
+                <div className="bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 rounded-3xl p-6 relative overflow-hidden shadow-sm dark:shadow-xl transition-all group">
                     <div className="absolute top-0 right-0 p-5 opacity-10 group-hover:opacity-20 transition-opacity">
                         <Receipt size={80} className="text-primary" />
                     </div>
-                    <div className="flex items-center gap-2 text-muted-foreground text-xs font-bold uppercase tracking-wider mb-2">
+                    <div className="flex items-center gap-2 text-slate-600 dark:text-muted-foreground text-xs font-bold uppercase tracking-wider mb-2">
                         <Receipt size={13} className="text-primary" />
                         Total Histórico Comisiones
                     </div>
-                    <h3 className="text-3xl sm:text-4xl font-black text-white font-mono">
+                    <h3 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white font-mono">
                         {formatCLP(stats.total_paid + stats.total_pending)}
                     </h3>
-                    <p className="text-xs text-muted-foreground mt-2 font-medium">
+                    <p className="text-xs text-slate-600 dark:text-muted-foreground mt-2 font-medium">
                         {totalItems} {totalItems === 1 ? 'orden con convenio registrada' : 'órdenes con convenio registradas'}
                     </p>
                 </div>
             </div>
 
             {/* Filter and Control Bar */}
-            <div className="bg-[#0f172a] border border-white/10 rounded-3xl p-5 flex flex-col md:flex-row gap-4 justify-between items-center shadow-lg">
+            <div className="bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-white/10 rounded-3xl p-5 flex flex-col md:flex-row gap-4 justify-between items-center shadow-lg">
                 <div className="relative w-full md:max-w-md">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 dark:text-muted-foreground" size={16} />
                     <input
                         type="text"
                         placeholder="Buscar por veterinaria, mascota o RUT..."
@@ -280,13 +280,13 @@ export default function ComisionesPage() {
                             setSearch(e.target.value);
                             setPage(1);
                         }}
-                        className="w-full bg-black/40 border border-white/10 rounded-2xl py-2.5 pl-11 pr-4 text-xs text-white placeholder:text-muted-foreground/60 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all"
+                        className="w-full bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-2xl py-2.5 pl-11 pr-4 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-muted-foreground/60 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all"
                     />
                     {search && (
                         <button
                             type="button"
                             onClick={() => setSearch('')}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-white"
                         >
                             <X size={14} />
                         </button>
@@ -295,14 +295,14 @@ export default function ComisionesPage() {
 
                 <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
                     {/* Status Pill Filter */}
-                    <div className="flex items-center bg-black/40 border border-white/10 rounded-2xl p-1">
+                    <div className="flex items-center bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-2xl p-1">
                         <button
                             type="button"
                             onClick={() => { setStatusFilter('all'); setPage(1); }}
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                                 statusFilter === 'all'
-                                    ? 'bg-primary text-black font-extrabold shadow-sm'
-                                    : 'text-muted-foreground hover:text-white'
+                                    ? 'bg-primary text-white dark:text-black font-extrabold shadow-sm'
+                                    : 'text-slate-600 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-white'
                             }`}
                         >
                             Todas
@@ -313,7 +313,7 @@ export default function ComisionesPage() {
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                                 statusFilter === 'pendiente'
                                     ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                    : 'text-muted-foreground hover:text-white'
+                                    : 'text-slate-600 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-white'
                             }`}
                         >
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
@@ -325,7 +325,7 @@ export default function ComisionesPage() {
                             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                                 statusFilter === 'pagado'
                                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                                    : 'text-muted-foreground hover:text-white'
+                                    : 'text-slate-600 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-white'
                             }`}
                         >
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
@@ -338,7 +338,7 @@ export default function ComisionesPage() {
                         type="button"
                         onClick={() => fetchCommissions()}
                         disabled={loading}
-                        className="p-2.5 rounded-2xl bg-black/40 hover:bg-white/5 border border-white/10 text-muted-foreground hover:text-white transition-all disabled:opacity-50"
+                        className="p-2.5 rounded-2xl bg-slate-50 dark:bg-black/40 hover:bg-slate-100 dark:hover:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-white transition-all disabled:opacity-50"
                         title="Actualizar tabla"
                     >
                         <RefreshCw size={15} className={loading ? 'animate-spin text-primary' : ''} />
@@ -347,19 +347,19 @@ export default function ComisionesPage() {
             </div>
 
             {/* Commissions Table */}
-            <div className="bg-[#0f172a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
+            <div className="bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-white/10 rounded-3xl overflow-hidden shadow-sm dark:shadow-2xl">
                 {loading ? (
-                    <div className="py-24 flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                    <div className="py-24 flex flex-col items-center justify-center gap-3 text-slate-600 dark:text-muted-foreground">
                         <Loader2 className="animate-spin text-primary" size={36} />
                         <p className="text-xs font-bold uppercase tracking-wider">Cargando comisiones...</p>
                     </div>
                 ) : commissions.length === 0 ? (
                     <div className="py-20 px-4 text-center flex flex-col items-center justify-center">
-                        <div className="w-16 h-16 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center text-muted-foreground mb-4">
+                        <div className="w-16 h-16 rounded-3xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-muted-foreground mb-4">
                             <Receipt size={30} />
                         </div>
-                        <h4 className="text-base font-bold text-white mb-1">No se encontraron comisiones</h4>
-                        <p className="text-xs text-muted-foreground max-w-sm">
+                        <h4 className="text-base font-bold text-slate-900 dark:text-white mb-1">No se encontraron comisiones</h4>
+                        <p className="text-xs text-slate-600 dark:text-muted-foreground max-w-sm">
                             {search || statusFilter !== 'all'
                                 ? 'Prueba ajustando los filtros de búsqueda o de estado.'
                                 : 'Las órdenes creadas o actualizadas con convenio veterinario aparecerán automáticamente aquí para su liquidación.'}
@@ -368,7 +368,7 @@ export default function ComisionesPage() {
                             <button
                                 type="button"
                                 onClick={() => { setSearch(''); setStatusFilter('all'); }}
-                                className="mt-4 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-white transition-all"
+                                className="mt-4 px-4 py-2 rounded-xl bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-xs font-bold text-slate-900 dark:text-white transition-all"
                             >
                                 Limpiar Filtros
                             </button>
@@ -378,35 +378,35 @@ export default function ComisionesPage() {
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="border-b border-white/10 bg-white/[0.02]">
-                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                                <tr className="border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.02]">
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600 dark:text-muted-foreground">
                                         Orden / Mascota
                                     </th>
-                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600 dark:text-muted-foreground">
                                         Veterinaria (Partner)
                                     </th>
-                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground text-right">
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600 dark:text-muted-foreground text-right">
                                         Total Orden
                                     </th>
-                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground text-center">
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600 dark:text-muted-foreground text-center">
                                         Regla
                                     </th>
-                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground text-right">
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600 dark:text-muted-foreground text-right">
                                         Comisión a Pagar
                                     </th>
-                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground text-center">
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600 dark:text-muted-foreground text-center">
                                         Estado
                                     </th>
-                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground text-right">
+                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-slate-600 dark:text-muted-foreground text-right">
                                         Acción
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-white/5">
+                            <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                                 {commissions.map((item) => {
                                     const isPaid = item.status?.toLowerCase() === 'pagado';
                                     return (
-                                        <tr key={item.id} className="hover:bg-white/[0.02] transition-colors group">
+                                        <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors group">
                                             {/* Orden / Mascota */}
                                             <td className="px-6 py-4 min-w-[200px]">
                                                 <div className="flex items-start gap-3">
@@ -420,14 +420,14 @@ export default function ComisionesPage() {
                                                                 ORD-{item.cremation_id}
                                                                 <ArrowUpRight size={11} />
                                                             </Link>
-                                                            <span className="text-[10px] text-muted-foreground/60 font-mono">
+                                                            <span className="text-[10px] text-slate-500 dark:text-muted-foreground/60 font-mono">
                                                                 {new Date(item.created_at).toLocaleDateString('es-CL')}
                                                             </span>
                                                         </div>
-                                                        <p className="text-sm font-bold text-white truncate max-w-[180px]">
+                                                        <p className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[180px]">
                                                             {item.pet_name || 'Mascota'}
                                                         </p>
-                                                        <p className="text-[11px] text-muted-foreground truncate max-w-[180px]">
+                                                        <p className="text-[11px] text-slate-600 dark:text-muted-foreground truncate max-w-[180px]">
                                                             {item.service_name}
                                                         </p>
                                                     </div>
@@ -439,12 +439,12 @@ export default function ComisionesPage() {
                                                 <div className="space-y-1">
                                                     <div className="flex items-center gap-1.5">
                                                         <Building2 size={13} className="text-emerald-400 shrink-0" />
-                                                        <span className="text-xs font-bold text-white truncate max-w-[180px]" title={item.partner_name}>
+                                                        <span className="text-xs font-bold text-slate-900 dark:text-white truncate max-w-[180px]" title={item.partner_name}>
                                                             {item.partner_name}
                                                         </span>
                                                     </div>
                                                     {item.partner_rut && (
-                                                        <p className="text-[10px] text-muted-foreground font-mono">
+                                                        <p className="text-[10px] text-slate-600 dark:text-muted-foreground font-mono">
                                                             RUT: {item.partner_rut}
                                                         </p>
                                                     )}
@@ -460,13 +460,13 @@ export default function ComisionesPage() {
                                             </td>
 
                                             {/* Total Orden */}
-                                            <td className="px-6 py-4 text-right font-mono text-xs font-bold text-white/90">
+                                            <td className="px-6 py-4 text-right font-mono text-xs font-bold text-slate-800 dark:text-white/90">
                                                 {formatCLP(item.order_total || 0)}
                                             </td>
 
                                             {/* Regla (%) */}
                                             <td className="px-6 py-4 text-center">
-                                                <span className="text-[11px] font-black px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 text-muted-foreground font-mono">
+                                                <span className="text-[11px] font-black px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-muted-foreground font-mono">
                                                     {item.amount_porcentaje ? `${item.amount_porcentaje}%` : 'Fijo'}
                                                 </span>
                                             </td>
@@ -486,7 +486,7 @@ export default function ComisionesPage() {
                                                             <CheckCircle2 size={11} /> Pagado
                                                         </span>
                                                         {item.paid_at && (
-                                                            <span className="text-[9px] text-muted-foreground font-mono mt-0.5">
+                                                            <span className="text-[9px] text-slate-600 dark:text-muted-foreground font-mono mt-0.5">
                                                                 {new Date(item.paid_at).toLocaleDateString('es-CL')}
                                                             </span>
                                                         )}
@@ -505,7 +505,7 @@ export default function ComisionesPage() {
                                                         <button
                                                             type="button"
                                                             onClick={() => setUnpayingCommission(item)}
-                                                            className="text-[10px] text-muted-foreground hover:text-red-400 font-bold hover:underline transition-colors"
+                                                            className="text-[10px] text-slate-600 dark:text-muted-foreground hover:text-red-400 font-bold hover:underline transition-colors"
                                                             title="Revertir estado a pendiente"
                                                         >
                                                             Desmarcar
@@ -518,7 +518,7 @@ export default function ComisionesPage() {
                                                             setPayingCommission(item);
                                                             setPaymentNotes('');
                                                         }}
-                                                        className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black transition-all shadow-md shadow-emerald-500/20 active:scale-95 flex items-center gap-1.5 ml-auto"
+                                                        className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-500 dark:hover:bg-emerald-400 dark:text-black text-xs font-black transition-all shadow-md shadow-emerald-500/20 active:scale-95 flex items-center gap-1.5 ml-auto"
                                                     >
                                                         <CheckCircle2 size={13} />
                                                         Marcar Pagada
@@ -535,7 +535,7 @@ export default function ComisionesPage() {
 
                 {/* Pagination */}
                 {totalItems > limit && (
-                    <div className="px-6 py-4 border-t border-white/10 flex items-center justify-between text-xs text-muted-foreground bg-white/[0.01]">
+                    <div className="px-6 py-4 border-t border-slate-200 dark:border-white/10 flex items-center justify-between text-xs text-slate-600 dark:text-muted-foreground bg-slate-50 dark:bg-white/[0.01]">
                         <span>
                             Mostrando {((page - 1) * limit) + 1} - {Math.min(page * limit, totalItems)} de {totalItems} comisiones
                         </span>
@@ -544,18 +544,18 @@ export default function ComisionesPage() {
                                 type="button"
                                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                                 disabled={page === 1}
-                                className="px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5 disabled:opacity-30 disabled:pointer-events-none font-bold"
+                                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 disabled:opacity-30 disabled:pointer-events-none font-bold"
                             >
                                 Anterior
                             </button>
-                            <span className="font-mono text-white px-2">
+                            <span className="font-mono text-slate-900 dark:text-white px-2">
                                 {page} / {totalPages}
                             </span>
                             <button
                                 type="button"
                                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                                 disabled={page >= totalPages}
-                                className="px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/5 disabled:opacity-30 disabled:pointer-events-none font-bold"
+                                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 disabled:opacity-30 disabled:pointer-events-none font-bold"
                             >
                                 Siguiente
                             </button>
@@ -576,7 +576,7 @@ export default function ComisionesPage() {
                         <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-3">
                             <Building2 className="text-emerald-400 shrink-0" size={24} />
                             <div className="min-w-0">
-                                <p className="text-xs font-black text-white truncate">
+                                <p className="text-xs font-black text-slate-900 dark:text-white truncate">
                                     {selectedBankCommission.partner_name}
                                 </p>
                                 <p className="text-[11px] text-emerald-400/80 font-mono">
@@ -586,41 +586,41 @@ export default function ComisionesPage() {
                         </div>
 
                         {selectedBankCommission.bank_name || selectedBankCommission.account_number ? (
-                            <div className="space-y-2.5 bg-black/40 border border-white/10 rounded-2xl p-4 text-xs">
-                                <div className="flex justify-between items-center py-1 border-b border-white/5">
-                                    <span className="text-muted-foreground">Banco:</span>
-                                    <span className="font-bold text-white">{selectedBankCommission.bank_name || 'No especificado'}</span>
+                            <div className="space-y-2.5 bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-2xl p-4 text-xs">
+                                <div className="flex justify-between items-center py-1 border-b border-slate-100 dark:border-white/5">
+                                    <span className="text-slate-600 dark:text-muted-foreground">Banco:</span>
+                                    <span className="font-bold text-slate-900 dark:text-white">{selectedBankCommission.bank_name || 'No especificado'}</span>
                                 </div>
-                                <div className="flex justify-between items-center py-1 border-b border-white/5">
-                                    <span className="text-muted-foreground">Tipo de Cuenta:</span>
-                                    <span className="font-bold text-white capitalize">{selectedBankCommission.account_type || 'Cuenta Corriente'}</span>
+                                <div className="flex justify-between items-center py-1 border-b border-slate-100 dark:border-white/5">
+                                    <span className="text-slate-600 dark:text-muted-foreground">Tipo de Cuenta:</span>
+                                    <span className="font-bold text-slate-900 dark:text-white capitalize">{selectedBankCommission.account_type || 'Cuenta Corriente'}</span>
                                 </div>
-                                <div className="flex justify-between items-center py-1 border-b border-white/5">
-                                    <span className="text-muted-foreground">N° de Cuenta:</span>
+                                <div className="flex justify-between items-center py-1 border-b border-slate-100 dark:border-white/5">
+                                    <span className="text-slate-600 dark:text-muted-foreground">N° de Cuenta:</span>
                                     <div className="flex items-center gap-1.5">
-                                        <span className="font-mono font-black text-white">{selectedBankCommission.account_number}</span>
+                                        <span className="font-mono font-black text-slate-900 dark:text-white">{selectedBankCommission.account_number}</span>
                                         <button
                                             type="button"
                                             onClick={() => handleCopy(selectedBankCommission.account_number, 'account_num')}
-                                            className="p-1 text-muted-foreground hover:text-white"
+                                            className="p-1 text-slate-600 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-white"
                                             title="Copiar número"
                                         >
                                             {copiedKey === 'account_num' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
                                         </button>
                                     </div>
                                 </div>
-                                <div className="flex justify-between items-center py-1 border-b border-white/5">
-                                    <span className="text-muted-foreground">Titular:</span>
-                                    <span className="font-bold text-white">{selectedBankCommission.nombre_titular || selectedBankCommission.partner_name}</span>
+                                <div className="flex justify-between items-center py-1 border-b border-slate-100 dark:border-white/5">
+                                    <span className="text-slate-600 dark:text-muted-foreground">Titular:</span>
+                                    <span className="font-bold text-slate-900 dark:text-white">{selectedBankCommission.nombre_titular || selectedBankCommission.partner_name}</span>
                                 </div>
                                 <div className="flex justify-between items-center py-1">
-                                    <span className="text-muted-foreground">RUT Titular:</span>
+                                    <span className="text-slate-600 dark:text-muted-foreground">RUT Titular:</span>
                                     <div className="flex items-center gap-1.5">
-                                        <span className="font-mono font-bold text-white">{selectedBankCommission.rut_titular || selectedBankCommission.partner_rut}</span>
+                                        <span className="font-mono font-bold text-slate-900 dark:text-white">{selectedBankCommission.rut_titular || selectedBankCommission.partner_rut}</span>
                                         <button
                                             type="button"
                                             onClick={() => handleCopy(selectedBankCommission.rut_titular || selectedBankCommission.partner_rut, 'rut')}
-                                            className="p-1 text-muted-foreground hover:text-white"
+                                            className="p-1 text-slate-600 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-white"
                                             title="Copiar RUT"
                                         >
                                             {copiedKey === 'rut' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
@@ -644,7 +644,7 @@ export default function ComisionesPage() {
                             <button
                                 type="button"
                                 onClick={() => setSelectedBankCommission(null)}
-                                className="w-full py-2.5 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-bold text-white transition-all"
+                                className="w-full py-2.5 px-4 rounded-xl bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/15 text-xs font-bold text-slate-900 dark:text-white transition-all"
                             >
                                 Cerrar
                             </button>
@@ -662,21 +662,21 @@ export default function ComisionesPage() {
                     maxWidth="max-w-md"
                 >
                     <div className="space-y-4 pt-2">
-                        <div className="p-4 rounded-2xl bg-[#0f172a] border border-white/10 space-y-3">
+                        <div className="p-4 rounded-2xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-white/10 space-y-3">
                             <div className="flex justify-between items-center text-xs">
-                                <span className="text-muted-foreground">Veterinaria:</span>
-                                <span className="font-bold text-white">{payingCommission.partner_name}</span>
+                                <span className="text-slate-600 dark:text-muted-foreground">Veterinaria:</span>
+                                <span className="font-bold text-slate-900 dark:text-white">{payingCommission.partner_name}</span>
                             </div>
                             <div className="flex justify-between items-center text-xs">
-                                <span className="text-muted-foreground">Orden:</span>
+                                <span className="text-slate-600 dark:text-muted-foreground">Orden:</span>
                                 <span className="font-mono font-bold text-primary">ORD-{payingCommission.cremation_id} ({payingCommission.pet_name})</span>
                             </div>
                             <div className="flex justify-between items-center text-xs">
-                                <span className="text-muted-foreground">Total Orden:</span>
-                                <span className="font-mono text-white">{formatCLP(payingCommission.order_total || 0)}</span>
+                                <span className="text-slate-600 dark:text-muted-foreground">Total Orden:</span>
+                                <span className="font-mono text-slate-900 dark:text-white">{formatCLP(payingCommission.order_total || 0)}</span>
                             </div>
-                            <div className="pt-2 border-t border-white/10 flex justify-between items-center">
-                                <span className="text-xs font-black uppercase text-muted-foreground">Monto Comisión:</span>
+                            <div className="pt-2 border-t border-slate-200 dark:border-white/10 flex justify-between items-center">
+                                <span className="text-xs font-black uppercase text-slate-600 dark:text-muted-foreground">Monto Comisión:</span>
                                 <span className="text-xl font-black font-mono text-emerald-400">
                                     {formatCLP(payingCommission.amount)}
                                 </span>
@@ -684,7 +684,7 @@ export default function ComisionesPage() {
                         </div>
 
                         <div>
-                            <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
+                            <label className="block text-[10px] font-bold text-slate-600 dark:text-muted-foreground uppercase tracking-wider mb-1.5">
                                 N° Comprobante o Nota de Transferencia (opcional)
                             </label>
                             <input
@@ -692,7 +692,7 @@ export default function ComisionesPage() {
                                 placeholder="Ej: Transf. #948293 / Banco Estado..."
                                 value={paymentNotes}
                                 onChange={(e) => setPaymentNotes(e.target.value)}
-                                className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-muted-foreground/60 outline-none focus:border-primary/50"
+                                className="w-full bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-muted-foreground/60 outline-none focus:border-primary/50"
                             />
                         </div>
 
@@ -701,7 +701,7 @@ export default function ComisionesPage() {
                                 type="button"
                                 onClick={() => setPayingCommission(null)}
                                 disabled={isProcessingPayment}
-                                className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-muted-foreground hover:text-white transition-all"
+                                className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-xs font-bold text-slate-600 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-white transition-all"
                             >
                                 Cancelar
                             </button>
@@ -709,7 +709,7 @@ export default function ComisionesPage() {
                                 type="button"
                                 onClick={handleConfirmPayment}
                                 disabled={isProcessingPayment}
-                                className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center gap-1.5"
+                                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-500 dark:hover:bg-emerald-400 dark:text-black text-xs font-black transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center gap-1.5"
                             >
                                 {isProcessingPayment ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                                 Confirmar Pago Realizado
@@ -728,7 +728,7 @@ export default function ComisionesPage() {
                     maxWidth="max-w-md"
                 >
                     <div className="space-y-4 pt-2">
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-slate-600 dark:text-muted-foreground">
                             ¿Estás seguro de que deseas desmarcar la comisión de <strong>{formatCLP(unpayingCommission.amount)}</strong> para <strong>{unpayingCommission.partner_name}</strong>? Volverá al total pendiente de liquidar.
                         </p>
 
@@ -737,7 +737,7 @@ export default function ComisionesPage() {
                                 type="button"
                                 onClick={() => setUnpayingCommission(null)}
                                 disabled={isProcessingPayment}
-                                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-muted-foreground hover:text-white transition-all"
+                                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-xs font-bold text-slate-600 dark:text-muted-foreground hover:text-slate-900 dark:hover:text-white transition-all"
                             >
                                 Cancelar
                             </button>

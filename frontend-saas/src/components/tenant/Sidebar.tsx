@@ -26,7 +26,6 @@ import {
     Store,
     DollarSign,
     Activity,
-    Compass,
     Stamp,
     Lock,
     CreditCard as CreditCardIcon,
@@ -108,7 +107,8 @@ const navItems: NavItem[] = [
         moduleKey: 'operaciones',
         children: [
             { name: 'Panel de Trabajo', href: '/dashboard/operaciones/lista', icon: Activity, allowedRoles: ['admin', 'operator', 'driver', 'operador_cremacion'], moduleKey: 'operaciones', featureKey: 'operaciones:panel' },
-            { name: 'Iniciar Nuevo Tracking', href: '/dashboard/operaciones/crear-seguimiento', icon: Compass, moduleKey: 'operaciones', featureKey: 'operaciones:seguimiento:crear' },
+            // 'Iniciar Nuevo Tracking' (/dashboard/operaciones/crear-seguimiento) oculto del menú: la ruta sigue
+            // activa porque homeRouteFor la usa como inicio de roles con operaciones y sin dashboard.
         ]
     },
     { name: 'Historial y Cobros', href: '/dashboard/ordenes-cremacion', icon: CreditCard, moduleKey: 'pagos', featureKey: 'pagos:ver_historial', group: 'operacion' },
