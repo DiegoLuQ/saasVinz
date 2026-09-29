@@ -16,6 +16,16 @@ export default function DashboardTrendChart() {
         );
     }
 
+    // Sin entregas en el período: no dibujar barras mínimas que aparentan actividad
+    if (data.every(d => d.cremations === 0 && d.revenue === 0)) {
+        return (
+            <div className="h-32 flex flex-col items-center justify-center gap-1 text-center">
+                <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">Aún no hay cremaciones entregadas</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">El gráfico se completará a medida que entregues servicios.</p>
+            </div>
+        );
+    }
+
     const maxCremations = Math.max(...data.map(d => d.cremations), 1);
     const maxRevenue = Math.max(...data.map(d => d.revenue), 1);
 

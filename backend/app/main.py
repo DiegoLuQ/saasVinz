@@ -259,6 +259,10 @@ app.include_router(partners_router)
 from app.api.internal.creator.widgets.router import router as creator_widgets_router
 app.include_router(creator_widgets_router, prefix="/api/internal/creator/widgets", tags=["Creator - Widgets"])
 
+# Carga masiva de catálogo (servicios + productos) desde Excel — SuperAdmin
+from app.api.internal.creator.catalog_import.router import router as creator_catalog_import_router
+app.include_router(creator_catalog_import_router, prefix="/api/internal/creator", tags=["Creator - Carga masiva de catálogo"])
+
 # ===== API v1 - Public Endpoints =====
 
 from app.api.public.forms.router import router as public_forms_router

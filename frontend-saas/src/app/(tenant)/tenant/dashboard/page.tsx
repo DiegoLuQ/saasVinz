@@ -294,14 +294,9 @@ export default function DashboardPage() {
                         <h2 className="text-base font-bold text-[#0A192F] dark:text-white tracking-tight">
                             Cremaciones por mes
                         </h2>
-                        <div className="flex items-center gap-3 text-xs font-semibold">
-                            <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-                                <span className="w-2.5 h-2.5 rounded-full bg-[#0EA5E9]" /> 2024
-                            </span>
-                            <span className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
-                                <span className="w-2.5 h-2.5 rounded-full bg-[#10B981]" /> 2025
-                            </span>
-                        </div>
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                            Últimos 6 meses
+                        </span>
                     </div>
                     <div className="pt-2 flex-1">
                         <DashboardTrendChart />

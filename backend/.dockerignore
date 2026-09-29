@@ -1,0 +1,30 @@
+# Contexto de build del backend: solo lo necesario para correr la app.
+
+# Secretos: en Docker la config viene del .env de la raíz (env_file del compose)
+.env
+.env.*
+!.env.example
+
+# Entorno virtual local (Windows) y cachés de Python
+venv/
+.venv/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+
+# Logs locales
+*.log
+
+# Pruebas y borradores
+tests/
+test_*.py
+scratch/
+
+# Subidas temporales (la app recrea el directorio con os.makedirs)
+temp_uploads/*
+
+# Control de versiones / editores
+.git
+.gitignore
+.vscode/
+.idea/

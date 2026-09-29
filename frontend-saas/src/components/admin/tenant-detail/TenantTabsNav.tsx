@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Shield, Users as UsersIcon, Palette, CreditCard, Activity, Plug, History } from 'lucide-react';
+import { Shield, Users as UsersIcon, Palette, CreditCard, Activity, Plug, History, FileSpreadsheet } from 'lucide-react';
 
 interface TenantTabsNavProps {
     slug: string;
@@ -20,6 +20,7 @@ export default function TenantTabsNav({ slug, usersCount }: TenantTabsNavProps) 
         { href: `${base}/branding`, label: 'Branding y Seguridad', description: 'Logo y clave maestra', Icon: Palette, accent: 'text-pink-400' },
         { href: `${base}/facturacion`, label: 'Facturación', description: 'Plan, ciclo y notificaciones', Icon: CreditCard, accent: 'text-green-400' },
         { href: `${base}/uso`, label: 'Uso y Cuotas', description: 'Recursos vs límites del plan', Icon: Activity, accent: 'text-amber-400' },
+        { href: `${base}/catalogo`, label: 'Carga de catálogo', description: 'Servicios y productos (Excel)', Icon: FileSpreadsheet, accent: 'text-emerald-400' },
         { href: `${base}/integraciones`, label: 'Integraciones', description: 'Polar, R2, Mail', Icon: Plug, accent: 'text-purple-400' },
         { href: `${base}/auditoria`, label: 'Auditoría', description: 'Historial de eventos', Icon: History, accent: 'text-rose-400' },
     ];
