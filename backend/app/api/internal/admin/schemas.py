@@ -646,6 +646,9 @@ class BootstrapTenantData(BaseModel):
     region: Optional[str] = None
     city: Optional[str] = None
     social_media: Optional[dict] = None
+    # Textos del catálogo público (los edita Perfil de Empresa, que carga desde bootstrap)
+    catalog_tagline: Optional[str] = None
+    catalog_intro: Optional[str] = None
     legal_rep_name: Optional[str] = None
     legal_rep_rut: Optional[str] = None
     subscription_plan: Optional[SubscriptionPlanInDB] = None

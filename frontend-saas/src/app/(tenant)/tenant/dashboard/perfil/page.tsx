@@ -18,9 +18,11 @@ import {
     Upload,
     Phone,
     Globe,
-    MessageCircle
+    MessageCircle,
+    Store
 } from 'lucide-react';
 import { apiRequest, API_URL, getImageUrl } from '@/lib/tenant/api';
+import { DEFAULT_CATALOG_INTRO } from '@/lib/catalogDefaults';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSessionBootstrap } from '@/hooks/useSessionBootstrap';
 import { useQueryClient } from '@tanstack/react-query';
@@ -525,43 +527,85 @@ export default function ProfilePage() {
                             </div>
 
                             {/* Catálogo online: textos y contacto que ven las familias en el catálogo de planes */}
-                            <div className="pt-4 border-t border-white/5 space-y-4">
-                                <div>
-                                    <h4 className="text-sm font-bold">Catálogo Online</h4>
-                                    <p className="text-[11px] text-muted-foreground mt-1">
-                                        Se muestran en el catálogo de planes que compartes. La dirección, el teléfono, el correo y las redes se toman de los datos de arriba. Lo que dejes vacío no se muestra.
-                                    </p>
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="flex items-center text-xs text-muted-foreground mb-1"><MessageCircle size={12} className="mr-1" /> WhatsApp de contacto</div>
-                                    <input
-                                        value={tenant?.social_media?.whatsapp || ''}
-                                        onChange={(e) => setTenant({ ...tenant, social_media: { ...tenant.social_media, whatsapp: e.target.value } })}
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-xs"
-                                        placeholder="+56 9 1234 5678"
-                                    />
-                                    <p className="text-[11px] text-muted-foreground">Número al que llegan las consultas de cada plan. Vacío: se usa el teléfono de la empresa.</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="text-xs text-muted-foreground mb-1">Lema</div>
-                                    <input
-                                        maxLength={120}
-                                        value={tenant?.catalog_tagline || ''}
-                                        onChange={(e) => setTenant({ ...tenant, catalog_tagline: e.target.value })}
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-xs"
-                                        placeholder="Ej: Honramos su amor, cuidamos su recuerdo"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="text-xs text-muted-foreground mb-1">Introducción</div>
-                                    <textarea
-                                        maxLength={600}
-                                        rows={3}
-                                        value={tenant?.catalog_intro || ''}
-                                        onChange={(e) => setTenant({ ...tenant, catalog_intro: e.target.value })}
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-xs resize-none"
-                                        placeholder="Un mensaje breve y cercano para las familias que revisan tus planes."
-                                    />
+                            <div className="pt-6 border-t border-white/5">
+                                <div className="rounded-3xl border border-amber-500/15 bg-gradient-to-br from-amber-500/[0.06] via-transparent to-transparent p-5 sm:p-6 space-y-5">
+                                    <div className="flex items-start gap-3">
+                                        <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 shrink-0">
+                                            <Store size={18} />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-bold tracking-tight">Catálogo Online</h4>
+                                            <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                                                Lo que ven las familias en el catálogo de planes que compartes. Dirección, teléfono, correo y redes se toman de los datos de arriba.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* WhatsApp: solo dígitos, con código de país */}
+                                    <div className="space-y-1.5">
+                                        <label htmlFor="catalog-whatsapp" className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                            <MessageCircle size={12} /> WhatsApp de consultas
+                                        </label>
+                                        <input
+                                            id="catalog-whatsapp"
+                                            type="text"
+                                            inputMode="numeric"
+                                            autoComplete="tel"
+                                            maxLength={15}
+                                            value={(tenant?.social_media?.whatsapp || '').replace(/\D/g, '')}
+                                            onChange={(e) => setTenant({ ...tenant, social_media: { ...tenant.social_media, whatsapp: e.target.value.replace(/\D/g, '') } })}
+                                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-3 px-4 text-sm font-medium tracking-wide tabular-nums outline-none focus:border-amber-500/40 transition-colors"
+                                            placeholder="56912345678"
+                                        />
+                                        <p className="text-[11px] text-muted-foreground/70">Solo números, con código de país (56). Si lo dejas vacío se usa el teléfono de la empresa.</p>
+                                    </div>
+
+                                    {/* Lema */}
+                                    <div className="space-y-1.5">
+                                        <div className="flex items-center justify-between">
+                                            <label htmlFor="catalog-tagline" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Lema</label>
+                                            <span className="text-[10px] text-muted-foreground/50 tabular-nums">{(tenant?.catalog_tagline || '').length}/120</span>
+                                        </div>
+                                        <input
+                                            id="catalog-tagline"
+                                            maxLength={120}
+                                            value={tenant?.catalog_tagline || ''}
+                                            onChange={(e) => setTenant({ ...tenant, catalog_tagline: e.target.value })}
+                                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-3 px-4 text-sm italic outline-none focus:border-amber-500/40 transition-colors"
+                                            placeholder="Ej: Honramos su amor, cuidamos su recuerdo"
+                                        />
+                                    </div>
+
+                                    {/* Introducción */}
+                                    <div className="space-y-1.5">
+                                        <div className="flex items-center justify-between">
+                                            <label htmlFor="catalog-intro" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Introducción</label>
+                                            <span className="text-[10px] text-muted-foreground/50 tabular-nums">{(tenant?.catalog_intro || '').length}/600</span>
+                                        </div>
+                                        <textarea
+                                            id="catalog-intro"
+                                            maxLength={600}
+                                            rows={4}
+                                            value={tenant?.catalog_intro || ''}
+                                            onChange={(e) => setTenant({ ...tenant, catalog_intro: e.target.value })}
+                                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-3 px-4 text-sm leading-relaxed resize-none outline-none focus:border-amber-500/40 transition-colors"
+                                            placeholder={DEFAULT_CATALOG_INTRO}
+                                        />
+                                        <p className="text-[11px] text-muted-foreground/70">Si la dejas vacía se muestra el texto de ejemplo.</p>
+                                    </div>
+
+                                    {/* Vista previa del encabezado del catálogo */}
+                                    <div className="rounded-2xl bg-[#fbf9f6] px-5 py-6 text-center">
+                                        <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-[#8a6428]">Vista previa</p>
+                                        <p className="mt-2 font-serif text-xl font-semibold text-[#2b2724]">{tenant?.name || 'Tu crematorio'}</p>
+                                        {tenant?.catalog_tagline && (
+                                            <p className="mt-1 font-serif italic text-[15px] text-[#8a6428]">{tenant.catalog_tagline}</p>
+                                        )}
+                                        <div className="mx-auto my-3 h-px w-10 bg-[#a67c37]/50" />
+                                        <p className="text-[12px] leading-relaxed text-[#6f665e] whitespace-pre-line">
+                                            {tenant?.catalog_intro || DEFAULT_CATALOG_INTRO}
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
 

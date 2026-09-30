@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Cormorant_Garamond, Plus_Jakarta_Sans } from 'next/font/google';
+import { DEFAULT_CATALOG_INTRO } from '@/lib/catalogDefaults';
 import {
     Check, ChevronDown, Facebook, Feather, Globe, Info, Instagram, Mail, MapPin, MessageCircle, Phone, Plus, Search, Share2, X,
 } from 'lucide-react';
@@ -194,6 +195,14 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
             {/* Presentación */}
             <section className="px-4 sm:px-6 pt-12 pb-10 sm:pt-16 sm:pb-14 text-center">
                 <div className="max-w-2xl mx-auto">
+                    {logoUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                            src={logoUrl}
+                            alt={`Logo de ${tenant.name}`}
+                            className="mx-auto mb-6 w-24 h-24 sm:w-28 sm:h-28 rounded-full object-contain bg-white border border-[var(--cat-line)] p-3 shadow-[0_12px_30px_-18px_rgba(43,39,36,0.45)]"
+                        />
+                    )}
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--cat-gold-deep)]">Nuestros planes</p>
                     <h1 className="mt-3 [font-family:var(--cat-serif)] text-4xl sm:text-5xl font-semibold leading-tight">{tenant.name}</h1>
                     {tenant.tagline && (
@@ -201,7 +210,7 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                     )}
                     <div className="mx-auto mt-6 h-px w-16 bg-[var(--cat-gold)]/50" />
                     <p className="mt-6 text-[15px] leading-relaxed text-[var(--cat-muted)] whitespace-pre-line">
-                        {tenant.intro || 'Acompañamos a tu familia con respeto y cercanía en la despedida de tu compañero. Conoce nuestros planes y escríbenos cuando lo necesites: te orientaremos sin compromiso.'}
+                        {tenant.intro || DEFAULT_CATALOG_INTRO}
                     </p>
                 </div>
 
@@ -341,6 +350,14 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                             </li>
                         )}
                     </ul>
+                </div>
+                <div className="border-t border-[var(--cat-line)]">
+                    <p className="max-w-6xl mx-auto px-4 sm:px-6 py-4 text-center text-[12px] text-[var(--cat-muted)]">
+                        Crematorio potenciado por{' '}
+                        <a href="https://vinzer.cl" target="_blank" rel="noopener" className="font-semibold text-[var(--cat-gold-deep)] hover:underline">
+                            vinzer.cl
+                        </a>
+                    </p>
                 </div>
             </footer>
         </div>
