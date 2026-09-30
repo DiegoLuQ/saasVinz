@@ -341,18 +341,18 @@ export default function ProductsPage() {
 
     return (
         <div className="space-y-8">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-5">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Productos</h1>
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Productos</h1>
                     <p className="text-muted-foreground mt-1">Inventario de urnas y accesorios.</p>
                 </div>
-                <div className="flex items-center gap-4">
-                    <div className="text-xs font-semibold text-muted-foreground px-4 py-2 bg-white/5 rounded-full border border-white/5 h-fit whitespace-nowrap">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full xl:w-auto">
+                    <div className="w-full sm:w-auto text-center text-xs font-semibold text-muted-foreground px-4 py-2 bg-white/5 rounded-full border border-white/5 h-fit whitespace-nowrap">
                         Total: {products.length} / {formatLimit(tenantData?.subscription_plan?.max_products)}
                     </div>
                     <button
                         onClick={() => canViewCatalog ? setShowCatalogModal(true) : setShowLimitModal(true)}
-                        className={`border border-white/10 font-bold py-3 px-6 rounded-2xl flex items-center justify-center transition-all text-sm ${
+                        className={`flex-1 sm:flex-none whitespace-nowrap border border-white/10 font-bold py-3 px-4 sm:px-6 rounded-2xl flex items-center justify-center transition-all text-sm ${
                             canViewCatalog 
                             ? 'bg-white/5 text-white hover:bg-white/10 hover:border-amber-500/30 active:scale-95' 
                             : 'bg-white/5 text-white/50 hover:bg-white/10 cursor-pointer'
@@ -368,7 +368,7 @@ export default function ProductsPage() {
                     </button>
                     <button
                         onClick={() => canViewCatalog ? setIsShareModalOpen(true) : setShowLimitModal(true)}
-                        className={`border font-bold py-3 px-6 rounded-2xl flex items-center justify-center transition-all text-sm ${
+                        className={`flex-1 sm:flex-none whitespace-nowrap border font-bold py-3 px-4 sm:px-6 rounded-2xl flex items-center justify-center transition-all text-sm ${
                             canViewCatalog 
                             ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20 active:scale-95 shadow-lg shadow-amber-500/10' 
                             : 'border-white/10 bg-white/5 text-white/50 hover:bg-white/10 cursor-pointer'
@@ -387,7 +387,7 @@ export default function ProductsPage() {
                             onClick={() => canCreateProductFeature ? handleOpenModal() : showToast('Tu plan no incluye crear productos.', 'error')}
                             disabled={isLimitReached || !canCreateProductFeature}
                             title={!canCreateProductFeature ? 'Característica no incluida en tu plan' : undefined}
-                            className={`bg-primary text-primary-foreground font-bold py-2.5 sm:py-3 px-4 sm:px-6 rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all text-xs sm:text-sm ${(isLimitReached || !canCreateProductFeature) ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
+                            className={`w-full sm:w-auto whitespace-nowrap bg-primary text-primary-foreground font-bold py-3 px-4 sm:px-6 rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all text-xs sm:text-sm ${(isLimitReached || !canCreateProductFeature) ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
                         >
                             {!canCreateProductFeature ? <Lock className="mr-2" size={16} /> : <Plus className="mr-2" size={16} />}
                             Nuevo Producto

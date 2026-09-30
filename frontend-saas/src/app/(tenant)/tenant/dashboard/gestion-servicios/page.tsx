@@ -193,13 +193,13 @@ export default function ServicesPage() {
             <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-amber-900/20 via-primary/5 to-transparent border border-amber-900/10 p-8">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl" />
                 <div className="absolute bottom-0 left-1/4 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl" />
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+                <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-5 relative z-10">
                     <div className="flex items-start gap-4">
                         <div className="hidden sm:flex w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-600/10 items-center justify-center border border-amber-500/20 shadow-lg shadow-amber-500/5">
                             <FolderTree className="text-amber-400" size={28} />
                         </div>
                         <div>
-                            <h1 className="text-3xl font-black tracking-tight">Catálogo de Servicios</h1>
+                            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Catálogo de Servicios</h1>
                             <p className="text-muted-foreground mt-1.5 max-w-xl">Diseña los servicios y paquetes que ofrecerás a las familias. Cada servicio puede incluir productos y prestaciones personalizadas.</p>
                             {tenantData?.subscription_plan && (
                                 <div className="flex flex-wrap items-center gap-3 mt-4">
@@ -216,11 +216,11 @@ export default function ServicesPage() {
                             )}
                         </div>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full xl:w-auto xl:shrink-0">
                         {activeTab === 'planes' && (
                             <button
                                 onClick={() => setShowSharePlansModal(true)}
-                                className="border border-white/10 font-bold py-3.5 px-6 rounded-2xl flex items-center justify-center transition-all text-sm bg-white/5 text-white hover:bg-white/10 hover:border-amber-500/30 active:scale-95"
+                                className="flex-1 sm:flex-none whitespace-nowrap border border-white/10 font-bold py-3 px-4 sm:px-6 rounded-2xl flex items-center justify-center transition-all text-sm bg-white/5 text-white hover:bg-white/10 hover:border-amber-500/30 active:scale-95"
                                 title="Generar enlace para compartir el catálogo de planes online"
                             >
                                 <Share2 className="mr-2" size={18} />
@@ -230,7 +230,7 @@ export default function ServicesPage() {
                         {activeTab === 'planes' && (
                             <button
                                 onClick={() => setShowPlansCatalogModal(true)}
-                                className="border border-white/10 font-bold py-3.5 px-6 rounded-2xl flex items-center justify-center transition-all text-sm bg-white/5 text-white hover:bg-white/10 hover:border-amber-500/30 active:scale-95"
+                                className="flex-1 sm:flex-none whitespace-nowrap border border-white/10 font-bold py-3 px-4 sm:px-6 rounded-2xl flex items-center justify-center transition-all text-sm bg-white/5 text-white hover:bg-white/10 hover:border-amber-500/30 active:scale-95"
                                 title="Ver Catálogo de Planes"
                             >
                                 <BookOpen className="mr-2" size={18} />
@@ -241,7 +241,7 @@ export default function ServicesPage() {
                             <button
                                 onClick={() => activeTab === 'servicios' ? handleOpenServiceModal() : router.push('/dashboard/gestion-servicios/plan/nuevo')}
                                 disabled={activeTab === 'servicios' ? isServiceLimitReached : isPlanLimitReached}
-                                className="bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold py-3.5 px-7 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:-translate-y-0.5 active:scale-95 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                                className="w-full sm:w-auto whitespace-nowrap bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold py-3 px-6 sm:px-7 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:-translate-y-0.5 active:scale-95 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                             >
                                 <Plus className="mr-2" size={18} />
                                 {activeTab === 'servicios' ? 'Nuevo Servicio' : 'Nuevo Plan'}

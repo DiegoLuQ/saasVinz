@@ -232,7 +232,7 @@ export default function Sidebar() {
             >
                 {/* Logo Section */}
                 <div className={cn(
-                    "h-20 flex items-center border-b border-slate-100 dark:border-white/5 transition-all duration-300",
+                    "h-20 shrink-0 flex items-center border-b border-slate-100 dark:border-white/5 transition-all duration-300",
                     collapsed ? "justify-center px-0" : "px-6"
                 )}>
                     {tenant?.logo_url ? (
@@ -262,7 +262,9 @@ export default function Sidebar() {
                 </div>
 
                 {/* Nav Items */}
-                <nav className="flex-1 py-5 px-3 overflow-y-auto overflow-x-hidden">
+                {/* min-h-0: sin esto el ítem flex crece al alto de su contenido y el
+                    overflow-hidden del aside lo recorta en celulares (no aparecía scroll) */}
+                <nav className="flex-1 min-h-0 py-5 px-3 overflow-y-auto overflow-x-hidden overscroll-contain">
                     {loadingModules ? (
                         <div className="flex flex-col gap-3 px-3">
                             {[1, 2, 3, 4, 5].map(i => (
@@ -435,7 +437,7 @@ export default function Sidebar() {
                 </nav>
 
                 {/* Footer Perfil de Usuario como en la imagen */}
-                <div className="p-3 border-t border-slate-100 bg-slate-50 dark:border-white/5 dark:bg-[#081527]">
+                <div className="shrink-0 p-3 border-t border-slate-100 bg-slate-50 dark:border-white/5 dark:bg-[#081527]">
                     <div className={cn("flex items-center gap-2.5", collapsed ? "justify-center" : "px-2 py-1")}>
                         <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#19B5FE] to-[#10B981] flex items-center justify-center text-white text-xs font-black shrink-0 shadow-xs">
                             {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
