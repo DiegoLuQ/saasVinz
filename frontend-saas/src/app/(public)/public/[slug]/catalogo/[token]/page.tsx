@@ -45,6 +45,12 @@ interface PublicCatalogData {
     tenant_slug: string;
     tenant_logo?: string | null;
     tenant_phone?: string | null;
+    tenant_email?: string | null;
+    tenant_address?: string | null;
+    tenant_city?: string | null;
+    tenant_social?: Record<string, string> | null;
+    catalog_tagline?: string | null;
+    catalog_intro?: string | null;
     whatsapp?: string | null;
     expires_at?: string | null;
     products: ProductItem[];
@@ -289,10 +295,18 @@ export default function PublicCatalogPage() {
     if (data.catalog_type === 'plans') {
         return (
             <PublicPlansCatalog
-                tenantName={data.tenant_name}
-                tenantLogo={data.tenant_logo}
-                whatsapp={data.whatsapp}
-                expiresAt={data.expires_at}
+                tenant={{
+                    name: data.tenant_name,
+                    logo: data.tenant_logo,
+                    phone: data.tenant_phone,
+                    email: data.tenant_email,
+                    address: data.tenant_address,
+                    city: data.tenant_city,
+                    social: data.tenant_social,
+                    tagline: data.catalog_tagline,
+                    intro: data.catalog_intro,
+                    whatsapp: data.whatsapp,
+                }}
                 plans={data.plans ?? []}
                 getImageUrl={getImageUrl}
                 onShare={handleShareLink}

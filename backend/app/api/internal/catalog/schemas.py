@@ -129,10 +129,15 @@ class PlanBase(BaseModel):
     cost: float = 0.0
     image_url: Optional[str] = None
     is_active: bool = True
+    # Presentación en el catálogo público
+    is_featured: bool = False
+    price_label: Optional[str] = Field(None, max_length=60)
+    sort_order: int = 0
 
 class PlanCreate(PlanBase):
-    service_ids: List[int] = [] # IDs de servicios a vincular
+    service_ids: List[int] = [] # IDs de servicios a vincular (el orden de la lista es el orden en el catálogo)
     product_ids: List[int] = [] # IDs de productos a vincular
+    optional_service_ids: List[int] = [] # Subconjunto de service_ids que son extras opcionales
 
 class PlanUpdate(BaseModel):
     name: Optional[str] = None
@@ -141,14 +146,19 @@ class PlanUpdate(BaseModel):
     cost: Optional[float] = None
     image_url: Optional[str] = None
     is_active: Optional[bool] = None
+    is_featured: Optional[bool] = None
+    price_label: Optional[str] = Field(None, max_length=60)
+    sort_order: Optional[int] = None
     service_ids: Optional[List[int]] = None
     product_ids: Optional[List[int]] = None
+    optional_service_ids: Optional[List[int]] = None
 
 class PlanInDB(PlanBase):
     id: int
     tenant_id: int
     services: List[ServiceInDB] = []
     products: List[ProductInDB] = []
+    optional_service_ids: List[int] = []
     created_at: datetime
     model_config = {"from_attributes": True}
 
@@ -208,12 +218,15 @@ class PublicCatalogPlanItem(BaseModel):
     name: str
     description: Optional[str] = None
     image_url: Optional[str] = None
+    is_optional: bool = False
 
 class PublicCatalogPlan(BaseModel):
     id: int
     name: str
     description: Optional[str] = None
     price: float
+    price_label: Optional[str] = None
+    is_featured: bool = False
     image_url: Optional[str] = None  # portada del plan
     services: List[PublicCatalogPlanItem] = []
     products: List[PublicCatalogPlanItem] = []
@@ -225,6 +238,12 @@ class PublicCatalogResponse(BaseModel):
     tenant_slug: str
     tenant_logo: Optional[str] = None
     tenant_phone: Optional[str] = None
+    tenant_email: Optional[str] = None
+    tenant_address: Optional[str] = None
+    tenant_city: Optional[str] = None
+    tenant_social: Optional[dict] = None  # solo redes públicas (instagram, facebook, tiktok, website)
+    catalog_tagline: Optional[str] = None
+    catalog_intro: Optional[str] = None
     whatsapp: Optional[str] = None
     expires_at: Optional[datetime] = None
     products: List[PublicCatalogProduct] = []

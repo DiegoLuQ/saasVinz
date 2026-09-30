@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Float, Enum, JSON
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Float, Enum, JSON, Text
 from sqlalchemy.orm import relationship
 from app.database import Base
 from datetime import datetime
@@ -67,6 +67,9 @@ class Tenant(Base):
     country = Column(String, default="Chile")
     logo_url = Column(String)
     social_media = Column(JSON) # {tiktok, instagram, facebook, youtube, website}
+    # Catálogo público de planes: lema e introducción (opcionales)
+    catalog_tagline = Column(String(120), nullable=True)
+    catalog_intro = Column(Text, nullable=True)
     legal_rep_name = Column(String)
     legal_rep_rut = Column(String)
     timezone = Column(String, default="America/Santiago")

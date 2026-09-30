@@ -251,7 +251,9 @@ class PlanService:
         return self.db.query(models.Plan).options(
             selectinload(models.Plan.services),
             selectinload(models.Plan.products)
-        ).filter(models.Plan.tenant_id == tenant_id).all()
+        ).filter(models.Plan.tenant_id == tenant_id).order_by(
+            models.Plan.sort_order.asc(), models.Plan.price.asc(), models.Plan.name.asc()
+        ).all()
 
     def get_by_id(self, tenant_id: int, plan_id: int) -> models.Plan:
         plan = self.db.query(models.Plan).options(
@@ -273,6 +275,9 @@ class PlanService:
         if existing:
             raise HTTPException(status_code=400, detail=f"El plan '{plan_in.name}' ya existe.")
 
+        if plan_in.is_featured:
+            self._clear_featured(tenant_id)
+
         db_plan = models.Plan(
             name=plan_in.name,
             description=plan_in.description,
@@ -280,20 +285,16 @@ class PlanService:
             cost=plan_in.cost,
             image_url=plan_in.image_url,
             is_active=plan_in.is_active,
+            is_featured=plan_in.is_featured,
+            price_label=(plan_in.price_label or "").strip() or None,
+            sort_order=plan_in.sort_order,
             tenant_id=tenant_id
         )
         self.db.add(db_plan)
         self.db.commit()
         self.db.refresh(db_plan)
 
-        # Vincular servicios
-        for svc_id in plan_in.service_ids:
-            svc = self.db.query(models.Service).filter(
-                models.Service.id == svc_id, 
-                models.Service.tenant_id == tenant_id
-            ).first()
-            if svc:
-                self.db.add(models.PlanService(plan_id=db_plan.id, service_id=svc_id, tenant_id=tenant_id))
+        self._link_services(tenant_id, db_plan.id, plan_in.service_ids, plan_in.optional_service_ids)
         
         # Vincular productos
         for prod_id in plan_in.product_ids:
@@ -322,19 +323,26 @@ class PlanService:
             if existing:
                 raise HTTPException(status_code=400, detail=f"Ya existe otro plan con el nombre '{update_data['name']}'.")
         
+        optional_ids = update_data.pop("optional_service_ids", None)
         if "service_ids" in update_data:
             service_ids = update_data.pop("service_ids")
+            if optional_ids is None:
+                optional_ids = db_plan.optional_service_ids  # conservar los opcionales actuales
             self.db.query(models.PlanService).filter(
-                models.PlanService.plan_id == plan_id, 
+                models.PlanService.plan_id == plan_id,
                 models.PlanService.tenant_id == tenant_id
             ).delete()
-            for svc_id in service_ids:
-                svc = self.db.query(models.Service).filter(
-                    models.Service.id == svc_id, 
-                    models.Service.tenant_id == tenant_id
-                ).first()
-                if svc:
-                    self.db.add(models.PlanService(plan_id=plan_id, service_id=svc_id, tenant_id=tenant_id))
+            self._link_services(tenant_id, plan_id, service_ids, optional_ids)
+        elif optional_ids is not None:
+            optional_set = set(optional_ids)
+            for link in db_plan.plan_links:
+                link.is_optional = link.service_id in optional_set
+
+        if "price_label" in update_data:
+            update_data["price_label"] = (update_data["price_label"] or "").strip() or None
+
+        if update_data.get("is_featured"):
+            self._clear_featured(tenant_id, exclude_plan_id=plan_id)
 
         if "product_ids" in update_data:
             product_ids = update_data.pop("product_ids")
@@ -365,6 +373,36 @@ class PlanService:
         self.db.commit()
         self.db.refresh(db_plan)
         return db_plan
+
+    def _link_services(self, tenant_id: int, plan_id: int, service_ids: List[int], optional_ids: List[int]):
+        """Vincula servicios al plan respetando el orden recibido (sort_order) y los opcionales."""
+        optional_set = set(optional_ids or [])
+        seen = set()
+        position = 0
+        for svc_id in service_ids:
+            if svc_id in seen:
+                continue
+            seen.add(svc_id)
+            svc = self.db.query(models.Service).filter(
+                models.Service.id == svc_id,
+                models.Service.tenant_id == tenant_id
+            ).first()
+            if svc:
+                self.db.add(models.PlanService(
+                    plan_id=plan_id, service_id=svc_id, tenant_id=tenant_id,
+                    sort_order=position, is_optional=svc_id in optional_set,
+                ))
+                position += 1
+
+    def _clear_featured(self, tenant_id: int, exclude_plan_id: int = None):
+        """Solo un plan destacado por tenant: desmarca los demás."""
+        q = self.db.query(models.Plan).filter(
+            models.Plan.tenant_id == tenant_id,
+            models.Plan.is_featured == True,
+        )
+        if exclude_plan_id is not None:
+            q = q.filter(models.Plan.id != exclude_plan_id)
+        q.update({models.Plan.is_featured: False}, synchronize_session=False)
 
     def _delete_image_from_storage(self, url: str):
         """Borra una imagen de plan de R2/biblioteca de medios (mismo patrón que productos)."""

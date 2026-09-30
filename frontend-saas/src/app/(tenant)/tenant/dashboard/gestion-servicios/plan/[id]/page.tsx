@@ -11,7 +11,11 @@ import {
     X,
     TrendingUp,
     Layers,
-    AlertTriangle
+    AlertTriangle,
+    ChevronUp,
+    ChevronDown,
+    Star,
+    Store
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -42,7 +46,7 @@ export default function EditPlanPage() {
     const savePlanMutation = useSavePlan();
     const saveProductMutation = useSaveProduct();
 
-    const [currentPlan, setCurrentPlan] = useState<Partial<Plan> | null>(isNew ? { name: '', description: '', price: 0, cost: 0, is_active: true, service_ids: [], product_ids: [] } : null);
+    const [currentPlan, setCurrentPlan] = useState<Partial<Plan> | null>(isNew ? { name: '', description: '', price: 0, cost: 0, is_active: true, is_featured: false, price_label: '', sort_order: 0, service_ids: [], optional_service_ids: [], product_ids: [] } : null);
     const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [showQuickProduct, setShowQuickProduct] = useState(false);
@@ -57,6 +61,7 @@ export default function EditPlanPage() {
                 setCurrentPlan({
                     ...plan,
                     service_ids: plan.services?.map(s => s.id) || [],
+                    optional_service_ids: plan.optional_service_ids || [],
                     product_ids: plan.products?.map(p => p.id) || [],
                 });
             } else {
@@ -99,6 +104,23 @@ export default function EditPlanPage() {
         } finally {
             setIsSaving(false);
         }
+    };
+
+    // Orden de los servicios = orden en que se muestran en el catálogo público
+    const moveService = (index: number, delta: number) => {
+        const ids = [...(currentPlan?.service_ids || [])];
+        const target = index + delta;
+        if (target < 0 || target >= ids.length) return;
+        [ids[index], ids[target]] = [ids[target], ids[index]];
+        setCurrentPlan({ ...currentPlan, service_ids: ids });
+    };
+
+    const toggleOptional = (svcId: number) => {
+        const current = currentPlan?.optional_service_ids || [];
+        const optional_service_ids = current.includes(svcId)
+            ? current.filter(id => id !== svcId)
+            : [...current, svcId];
+        setCurrentPlan({ ...currentPlan, optional_service_ids });
     };
 
     const handleQuickProductCreate = async () => {
@@ -276,6 +298,63 @@ export default function EditPlanPage() {
                     </div>
                 </div>
 
+                {/* Section: Catalog presentation */}
+                <div className="bg-white/[0.03] rounded-3xl p-6 border border-white/[0.04] space-y-5">
+                    <div className="flex items-center gap-3 pb-3 border-b border-white/[0.04]">
+                        <div className="p-2 rounded-xl bg-gradient-to-br from-amber-500/15 to-amber-600/5 border border-amber-500/10">
+                            <Store className="text-amber-400" size={16} />
+                        </div>
+                        <div>
+                            <h3 className="text-xs font-black uppercase tracking-widest text-white">Catálogo Online</h3>
+                            <p className="text-[9px] text-muted-foreground/50">Cómo se muestra este plan a las familias</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+                        <div className="md:col-span-2 space-y-2">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Texto de precio</label>
+                            <input
+                                type="text"
+                                maxLength={60}
+                                value={currentPlan?.price_label || ''}
+                                onChange={(e) => setCurrentPlan({ ...currentPlan, price_label: e.target.value })}
+                                className="w-full bg-black/20 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-amber-500/40 transition-all text-sm font-medium"
+                                placeholder="Ej: Valores según peso · Mascotas < 1 kg"
+                            />
+                            <p className="text-[10px] text-muted-foreground/60 ml-1">
+                                Reemplaza al precio en el catálogo. Vacío: se muestra el precio de venta, o &quot;Valor según peso&quot; si es $0.
+                            </p>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Posición</label>
+                            <input
+                                type="number"
+                                min={0}
+                                value={currentPlan?.sort_order ?? 0}
+                                onChange={(e) => setCurrentPlan({ ...currentPlan, sort_order: Math.max(0, Number(e.target.value) || 0) })}
+                                className="w-full bg-black/20 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-amber-500/40 transition-all text-sm font-bold"
+                            />
+                            <p className="text-[10px] text-muted-foreground/60 ml-1">Menor = aparece primero. Empates: por precio.</p>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Destacado</label>
+                            <button
+                                type="button"
+                                onClick={() => setCurrentPlan({ ...currentPlan, is_featured: !currentPlan?.is_featured })}
+                                className={`w-full rounded-2xl py-3 px-4 border text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+                                    currentPlan?.is_featured
+                                        ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                                        : 'bg-black/20 border-white/10 text-muted-foreground hover:border-amber-500/30'
+                                }`}
+                            >
+                                <Star size={15} className={currentPlan?.is_featured ? 'fill-amber-400 text-amber-400' : ''} />
+                                {currentPlan?.is_featured ? 'Más solicitado' : 'No destacado'}
+                            </button>
+                            <p className="text-[10px] text-muted-foreground/60 ml-1">Solo un plan a la vez; marcar este desmarca el anterior.</p>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Section 2: Composition */}
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                     {/* Services Column - 60% */}
@@ -295,11 +374,17 @@ export default function EditPlanPage() {
                             placeholder="Agregar servicios..."
                         />
 
-                        <div className="mt-4 flex-1 space-y-1.5 overflow-y-auto max-h-[180px] pr-1 scrollbar-hide">
+                        {(currentPlan?.service_ids?.length || 0) > 1 && (
+                            <p className="mt-3 text-[10px] text-muted-foreground/60">Usa las flechas para definir el orden en el catálogo. Marca como &quot;Opcional&quot; los extras que no vienen incluidos.</p>
+                        )}
+
+                        <div className="mt-3 flex-1 space-y-1.5 overflow-y-auto max-h-[320px] pr-1 scrollbar-hide">
                             <AnimatePresence>
-                                {currentPlan?.service_ids?.map(svcId => {
+                                {currentPlan?.service_ids?.map((svcId, index) => {
                                     const service = services.find((s: Service) => s.id === svcId);
                                     if (!service) return null;
+                                    const isOptional = currentPlan?.optional_service_ids?.includes(svcId);
+                                    const total = currentPlan?.service_ids?.length || 0;
                                     return (
                                         <motion.div
                                             key={svcId}
@@ -308,17 +393,54 @@ export default function EditPlanPage() {
                                             exit={{ opacity: 0, x: 10 }}
                                             className="flex justify-between items-center bg-black/30 px-3.5 py-2.5 rounded-xl border border-white/[0.04] hover:border-blue-500/20 transition-all group/item"
                                         >
-                                            <div className="flex items-center gap-2.5 min-w-0">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-400/40 shrink-0" />
-                                                <span className="text-xs font-medium text-white/80 truncate">{service.name}</span>
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <div className="flex flex-col shrink-0">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => moveService(index, -1)}
+                                                        disabled={index === 0}
+                                                        className="text-muted-foreground/50 hover:text-blue-300 disabled:opacity-20 disabled:hover:text-muted-foreground/50 transition-colors"
+                                                        title="Subir"
+                                                    >
+                                                        <ChevronUp size={13} />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => moveService(index, 1)}
+                                                        disabled={index === total - 1}
+                                                        className="text-muted-foreground/50 hover:text-blue-300 disabled:opacity-20 disabled:hover:text-muted-foreground/50 transition-colors"
+                                                        title="Bajar"
+                                                    >
+                                                        <ChevronDown size={13} />
+                                                    </button>
+                                                </div>
+                                                <span className={`text-xs font-medium truncate ${isOptional ? 'text-white/50' : 'text-white/80'}`}>{service.name}</span>
                                             </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => setCurrentPlan({ ...currentPlan, service_ids: currentPlan.service_ids?.filter(id => id !== svcId) })}
-                                                className="text-red-500/30 hover:text-red-400 hover:bg-red-500/10 p-1.5 rounded-lg transition-all opacity-0 group-hover/item:opacity-100"
-                                            >
-                                                <X size={12} />
-                                            </button>
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleOptional(svcId)}
+                                                    className={`px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider border transition-all ${
+                                                        isOptional
+                                                            ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                                                            : 'border-white/10 text-muted-foreground/60 hover:text-amber-300 hover:border-amber-500/30'
+                                                    }`}
+                                                    title="Marcar como extra opcional (no incluido en el plan)"
+                                                >
+                                                    {isOptional ? 'Opcional' : 'Incluido'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setCurrentPlan({
+                                                        ...currentPlan,
+                                                        service_ids: currentPlan.service_ids?.filter(id => id !== svcId),
+                                                        optional_service_ids: currentPlan.optional_service_ids?.filter(id => id !== svcId),
+                                                    })}
+                                                    className="text-red-500/30 hover:text-red-400 hover:bg-red-500/10 p-1.5 rounded-lg transition-all opacity-0 group-hover/item:opacity-100"
+                                                >
+                                                    <X size={12} />
+                                                </button>
+                                            </div>
                                         </motion.div>
                                     );
                                 })}

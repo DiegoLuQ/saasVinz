@@ -123,6 +123,11 @@ def update_my_tenant(
             merged.pop('google_review', None)
         update_data['social_media'] = merged
 
+    # Textos del catálogo público: vacío = no se muestra
+    for key in ('catalog_tagline', 'catalog_intro'):
+        if key in update_data:
+            update_data[key] = (update_data[key] or '').strip() or None
+
     for key, value in update_data.items():
         setattr(tenant, key, value)
     

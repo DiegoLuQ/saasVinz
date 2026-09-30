@@ -29,8 +29,13 @@ export interface Plan {
     cost: number;
     image_url?: string | null;
     is_active: boolean;
+    // Presentación en el catálogo público
+    is_featured?: boolean;
+    price_label?: string | null;
+    sort_order?: number;
     services?: Service[];
-    service_ids?: number[];
+    service_ids?: number[];          // el orden de la lista es el orden en el catálogo
+    optional_service_ids?: number[]; // subconjunto de service_ids marcados como opcionales
     products?: Product[];
     product_ids?: number[];
 }

@@ -17,7 +17,8 @@ import {
     Linkedin,
     Upload,
     Phone,
-    Globe
+    Globe,
+    MessageCircle
 } from 'lucide-react';
 import { apiRequest, API_URL, getImageUrl } from '@/lib/tenant/api';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -520,6 +521,47 @@ export default function ProfilePage() {
                                     <p className="text-[11px] text-muted-foreground">
                                         Lo encuentras en tu Perfil de Empresa de Google → &quot;Pedir reseñas&quot;. Se muestra a la familia al entregar las cenizas (seguimiento y WhatsApp). Déjalo vacío para no mostrarlo.
                                     </p>
+                                </div>
+                            </div>
+
+                            {/* Catálogo online: textos y contacto que ven las familias en el catálogo de planes */}
+                            <div className="pt-4 border-t border-white/5 space-y-4">
+                                <div>
+                                    <h4 className="text-sm font-bold">Catálogo Online</h4>
+                                    <p className="text-[11px] text-muted-foreground mt-1">
+                                        Se muestran en el catálogo de planes que compartes. La dirección, el teléfono, el correo y las redes se toman de los datos de arriba. Lo que dejes vacío no se muestra.
+                                    </p>
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="flex items-center text-xs text-muted-foreground mb-1"><MessageCircle size={12} className="mr-1" /> WhatsApp de contacto</div>
+                                    <input
+                                        value={tenant?.social_media?.whatsapp || ''}
+                                        onChange={(e) => setTenant({ ...tenant, social_media: { ...tenant.social_media, whatsapp: e.target.value } })}
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-xs"
+                                        placeholder="+56 9 1234 5678"
+                                    />
+                                    <p className="text-[11px] text-muted-foreground">Número al que llegan las consultas de cada plan. Vacío: se usa el teléfono de la empresa.</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="text-xs text-muted-foreground mb-1">Lema</div>
+                                    <input
+                                        maxLength={120}
+                                        value={tenant?.catalog_tagline || ''}
+                                        onChange={(e) => setTenant({ ...tenant, catalog_tagline: e.target.value })}
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-xs"
+                                        placeholder="Ej: Honramos su amor, cuidamos su recuerdo"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="text-xs text-muted-foreground mb-1">Introducción</div>
+                                    <textarea
+                                        maxLength={600}
+                                        rows={3}
+                                        value={tenant?.catalog_intro || ''}
+                                        onChange={(e) => setTenant({ ...tenant, catalog_intro: e.target.value })}
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-xs resize-none"
+                                        placeholder="Un mensaje breve y cercano para las familias que revisan tus planes."
+                                    />
                                 </div>
                             </div>
 

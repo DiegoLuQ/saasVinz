@@ -157,6 +157,8 @@ class TenantBase(BaseModel):
     country: Optional[str] = "Chile"
     logo_url: Optional[str] = None
     social_media: Optional[dict] = None
+    catalog_tagline: Optional[str] = None
+    catalog_intro: Optional[str] = None
     legal_rep_name: Optional[str] = None
     legal_rep_rut: Optional[str] = None
     slug: Optional[str] = None
@@ -181,6 +183,8 @@ class TenantUpdate(BaseModel):
     country: Optional[str] = None
     logo_url: Optional[str] = None
     social_media: Optional[dict] = None
+    catalog_tagline: Optional[str] = Field(None, max_length=120)
+    catalog_intro: Optional[str] = Field(None, max_length=600)
     legal_rep_name: Optional[str] = None
     legal_rep_rut: Optional[str] = None
     status: Optional[TenantStatus] = None

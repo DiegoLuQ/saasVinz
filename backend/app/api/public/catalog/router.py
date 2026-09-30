@@ -10,6 +10,9 @@ from app.utils import tz
 
 router = APIRouter()
 
+# Redes que se exponen en el catálogo público (social_media también guarda datos internos)
+PUBLIC_SOCIAL_KEYS = ("instagram", "facebook", "tiktok", "website")
+
 
 @router.get("/{slug}/{token}", response_model=schemas.PublicCatalogResponse)
 @limiter.limit("60/minute")
@@ -17,6 +20,7 @@ def get_public_catalog(
     request: Request,
     slug: str,
     token: str,
+    preview: bool = False,
     db: Session = Depends(get_db),
 ):
     """
@@ -50,6 +54,31 @@ def get_public_catalog(
         raw_whatsapp = tenant.phone
 
     clean_whatsapp = "".join(ch for ch in (raw_whatsapp or "") if ch.isdigit())
+    # Celular chileno sin código de país (9 1234 5678): wa.me exige el 56 delante
+    if len(clean_whatsapp) == 9 and clean_whatsapp.startswith("9"):
+        clean_whatsapp = f"56{clean_whatsapp}"
+
+    # Datos de presentación del tenant (comunes a todas las respuestas)
+    public_social = None
+    if isinstance(tenant.social_media, dict):
+        public_social = {
+            k: v for k, v in tenant.social_media.items()
+            if k in PUBLIC_SOCIAL_KEYS and isinstance(v, str) and v.strip()
+        } or None
+    tenant_info = dict(
+        tenant_name=tenant.name,
+        tenant_slug=tenant.slug,
+        tenant_logo=tenant.logo_url,
+        tenant_phone=tenant.phone,
+        tenant_email=tenant.email,
+        tenant_address=tenant.address,
+        tenant_city=tenant.city,
+        tenant_social=public_social,
+        catalog_tagline=tenant.catalog_tagline,
+        catalog_intro=tenant.catalog_intro,
+        whatsapp=clean_whatsapp,
+        expires_at=share_token.expires_at,
+    )
 
     # 3. Comprobar si está activo y no expirado
     now = tz.get_now()
@@ -65,19 +94,15 @@ def get_public_catalog(
         return schemas.PublicCatalogResponse(
             catalog_type=catalog_type,
             is_expired=True,
-            tenant_name=tenant.name,
-            tenant_slug=tenant.slug,
-            tenant_logo=tenant.logo_url,
-            tenant_phone=tenant.phone,
-            whatsapp=clean_whatsapp,
-            expires_at=share_token.expires_at,
+            **tenant_info,
             products=[],
         )
 
-    # 4. Registrar vista
-    share_token.views_count = (share_token.views_count or 0) + 1
-    share_token.last_viewed_at = now
-    db.commit()
+    # 4. Registrar vista (la previsualización del enlace, preview=1, no cuenta)
+    if not preview:
+        share_token.views_count = (share_token.views_count or 0) + 1
+        share_token.last_viewed_at = now
+        db.commit()
 
     apply_tenant_rls(db, tenant.id)
 
@@ -86,12 +111,7 @@ def get_public_catalog(
         return schemas.PublicCatalogResponse(
             catalog_type="plans",
             is_expired=False,
-            tenant_name=tenant.name,
-            tenant_slug=tenant.slug,
-            tenant_logo=tenant.logo_url,
-            tenant_phone=tenant.phone,
-            whatsapp=clean_whatsapp,
-            expires_at=share_token.expires_at,
+            **tenant_info,
             plans=_active_plans(db, tenant.id),
         )
 
@@ -131,42 +151,52 @@ def get_public_catalog(
     return schemas.PublicCatalogResponse(
         catalog_type="products",
         is_expired=False,
-        tenant_name=tenant.name,
-        tenant_slug=tenant.slug,
-        tenant_logo=tenant.logo_url,
-        tenant_phone=tenant.phone,
-        whatsapp=clean_whatsapp,
-        expires_at=share_token.expires_at,
+        **tenant_info,
         products=product_list,
     )
 
 
 def _active_plans(db: Session, tenant_id: int) -> list:
-    """Planes activos con su portada y los servicios/productos activos que incluyen."""
+    """Planes activos con su portada y los servicios/productos activos que incluyen.
+
+    Orden: el definido por el tenant (sort_order), luego precio y nombre. Los
+    servicios salen en el orden configurado en el plan, con su marca de opcional.
+    """
     plans = (
         db.query(Plan)
-        .options(selectinload(Plan.services), selectinload(Plan.products))
+        .options(
+            selectinload(Plan.services),
+            selectinload(Plan.products),
+            selectinload(Plan.plan_links),
+        )
         .filter(Plan.tenant_id == tenant_id, Plan.is_active == True)
-        .order_by(Plan.price.asc(), Plan.name.asc())
+        .order_by(Plan.sort_order.asc(), Plan.price.asc(), Plan.name.asc())
         .all()
     )
-    return [
-        schemas.PublicCatalogPlan(
-            id=p.id,
-            name=p.name or "",
-            description=p.description,
-            price=float(p.price or 0.0),
-            image_url=p.image_url,
-            services=[
-                schemas.PublicCatalogPlanItem(name=s.name or "", description=s.description)
-                for s in sorted(p.services, key=lambda x: (x.name or "").lower())
-                if s.tenant_id == tenant_id and s.is_active
-            ],
-            products=[
-                schemas.PublicCatalogPlanItem(name=pr.name or "", description=pr.description, image_url=pr.image_url)
-                for pr in sorted(p.products, key=lambda x: (x.name or "").lower())
-                if pr.tenant_id == tenant_id and pr.is_active
-            ],
+    result = []
+    for p in plans:
+        optional_ids = set(p.optional_service_ids)
+        result.append(
+            schemas.PublicCatalogPlan(
+                id=p.id,
+                name=p.name or "",
+                description=p.description,
+                price=float(p.price or 0.0),
+                price_label=p.price_label,
+                is_featured=bool(p.is_featured),
+                image_url=p.image_url,
+                services=[
+                    schemas.PublicCatalogPlanItem(
+                        name=s.name or "", description=s.description, is_optional=s.id in optional_ids
+                    )
+                    for s in p.services
+                    if s.tenant_id == tenant_id and s.is_active
+                ],
+                products=[
+                    schemas.PublicCatalogPlanItem(name=pr.name or "", description=pr.description, image_url=pr.image_url)
+                    for pr in sorted(p.products, key=lambda x: (x.name or "").lower())
+                    if pr.tenant_id == tenant_id and pr.is_active
+                ],
+            )
         )
-        for p in plans
-    ]
+    return result

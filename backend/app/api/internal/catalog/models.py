@@ -80,10 +80,22 @@ class Plan(Base):
     cost = Column(Float, default=0.0)
     image_url = Column(String, nullable=True)  # Imagen de catálogo (WEBP en R2)
     is_active = Column(Boolean, default=True)
+    # Presentación en el catálogo público
+    is_featured = Column(Boolean, nullable=False, default=False, server_default="false")  # "Más solicitado" (uno por tenant)
+    price_label = Column(String(60), nullable=True)  # Reemplaza al precio (ej. "Según peso")
+    sort_order = Column(Integer, nullable=False, default=0, server_default="0")
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
 
-    services = relationship("Service", secondary="srv_plan_services", overlaps="plan,plan_links,service")
+    # Ordenados según el orden definido en el plan (srv_plan_services.sort_order)
+    services = relationship(
+        "Service", secondary="srv_plan_services", overlaps="plan,plan_links,service",
+        order_by="[PlanService.sort_order, PlanService.id]",
+    )
     products = relationship("Product", secondary="srv_plan_products")
+
+    @property
+    def optional_service_ids(self) -> list:
+        return [link.service_id for link in self.plan_links if link.is_optional]
 
     __table_args__ = (
         UniqueConstraint('tenant_id', 'name', name='uix_plan_name_tenant'),
@@ -105,6 +117,8 @@ class PlanService(Base):
     tenant_id = Column(Integer, ForeignKey("sys_tenants.id"), nullable=False, index=True)
     plan_id = Column(Integer, ForeignKey("srv_plans.id"))
     service_id = Column(Integer, ForeignKey("srv_services.id"))
+    sort_order = Column(Integer, nullable=False, default=0, server_default="0")
+    is_optional = Column(Boolean, nullable=False, default=False, server_default="false")  # Extra opcional, no incluido
 
     plan = relationship("Plan", backref=backref("plan_links", overlaps="services"), overlaps="services")
     service = relationship("Service", backref=backref("plan_links", overlaps="services"), overlaps="services")
