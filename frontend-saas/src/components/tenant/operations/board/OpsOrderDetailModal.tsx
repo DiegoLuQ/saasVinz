@@ -131,12 +131,12 @@ export default function OpsOrderDetailModal({
                     exit={{ opacity: 0, scale: 0.95, y: 15 }}
                     transition={{ type: 'spring', damping: 25, stiffness: 300 }}
                     onClick={e => e.stopPropagation()}
-                    className="relative w-full max-w-2xl bg-neutral-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+                    className="relative w-full max-w-2xl bg-card text-foreground border border-card-border rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
                 >
                     {/* Header */}
-                    <div className="p-4 sm:p-6 border-b border-white/10 flex items-start justify-between gap-4 bg-white/[0.02]">
+                    <div className="p-4 sm:p-6 border-b border-card-border flex items-start justify-between gap-4 bg-background/60">
                         <div className="flex items-center gap-3.5 min-w-0">
-                            <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
+                            <div className="w-14 h-14 rounded-2xl bg-background border border-card-border overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
                                 {petPhoto ? (
                                     <img
                                         src={getImageUrl(petPhoto)}
@@ -155,7 +155,7 @@ export default function OpsOrderDetailModal({
                                     <h3 className="text-xl sm:text-2xl font-black text-foreground truncate">
                                         {order.pet_name}
                                     </h3>
-                                    <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-lg bg-white/10 text-foreground border border-white/10">
+                                    <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-lg bg-background text-foreground border border-card-border">
                                         #OC-{order.oc_number ?? order.id}
                                     </span>
                                 </div>
@@ -167,7 +167,7 @@ export default function OpsOrderDetailModal({
 
                         <button
                             onClick={onClose}
-                            className="p-2.5 rounded-full bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all shrink-0"
+                            className="p-2.5 rounded-full bg-background hover:bg-foreground/10 text-muted-foreground hover:text-foreground transition-all shrink-0"
                             aria-label="Cerrar modal"
                         >
                             <X size={20} />
@@ -177,8 +177,8 @@ export default function OpsOrderDetailModal({
                     {/* Body scrollable */}
                     <div className="p-4 sm:p-6 overflow-y-auto space-y-5 text-sm">
                         {/* 1. SECCIÓN LOGÍSTICA (Destacada) */}
-                        <div className="rounded-2xl bg-white/[0.03] border border-primary/20 p-4 sm:p-5 space-y-4">
-                            <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-3">
+                        <div className="rounded-2xl bg-background/60 border border-primary/25 p-4 sm:p-5 space-y-4">
+                            <div className="flex items-center justify-between gap-2 border-b border-card-border pb-3">
                                 <div className="flex items-center gap-2 text-primary font-black uppercase text-xs tracking-wider">
                                     <Truck size={17} />
                                     <span>Datos de Logística y Traslados</span>
@@ -193,9 +193,9 @@ export default function OpsOrderDetailModal({
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {/* Retiro */}
-                                <div className="p-3.5 rounded-xl bg-background/60 border border-white/5 space-y-2">
+                                <div className="p-3.5 rounded-xl bg-card border border-card-border space-y-2">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-700 dark:text-amber-400 flex items-center gap-1">
                                             <Package size={13} /> Retiro de Mascota
                                         </span>
                                         {pickupFullLocation && (
@@ -222,9 +222,9 @@ export default function OpsOrderDetailModal({
                                 </div>
 
                                 {/* Entrega */}
-                                <div className="p-3.5 rounded-xl bg-background/60 border border-white/5 space-y-2">
+                                <div className="p-3.5 rounded-xl bg-card border border-card-border space-y-2">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-400 flex items-center gap-1">
+                                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
                                             <Truck size={13} /> Entrega de Cenizas
                                         </span>
                                         {deliveryFullLocation && (
@@ -253,8 +253,8 @@ export default function OpsOrderDetailModal({
                         </div>
 
                         {/* 2. SECCIÓN DUEÑO / CONTACTO */}
-                        <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-4 sm:p-5 space-y-3">
-                            <div className="flex items-center justify-between border-b border-white/5 pb-2.5">
+                        <div className="rounded-2xl bg-background/60 border border-card-border p-4 sm:p-5 space-y-3">
+                            <div className="flex items-center justify-between border-b border-card-border pb-2.5">
                                 <div className="flex items-center gap-2 text-foreground font-bold text-xs uppercase tracking-wider">
                                     <User size={15} className="text-primary" />
                                     <span>Tutor / Dueño de la Mascota</span>
@@ -264,7 +264,7 @@ export default function OpsOrderDetailModal({
                                         href={waUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#25D366]/20 text-[#25D366] hover:bg-[#25D366] hover:text-black transition-all text-xs font-bold"
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#25D366]/15 text-[#0F7A3D] dark:text-[#25D366] border border-[#25D366]/30 hover:bg-[#25D366] hover:text-black transition-all text-xs font-bold"
                                     >
                                         <MessageCircle size={14} /> Chatear por WhatsApp
                                     </a>
@@ -317,8 +317,8 @@ export default function OpsOrderDetailModal({
 
                         {/* 3. SECCIÓN VETERINARIA / CLÍNICA (Si aplica) */}
                         {partnerName && (
-                            <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-4 sm:p-5 space-y-2.5">
-                                <div className="flex items-center gap-2 text-foreground font-bold text-xs uppercase tracking-wider border-b border-white/5 pb-2">
+                            <div className="rounded-2xl bg-background/60 border border-card-border p-4 sm:p-5 space-y-2.5">
+                                <div className="flex items-center gap-2 text-foreground font-bold text-xs uppercase tracking-wider border-b border-card-border pb-2">
                                     <Building2 size={15} className="text-primary" />
                                     <span>Clínica / Veterinaria de Origen</span>
                                 </div>
@@ -350,8 +350,8 @@ export default function OpsOrderDetailModal({
                         )}
 
                         {/* 4. DETALLES DE LA ORDEN (Servicio, Peso, Notas) */}
-                        <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-4 sm:p-5 space-y-3">
-                            <div className="flex items-center gap-2 text-foreground font-bold text-xs uppercase tracking-wider border-b border-white/5 pb-2">
+                        <div className="rounded-2xl bg-background/60 border border-card-border p-4 sm:p-5 space-y-3">
+                            <div className="flex items-center gap-2 text-foreground font-bold text-xs uppercase tracking-wider border-b border-card-border pb-2">
                                 <FileText size={15} className="text-primary" />
                                 <span>Detalles del Servicio y Notas</span>
                             </div>
@@ -382,9 +382,9 @@ export default function OpsOrderDetailModal({
                             </div>
 
                             {notes && (
-                                <div className="pt-2 border-t border-white/5">
+                                <div className="pt-2 border-t border-card-border">
                                     <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider">Observaciones / Notas</span>
-                                    <p className="text-xs text-foreground bg-white/5 p-3 rounded-xl mt-1 leading-relaxed border border-white/5">
+                                    <p className="text-xs text-foreground bg-card p-3 rounded-xl mt-1 leading-relaxed border border-card-border">
                                         {notes}
                                     </p>
                                 </div>
@@ -393,7 +393,7 @@ export default function OpsOrderDetailModal({
                     </div>
 
                     {/* Footer */}
-                    <div className="p-4 sm:p-5 border-t border-white/10 flex items-center justify-between gap-3 bg-white/[0.02]">
+                    <div className="p-4 sm:p-5 border-t border-card-border flex items-center justify-between gap-3 bg-background/60">
                         <div className="text-xs text-muted-foreground">
                             {order.verification_code && (
                                 <span>Código: <strong className="text-foreground font-mono">{order.verification_code}</strong></span>
