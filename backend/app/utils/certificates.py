@@ -999,6 +999,7 @@ def generate_image_certificate_html(
     tenant_id: int = 0,
     paper_format: str = "Carta",
     base_url: str = "http://localhost:8000",
+    verification_code: str = "",
     **kwargs,
 ) -> dict:
     """Genera el HTML de un certificado basado en imagen con campos posicionados.
@@ -1195,6 +1196,11 @@ def generate_image_certificate_html(
             value = tenant_phone or ""
         elif ftype == "direccion_tenant":
             value = tenant_address or ""
+        elif ftype == "codigo_verificacion":
+            # Código corto de la orden (el mismo del panel y del seguimiento público)
+            value = verification_code or ""
+        elif ftype == "numero_certificado":
+            value = cert_number or ""
         else:
             continue
 

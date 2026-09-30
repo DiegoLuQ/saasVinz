@@ -335,6 +335,7 @@ class TrackingTimelineEvent(BaseModel):
 
 class PublicTrackingResponse(BaseModel):
     oc_number: Optional[int] = None
+    verification_code: Optional[str] = None  # código corto (10 car.) para validar/buscar
     pet_name: str
     pet_species: str
     pet_breed: Optional[str] = None

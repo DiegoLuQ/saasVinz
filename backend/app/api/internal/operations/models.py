@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Float, Enum, JSON
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Float, Enum, JSON, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.database import Base
 from datetime import datetime
@@ -227,12 +227,16 @@ class Certificate(Base):
     tenant_id = Column(Integer, ForeignKey("sys_tenants.id"), nullable=False, index=True)
     cremation_id = Column(Integer, ForeignKey("oc_cremations.id"))
     type = Column(String)
-    number = Column(String, unique=True)
+    number = Column(String)  # único por crematorio (ver __table_args__)
     issue_date = Column(DateTime(timezone=True), default=tz.get_now)
     html_content = Column(String)
     # sku = Column(String, nullable=True) # Removed: not in DB
     # pdf_url = Column(String, nullable=True) # Removed: not in DB
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
+
+    __table_args__ = (
+        UniqueConstraint('tenant_id', 'number', name='uix_certificate_number_tenant'),
+    )
 
 class CertificateTemplate(Base):
     __tablename__ = "ops_certificate_templates"

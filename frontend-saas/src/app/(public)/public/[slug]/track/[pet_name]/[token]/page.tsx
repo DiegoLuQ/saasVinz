@@ -805,7 +805,8 @@ export default function TrackingPage() {
                                         Código de Validación
                                     </span>
                                     <span className="text-xs font-mono font-black text-emerald-600 dark:text-emerald-400">
-                                        {token}
+                                        {/* Código corto (el mismo del panel); el token largo solo si aún no hay orden */}
+                                        {data?.verification_code || token}
                                     </span>
                                 </div>
 

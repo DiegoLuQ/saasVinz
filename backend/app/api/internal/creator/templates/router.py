@@ -219,6 +219,7 @@ def preview_test_admin_template(
             cert_number="SAAS-PREVIEW-IMG",
             tenant_id=0,
             base_url=base_url,
+            verification_code="YZAEAQ7TMV",
         )
 
     if category == 'recibo_suscripcion':

@@ -35,7 +35,9 @@ import {
     Globe,
     ArrowLeftRight,
     ArrowUpDown,
-    Crosshair
+    Crosshair,
+    ShieldCheck,
+    Hash,
 } from 'lucide-react';
 import { apiRequest, getImageUrl } from '@/lib/admin/api';
 import ImageCropper from '@/components/tenant/ImageCropper';
@@ -68,6 +70,8 @@ type FieldType =
     | 'rut_encargado'
     | 'celular_tenant'
     | 'direccion_tenant'
+    | 'codigo_verificacion'
+    | 'numero_certificado'
     | 'texto_fijo';
 
 interface DesignField extends TextBg {
@@ -141,6 +145,8 @@ const FIELD_META: Record<FieldType, { label: string; icon: any; isImage?: boolea
     rut_encargado: { label: 'RUT Encargado', icon: Fingerprint },
     celular_tenant: { label: 'Celular', icon: Phone },
     direccion_tenant: { label: 'Dirección', icon: MapPin },
+    codigo_verificacion: { label: 'Código Verificación', icon: ShieldCheck },
+    numero_certificado: { label: 'N° Certificado', icon: Hash },
     texto_fijo: { label: 'Texto Libre', icon: Type },
 };
 
@@ -176,6 +182,8 @@ function fieldDemoValue(f: DesignField): string {
     if (f.type === 'rut_encargado') return '12.345.678-9';
     if (f.type === 'celular_tenant') return '+56 9 1234 5678';
     if (f.type === 'direccion_tenant') return 'Av. Siempre Viva 742, Santiago';
+    if (f.type === 'codigo_verificacion') return 'YZAEAQ7TMV';
+    if (f.type === 'numero_certificado') return 'CREM-2026-0001';
     if (f.type === 'texto_fijo') return f.value || 'Texto libre';
     return '';
 }

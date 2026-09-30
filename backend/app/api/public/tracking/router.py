@@ -260,6 +260,7 @@ def get_tracking_info(
         tenant_website = tenant.social_media.get("website") or tenant.social_media.get("instagram")
 
     return schemas.PublicTrackingResponse(
+        verification_code=cremation.verification_code,
         pet_name=pet.name,
         pet_species=pet.species,
         pet_breed=pet.breed,

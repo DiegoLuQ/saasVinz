@@ -25,7 +25,7 @@ import { extractCertSpec, renderCertSpecToCanvas } from '@/lib/certImageDraw';
 // --- Tipos compartidos con el editor admin --------------------------------
 interface DesignField extends TextBg {
     id: string;
-    type: 'nombre_mascota' | 'fecha_nacimiento' | 'fecha_fallecimiento' | 'fecha_actual' | 'imagen_mascota' | 'logo_tenant' | 'nombre_empresa' | 'rut_tenant' | 'encargado_tenant' | 'rut_encargado' | 'celular_tenant' | 'direccion_tenant' | 'texto_fijo';
+    type: 'nombre_mascota' | 'fecha_nacimiento' | 'fecha_fallecimiento' | 'fecha_actual' | 'imagen_mascota' | 'logo_tenant' | 'nombre_empresa' | 'rut_tenant' | 'encargado_tenant' | 'rut_encargado' | 'celular_tenant' | 'direccion_tenant' | 'codigo_verificacion' | 'numero_certificado' | 'texto_fijo';
     x: number;
     y: number;
     fontSize?: number;
@@ -78,6 +78,8 @@ const FIELD_LABELS: Record<DesignField['type'], string> = {
     rut_encargado: 'RUT Encargado',
     celular_tenant: 'Celular',
     direccion_tenant: 'Dirección',
+    codigo_verificacion: 'Código verificación',
+    numero_certificado: 'N° certificado',
     texto_fijo: 'Texto libre',
 };
 

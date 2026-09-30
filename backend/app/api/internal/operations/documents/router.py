@@ -102,6 +102,7 @@ def _render_preview(request: Request, tenant: models.Tenant, template: Optional[
             cert_number="PREVIEW-001",
             tenant_id=tenant.id if tenant else 0,
             base_url=base_url,
+            verification_code="YZAEAQ7TMV",
         )
 
     t = template
@@ -346,6 +347,7 @@ def generar_certificado(
                 cert_number=cert_number,
                 tenant_id=tenant_id,
                 base_url=base_url,
+                verification_code=(cremation.verification_code if cremation else "") or "",
             )
 
             # persist=False -> solo vista previa (Documentos la pide en vivo sin
@@ -433,7 +435,10 @@ def generar_certificado(
         # 6. Guardar en DB para historial (persist=False -> solo vista previa)
         if not req.persist:
             return result
-        existing_cert = db.query(models.Certificate).filter(models.Certificate.number == data["cert_number"]).first()
+        existing_cert = db.query(models.Certificate).filter(
+            models.Certificate.number == data["cert_number"],
+            models.Certificate.tenant_id == tenant_id
+        ).first()
         if existing_cert:
             existing_cert.html_content = result["html_content"]
             existing_cert.issue_date = now
