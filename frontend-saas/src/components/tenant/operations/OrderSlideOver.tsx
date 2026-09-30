@@ -335,7 +335,18 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                     <Compass size={16} className="text-primary shrink-0" />
                                     <div className="min-w-0">
                                         <p className="text-xs font-bold text-white">Seguimiento en vivo</p>
-                                        <p className="text-[11px] font-mono text-muted-foreground truncate">{exp.order.verification_code}</p>
+                                        {exp.order.verification_code && (
+                                            // Código corto: la familia lo puede escribir en la página de búsqueda de seguimiento
+                                            <button
+                                                type="button"
+                                                onClick={() => copy('code', exp.order.verification_code!, 'Código de seguimiento copiado')}
+                                                className="mt-0.5 inline-flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground hover:text-white transition"
+                                                title="Copiar código de seguimiento"
+                                            >
+                                                {exp.order.verification_code}
+                                                {copied === 'code' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                                 {trackingUrl && (
@@ -345,7 +356,7 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                             onClick={() => copy('tracking', trackingUrl, 'Enlace de seguimiento copiado')}
                                             className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition flex items-center gap-1.5"
                                         >
-                                            {copied === 'tracking' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />} Copiar
+                                            {copied === 'tracking' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />} Copiar enlace
                                         </button>
                                         <a href={trackingUrl} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition flex items-center gap-1.5">
                                             <ExternalLink size={14} /> Ver
