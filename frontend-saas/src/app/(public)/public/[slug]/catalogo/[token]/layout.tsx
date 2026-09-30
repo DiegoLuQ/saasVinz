@@ -25,6 +25,13 @@ async function resolveOrigin(): Promise<string> {
   }
 }
 
+/** Hash corto y estable (djb2) para versionar la URL de la imagen. */
+const shortHash = (text: string) => {
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+};
+
 const truncate = (text: string, max: number) =>
   text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
 
@@ -39,6 +46,7 @@ export async function generateMetadata({
   let tenantName = "";
   let isPlans = true;
   let summary = "";
+  let logoUrl = "";
 
   try {
     // preview=1: la lectura para la previsualización no cuenta como visita.
@@ -51,6 +59,7 @@ export async function generateMetadata({
       tenantName = data?.tenant_name || "";
       isPlans = data?.catalog_type !== "products";
       summary = data?.catalog_tagline || data?.catalog_intro || "";
+      logoUrl = data?.tenant_logo || "";
     }
   } catch {
     // Sin datos se usa un texto genérico.
@@ -66,7 +75,12 @@ export async function generateMetadata({
         : "Conoce nuestras ánforas, relicarios y recuerdos conmemorativos."),
     200
   );
-  const image = `${origin}/og-form.jpg`;
+  // Con logo: tarjeta JPEG generada por el backend (WhatsApp no previsualiza el
+  // .webp original). ?v= cambia con el logo para que WhatsApp no reutilice una
+  // previsualización antigua si el tenant lo reemplaza.
+  const image = logoUrl
+    ? `${origin}/api/public/catalog/${encodeURIComponent(slug)}/${encodeURIComponent(token)}/og-image.jpg?v=${shortHash(logoUrl)}`
+    : `${origin}/og-form.jpg`;
 
   return {
     metadataBase: new URL(origin),

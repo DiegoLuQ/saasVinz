@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
@@ -201,3 +201,99 @@ def _active_plans(db: Session, tenant_id: int) -> list:
             )
         )
     return result
+
+
+# ---------------------------------------------------------------------------
+# Imagen de previsualización (Open Graph) para compartir el catálogo por WhatsApp
+# ---------------------------------------------------------------------------
+_OG_W, _OG_H = 1200, 630
+_OG_BG = (251, 249, 246)      # marfil del catálogo
+_OG_RING = (166, 124, 55)     # dorado antiguo
+
+
+def _compose_logo_card(image_bytes: bytes) -> bytes:
+    """Logo del tenant -> tarjeta 1200x630 JPEG: logo centrado en un círculo blanco
+    sobre el fondo marfil del catálogo. WhatsApp no previsualiza .webp (formato en
+    que se guardan los logos), por eso se entrega JPEG."""
+    import io
+    from PIL import Image, ImageDraw, ImageOps
+
+    logo = Image.open(io.BytesIO(image_bytes))
+    try:
+        logo = ImageOps.exif_transpose(logo)
+    except Exception:
+        pass
+    logo = logo.convert("RGBA")
+
+    # Recortar el margen vacío (transparente o blanco) que traen muchos logos
+    from PIL import ImageChops
+    flat = Image.new("RGB", logo.size, (255, 255, 255))
+    flat.paste(logo, mask=logo.getchannel("A"))
+    bbox = ImageChops.difference(flat, Image.new("RGB", logo.size, (255, 255, 255))).convert("L").point(
+        lambda v: 255 if v > 12 else 0
+    ).getbbox()
+    if bbox:
+        logo = logo.crop(bbox)
+
+    card = Image.new("RGB", (_OG_W, _OG_H), _OG_BG)
+    draw = ImageDraw.Draw(card)
+
+    # Círculo blanco con anillo dorado fino
+    diameter = 440
+    cx, cy = _OG_W // 2, _OG_H // 2
+    box = [cx - diameter // 2, cy - diameter // 2, cx + diameter // 2, cy + diameter // 2]
+    draw.ellipse([box[0] - 6, box[1] - 6, box[2] + 6, box[3] + 6], fill=_OG_RING)
+    draw.ellipse(box, fill=(255, 255, 255))
+
+    # Logo contenido (sin recortar) dentro del círculo, respetando transparencia
+    inner = int(diameter * 0.66)
+    logo = ImageOps.contain(logo, (inner, inner), Image.Resampling.LANCZOS)
+    card.paste(logo, (cx - logo.width // 2, cy - logo.height // 2), logo)
+
+    out = io.BytesIO()
+    card.save(out, format="JPEG", quality=88, optimize=True)
+    return out.getvalue()
+
+
+@router.get("/{slug}/{token}/og-image.jpg")
+@limiter.limit("60/minute")
+def get_catalog_og_image(
+    request: Request,
+    slug: str,
+    token: str,
+    db: Session = Depends(get_db),
+):
+    """Tarjeta JPEG con el logo del tenant para el preview del enlace del catálogo."""
+    apply_bypass_rls(db)
+    tenant = db.query(models.Tenant).filter(models.Tenant.slug == slug).first()
+    if not tenant or not tenant.logo_url:
+        raise HTTPException(status_code=404, detail="Sin imagen disponible")
+
+    exists = db.query(CatalogShareToken.id).filter(
+        CatalogShareToken.tenant_id == tenant.id,
+        CatalogShareToken.token == token,
+    ).first()
+    if not exists:
+        raise HTTPException(status_code=404, detail="Sin imagen disponible")
+
+    logo_url = str(tenant.logo_url)
+    if not logo_url.lower().startswith(("http://", "https://")):
+        raise HTTPException(status_code=404, detail="Sin imagen disponible")
+
+    try:
+        import requests
+        resp = requests.get(logo_url, timeout=8)
+        if resp.status_code != 200 or not resp.content:
+            raise HTTPException(status_code=404, detail="Sin imagen disponible")
+        jpeg = _compose_logo_card(resp.content)
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error generando og-image de catálogo: {e}")
+        raise HTTPException(status_code=404, detail="Sin imagen disponible")
+
+    return Response(
+        content=jpeg,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
