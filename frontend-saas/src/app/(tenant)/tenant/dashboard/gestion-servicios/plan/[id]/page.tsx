@@ -353,6 +353,19 @@ export default function EditPlanPage() {
                             <p className="text-[10px] text-muted-foreground/60 ml-1">Solo un plan a la vez; marcar este desmarca el anterior.</p>
                         </div>
                     </div>
+
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Importante (opcional)</label>
+                        <input
+                            type="text"
+                            maxLength={200}
+                            value={currentPlan?.important_note || ''}
+                            onChange={(e) => setCurrentPlan({ ...currentPlan, important_note: e.target.value })}
+                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-amber-500/40 transition-all text-sm font-medium"
+                            placeholder="Ej: Exclusivo para mascotas de menos de 1 kg (aves, roedores, exóticos)"
+                        />
+                        <p className="text-[10px] text-muted-foreground/60 ml-1">Aviso destacado en la tarjeta del plan. Vacío: no se muestra.</p>
+                    </div>
                 </div>
 
                 {/* Section 2: Composition */}

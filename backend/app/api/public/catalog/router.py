@@ -183,6 +183,7 @@ def _active_plans(db: Session, tenant_id: int) -> list:
                 description=p.description,
                 price=float(p.price or 0.0),
                 price_label=p.price_label,
+                important_note=p.important_note,
                 is_featured=bool(p.is_featured),
                 image_url=p.image_url,
                 services=[

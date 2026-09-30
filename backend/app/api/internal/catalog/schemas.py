@@ -132,6 +132,7 @@ class PlanBase(BaseModel):
     # Presentación en el catálogo público
     is_featured: bool = False
     price_label: Optional[str] = Field(None, max_length=60)
+    important_note: Optional[str] = Field(None, max_length=200)
     sort_order: int = 0
 
 class PlanCreate(PlanBase):
@@ -148,6 +149,7 @@ class PlanUpdate(BaseModel):
     is_active: Optional[bool] = None
     is_featured: Optional[bool] = None
     price_label: Optional[str] = Field(None, max_length=60)
+    important_note: Optional[str] = Field(None, max_length=200)
     sort_order: Optional[int] = None
     service_ids: Optional[List[int]] = None
     product_ids: Optional[List[int]] = None
@@ -226,6 +228,7 @@ class PublicCatalogPlan(BaseModel):
     description: Optional[str] = None
     price: float
     price_label: Optional[str] = None
+    important_note: Optional[str] = None
     is_featured: bool = False
     image_url: Optional[str] = None  # portada del plan
     services: List[PublicCatalogPlanItem] = []

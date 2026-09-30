@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { Cormorant_Garamond, Plus_Jakarta_Sans } from 'next/font/google';
 import {
-    Check, Facebook, Feather, Globe, Instagram, Mail, MapPin, MessageCircle, Phone, Plus, Search, Share2, X,
+    Check, ChevronDown, Facebook, Feather, Globe, Info, Instagram, Mail, MapPin, MessageCircle, Phone, Plus, Search, Share2, X,
 } from 'lucide-react';
 
 const serif = Cormorant_Garamond({ subsets: ['latin'], weight: ['500', '600', '700'], variable: '--cat-serif' });
@@ -22,6 +22,7 @@ export interface PublicPlan {
     description?: string | null;
     price: number;
     price_label?: string | null;
+    important_note?: string | null;
     is_featured?: boolean;
     image_url?: string | null;
     services: PublicPlanItem[];
@@ -63,15 +64,25 @@ const THEME = {
 } as React.CSSProperties;
 
 const SEARCH_THRESHOLD = 6;
-const DIFF_MIN_BASE = 3; // "Todo lo del plan X" solo si el plan anterior tiene contenido suficiente
+const COLLAPSED_ITEMS = 5; // ítems visibles antes de "Ver más"
+
+// Tamaños de mascota para cotizar: el precio de cremación depende del peso.
+const PET_SIZES = [
+    { key: 'mini', label: 'Aves / Menos de 1 kg' },
+    { key: 'small', label: 'Pequeño (1 a 10 kg)' },
+    { key: 'medium', label: 'Mediano (10 a 25 kg)' },
+    { key: 'large', label: 'Grande (25 a 45 kg)' },
+    { key: 'giant', label: 'Gigante (+45 kg)' },
+] as const;
+const DEFAULT_SIZE = 'small';
 
 const formatCLP = (value: number) => `$${Math.round(value).toLocaleString('es-CL')}`;
 
-/** Texto de precio: la etiqueta del tenant manda; nunca se muestra "$0". */
-const priceText = (plan: PublicPlan): { main: string; isAmount: boolean } => {
+/** Precio propio del plan (etiqueta del tenant o monto); null si no tiene. Nunca "$0". */
+const priceText = (plan: PublicPlan): { main: string; isAmount: boolean } | null => {
     if (plan.price_label?.trim()) return { main: plan.price_label.trim(), isAmount: false };
     if (plan.price > 0) return { main: formatCLP(plan.price), isAmount: true };
-    return { main: 'Valor según peso', isAmount: false };
+    return null;
 };
 
 const planReference = (name: string) => (/^plan\b/i.test(name.trim()) ? `el ${name.trim()}` : `el plan ${name.trim()}`);
@@ -101,42 +112,19 @@ interface PlanView {
     plan: PublicPlan;
     included: PublicPlanItem[];   // servicios + productos incluidos
     optional: PublicPlanItem[];
-    /** Plan anterior cuyo contenido está totalmente contenido en este (para "Todo lo del…, más:"). */
-    baseName: string | null;
-    extras: PublicPlanItem[];     // lo que este plan agrega sobre el anterior
 }
 
 /** Catálogo público de planes: diseño sobrio y cálido; los datos son los de cada tenant. */
 export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare, copiedLink }: Props) {
     const [searchTerm, setSearchTerm] = useState('');
+    const [sizeKey, setSizeKey] = useState<string>(DEFAULT_SIZE);
+    const sizeLabel = PET_SIZES.find(s => s.key === sizeKey)?.label ?? PET_SIZES[1].label;
 
-    // Vista derivada sobre el orden completo (el "plan anterior" no depende del filtro).
-    const views = useMemo<PlanView[]>(() => {
-        return plans.map((plan, idx) => {
-            const included = [
-                ...plan.services.filter(s => !s.is_optional),
-                ...plan.products,
-            ];
-            const optional = plan.services.filter(s => s.is_optional);
-
-            let baseName: string | null = null;
-            let extras: PublicPlanItem[] = [];
-            const prev = idx > 0 ? plans[idx - 1] : null;
-            if (prev) {
-                const prevNames = new Set(
-                    [...prev.services.filter(s => !s.is_optional), ...prev.products].map(i => i.name.toLowerCase())
-                );
-                const currentNames = new Set(included.map(i => i.name.toLowerCase()));
-                const containsPrev = prevNames.size >= DIFF_MIN_BASE && [...prevNames].every(n => currentNames.has(n));
-                const added = included.filter(i => !prevNames.has(i.name.toLowerCase()));
-                if (containsPrev && added.length > 0) {
-                    baseName = prev.name;
-                    extras = added;
-                }
-            }
-            return { plan, included, optional, baseName, extras };
-        });
-    }, [plans]);
+    const views = useMemo<PlanView[]>(() => plans.map(plan => ({
+        plan,
+        included: [...plan.services.filter(s => !s.is_optional), ...plan.products],
+        optional: plan.services.filter(s => s.is_optional),
+    })), [plans]);
 
     const filtered = useMemo(() => {
         const q = searchTerm.trim().toLowerCase();
@@ -152,7 +140,7 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
     const whatsappUrl = (text: string) =>
         tenant.whatsapp ? `https://wa.me/${tenant.whatsapp}?text=${encodeURIComponent(text)}` : null;
 
-    const generalWhatsApp = whatsappUrl(`Hola ${tenant.name}, estoy viendo sus planes y quisiera hacer una consulta.`);
+    const generalWhatsApp = whatsappUrl(`Hola ${tenant.name}, estoy viendo sus planes y quisiera hacer una consulta. Tamaño de mi mascota: ${sizeLabel}.`);
     const logoUrl = getImageUrl(tenant.logo);
     const location = [tenant.address, tenant.city].filter(Boolean).join(', ');
     const socials = Object.entries(tenant.social || {})
@@ -238,6 +226,36 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
 
             {/* Planes */}
             <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 pb-16">
+                {/* Selector de tamaño: ajusta el texto de cotización y el mensaje de WhatsApp de cada plan */}
+                {plans.length > 0 && (
+                    <div className="mb-10 mx-auto max-w-5xl rounded-3xl bg-white border border-[var(--cat-line)] shadow-[0_10px_30px_-24px_rgba(43,39,36,0.35)] px-4 py-6 sm:px-6 text-center">
+                        <h2 id="pet-size-title" className="[font-family:var(--cat-serif)] text-2xl font-semibold">
+                            ¿Cuál es el tamaño aproximado de tu mascota?
+                        </h2>
+                        <div role="radiogroup" aria-labelledby="pet-size-title" className="mt-5 flex flex-wrap justify-center gap-2.5">
+                            {PET_SIZES.map(size => {
+                                const active = size.key === sizeKey;
+                                return (
+                                    <button
+                                        key={size.key}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={active}
+                                        onClick={() => setSizeKey(size.key)}
+                                        className={`rounded-full px-3.5 py-2.5 text-[14px] font-medium border transition-all ${
+                                            active
+                                                ? 'bg-[var(--cat-gold-deep)] border-[var(--cat-gold-deep)] text-white shadow-[0_6px_16px_-8px_rgba(138,100,40,0.7)]'
+                                                : 'bg-[var(--cat-bg)] border-[var(--cat-line)] text-[var(--cat-ink)] hover:border-[var(--cat-gold)]/60'
+                                        }`}
+                                    >
+                                        {size.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
                 {filtered.length === 0 ? (
                     <div className="py-16 text-center">
                         <Feather className="mx-auto text-[var(--cat-gold)]/60" size={36} />
@@ -256,7 +274,8 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                                 key={view.plan.id}
                                 view={view}
                                 cover={getImageUrl(view.plan.image_url)}
-                                waUrl={whatsappUrl(`Hola ${tenant.name}, quisiera consultar por ${planReference(view.plan.name)}.`)}
+                                sizeLabel={sizeLabel}
+                                waUrl={whatsappUrl(`Hola ${tenant.name}, quisiera consultar por ${planReference(view.plan.name)} para mi mascota de tamaño ${sizeLabel}.`)}
                             />
                         ))}
                     </div>
@@ -328,15 +347,16 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
     );
 }
 
-function PlanCard({ view, cover, waUrl }: { view: PlanView; cover: string | null; waUrl: string | null }) {
-    const { plan, included, optional, baseName, extras } = view;
-    const [showAll, setShowAll] = useState(false);
-    const [descOpen, setDescOpen] = useState(false);
+function PlanCard({ view, cover, waUrl, sizeLabel }: { view: PlanView; cover: string | null; waUrl: string | null; sizeLabel: string }) {
+    const { plan, included, optional } = view;
+    // Tarjeta corta por defecto: descripción recortada y primeros ítems; "Ver más" muestra todo.
+    const [expanded, setExpanded] = useState(false);
     const price = priceText(plan);
     const featured = Boolean(plan.is_featured);
-    const useDiff = Boolean(baseName) && !showAll;
-    const list = useDiff ? extras : included;
-    const longDesc = (plan.description || '').length > 160;
+    const longDesc = (plan.description || '').length > 120;
+    const hiddenCount = Math.max(0, included.length - COLLAPSED_ITEMS) + optional.length;
+    const canExpand = hiddenCount > 0 || longDesc;
+    const visible = expanded ? included : included.slice(0, COLLAPSED_ITEMS);
 
     return (
         <article
@@ -366,45 +386,45 @@ function PlanCard({ view, cover, waUrl }: { view: PlanView; cover: string | null
 
             <div className="flex-1 flex flex-col p-6 sm:p-7">
                 <h2 className="[font-family:var(--cat-serif)] text-[28px] leading-tight font-semibold">{plan.name}</h2>
-                <p className={`mt-1 font-semibold ${price.isAmount ? 'text-lg tabular-nums' : 'text-sm uppercase tracking-wider'} text-[var(--cat-gold-deep)]`}>
-                    {price.main}
-                </p>
-
-                {plan.description && (
-                    <div className="mt-3">
-                        <p className={`text-[14px] leading-relaxed text-[var(--cat-muted)] ${longDesc && !descOpen ? 'line-clamp-3' : ''}`}>
-                            {plan.description}
+                {price ? (
+                    <>
+                        <p className={`mt-1 font-semibold ${price.isAmount ? 'text-lg tabular-nums' : 'text-sm uppercase tracking-wider'} text-[var(--cat-gold-deep)]`}>
+                            {price.main}
                         </p>
-                        {longDesc && (
-                            <button type="button" onClick={() => setDescOpen(o => !o)} className="mt-1 text-[13px] font-medium text-[var(--cat-gold-deep)] hover:underline">
-                                {descOpen ? 'Leer menos' : 'Leer más'}
-                            </button>
-                        )}
+                        <p className="mt-0.5 text-[13px] text-[var(--cat-muted)]">Cotizar para: {sizeLabel}</p>
+                    </>
+                ) : (
+                    <p className="mt-1 text-sm font-semibold text-[var(--cat-gold-deep)]">Cotizar para: {sizeLabel}</p>
+                )}
+
+                {plan.important_note && (
+                    <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-[var(--cat-gold)]/35 bg-[#fbf3e4] px-3.5 py-3 text-[13px] leading-snug text-[var(--cat-ink)]">
+                        <Info size={16} className="mt-px shrink-0 text-[var(--cat-gold-deep)]" />
+                        <p><span className="font-semibold">Importante:</span> {plan.important_note}</p>
                     </div>
                 )}
 
-                {(list.length > 0 || useDiff) && (
+                {plan.description && (
+                    <p className={`mt-3 text-[14px] leading-relaxed text-[var(--cat-muted)] ${longDesc && !expanded ? 'line-clamp-2' : ''}`}>
+                        {plan.description}
+                    </p>
+                )}
+
+                {included.length > 0 && (
                     <div className="mt-5 pt-5 border-t border-[var(--cat-line)]">
-                        <p className="text-[13px] font-semibold text-[var(--cat-ink)] mb-3">
-                            {useDiff ? `Todo lo ${planReference(baseName!).replace(/^el /, 'del ')}, más:` : 'Incluye'}
-                        </p>
+                        <p className="text-[13px] font-semibold text-[var(--cat-ink)] mb-3">Incluye</p>
                         <ul className="space-y-2.5">
-                            {list.map((item, i) => (
+                            {visible.map((item, i) => (
                                 <li key={`${item.name}-${i}`} className="flex items-start gap-2.5 text-[14px] leading-snug">
                                     <Check size={16} strokeWidth={2.25} className="mt-0.5 shrink-0 text-[var(--cat-gold)]" />
                                     <span>{item.name}</span>
                                 </li>
                             ))}
                         </ul>
-                        {baseName && (
-                            <button type="button" onClick={() => setShowAll(s => !s)} className="mt-3 text-[13px] font-medium text-[var(--cat-gold-deep)] hover:underline">
-                                {showAll ? 'Ver solo lo que agrega' : `Ver todo lo incluido (${included.length})`}
-                            </button>
-                        )}
                     </div>
                 )}
 
-                {optional.length > 0 && (
+                {expanded && optional.length > 0 && (
                     <div className="mt-5 rounded-2xl bg-[var(--cat-sand)]/60 px-4 py-3.5">
                         <p className="text-[12px] font-semibold uppercase tracking-wider text-[var(--cat-muted)] mb-2">Opcionales</p>
                         <ul className="space-y-2">
@@ -418,21 +438,33 @@ function PlanCard({ view, cover, waUrl }: { view: PlanView; cover: string | null
                     </div>
                 )}
 
+                {canExpand && (
+                    <button
+                        type="button"
+                        onClick={() => setExpanded(e => !e)}
+                        aria-expanded={expanded}
+                        className="mt-4 self-start inline-flex items-center gap-1 text-[13px] font-semibold text-[var(--cat-gold-deep)] hover:underline"
+                    >
+                        {expanded ? 'Ver menos' : hiddenCount > 0 ? `Ver más (+${hiddenCount})` : 'Ver más'}
+                        <ChevronDown size={15} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                    </button>
+                )}
+
                 {waUrl && (
                     <div className="mt-auto pt-6">
-                    <a
-                        href={waUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`w-full rounded-full py-3.5 flex items-center justify-center gap-2 text-[15px] font-semibold transition-colors ${
-                            featured
-                                ? 'bg-[var(--cat-gold-deep)] text-white hover:bg-[#735220]'
-                                : 'bg-white text-[var(--cat-gold-deep)] border border-[var(--cat-gold)]/60 hover:bg-[var(--cat-gold-deep)] hover:text-white'
-                        }`}
-                    >
-                        <MessageCircle size={17} />
-                        Consultar por WhatsApp
-                    </a>
+                        <a
+                            href={waUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`w-full rounded-full py-3.5 flex items-center justify-center gap-2 text-[15px] font-semibold transition-colors ${
+                                featured
+                                    ? 'bg-[var(--cat-gold-deep)] text-white hover:bg-[#735220]'
+                                    : 'bg-white text-[var(--cat-gold-deep)] border border-[var(--cat-gold)]/60 hover:bg-[var(--cat-gold-deep)] hover:text-white'
+                            }`}
+                        >
+                            <MessageCircle size={17} />
+                            Consultar por WhatsApp
+                        </a>
                     </div>
                 )}
             </div>

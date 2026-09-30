@@ -18,7 +18,9 @@ import {
     Info,
     Lock,
     BookOpen,
-    Share2
+    Share2,
+    Star,
+    AlertCircle
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { API_URL } from '@/lib/tenant/api';
@@ -59,6 +61,8 @@ interface Plan {
     cost: number;
     image_url?: string | null;
     is_active: boolean;
+    is_featured?: boolean;
+    important_note?: string | null;
     services?: Service[];
     service_ids?: number[];
     products?: any[];
@@ -495,6 +499,24 @@ export default function ServicesPage() {
                                     <div className="p-7 pt-5 flex flex-col flex-1 relative z-10">
                                         <div className="flex-1 space-y-3">
                                             <h3 className="text-lg font-bold leading-tight">{plan.name}</h3>
+                                            {(plan.is_featured || plan.important_note) && (
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {plan.is_featured && (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/25">
+                                                            <Star size={10} className="fill-amber-400 text-amber-400" /> Más solicitado
+                                                        </span>
+                                                    )}
+                                                    {plan.important_note && (
+                                                        <span
+                                                            className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-sky-500/10 text-sky-300 border border-sky-500/20 max-w-full"
+                                                            title={plan.important_note}
+                                                        >
+                                                            <AlertCircle size={10} className="shrink-0" />
+                                                            <span className="truncate">Importante: {plan.important_note}</span>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
                                             <p className="text-sm text-muted-foreground/80 leading-relaxed line-clamp-2">{plan.description || 'Sin descripción'}</p>
 
                                             {plan.services && plan.services.length > 0 && (

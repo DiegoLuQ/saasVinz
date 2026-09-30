@@ -287,6 +287,7 @@ class PlanService:
             is_active=plan_in.is_active,
             is_featured=plan_in.is_featured,
             price_label=(plan_in.price_label or "").strip() or None,
+            important_note=(plan_in.important_note or "").strip() or None,
             sort_order=plan_in.sort_order,
             tenant_id=tenant_id
         )
@@ -338,8 +339,10 @@ class PlanService:
             for link in db_plan.plan_links:
                 link.is_optional = link.service_id in optional_set
 
-        if "price_label" in update_data:
-            update_data["price_label"] = (update_data["price_label"] or "").strip() or None
+        # Textos del catálogo: vacío = no se muestra
+        for key in ("price_label", "important_note"):
+            if key in update_data:
+                update_data[key] = (update_data[key] or "").strip() or None
 
         if update_data.get("is_featured"):
             self._clear_featured(tenant_id, exclude_plan_id=plan_id)

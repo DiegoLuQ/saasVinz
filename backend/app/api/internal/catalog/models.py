@@ -83,6 +83,7 @@ class Plan(Base):
     # Presentación en el catálogo público
     is_featured = Column(Boolean, nullable=False, default=False, server_default="false")  # "Más solicitado" (uno por tenant)
     price_label = Column(String(60), nullable=True)  # Reemplaza al precio (ej. "Según peso")
+    important_note = Column(String(200), nullable=True)  # Aviso destacado (ej. "Exclusivo mascotas < 1 kg")
     sort_order = Column(Integer, nullable=False, default=0, server_default="0")
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
 

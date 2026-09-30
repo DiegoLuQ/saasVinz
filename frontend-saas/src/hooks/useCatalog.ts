@@ -32,6 +32,7 @@ export interface Plan {
     // Presentación en el catálogo público
     is_featured?: boolean;
     price_label?: string | null;
+    important_note?: string | null;  // aviso destacado en la tarjeta del catálogo
     sort_order?: number;
     services?: Service[];
     service_ids?: number[];          // el orden de la lista es el orden en el catálogo
