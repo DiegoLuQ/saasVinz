@@ -5,16 +5,22 @@ import type { SelectedService, SelectedPlan, SelectedProduct, WeightPricingRule 
 
 /**
  * Calculate the weight-based surcharge from the pricing rules table.
+ * Tramos "hasta X kg": aplica el primero (por máximo ascendente) cuyo máximo
+ * cubre el peso; max_weight null = tramo abierto. Así 4,05 kg no cae en un
+ * hueco entre "0–4" y "4,1–7" de reglas antiguas.
  */
 export function calculateWeightPrice(
     weight: number | undefined,
     rules: WeightPricingRule[]
 ): number {
     if (!weight || weight <= 0) return 0;
-    const matchingRule = rules.find(
-        rule => weight >= rule.min_weight && weight <= rule.max_weight
+    const sorted = [...rules].sort(
+        (a, b) => (a.max_weight ?? Infinity) - (b.max_weight ?? Infinity)
     );
-    return matchingRule ? matchingRule.price : 0;
+    // Reglas antiguas cuyo primer tramo no parte en 0: bajo ese mínimo no hay recargo.
+    if (sorted.length === 0 || weight < (sorted[0].min_weight ?? 0)) return 0;
+    const matchingRule = sorted.find(rule => weight <= (rule.max_weight ?? Infinity));
+    return matchingRule?.price ?? 0;
 }
 
 /**

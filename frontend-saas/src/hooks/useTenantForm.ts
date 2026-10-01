@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { apiRequest, API_BASE_URL } from '@/lib/api';
 import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 import { compressImages } from '@/lib/clientImageCompressor';
 import { Service } from '@/components/public/ServiceSelectionStep';
 import { saveDraftImages, loadDraftImages, clearDraftImages } from '@/lib/formDraftImages';
+import { resolveFormConfig, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
 
 export interface Tenant {
     id: number;
@@ -16,6 +17,10 @@ export interface Tenant {
     country?: string;
     region?: string;
     city?: string;
+    /** Campos visibles/obligatorios del formulario (configurable por crematorio) */
+    form_config?: PublicFormConfig | null;
+    /** Tramos de peso del crematorio (precio solo si los muestra) */
+    weight_tiers?: WeightTier[];
 }
 
 export interface OwnerData {
@@ -43,7 +48,10 @@ export interface PetData {
     birthDate: string;
     deathDate: string;
     size: string;
+    /** Rangos fijos previos: solo si el crematorio no definió tramos */
     weightRange: 'small' | 'medium' | 'large' | 'giant' | '';
+    /** Tramo del crematorio elegido (id de srv_weight_pricing) */
+    weightTierId: string;
     weightKg: string;
     dedication: string;
 }
@@ -74,6 +82,7 @@ export const INITIAL_PET_DATA: PetData = {
     deathDate: '',
     size: '',
     weightRange: '',
+    weightTierId: '',
     weightKg: '',
     dedication: '',
 };
@@ -295,15 +304,25 @@ export function useTenantForm(
         }
     }, [partnerSlug, tenant]);
 
+    // Campos visibles/obligatorios y tramos de peso definidos por el crematorio
+    const formConfig = useMemo(() => resolveFormConfig(tenant?.form_config), [tenant]);
+    const weightTiers = useMemo(() => tenant?.weight_tiers ?? [], [tenant]);
+
     // 6. Validaciones
     const validateOwner = useCallback(() => {
         const errors: Record<string, string> = {};
+        const f = formConfig.fields;
+        const blank = (v?: string) => !(v || '').trim();
         if (!ownerData.fullName) errors.fullName = 'Requerido';
-        if (ownerData.email && !/\S+@\S+\.\S+/.test(ownerData.email)) errors.email = 'Email inválido';
         if (!ownerData.phone) errors.phone = 'Requerido';
-        if (!ownerData.address) errors.address = 'Requerido';
-        // Retiro y entrega son dos direcciones: el retiro también es obligatorio
-        if (!(ownerData.veterinary || '').trim()) errors.veterinary = 'Requerido';
+        if (f.rut.required && blank(ownerData.rut)) errors.rut = 'Requerido';
+        if (f.email.required && blank(ownerData.email)) errors.email = 'Requerido';
+        if (f.email.visible && ownerData.email && !/\S+@\S+\.\S+/.test(ownerData.email)) errors.email = 'Email inválido';
+        if (f.contactPreference.required && !ownerData.contactPreference) errors.contactPreference = 'Selecciona una opción';
+        if (f.address.required && blank(ownerData.address)) errors.address = 'Requerido';
+        // Retiro y entrega son dos direcciones: el retiro puede ser obligatorio
+        if (f.pickup.required && blank(ownerData.veterinary)) errors.veterinary = 'Requerido';
+        if (f.comments.required && blank(ownerData.comments)) errors.comments = 'Requerido';
 
         if (ownerData.fullName.length > 50) errors.fullName = 'Máx 50 caracteres';
         if (ownerData.email && ownerData.email.length > 50) errors.email = 'Máx 50 caracteres';
@@ -312,18 +331,27 @@ export function useTenantForm(
 
         setOwnerErrors(errors);
         return Object.keys(errors).length === 0;
-    }, [ownerData]);
+    }, [ownerData, formConfig]);
 
     const validatePet = useCallback(() => {
         const errors: Record<string, string> = {};
+        const f = formConfig.fields;
         if (!petData.name) errors.name = 'Requerido';
         if (!petData.type) errors.type = 'Requerido';
-        if (!petData.age) errors.age = 'Requerido';
+        if (f.age.required && !petData.age) errors.age = 'Requerido';
+        if (f.nickname.required && !(petData.nickname || '').trim()) errors.nickname = 'Requerido';
+        if (f.breed.required && !(petData.breed || '').trim()) errors.breed = 'Requerido';
+        if (f.birthDate.required && !petData.birthDate) errors.birthDate = 'Requerido';
+        if (f.deathDate.required && !petData.deathDate) errors.deathDate = 'Requerido';
 
-        if (!petData.weightRange && !petData.weightKg) {
+        // Con tramos del crematorio vale el tramo elegido; si no tiene, los rangos fijos previos
+        const hasRange = weightTiers.length > 0
+            ? weightTiers.some(t => String(t.id) === petData.weightTierId)
+            : !!petData.weightRange;
+        if (f.weight.required && !hasRange && !petData.weightKg) {
             errors.weightRange = 'Selecciona un rango de peso';
         }
-        if (petData.weightKg) {
+        if (f.weight.visible && petData.weightKg) {
             const wkg = parseFloat(petData.weightKg);
             if (isNaN(wkg) || wkg <= 0 || wkg > 200) {
                 errors.weightKg = 'Peso fuera de rango (0-200 kg)';
@@ -348,7 +376,7 @@ export function useTenantForm(
 
         setPetErrors(errors);
         return Object.keys(errors).length === 0;
-    }, [petData]);
+    }, [petData, formConfig, weightTiers]);
 
     // 7. Navegación entre pasos
     const handleNext = useCallback(() => {
@@ -433,8 +461,27 @@ export function useTenantForm(
 
             const formData = new FormData();
             formData.append('tenant_id', String(tenant.id));
-            formData.append('owner_data', JSON.stringify(ownerData));
-            formData.append('pet_data', JSON.stringify(petData));
+            // Los campos que el crematorio oculta no se envían (un borrador
+            // antiguo podría traerlos con datos).
+            const f = formConfig.fields;
+            const owner = { ...ownerData };
+            if (!f.rut.visible) owner.rut = '';
+            if (!f.email.visible) owner.email = '';
+            if (!f.contactPreference.visible) owner.contactPreference = '';
+            if (!f.comments.visible) owner.comments = '';
+            if (!f.pickup.visible) { owner.veterinary = ''; owner.pickupRegion = ''; owner.pickupCommune = ''; }
+            if (!f.address.visible) { owner.address = ''; owner.commune = ''; }
+            const pet = { ...petData };
+            if (!f.nickname.visible) pet.nickname = '';
+            if (!f.breed.visible) pet.breed = '';
+            if (!f.age.visible) pet.age = '';
+            if (!f.birthDate.visible) pet.birthDate = '';
+            if (!f.deathDate.visible) pet.deathDate = '';
+            if (!f.weight.visible) { pet.weightKg = ''; pet.weightRange = ''; pet.weightTierId = ''; }
+            if (weightTiers.length > 0) pet.weightRange = '';
+            else pet.weightTierId = '';
+            formData.append('owner_data', JSON.stringify(owner));
+            formData.append('pet_data', JSON.stringify(pet));
             formData.append('selected_services', JSON.stringify(selectedServices));
             if (token) formData.append('token', token);
             if (widgetKey) formData.append('widget_key', widgetKey);
@@ -503,6 +550,8 @@ export function useTenantForm(
 
     return {
         tenant,
+        formConfig,
+        weightTiers,
         loading,
         error,
         isSubmitting,

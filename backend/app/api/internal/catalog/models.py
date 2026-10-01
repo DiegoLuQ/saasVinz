@@ -128,8 +128,9 @@ class WeightPricing(Base):
     __tablename__ = "srv_weight_pricing"
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(Integer, ForeignKey("sys_tenants.id"), nullable=False, index=True)
+    label = Column(String(40), nullable=True)  # Nombre visible del tramo ("Pequeño")
     min_weight = Column(Float)
-    max_weight = Column(Float)
+    max_weight = Column(Float)  # NULL = tramo abierto ("X kg o más"), solo el último
     price = Column(Float)
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
 

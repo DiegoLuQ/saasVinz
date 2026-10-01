@@ -19,7 +19,7 @@ from app.api.internal.catalog.schemas import (
     ServiceBase, ServiceCreate, ServiceUpdate, ServiceInDB,
     ProductBase, ProductCreate, ProductUpdate, ProductInDB,
     PlanBase, PlanCreate, PlanUpdate, PlanInDB,
-    WeightPricingBase, WeightPricingCreate, WeightPricingInDB,
+    WeightPricingBase, WeightPricingCreate, WeightPricingReplace, WeightPricingInDB,
     CatalogShareTokenCreate, CatalogShareTokenInDB,
     PublicCatalogProduct, PublicCatalogResponse, PublicCatalogPlan, PublicCatalogPlanItem
 )

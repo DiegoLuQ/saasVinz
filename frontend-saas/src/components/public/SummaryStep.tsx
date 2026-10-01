@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { User, PawPrint, Package, Heart, Pencil, ImageIcon, Check, Sparkles, Gem, ChevronDown, Camera, Eye, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import FarewellPreview from '@/app/(tenant)/tenant/dashboard/documentos/disenos/components/FarewellPreview';
+import { DEFAULT_FORM_CONFIG, formatCLP, tierDisplay, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
 
 interface OwnerData {
     fullName: string;
@@ -30,6 +31,7 @@ interface PetData {
     birthDate?: string;
     deathDate?: string;
     weightRange?: string;
+    weightTierId?: string;
     weightKg?: string;
     dedication?: string;
     species?: string;
@@ -59,6 +61,8 @@ interface Props {
     images: File[];
     onEditStep: (step: number) => void;
     farewellTemplate?: any;
+    formConfig?: PublicFormConfig;
+    weightTiers?: WeightTier[];
 }
 
 const WEIGHT_LABELS: Record<string, string> = {
@@ -219,7 +223,12 @@ function PlanAccordionItem({ item }: { item: ServiceItem }) {
     );
 }
 
-export default function SummaryStep({ ownerData, petData, selectedServices, services, images, onEditStep, farewellTemplate }: Props) {
+export default function SummaryStep({ ownerData, petData, selectedServices, services, images, onEditStep, farewellTemplate, formConfig = DEFAULT_FORM_CONFIG, weightTiers = [] }: Props) {
+    const f = formConfig.fields;
+    const tier = weightTiers.find(t => String(t.id) === petData.weightTierId);
+    const tierText = tier
+        ? `${tierDisplay(tier)}${formConfig.show_weight_prices && tier.price != null ? ` · ${formatCLP(tier.price)}` : ''}`
+        : null;
     const selectedItems = services.filter(s => selectedServices.includes(s.id));
     const [showFarewellModal, setShowFarewellModal] = useState(false);
 
@@ -275,24 +284,26 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
             <SectionCard icon={User} title="Datos de la Familia" step={1} onEdit={onEditStep}>
                 <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
                     <DataRow label="Nombre" value={ownerData.fullName} />
-                    <DataRow label="Email" value={ownerData.email} />
+                    {f.email.visible && ownerData.email && <DataRow label="Email" value={ownerData.email} />}
                     <DataRow label="Teléfono" value={ownerData.phone} />
-                    {ownerData.rut && <DataRow label="RUT" value={ownerData.rut} />}
+                    {f.rut.visible && ownerData.rut && <DataRow label="RUT" value={ownerData.rut} />}
                     {/* Retiro y entrega con la misma estructura: dirección, comuna, región */}
-                    {ownerData.veterinary && (
+                    {f.pickup.visible && ownerData.veterinary && (
                         <DataRow
                             label="Lugar de Retiro"
                             value={[ownerData.veterinary, ownerData.pickupCommune, ownerData.pickupRegion].filter(Boolean).join(', ')}
                         />
                     )}
-                    <DataRow
-                        label="Dirección Entrega"
-                        value={[ownerData.address, ownerData.commune, ownerData.region].filter(Boolean).join(', ')}
-                    />
-                    {ownerData.contactPreference && (
+                    {f.address.visible && (
+                        <DataRow
+                            label="Dirección Entrega"
+                            value={[ownerData.address, ownerData.commune, ownerData.region].filter(Boolean).join(', ')}
+                        />
+                    )}
+                    {f.contactPreference.visible && ownerData.contactPreference && (
                         <DataRow label="Contacto" value={CONTACT_LABELS[ownerData.contactPreference] || ownerData.contactPreference} />
                     )}
-                    {ownerData.comments && <DataRow label="Comentarios" value={ownerData.comments} />}
+                    {f.comments.visible && ownerData.comments && <DataRow label="Comentarios" value={ownerData.comments} />}
                 </div>
             </SectionCard>
 
@@ -300,14 +311,15 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
             <SectionCard icon={PawPrint} title="Tu Angelito" step={2} onEdit={onEditStep}>
                 <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
                     <DataRow label="Nombre" value={petData.name} />
-                    {petData.nickname && <DataRow label="Apodo" value={petData.nickname} />}
+                    {f.nickname.visible && petData.nickname && <DataRow label="Apodo" value={petData.nickname} />}
                     <DataRow label="Especie" value={petData.type} />
-                    {petData.breed && <DataRow label="Raza" value={petData.breed} />}
-                    <DataRow label="Edad" value={petData.age ? `${petData.age} años` : undefined} />
-                    {petData.weightRange && <DataRow label="Peso" value={WEIGHT_LABELS[petData.weightRange]} />}
-                    {petData.weightKg && <DataRow label="Peso exacto" value={`${petData.weightKg} kg`} />}
-                    {petData.birthDate && <DataRow label="Nacimiento" value={formatDate(petData.birthDate)} />}
-                    {petData.deathDate && <DataRow label="Fallecimiento" value={formatDate(petData.deathDate)} />}
+                    {f.breed.visible && petData.breed && <DataRow label="Raza" value={petData.breed} />}
+                    {f.age.visible && <DataRow label="Edad" value={petData.age ? `${petData.age} años` : undefined} />}
+                    {f.weight.visible && tierText && <DataRow label="Peso" value={tierText} />}
+                    {f.weight.visible && !tier && weightTiers.length === 0 && petData.weightRange && <DataRow label="Peso" value={WEIGHT_LABELS[petData.weightRange]} />}
+                    {f.weight.visible && petData.weightKg && <DataRow label="Peso exacto" value={`${petData.weightKg} kg`} />}
+                    {f.birthDate.visible && petData.birthDate && <DataRow label="Nacimiento" value={formatDate(petData.birthDate)} />}
+                    {f.deathDate.visible && petData.deathDate && <DataRow label="Fallecimiento" value={formatDate(petData.deathDate)} />}
                 </div>
             </SectionCard>
 

@@ -9,7 +9,11 @@ from app.auth import get_current_admin
 from app.api.internal.admin.rbac.router import check_permission
 from app.api.internal.admin.maintenance import backups
 from app.core.tenant_context import apply_tenant_rls, apply_bypass_rls
-from typing import List
+from typing import Dict, List
+from pydantic import BaseModel, Field
+from app.services.public_form_config import (
+    DEFAULT_FIELDS, MAX_WEIGHT_TIERS, form_config_with_meta, get_weight_tiers, normalize_form_config,
+)
 
 router = APIRouter()
 
@@ -69,68 +73,113 @@ def create_or_update_table_config(
         return new_config
 
 # ===== WEIGHT PRICING ENDPOINTS =====
+# Tramos "hasta X kg" (máx. MAX_WEIGHT_TIERS). Los usa el recargo por peso de
+# las órdenes internas y el selector de tamaño del formulario/catálogo público.
 
 @router.get("/weight-pricing", response_model=List[schemas.WeightPricingInDB])
 def get_weight_pricing_rules(
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
-    _: bool = Depends(auth.get_current_user) # Solo necesitamos que esté autenticado para la lógica de abajo
+    _: models.User = Depends(auth.get_current_user)  # Lo consumen los formularios de orden de varios roles
 ):
-    """Get all weight-based pricing rules"""
-    # Verificación manual de permisos para permitir múltiples módulos
-    db_user = auth.get_current_user # Esto es el objeto, no la dependencia corregida
-    # En FastAPI, las dependencias inyectadas ya están resueltas. 
-    # Usaremos una verificación directa contra check_permission pero de forma interna o simplemente pasando.
-    # MEJOR: Usaremos el check_permission directamente en la dependencia si FastAPI lo permite dinámico, 
-    # pero aquí lo haremos simple:
-    return db.query(models.WeightPricing).filter(
-        models.WeightPricing.tenant_id == tenant_id
-    ).order_by(models.WeightPricing.min_weight).all()
+    """Tramos de peso ordenados por límite superior (el abierto al final)."""
+    return get_weight_tiers(db, tenant_id)
 
-@router.post("/weight-pricing", response_model=schemas.WeightPricingInDB)
-def create_weight_pricing_rule(
-    rule_in: schemas.WeightPricingCreate,
+@router.put("/weight-pricing", response_model=List[schemas.WeightPricingInDB])
+def replace_weight_pricing_rules(
+    payload: schemas.WeightPricingReplace,
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
-    admin: models.User = Depends(check_permission("configuracion", "view"))
+    admin: models.User = Depends(check_permission("configuracion", "edit"))
 ):
-    """Create a new weight-based pricing rule"""
-    # Validate range
-    if rule_in.min_weight >= rule_in.max_weight:
-        raise HTTPException(
-            status_code=400,
-            detail="El peso mínimo debe ser menor que el peso máximo"
-        )
-    
-    new_rule = models.WeightPricing(
-        tenant_id=tenant_id,
-        min_weight=rule_in.min_weight,
-        max_weight=rule_in.max_weight,
-        price=rule_in.price
-    )
-    db.add(new_rule)
+    """Guarda la tabla completa de tramos.
+
+    Cada tramo trae solo su límite superior; el mínimo es el máximo del tramo
+    anterior (el primero parte en 0), así no quedan huecos ni solapes. Solo el
+    último puede quedar abierto (max_weight = null → "más de X kg").
+    Las filas existentes se reutilizan por posición para conservar sus IDs
+    (borradores del formulario público que ya eligieron un tramo).
+    """
+    tiers = payload.tiers
+    if len(tiers) > MAX_WEIGHT_TIERS:
+        raise HTTPException(status_code=400, detail=f"Máximo {MAX_WEIGHT_TIERS} rangos de peso")
+
+    prev_max = 0.0
+    for idx, t in enumerate(tiers):
+        is_last = idx == len(tiers) - 1
+        if t.max_weight is None:
+            if not is_last:
+                raise HTTPException(status_code=400, detail="Solo el último rango puede quedar abierto (sin máximo)")
+            continue
+        if t.max_weight <= prev_max:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Rango {idx + 1}: el máximo debe ser mayor que {prev_max:g} kg"
+            )
+        if t.max_weight > 500:
+            raise HTTPException(status_code=400, detail=f"Rango {idx + 1}: máximo fuera de rango (500 kg)")
+        prev_max = t.max_weight
+
+    existing = get_weight_tiers(db, tenant_id)
+    prev_max = 0.0
+    for idx, t in enumerate(tiers):
+        row = existing[idx] if idx < len(existing) else models.WeightPricing(tenant_id=tenant_id)
+        row.label = (t.label or "").strip() or None
+        row.min_weight = prev_max
+        row.max_weight = t.max_weight
+        row.price = t.price
+        if idx >= len(existing):
+            db.add(row)
+        if t.max_weight is not None:
+            prev_max = t.max_weight
+    for row in existing[len(tiers):]:
+        db.delete(row)
+
     db.commit()
-    apply_bypass_rls(db)
-    db.refresh(new_rule)
     apply_tenant_rls(db, tenant_id)
-    return new_rule
+    return get_weight_tiers(db, tenant_id)
 
-@router.delete("/weight-pricing/{rule_id}")
-def delete_weight_pricing_rule(
-    rule_id: int,
+
+# ===== PUBLIC FORM CONFIGURATION =====
+
+class FormFieldSetting(BaseModel):
+    visible: bool = True
+    required: bool = False
+
+class FormConfigUpdate(BaseModel):
+    fields: Dict[str, FormFieldSetting] = Field(default_factory=dict)
+    show_weight_prices: bool = False
+
+@router.get("/form-config")
+def get_form_config(
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
     admin: models.User = Depends(check_permission("configuracion", "view"))
 ):
-    """Delete a weight-based pricing rule"""
-    rule = db.query(models.WeightPricing).filter(
-        models.WeightPricing.id == rule_id,
-        models.WeightPricing.tenant_id == tenant_id
-    ).first()
-    
-    if not rule:
-        raise HTTPException(status_code=404, detail="Regla no encontrada")
-    
-    db.delete(rule)
+    """Campos configurables del formulario público con su estado actual."""
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+    return form_config_with_meta(tenant.form_config)
+
+@router.put("/form-config")
+def update_form_config(
+    payload: FormConfigUpdate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    admin: models.User = Depends(check_permission("configuracion", "edit"))
+):
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+    unknown = set(payload.fields) - set(DEFAULT_FIELDS)
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"Campos desconocidos: {', '.join(sorted(unknown))}")
+
+    # Se guarda normalizado (obligatorio implica visible); claves ausentes = defecto.
+    tenant.form_config = normalize_form_config({
+        "fields": {k: v.model_dump() for k, v in payload.fields.items()},
+        "show_weight_prices": payload.show_weight_prices,
+    })
     db.commit()
-    return {"message": "Regla eliminada exitosamente"}
+    return form_config_with_meta(tenant.form_config)

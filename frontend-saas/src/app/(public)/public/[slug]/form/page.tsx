@@ -103,6 +103,8 @@ export default function TenantFormPage() {
 
     const {
         tenant,
+        formConfig,
+        weightTiers,
         loading,
         error,
         isSubmitting,
@@ -595,6 +597,7 @@ export default function TenantFormPage() {
                                         hideServiceCode={!!partnerId}
                                         tenantCountry={tenant.country}
                                         tenantRegion={tenant.region}
+                                        formConfig={formConfig}
                                     />
                                 )}
                                 {currentStep === 2 && (
@@ -602,6 +605,8 @@ export default function TenantFormPage() {
                                         data={petData}
                                         updateData={(d) => setPetData(prev => ({ ...prev, ...d }))}
                                         errors={petErrors}
+                                        formConfig={formConfig}
+                                        weightTiers={weightTiers}
                                     />
                                 )}
                                 {currentStep === 3 && (
@@ -630,6 +635,8 @@ export default function TenantFormPage() {
                                         images={images}
                                         onEditStep={handleEditFromSummary}
                                         farewellTemplate={farewellTemplate}
+                                        formConfig={formConfig}
+                                        weightTiers={weightTiers}
                                     />
                                 )}
                             </motion.div>

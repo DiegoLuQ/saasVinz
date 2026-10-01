@@ -10,7 +10,8 @@ import {
     Box,
     RefreshCcw,
     MessageCircle,
-    Award
+    Award,
+    ClipboardList
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -24,7 +25,7 @@ import DeactivateTenantModal from '@/components/tenant/modals/DeactivateTenantMo
 
 import { GeneralTab } from '@/components/tenant/settings/GeneralTab';
 import { NotificationsTab } from '@/components/tenant/settings/NotificationsTab';
-import { MaintenanceTab } from '@/components/tenant/settings/MaintenanceTab';
+import { PublicFormTab } from '@/components/tenant/settings/PublicFormTab';
 import { WorkflowTab } from '@/components/tenant/settings/WorkflowTab';
 import { BillingTab } from '@/components/tenant/settings/BillingTab';
 import { CertificatesTab } from '@/components/tenant/settings/CertificatesTab';
@@ -62,6 +63,7 @@ export default function SettingsPage() {
         { id: 'certificados', name: 'Certificados', icon: Award },
         { id: 'facturacion', name: 'Facturación', icon: CreditCard },
         { id: 'flujo', name: 'Flujo Operativo', icon: Activity },
+        { id: 'formulario', name: 'Formulario y Pesos', icon: ClipboardList },
     ];
 
     const handleDeactivateTenant = async () => {
@@ -154,11 +156,11 @@ export default function SettingsPage() {
                         )}
 
                         {activeTab === 'flujo' && (
-                            <div className="space-y-12">
-                                <WorkflowTab />
-                                <div className="h-px bg-white/5 w-full" />
-                                <MaintenanceTab />
-                            </div>
+                            <WorkflowTab />
+                        )}
+
+                        {activeTab === 'formulario' && (
+                            <PublicFormTab />
                         )}
 
                         {activeTab === 'facturacion' && (

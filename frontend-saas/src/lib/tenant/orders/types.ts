@@ -121,9 +121,12 @@ export interface Customer {
 }
 
 export interface WeightPricingRule {
-    min_weight: number;
-    max_weight: number;
-    price: number;
+    id?: number;
+    label?: string | null;
+    min_weight: number | null;
+    /** null = tramo abierto ("más de X kg"), solo el último */
+    max_weight: number | null;
+    price: number | null;
 }
 
 export interface Partner {
