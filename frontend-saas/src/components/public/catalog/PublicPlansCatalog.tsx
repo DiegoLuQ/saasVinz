@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { Cormorant_Garamond, Plus_Jakarta_Sans } from 'next/font/google';
 import { DEFAULT_CATALOG_INTRO } from '@/lib/catalogDefaults';
+import type { WeightTier } from '@/lib/publicFormConfig';
 import {
     Check, ChevronDown, Facebook, Feather, Globe, Info, Instagram, Mail, MapPin, MessageCircle, Phone, Plus, Search, Share2, X,
 } from 'lucide-react';
@@ -49,6 +50,8 @@ interface Props {
     getImageUrl: (url?: string | null) => string | null;
     onShare: () => void;
     copiedLink: boolean;
+    /** Tramos de peso del crematorio; vacío = tamaños genéricos */
+    weightTiers?: WeightTier[];
 }
 
 // Paleta cálida y luminosa, igual para todos los tenants: el catálogo lo abren
@@ -68,6 +71,7 @@ const SEARCH_THRESHOLD = 6;
 const COLLAPSED_ITEMS = 5; // ítems visibles antes de "Ver más"
 
 // Tamaños de mascota para cotizar: el precio de cremación depende del peso.
+// Respaldo si el crematorio no definió sus tramos de peso en Configuración.
 const PET_SIZES = [
     { key: 'mini', label: 'Aves / Menos de 1 kg' },
     { key: 'small', label: 'Pequeño (1 a 10 kg)' },
@@ -76,6 +80,12 @@ const PET_SIZES = [
     { key: 'giant', label: 'Gigante (+45 kg)' },
 ] as const;
 const DEFAULT_SIZE = 'small';
+
+/** Tramos del crematorio como opciones del selector ("Pequeño (Hasta 4 kg) · $10.000"). */
+const tierSizes = (tiers: WeightTier[]) => tiers.map(t => {
+    const base = t.label ? `${t.label} (${t.range_text})` : t.range_text;
+    return { key: String(t.id), label: base, display: t.price != null ? `${base} · ${formatCLP(t.price)}` : base };
+});
 
 const formatCLP = (value: number) => `$${Math.round(value).toLocaleString('es-CL')}`;
 
@@ -116,10 +126,17 @@ interface PlanView {
 }
 
 /** Catálogo público de planes: diseño sobrio y cálido; los datos son los de cada tenant. */
-export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare, copiedLink }: Props) {
+export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare, copiedLink, weightTiers = [] }: Props) {
     const [searchTerm, setSearchTerm] = useState('');
-    const [sizeKey, setSizeKey] = useState<string>(DEFAULT_SIZE);
-    const sizeLabel = PET_SIZES.find(s => s.key === sizeKey)?.label ?? PET_SIZES[1].label;
+    const sizes = useMemo(
+        () => (weightTiers.length > 0 ? tierSizes(weightTiers) : PET_SIZES.map(s => ({ ...s, display: s.label }))),
+        [weightTiers]
+    );
+    const [sizeKey, setSizeKey] = useState<string>(
+        weightTiers.length > 0 ? String(weightTiers[0].id) : DEFAULT_SIZE
+    );
+    // El texto de cotización y de WhatsApp no lleva el precio del tramo.
+    const sizeLabel = (sizes.find(s => s.key === sizeKey) ?? sizes[0])?.label ?? '';
 
     const views = useMemo<PlanView[]>(() => plans.map(plan => ({
         plan,
@@ -242,7 +259,7 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                             ¿Cuál es el tamaño aproximado de tu mascota?
                         </h2>
                         <div role="radiogroup" aria-labelledby="pet-size-title" className="mt-5 flex flex-wrap justify-center gap-2.5">
-                            {PET_SIZES.map(size => {
+                            {sizes.map(size => {
                                 const active = size.key === sizeKey;
                                 return (
                                     <button
@@ -257,7 +274,7 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                                                 : 'bg-[var(--cat-bg)] border-[var(--cat-line)] text-[var(--cat-ink)] hover:border-[var(--cat-gold)]/60'
                                         }`}
                                     >
-                                        {size.label}
+                                        {size.display}
                                     </button>
                                 );
                             })}

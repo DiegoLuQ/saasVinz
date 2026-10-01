@@ -166,12 +166,20 @@ class PlanInDB(PlanBase):
 
 # Precios por Peso (Weight Pricing)
 class WeightPricingBase(BaseModel):
-    min_weight: float
-    max_weight: float
-    price: float
+    label: Optional[str] = None
+    min_weight: Optional[float] = 0
+    max_weight: Optional[float] = None  # None = tramo abierto ("X kg o más")
+    price: Optional[float] = 0
 
-class WeightPricingCreate(WeightPricingBase):
-    pass
+class WeightPricingCreate(BaseModel):
+    """Un tramo al guardar la tabla completa: solo el límite superior.
+    El mínimo lo calcula el servidor (máximo del tramo anterior)."""
+    label: Optional[str] = Field(default=None, max_length=40)
+    max_weight: Optional[float] = None
+    price: float = Field(default=0, ge=0)
+
+class WeightPricingReplace(BaseModel):
+    tiers: List[WeightPricingCreate] = Field(default_factory=list)
 
 class WeightPricingInDB(WeightPricingBase):
     id: int
@@ -251,4 +259,7 @@ class PublicCatalogResponse(BaseModel):
     expires_at: Optional[datetime] = None
     products: List[PublicCatalogProduct] = []
     plans: List[PublicCatalogPlan] = []
+    # Tramos de peso del crematorio para el selector de tamaño (precio solo si
+    # el crematorio habilitó mostrarlo; ver app/services/public_form_config.py)
+    weight_tiers: List[dict] = []
 

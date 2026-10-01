@@ -14,6 +14,7 @@ import uuid
 from app.api.internal.common.media_service import MediaService
 from app.core.rate_limiter import limiter
 from app.services.recaptcha import verify_recaptcha
+from app.services.public_form_config import apply_form_config_to_submission
 from app.core.tenant_context import apply_tenant_rls, apply_bypass_rls
 from app.utils.upload_validation import read_and_validate_image, enforce_max_files
 from app.api.internal.integrations.models import TenantApiKey
@@ -259,6 +260,9 @@ async def submit_public_form(
 
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Datos inválidos (JSON)")
+
+    # 2.1 Campos obligatorios configurados por el crematorio + tramo de peso
+    apply_form_config_to_submission(db, tenant, owner_dict, pet_dict)
 
     # 3. Enrich Services Data (Snapshot Prices)
     enriched_services = []

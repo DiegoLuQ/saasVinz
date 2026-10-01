@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PublicPlansCatalog, { type PublicPlan } from '@/components/public/catalog/PublicPlansCatalog';
+import type { WeightTier } from '@/lib/publicFormConfig';
 
 interface ProductItem {
     id: number;
@@ -55,6 +56,7 @@ interface PublicCatalogData {
     expires_at?: string | null;
     products: ProductItem[];
     plans?: PublicPlan[];
+    weight_tiers?: WeightTier[];
 }
 
 export default function PublicCatalogPage() {
@@ -308,6 +310,7 @@ export default function PublicCatalogPage() {
                     whatsapp: data.whatsapp,
                 }}
                 plans={data.plans ?? []}
+                weightTiers={data.weight_tiers ?? []}
                 getImageUrl={getImageUrl}
                 onShare={handleShareLink}
                 copiedLink={copiedLink}

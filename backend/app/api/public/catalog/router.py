@@ -7,6 +7,7 @@ from app.core.rate_limiter import limiter
 from app.core.tenant_context import apply_bypass_rls, apply_tenant_rls
 from app.api.internal.catalog.models import CatalogShareToken, Product, Category, Plan
 from app.utils import tz
+from app.services.public_form_config import normalize_form_config, public_weight_tiers
 
 router = APIRouter()
 
@@ -113,6 +114,10 @@ def get_public_catalog(
             is_expired=False,
             **tenant_info,
             plans=_active_plans(db, tenant.id),
+            weight_tiers=public_weight_tiers(
+                db, tenant.id,
+                include_price=normalize_form_config(tenant.form_config)["show_weight_prices"],
+            ),
         )
 
     # 5b. Obtener productos activos del tenant

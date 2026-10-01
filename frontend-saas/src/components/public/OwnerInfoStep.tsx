@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { formatRut } from '@/lib/formatters';
 import { ChevronDown, MessageCircle, Phone, Sparkles, MapPin } from 'lucide-react';
 import { Country, State, City } from 'country-state-city';
+import { DEFAULT_FORM_CONFIG, fieldSuffix, type PublicFormConfig } from '@/lib/publicFormConfig';
 
 export interface OwnerData {
     fullName: string;
@@ -36,6 +37,8 @@ interface Props {
     tenantCountry?: string;
     /** Región del crematorio (para filtrar comunas) */
     tenantRegion?: string;
+    /** Campos visibles/obligatorios configurados por el crematorio */
+    formConfig?: PublicFormConfig;
 }
 
 const COUNTRY_CODES = [
@@ -73,7 +76,8 @@ const CONTACT_OPTIONS = [
 // Cambiar a `true` para reactivarlo en el formulario público.
 const SHOW_SERVICE_CODE = false;
 
-export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hideServiceCode, tenantCountry, tenantRegion }: Props) {
+export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hideServiceCode, tenantCountry, tenantRegion, formConfig = DEFAULT_FORM_CONFIG }: Props) {
+    const f = formConfig.fields;
     const [countryCode, setCountryCode] = useState('+56');
     const [localPhone, setLocalPhone] = useState('');
     const [partners, setPartners] = useState<{ id: number; name: string; slug: string }[]>([]);
@@ -198,6 +202,39 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                     {errors.fullName && <p className="text-[10px] text-red-500 mt-2 font-bold uppercase tracking-tight ml-2">! {errors.fullName}</p>}
                 </div>
 
+                {(f.rut.visible || f.email.visible) && (
+                    <div className={`grid grid-cols-1 gap-5 ${f.rut.visible && f.email.visible ? 'sm:grid-cols-2' : ''}`}>
+                        {f.rut.visible && (
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">RUT{fieldSuffix(f.rut)}</label>
+                                <input
+                                    type="text"
+                                    value={data.rut || ''}
+                                    onChange={handleRutChange}
+                                    className={`input-emotional ${errors.rut ? 'border-red-500/50 focus:ring-red-500/10' : ''}`}
+                                    placeholder="12.345.678-9"
+                                    maxLength={12}
+                                />
+                                {errors.rut && <p className="text-[10px] text-red-500 mt-2 font-bold uppercase tracking-tight ml-2">! {errors.rut}</p>}
+                            </div>
+                        )}
+                        {f.email.visible && (
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Email{fieldSuffix(f.email)}</label>
+                                <input
+                                    type="email"
+                                    value={data.email || ''}
+                                    onChange={(e) => updateData({ email: e.target.value.slice(0, 50) })}
+                                    className={`input-emotional ${errors.email ? 'border-red-500/50 focus:ring-red-500/10' : ''}`}
+                                    placeholder="tu@email.com"
+                                    maxLength={50}
+                                />
+                                {errors.email && <p className="text-[10px] text-red-500 mt-2 font-bold uppercase tracking-tight ml-2">! {errors.email}</p>}
+                            </div>
+                        )}
+                    </div>
+                )}
+
 
                 <div>
                     <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Teléfono *</label>
@@ -230,8 +267,9 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                 </div>
 
                 {/* Preferencia de contacto */}
+                {f.contactPreference.visible && (
                 <div className="pt-2">
-                    <label className="block text-xs font-semibold text-slate-400 dark:text-slate-500 ml-1 mb-3">¿Cómo prefieres que te contactemos?</label>
+                    <label className="block text-xs font-semibold text-slate-400 dark:text-slate-500 ml-1 mb-3">¿Cómo prefieres que te contactemos?{f.contactPreference.required ? ' *' : ''}</label>
                     <div className="grid grid-cols-3 gap-3">
                         {CONTACT_OPTIONS.map(opt => {
                             const isSelected = data.contactPreference === opt.value;
@@ -254,9 +292,12 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                             );
                         })}
                     </div>
+                    {errors.contactPreference && <p className="text-[10px] text-red-500 mt-2 font-bold uppercase tracking-tight ml-2">! {errors.contactPreference}</p>}
                 </div>
+                )}
             </div>
 
+            {f.pickup.visible && (
             <div className="form-card space-y-6">
                 <div>
                     <div className="flex items-center gap-2 mb-6">
@@ -269,6 +310,7 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                         </div>
                     </div>
 
+                    {f.address.visible && (
                     <label className="flex items-center gap-3 mb-5 cursor-pointer select-none">
                         <input
                             type="checkbox"
@@ -280,8 +322,9 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                             El retiro es en la misma dirección del tutor (dirección de entrega)
                         </span>
                     </label>
+                    )}
 
-                    {data.pickupSameAsOwner ? (
+                    {data.pickupSameAsOwner && f.address.visible ? (
                         <p className="text-[11px] text-slate-400 dark:text-slate-500 ml-1">
                             Usaremos la dirección de entrega que indiques abajo.
                             {errors.veterinary && !data.address && <span className="block text-red-500 font-bold mt-1">! Completa la dirección de entrega</span>}
@@ -289,7 +332,7 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                     ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                         <div className="sm:col-span-2">
-                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Dirección o Lugar de Retiro *</label>
+                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Dirección o Lugar de Retiro{fieldSuffix(f.pickup)}</label>
                             <input
                                 type="text"
                                 value={data.veterinary || ''}
@@ -349,8 +392,11 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                     )}
                 </div>
             </div>
+            )}
 
+            {(f.address.visible || f.comments.visible || (SHOW_SERVICE_CODE && !hideServiceCode)) && (
             <div className="form-card space-y-6">
+                {f.address.visible && (
                 <div>
                     <div className="flex items-center gap-2 mb-6">
                         <div className="p-2 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg">
@@ -364,7 +410,7 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                         <div className="sm:col-span-2">
-                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Calle y Número *</label>
+                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Calle y Número{fieldSuffix(f.address)}</label>
                             <input
                                 type="text"
                                 value={data.address}
@@ -376,7 +422,7 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                             {errors.address && <p className="text-[10px] text-red-500 mt-2 font-bold uppercase tracking-tight ml-2">! {errors.address}</p>}
                         </div>
                         <div>
-                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Región *</label>
+                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Región{f.address.required ? ' *' : ''}</label>
                             <div className="relative">
                                 <select
                                     value={data.region || ''}
@@ -422,6 +468,7 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                         </div>
                     </div>
                 </div>
+                )}
 
                 {SHOW_SERVICE_CODE && !hideServiceCode && (
                     <div className="pt-4 border-t border-slate-50 dark:border-slate-800/50">
@@ -437,17 +484,21 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                     </div>
                 )}
 
-                <div className="pt-4 border-t border-slate-50 dark:border-slate-800/50">
-                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Comentarios / Referencias (Opcional)</label>
+                {f.comments.visible && (
+                <div className={f.address.visible ? 'pt-4 border-t border-slate-50 dark:border-slate-800/50' : ''}>
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Comentarios / Referencias{fieldSuffix(f.comments)}</label>
                     <textarea
                         value={data.comments || ''}
                         onChange={(e) => updateData({ comments: e.target.value.slice(0, 250) })}
-                        className="input-emotional min-h-[120px] py-4"
+                        className={`input-emotional min-h-[120px] py-4 ${errors.comments ? 'border-red-500/50 focus:ring-red-500/10' : ''}`}
                         placeholder="Ej: Referencias para llegar, torre, departamento o timbre."
                         maxLength={250}
                     />
+                    {errors.comments && <p className="text-[10px] text-red-500 mt-2 font-bold uppercase tracking-tight ml-2">! {errors.comments}</p>}
                 </div>
+                )}
             </div>
+            )}
         </div>
     );
 }

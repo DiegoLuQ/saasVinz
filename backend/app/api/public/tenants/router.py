@@ -4,6 +4,7 @@ from app.database import get_db
 from app import models
 from app.core.tenant_context import apply_tenant_rls
 from pydantic import BaseModel
+from app.services.public_form_config import normalize_form_config, public_weight_tiers
 
 router = APIRouter()
 
@@ -17,6 +18,10 @@ class TenantPublicInfo(BaseModel):
     email: str | None = None
     # public_token NO se expone: es la credencial del enlace permanente del
     # formulario y solo la entrega la sesión interna del tenant.
+    # Formulario público: campos visibles/obligatorios y tramos de peso
+    # (el precio del tramo solo viaja si el crematorio lo habilitó).
+    form_config: dict | None = None
+    weight_tiers: list[dict] = []
 
     class Config:
         from_attributes = True
@@ -26,11 +31,16 @@ def get_tenant_by_slug(slug: str, db: Session = Depends(get_db)):
     tenant = db.query(models.Tenant).filter(models.Tenant.slug == slug).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
-        
+
     if tenant.status in [models.TenantStatus.inactive, models.TenantStatus.suspended]:
         raise HTTPException(status_code=403, detail=f"Acceso denegado. Esta empresa está {tenant.status.value}.")
-        
-    return tenant
+
+    apply_tenant_rls(db, tenant.id)
+    form_config = normalize_form_config(tenant.form_config)
+    info = TenantPublicInfo.model_validate(tenant)
+    info.form_config = form_config
+    info.weight_tiers = public_weight_tiers(db, tenant.id, include_price=form_config["show_weight_prices"])
+    return info
 
 class ServicePublicInfo(BaseModel):
     id: str  # Changed to str for prefixed IDs

@@ -70,6 +70,9 @@ class Tenant(Base):
     # Catálogo público de planes: lema e introducción (opcionales)
     catalog_tagline = Column(String(120), nullable=True)
     catalog_intro = Column(Text, nullable=True)
+    # Formulario público: campos visibles/obligatorios y precio de tramos.
+    # NULL = valores por defecto (app/services/public_form_config.py).
+    form_config = Column(JSON, nullable=True)
     legal_rep_name = Column(String)
     legal_rep_rut = Column(String)
     timezone = Column(String, default="America/Santiago")
