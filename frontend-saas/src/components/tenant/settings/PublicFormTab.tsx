@@ -8,7 +8,12 @@ import { formatCLP } from '@/lib/publicFormConfig';
 // y de los tramos de peso "hasta X kg" del crematorio. Los tramos también
 // calculan el recargo por peso de las órdenes internas.
 
-const MAX_TIERS = 6;
+const MAX_TIERS = 12;
+
+// Columnas: nombre del campo (se ajusta) | Mostrar | Obligatorio (ancho fijo)
+const FIELD_GRID = 'grid grid-cols-[minmax(0,1fr)_4.5rem_5.5rem] items-center gap-x-2';
+
+const TIER_PLACEHOLDERS = ['Mini', 'Pequeño', 'Mediano', 'Grande', 'Extra grande', 'Gigante'];
 
 interface FieldRow {
     key: string;
@@ -191,33 +196,54 @@ export function PublicFormTab() {
                 {SECTIONS.map(section => {
                     const Icon = section.icon;
                     return (
-                        <div key={section.key} className="glass-card p-5 sm:p-6 rounded-3xl">
+                        <div key={section.key} className="glass-card p-5 sm:p-6 rounded-3xl min-w-0">
                             <div className="flex items-center gap-2 mb-4">
-                                <Icon size={18} className="text-primary" />
+                                <div className="p-2 rounded-xl bg-primary/10">
+                                    <Icon size={16} className="text-primary" />
+                                </div>
                                 <h4 className="font-bold">{section.title}</h4>
                             </div>
-                            <div className="flex items-center justify-end gap-6 pr-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                                <span className="w-11 text-center">Mostrar</span>
-                                <span className="w-11 text-center">Obligatorio</span>
+
+                            {/* Misma cuadrícula para cabecera y filas: las columnas de los
+                                interruptores tienen ancho propio y nunca se desbordan. */}
+                            <div className={`${FIELD_GRID} pb-2 border-b border-foreground/10 text-[11px] font-semibold text-muted-foreground`}>
+                                <span>Campo</span>
+                                <span className="text-center">Mostrar</span>
+                                <span className="text-center">Obligatorio</span>
                             </div>
+
                             <div className="divide-y divide-foreground/5">
                                 {FIXED_FIELDS[section.key].map(name => (
-                                    <div key={name} className="flex items-center justify-between py-3 text-sm">
-                                        <span className="flex items-center gap-2 text-muted-foreground">
-                                            <Lock size={13} /> {name}
+                                    <div key={name} className={`${FIELD_GRID} py-3`}>
+                                        <span className="flex items-center gap-2 min-w-0 text-sm text-muted-foreground">
+                                            <Lock size={13} className="shrink-0" />
+                                            <span className="truncate">{name}</span>
                                         </span>
-                                        <span className="text-[11px] text-muted-foreground pr-1">Siempre</span>
+                                        <span className="col-span-2 justify-self-center rounded-full bg-foreground/5 px-3 py-1 text-[11px] font-medium text-muted-foreground">
+                                            Siempre obligatorio
+                                        </span>
                                     </div>
                                 ))}
-                                {fields.filter(f => f.section === section.key).map(f => (
-                                    <div key={f.key} className="flex items-center justify-between gap-4 py-3">
-                                        <span className="text-sm font-medium">{f.label}</span>
-                                        <div className="flex items-center gap-6 pr-1">
-                                            <Toggle label={`Mostrar ${f.label}`} checked={f.visible} onChange={v => updateField(f.key, { visible: v })} />
-                                            <Toggle label={`${f.label} obligatorio`} checked={f.required} disabled={!f.visible} onChange={v => updateField(f.key, { required: v })} />
+                                {fields.filter(f => f.section === section.key).map(f => {
+                                    const status = !f.visible ? 'Oculto' : f.required ? 'Obligatorio' : 'Opcional';
+                                    const statusClass = !f.visible
+                                        ? 'text-muted-foreground'
+                                        : f.required ? 'text-primary' : 'text-emerald-600 dark:text-emerald-400';
+                                    return (
+                                        <div key={f.key} className={`${FIELD_GRID} py-3`}>
+                                            <div className="min-w-0">
+                                                <p className={`text-sm font-medium break-words ${f.visible ? '' : 'text-muted-foreground'}`}>{f.label}</p>
+                                                <p className={`text-[11px] font-medium mt-0.5 ${statusClass}`}>{status}</p>
+                                            </div>
+                                            <div className="flex justify-center">
+                                                <Toggle label={`Mostrar ${f.label}`} checked={f.visible} onChange={v => updateField(f.key, { visible: v })} />
+                                            </div>
+                                            <div className="flex justify-center">
+                                                <Toggle label={`${f.label} obligatorio`} checked={f.required} disabled={!f.visible} onChange={v => updateField(f.key, { required: v })} />
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     );
@@ -261,7 +287,7 @@ export function PublicFormTab() {
                             return (
                                 <div key={idx} className="grid grid-cols-2 sm:grid-cols-[1.4fr_0.8fr_1fr_1fr_auto] gap-3 items-center">
                                     <div className="col-span-2 sm:col-span-1">
-                                        <FormInputLite placeholder={`Ej: ${['Pequeño', 'Mediano', 'Grande', 'Extra grande', 'Gigante', 'Muy grande'][idx]}`} value={t.label} maxLength={40} onChange={v => updateTier(idx, { label: v })} />
+                                        <FormInputLite placeholder={`Ej: ${TIER_PLACEHOLDERS[idx] ?? `Rango ${idx + 1}`}`} value={t.label} maxLength={40} onChange={v => updateTier(idx, { label: v })} />
                                     </div>
                                     <div className="text-sm text-muted-foreground px-1">
                                         <span className="sm:hidden text-[10px] font-bold uppercase mr-1">Desde</span>

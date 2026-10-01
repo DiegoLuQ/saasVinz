@@ -154,7 +154,7 @@ App Router layout groups: `(admin)`, `(public)`, `(tenant)`, `(veterinary)` — 
 
 ### Public Registration Form (per-tenant config)
 - Each tenant chooses which optional fields of the family form (`/public/[slug]/form`) are shown/required: `sys_tenants.form_config` (migration `d9a2c4e6f813`). Field catalog + defaults (= previous behavior) live in `backend/app/services/public_form_config.py`, mirrored in `frontend-saas/src/lib/publicFormConfig.ts`. Fixed fields: owner name/phone, pet name/species. `submit-form` enforces required fields server-side.
-- Weight tiers (`srv_weight_pricing`, max 6) are "up to X kg": min = previous max, last may be open (`max_weight` NULL). Saved as a whole via `PUT /api/internal/maintenance/weight-pricing`. Same tiers drive the internal weight surcharge, the public form size picker and the plans catalog; prices go public only if `form_config.show_weight_prices`. On submit the backend writes the chosen tier text into `pet_data.size`.
+- Weight tiers (`srv_weight_pricing`, max 12) are "up to X kg": min = previous max, last may be open (`max_weight` NULL). Saved as a whole via `PUT /api/internal/maintenance/weight-pricing`. Same tiers drive the internal weight surcharge, the public form size picker and the plans catalog; prices go public only if `form_config.show_weight_prices`. On submit the backend writes the chosen tier text into `pet_data.size`.
 - Settings UI: Configuración → "Formulario y Pesos" (`components/tenant/settings/PublicFormTab.tsx`).
 
 ### Memorials
