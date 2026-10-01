@@ -3,6 +3,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Box, Key } from 'lucide-react';
+import TenantStorageChip from './TenantStorageChip';
 
 interface TenantLayoutHeaderProps {
     tenantName?: string;
@@ -44,10 +45,12 @@ export default function TenantLayoutHeader({
                         <h1 className="text-4xl font-black text-white tracking-tight">
                             {tenantName || 'Editar Empresa'}
                         </h1>
-                        <div className="flex items-center gap-4 text-white/40 text-sm font-medium">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-white/40 text-sm font-medium">
                             <span className="flex items-center gap-1.5"><Key size={14} className="text-primary" /> ID: {tenantId}</span>
                             <span className="w-1.5 h-1.5 rounded-full bg-white/10" />
                             <span className="flex items-center gap-1.5"><Box size={14} className="text-blue-400" /> Slug: /{tenantSlug}</span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-white/10" />
+                            <TenantStorageChip tenantId={tenantId} tenantSlug={tenantSlug} />
                         </div>
                     </div>
                 </div>

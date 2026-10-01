@@ -12,6 +12,7 @@ import {
     CheckCircle2
 } from 'lucide-react';
 import { useTenantDetail } from '@/hooks/useTenantDetail';
+import MediaStorageSummary from '@/components/admin/media/MediaStorageSummary';
 
 interface QuotaBarProps {
     label: string;
@@ -137,6 +138,10 @@ export default function TenantUsoPage() {
                     />
                 </div>
             </div>
+
+            {data?.tenant?.id && (
+                <MediaStorageSummary title="Almacenamiento de imágenes y videos" tenant={data.tenant.id} />
+            )}
 
             <div>
                 <h2 className="text-xs font-black uppercase tracking-widest text-white/40 mb-3">Recursos sin cuota</h2>

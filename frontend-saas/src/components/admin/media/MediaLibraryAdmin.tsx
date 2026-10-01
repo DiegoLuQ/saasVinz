@@ -27,6 +27,8 @@ import { authHeader } from '@/lib/auth/token';
 import MediaFilterSelect, { type FilterOption } from './MediaFilterSelect';
 import { Building2, FolderTree, Eye } from 'lucide-react';
 import MediaUsagePanel from './MediaUsagePanel';
+import MediaStorageSummary from './MediaStorageSummary';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface MediaItem {
     id: number;
@@ -107,6 +109,8 @@ export default function MediaLibraryAdmin() {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    const queryClient = useQueryClient();
+
     const apiBase = () => (typeof window === 'undefined' ? (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') : '');
 
     // Carga inicial: facets (para los filtros) + categorías + primera página
@@ -135,6 +139,8 @@ export default function MediaLibraryAdmin() {
     }, [activeTab, selectedTenant, selectedCategory]);
 
     const fetchFacets = async () => {
+        // El resumen de almacenamiento cambia con cada subida/borrado
+        queryClient.invalidateQueries({ queryKey: ['media-stats'] });
         try {
             const res = await fetch(`${apiBase()}/api/internal/media/facets`, { headers: { ...authHeader() } });
             if (res.ok) setFacets(await res.json());
@@ -497,6 +503,16 @@ export default function MediaLibraryAdmin() {
                     </button>
                 )}
             </div>
+
+            {/* Cantidad y peso de lo filtrado (sin filtro de empresa: ranking por crematorio) */}
+            <MediaStorageSummary
+                title={selectedTenant === 'all' ? 'Almacenamiento total' : selectedTenant === 'global' ? 'Almacenamiento global (SuperAdmin)' : `Almacenamiento de ${tenantSelectOptions.find(o => o.value === selectedTenant)?.label ?? 'la empresa'}`}
+                tenant={selectedTenant}
+                category={selectedCategory}
+                mediaType={activeTab}
+                categoryLabel={catLabel}
+                onSelectTenant={(id) => setSelectedTenant(String(id))}
+            />
 
             <p className="text-xs text-muted-foreground/60">
                 {total} archivo{total === 1 ? '' : 's'}

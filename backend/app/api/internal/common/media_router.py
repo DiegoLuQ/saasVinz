@@ -220,6 +220,89 @@ async def media_facets(current_creator=Depends(get_current_creator), db: Session
         "categories": categories,
     }
 
+
+@router.get("/stats")
+async def media_stats(
+    tenant_id: int = None,
+    global_only: bool = False,
+    category: str = None,
+    media_type: str = None,
+    current_creator=Depends(get_current_creator),
+    db: Session = Depends(get_db),
+):
+    """
+    Almacenamiento de la biblioteca: cantidad de imágenes/videos y peso total
+    (suma de file_size, el archivo ya optimizado que se guarda; no incluye
+    miniaturas). Mismos filtros que el listado. Sin filtro de empresa, incluye
+    el ranking de crematorios que más espacio ocupan.
+    """
+    from sqlalchemy import func
+    from app import models as app_models
+
+    def apply_filters(q):
+        if category:
+            q = q.filter(MediaLibrary.category == category)
+        if media_type:
+            q = q.filter(MediaLibrary.media_type == media_type)
+        if global_only:
+            q = q.filter(MediaLibrary.tenant_id.is_(None))
+        elif tenant_id is not None:
+            q = q.filter(MediaLibrary.tenant_id == tenant_id)
+        return q
+
+    size = func.coalesce(MediaLibrary.file_size, 0)
+
+    type_rows = apply_filters(
+        db.query(MediaLibrary.media_type, func.count(MediaLibrary.id), func.sum(size))
+    ).group_by(MediaLibrary.media_type).all()
+    by_type = {(t or "otro"): {"count": c, "bytes": int(b or 0)} for t, c, b in type_rows}
+
+    total_count = sum(v["count"] for v in by_type.values())
+    total_bytes = sum(v["bytes"] for v in by_type.values())
+    unknown_size = apply_filters(
+        db.query(func.count(MediaLibrary.id)).filter(MediaLibrary.file_size.is_(None))
+    ).scalar() or 0
+    last_upload = apply_filters(db.query(func.max(MediaLibrary.created_at))).scalar()
+
+    cat_rows = apply_filters(
+        db.query(MediaLibrary.category, func.count(MediaLibrary.id), func.sum(size))
+    ).group_by(MediaLibrary.category).all()
+    by_category = sorted(
+        [{"category": c or "sin categoría", "count": n, "bytes": int(b or 0)} for c, n, b in cat_rows],
+        key=lambda x: x["bytes"], reverse=True,
+    )
+
+    top_tenants = []
+    if tenant_id is None and not global_only:
+        rows = (
+            apply_filters(db.query(MediaLibrary.tenant_id, func.count(MediaLibrary.id), func.sum(size)))
+            .filter(MediaLibrary.tenant_id.isnot(None))
+            .group_by(MediaLibrary.tenant_id)
+            .order_by(func.sum(size).desc())
+            .limit(10)
+            .all()
+        )
+        names = {}
+        if rows:
+            names = dict(db.query(app_models.Tenant.id, app_models.Tenant.name).filter(
+                app_models.Tenant.id.in_([r[0] for r in rows])
+            ).all())
+        top_tenants = [
+            {"id": tid, "name": names.get(tid, f"Empresa {tid}"), "count": n, "bytes": int(b or 0)}
+            for tid, n, b in rows
+        ]
+
+    return {
+        "total_count": total_count,
+        "total_bytes": total_bytes,
+        "images": by_type.get("image", {"count": 0, "bytes": 0}),
+        "videos": by_type.get("video", {"count": 0, "bytes": 0}),
+        "unknown_size_count": unknown_size,
+        "last_upload_at": last_upload,
+        "by_category": by_category,
+        "top_tenants": top_tenants,
+    }
+
 # ===== Categorías de la biblioteca (gestión SuperAdmin) =====
 
 def _serialize_category(c: MediaCategory) -> dict:
