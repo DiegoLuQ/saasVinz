@@ -10,6 +10,9 @@ from app.api.deps import get_tenant_id, get_current_user
 from app.api.internal.admin.rbac.router import check_permission
 from app.api.internal.catalog.models import CatalogShareToken
 from app.api.internal.catalog.schemas import CatalogType
+
+# Catálogo de planes: vigencias permitidas (30 días, 1 año)
+PLANS_EXPIRATION_HOURS = {720, 8760}
 from app.utils import tz
 
 router = APIRouter()
@@ -37,6 +40,7 @@ def _to_dto(item: CatalogShareToken, now) -> schemas.CatalogShareTokenInDB:
         token=item.token,
         name=item.name,
         catalog_type=item.catalog_type or "products",
+        message=item.message,
         expires_at=item.expires_at,
         is_active=item.is_active,
         views_count=item.views_count or 0,
@@ -83,8 +87,14 @@ def create_catalog_share_link(
     now = tz.get_now()
     expires_at = None
 
+    # Catálogo de planes: solo vigencias de 30 días o 1 año
+    if data.catalog_type == "plans" and data.expires_in_hours not in PLANS_EXPIRATION_HOURS:
+        raise HTTPException(status_code=400, detail="La vigencia del catálogo de planes debe ser 30 días o 1 año.")
+
     if data.expires_in_hours and data.expires_in_hours > 0:
         expires_at = now + timedelta(hours=data.expires_in_hours)
+
+    message = ((data.message or "").strip() or None) if data.catalog_type == "plans" else None
 
     # Genera token aleatorio URL-safe de 16 bytes (~22 chars)
     token_str = secrets.token_urlsafe(16)
@@ -94,6 +104,7 @@ def create_catalog_share_link(
         token=token_str,
         name=data.name.strip() if data.name else None,
         catalog_type=data.catalog_type,
+        message=message,
         expires_at=expires_at,
         is_active=True,
         views_count=0,

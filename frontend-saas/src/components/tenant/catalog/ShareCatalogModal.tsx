@@ -26,6 +26,7 @@ interface CatalogLink {
     tenant_id: number;
     token: string;
     name?: string | null;
+    message?: string | null;
     expires_at?: string | null;
     is_active: boolean;
     views_count: number;
@@ -63,13 +64,25 @@ interface ShareCatalogModalProps {
     catalogType?: CatalogType;
 }
 
-const EXPIRATION_OPTIONS = [
-    { label: '24 Horas', value: 24, badge: 'Recomendado' },
-    { label: '48 Horas', value: 48, badge: null },
-    { label: '7 Días', value: 168, badge: null },
-    { label: '30 Días', value: 720, badge: null },
-    { label: 'Permanente', value: null, badge: 'Sin vencimiento' },
-];
+type ExpirationOption = { label: string; value: number | null; badge: string | null };
+
+const EXPIRATION_OPTIONS: Record<CatalogType, ExpirationOption[]> = {
+    products: [
+        { label: '24 Horas', value: 24, badge: 'Recomendado' },
+        { label: '48 Horas', value: 48, badge: null },
+        { label: '7 Días', value: 168, badge: null },
+        { label: '30 Días', value: 720, badge: null },
+        { label: 'Permanente', value: null, badge: 'Sin vencimiento' },
+    ],
+    // El catálogo de planes solo se comparte por 30 días o 1 año (el backend lo exige)
+    plans: [
+        { label: '30 Días', value: 720, badge: 'Recomendado' },
+        { label: '1 Año', value: 8760, badge: null },
+    ],
+};
+
+// Mensaje del crematorio en el catálogo de planes (backend: CATALOG_MESSAGE_MAX)
+const MESSAGE_MAX = 300;
 
 export default function ShareCatalogModal({
     isOpen,
@@ -80,9 +93,12 @@ export default function ShareCatalogModal({
     catalogType = 'products',
 }: ShareCatalogModalProps) {
     const copy = COPY[catalogType];
+    const expirationOptions = EXPIRATION_OPTIONS[catalogType];
+    const isPlans = catalogType === 'plans';
     const { showToast } = useToast();
-    const [selectedHours, setSelectedHours] = useState<number | null>(24);
+    const [selectedHours, setSelectedHours] = useState<number | null>(expirationOptions[0].value);
     const [linkLabel, setLinkLabel] = useState('');
+    const [linkMessage, setLinkMessage] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [links, setLinks] = useState<CatalogLink[]>([]);
     const [loadingLinks, setLoadingLinks] = useState(false);
@@ -108,6 +124,8 @@ export default function ShareCatalogModal({
             fetchLinks();
             setRecentCreatedUrl(null);
             setLinkLabel('');
+            setLinkMessage('');
+            setSelectedHours(EXPIRATION_OPTIONS[catalogType][0].value);
         }
     }, [isOpen, catalogType]);
 
@@ -123,6 +141,7 @@ export default function ShareCatalogModal({
                     name: linkLabel.trim() || undefined,
                     expires_in_hours: selectedHours,
                     catalog_type: catalogType,
+                    message: isPlans ? linkMessage.trim() || undefined : undefined,
                 }),
             });
 
@@ -130,6 +149,7 @@ export default function ShareCatalogModal({
             setRecentCreatedUrl(fullUrl);
             showToast('Enlace de catálogo generado exitosamente', 'success');
             setLinkLabel('');
+            setLinkMessage('');
             fetchLinks();
         } catch (err: any) {
             console.error('Error creating catalog link:', err);
@@ -211,8 +231,8 @@ export default function ShareCatalogModal({
                         </div>
 
                         {/* Opciones de expiración */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                            {EXPIRATION_OPTIONS.map((opt) => {
+                        <div className={`grid gap-2.5 ${isPlans ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'}`}>
+                            {expirationOptions.map((opt) => {
                                 const isSelected = selectedHours === opt.value;
                                 return (
                                     <button
@@ -251,6 +271,32 @@ export default function ShareCatalogModal({
                                 className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3.5 text-xs text-white placeholder:text-muted-foreground/40 outline-none focus:border-amber-500/40 transition-all"
                             />
                         </div>
+
+                        {/* Mensaje para la familia (solo catálogo de planes) */}
+                        {isPlans && (
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between ml-1">
+                                    <label htmlFor="catalog-message" className="text-xs font-bold text-muted-foreground">
+                                        Mensaje para la familia (opcional)
+                                    </label>
+                                    <span className="text-[10px] text-muted-foreground/60 font-mono">
+                                        {linkMessage.length}/{MESSAGE_MAX}
+                                    </span>
+                                </div>
+                                <textarea
+                                    id="catalog-message"
+                                    rows={3}
+                                    maxLength={MESSAGE_MAX}
+                                    placeholder="Ej: Te acompañamos en este momento. Escríbenos y te ayudamos a elegir el plan adecuado."
+                                    value={linkMessage}
+                                    onChange={(e) => setLinkMessage(e.target.value.slice(0, MESSAGE_MAX))}
+                                    className="w-full resize-none bg-white/5 border border-white/10 rounded-xl py-2.5 px-3.5 text-xs text-white placeholder:text-muted-foreground/40 outline-none focus:border-amber-500/40 transition-all"
+                                />
+                                <p className="text-[10px] text-muted-foreground/70 ml-1">
+                                    Aparece en negrita en el catálogo, entre &quot;¿Cuál es el tamaño aproximado de tu mascota?&quot; y los planes.
+                                </p>
+                            </div>
+                        )}
 
                         <button
                             type="submit"
@@ -375,6 +421,12 @@ export default function ShareCatalogModal({
                                                         </span>
                                                     )}
                                                 </div>
+
+                                                {link.message && (
+                                                    <p className="text-[11px] text-white/60 italic truncate" title={link.message}>
+                                                        “{link.message}”
+                                                    </p>
+                                                )}
 
                                                 <div className="flex items-center gap-3 text-[10px] text-muted-foreground font-mono">
                                                     <span>

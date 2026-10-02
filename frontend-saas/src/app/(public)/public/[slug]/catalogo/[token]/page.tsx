@@ -57,6 +57,7 @@ interface PublicCatalogData {
     products: ProductItem[];
     plans?: PublicPlan[];
     weight_tiers?: WeightTier[];
+    catalog_message?: string | null;
 }
 
 export default function PublicCatalogPage() {
@@ -311,6 +312,7 @@ export default function PublicCatalogPage() {
                 }}
                 plans={data.plans ?? []}
                 weightTiers={data.weight_tiers ?? []}
+                message={data.catalog_message}
                 getImageUrl={getImageUrl}
                 onShare={handleShareLink}
                 copiedLink={copiedLink}

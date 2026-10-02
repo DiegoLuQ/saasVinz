@@ -77,11 +77,11 @@ def _fmt_kg(value: float) -> str:
 
 
 def tier_range_text(min_weight: float | None, max_weight: float | None) -> str:
+    """Texto del rango tal como lo escribió el crematorio: "0 – 4 kg", "4,1 – 7 kg",
+    "Desde 7,1 kg" (último abierto)."""
     if max_weight is None:
-        return f"Más de {_fmt_kg(min_weight or 0)} kg"
-    if not min_weight:
-        return f"Hasta {_fmt_kg(max_weight)} kg"
-    return f"Más de {_fmt_kg(min_weight)} hasta {_fmt_kg(max_weight)} kg"
+        return f"Desde {_fmt_kg(min_weight or 0)} kg"
+    return f"{_fmt_kg(min_weight or 0)} – {_fmt_kg(max_weight)} kg"
 
 
 def public_weight_tiers(db: Session, tenant_id: int, include_price: bool) -> list[dict]:

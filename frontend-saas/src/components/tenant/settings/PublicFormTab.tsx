@@ -25,7 +25,8 @@ interface FieldRow {
 
 interface TierRow {
     label: string;
-    max_weight: string; // vacío en el último = abierto ("más de X kg")
+    min_weight: string; // "desde", escrito por el crematorio
+    max_weight: string; // "hasta"; vacío en el último = abierto ("desde X kg")
     price: string;
 }
 
@@ -41,6 +42,7 @@ const SECTIONS: { key: FieldRow['section']; title: string; icon: typeof User }[]
 
 interface SavedTier {
     label: string | null;
+    min_weight: number | null;
     max_weight: number | null;
     price: number | null;
 }
@@ -50,6 +52,7 @@ const parseKg = (v: string) => parseFloat(v.replace(',', '.'));
 
 const toTierRows = (rules: SavedTier[]): TierRow[] => rules.map(r => ({
     label: r.label || '',
+    min_weight: fmtKg(r.min_weight ?? 0),
     max_weight: r.max_weight != null ? fmtKg(r.max_weight) : '',
     price: r.price != null ? String(r.price) : '0',
 }));
@@ -112,34 +115,31 @@ export function PublicFormTab() {
 
     const addTier = () => {
         if (tiers.length >= MAX_TIERS) return;
-        setTiers(prev => [...prev, { label: '', max_weight: '', price: '0' }]);
+        setTiers(prev => [...prev, { label: '', min_weight: prev.length === 0 ? '0' : '', max_weight: '', price: '0' }]);
     };
 
     const removeTier = (idx: number) => setTiers(prev => prev.filter((_, i) => i !== idx));
 
-    // "Desde" de cada tramo = máximo del anterior (solo informativo)
-    const tierFrom = (idx: number) => {
-        for (let i = idx - 1; i >= 0; i--) {
-            const v = parseKg(tiers[i].max_weight);
-            if (!isNaN(v)) return v;
-        }
-        return 0;
-    };
-
+    // Mismas reglas que el backend: desde ≥ hasta del rango anterior (sin solapes),
+    // hasta > desde, y solo el último rango puede quedar sin "hasta".
     const validateTiers = (): string | null => {
-        let prev = 0;
+        let prevMax: number | null = null;
         for (let i = 0; i < tiers.length; i++) {
             const t = tiers[i];
+            const n = i + 1;
             const isLast = i === tiers.length - 1;
             const price = parseFloat(t.price || '0');
-            if (isNaN(price) || price < 0) return `Rango ${i + 1}: precio inválido`;
+            if (isNaN(price) || price < 0) return `Rango ${n}: recargo inválido`;
+            const min = parseKg(t.min_weight);
+            if (!t.min_weight.trim() || isNaN(min) || min < 0) return `Rango ${n}: indica desde cuántos kg`;
+            if (prevMax !== null && min < prevMax) return `Rango ${n}: debe empezar en ${fmtKg(prevMax)} kg o más (el anterior llega hasta ${fmtKg(prevMax)} kg)`;
             if (!t.max_weight.trim()) {
-                if (!isLast) return `Rango ${i + 1}: indica hasta cuántos kg (solo el último puede quedar abierto)`;
+                if (!isLast) return `Rango ${n}: indica hasta cuántos kg (solo el último puede quedar abierto)`;
                 continue;
             }
             const max = parseKg(t.max_weight);
-            if (isNaN(max) || max <= prev) return `Rango ${i + 1}: el máximo debe ser mayor que ${fmtKg(prev)} kg`;
-            prev = max;
+            if (isNaN(max) || max <= min) return `Rango ${n}: el peso hasta debe ser mayor que ${fmtKg(min)} kg`;
+            prevMax = max;
         }
         return null;
     };
@@ -164,6 +164,7 @@ export function PublicFormTab() {
                 body: JSON.stringify({
                     tiers: tiers.map(t => ({
                         label: t.label.trim() || null,
+                        min_weight: parseKg(t.min_weight),
                         max_weight: t.max_weight.trim() ? parseKg(t.max_weight) : null,
                         price: parseFloat(t.price || '0') || 0,
                     })),
@@ -259,7 +260,7 @@ export function PublicFormTab() {
                             <h4 className="font-bold">Rangos de peso</h4>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1 max-w-xl">
-                            Hasta {MAX_TIERS} rangos. Cada uno empieza donde termina el anterior; deja vacío el máximo del último para “más de X kg”.
+                            Hasta {MAX_TIERS} rangos. Escribe desde y hasta cuántos kg (ej. 0 – 4, 4,1 – 7); un rango no puede empezar antes de que termine el anterior. Deja vacío el “hasta” del último para “desde X kg”.
                             Se usan en el formulario, en el catálogo de planes y para el recargo por peso de las órdenes.
                         </p>
                     </div>
@@ -277,7 +278,7 @@ export function PublicFormTab() {
                     <div className="space-y-3">
                         <div className="hidden sm:grid grid-cols-[1.4fr_0.8fr_1fr_1fr_auto] gap-3 px-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                             <span>Nombre (opcional)</span>
-                            <span>Desde</span>
+                            <span>Desde (kg)</span>
                             <span>Hasta (kg)</span>
                             <span>Recargo ($)</span>
                             <span className="w-9" />
@@ -289,12 +290,16 @@ export function PublicFormTab() {
                                     <div className="col-span-2 sm:col-span-1">
                                         <FormInputLite placeholder={`Ej: ${TIER_PLACEHOLDERS[idx] ?? `Rango ${idx + 1}`}`} value={t.label} maxLength={40} onChange={v => updateTier(idx, { label: v })} />
                                     </div>
-                                    <div className="text-sm text-muted-foreground px-1">
-                                        <span className="sm:hidden text-[10px] font-bold uppercase mr-1">Desde</span>
-                                        {idx === 0 ? '0 kg' : `más de ${fmtKg(tierFrom(idx))} kg`}
-                                    </div>
                                     <FormInputLite
-                                        placeholder={isLast ? 'o más' : 'Ej: 4'}
+                                        placeholder={idx === 0 ? 'Desde: 0' : `Desde: ${tiers[idx - 1].max_weight || '…'}`}
+                                        value={t.min_weight}
+                                        inputMode="decimal"
+                                        ariaLabel={`Rango ${idx + 1}: desde (kg)`}
+                                        onChange={v => updateTier(idx, { min_weight: v.replace(/[^\d.,]/g, '') })}
+                                    />
+                                    <FormInputLite
+                                        placeholder={isLast ? 'Hasta: o más' : 'Hasta: ej. 4'}
+                                        ariaLabel={`Rango ${idx + 1}: hasta (kg)`}
                                         value={t.max_weight}
                                         inputMode="decimal"
                                         onChange={v => updateTier(idx, { max_weight: v.replace(/[^\d.,]/g, '') })}
@@ -346,13 +351,14 @@ export function PublicFormTab() {
     );
 }
 
-function FormInputLite({ value, onChange, placeholder, maxLength, inputMode, hint }: {
+function FormInputLite({ value, onChange, placeholder, maxLength, inputMode, hint, ariaLabel }: {
     value: string;
     onChange: (v: string) => void;
     placeholder?: string;
     maxLength?: number;
     inputMode?: 'decimal' | 'numeric';
     hint?: string;
+    ariaLabel?: string;
 }) {
     return (
         <div>
@@ -363,6 +369,7 @@ function FormInputLite({ value, onChange, placeholder, maxLength, inputMode, hin
                 placeholder={placeholder}
                 maxLength={maxLength}
                 inputMode={inputMode}
+                aria-label={ariaLabel}
                 className="w-full bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 rounded-xl py-2.5 px-3 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all text-sm dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-white/30 dark:focus:border-primary/50 dark:focus:ring-0"
             />
             {hint && <p className="text-[10px] text-muted-foreground mt-1 ml-1">{hint}</p>}

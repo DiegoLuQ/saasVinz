@@ -52,6 +52,8 @@ interface Props {
     copiedLink: boolean;
     /** Tramos de peso del crematorio; vacío = tamaños genéricos */
     weightTiers?: WeightTier[];
+    /** Mensaje del crematorio en este enlace (se muestra en negrita antes de los planes) */
+    message?: string | null;
 }
 
 // Paleta cálida y luminosa, igual para todos los tenants: el catálogo lo abren
@@ -126,7 +128,7 @@ interface PlanView {
 }
 
 /** Catálogo público de planes: diseño sobrio y cálido; los datos son los de cada tenant. */
-export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare, copiedLink, weightTiers = [] }: Props) {
+export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare, copiedLink, weightTiers = [], message }: Props) {
     const [searchTerm, setSearchTerm] = useState('');
     const sizes = useMemo(
         () => (weightTiers.length > 0 ? tierSizes(weightTiers) : PET_SIZES.map(s => ({ ...s, display: s.label }))),
@@ -279,6 +281,15 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                                 );
                             })}
                         </div>
+                    </div>
+                )}
+
+                {/* Mensaje del crematorio para este enlace: entre el tamaño y los planes */}
+                {message?.trim() && (
+                    <div className="mb-10 mx-auto max-w-3xl rounded-2xl border border-[var(--cat-gold)]/30 bg-[var(--cat-gold)]/[0.06] px-5 py-4 sm:px-7 text-center">
+                        <p className="text-[15px] sm:text-base font-bold leading-relaxed text-[var(--cat-ink)] whitespace-pre-line">
+                            {message.trim()}
+                        </p>
                     </div>
                 )}
 

@@ -114,6 +114,7 @@ def get_public_catalog(
             is_expired=False,
             **tenant_info,
             plans=_active_plans(db, tenant.id),
+            catalog_message=share_token.message,
             weight_tiers=public_weight_tiers(
                 db, tenant.id,
                 include_price=normalize_form_config(tenant.form_config)["show_weight_prices"],

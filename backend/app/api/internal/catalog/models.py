@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Float, JSON, UniqueConstraint
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Float, JSON, UniqueConstraint, Text
 from sqlalchemy.orm import relationship, backref
 from app.database import Base
 from datetime import datetime
@@ -140,6 +140,8 @@ class CatalogShareToken(Base):
     tenant_id = Column(Integer, ForeignKey("sys_tenants.id"), nullable=False, index=True)
     token = Column(String(64), unique=True, index=True, nullable=False)
     name = Column(String(100), nullable=True) # opcional: etiqueta o nombre del cliente
+    # Mensaje del crematorio en el catálogo de planes (entre el selector de tamaño y los planes)
+    message = Column(Text, nullable=True)
     catalog_type = Column(String(20), nullable=False, default="products", server_default="products")  # 'products' | 'plans'
     expires_at = Column(DateTime(timezone=True), nullable=True) # None = sin vencimiento
     is_active = Column(Boolean, default=True)

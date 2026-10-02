@@ -172,9 +172,10 @@ class WeightPricingBase(BaseModel):
     price: Optional[float] = 0
 
 class WeightPricingCreate(BaseModel):
-    """Un tramo al guardar la tabla completa: solo el límite superior.
-    El mínimo lo calcula el servidor (máximo del tramo anterior)."""
+    """Un tramo al guardar la tabla completa: rango "desde – hasta" escrito
+    por el crematorio. Sin min_weight se usa el máximo del tramo anterior."""
     label: Optional[str] = Field(default=None, max_length=40)
+    min_weight: Optional[float] = None
     max_weight: Optional[float] = None
     price: float = Field(default=0, ge=0)
 
@@ -189,11 +190,14 @@ class WeightPricingInDB(WeightPricingBase):
 
 # Tokens de Compartir Catálogo Online
 CatalogType = Literal["products", "plans"]
+CATALOG_MESSAGE_MAX = 300  # mensaje del catálogo de planes
 
 class CatalogShareTokenCreate(BaseModel):
     name: Optional[str] = None
     expires_in_hours: Optional[int] = None # None o 0 = permanente
     catalog_type: CatalogType = "products"
+    # Solo catálogo de planes: mensaje visible para la familia
+    message: Optional[str] = Field(default=None, max_length=CATALOG_MESSAGE_MAX)
 
 class CatalogShareTokenInDB(BaseModel):
     id: int
@@ -201,6 +205,7 @@ class CatalogShareTokenInDB(BaseModel):
     token: str
     name: Optional[str] = None
     catalog_type: CatalogType = "products"
+    message: Optional[str] = None
     expires_at: Optional[datetime] = None
     is_active: bool
     views_count: int = 0
@@ -255,6 +260,7 @@ class PublicCatalogResponse(BaseModel):
     tenant_social: Optional[dict] = None  # solo redes públicas (instagram, facebook, tiktok, website)
     catalog_tagline: Optional[str] = None
     catalog_intro: Optional[str] = None
+    catalog_message: Optional[str] = None  # mensaje del enlace (catálogo de planes)
     whatsapp: Optional[str] = None
     expires_at: Optional[datetime] = None
     products: List[PublicCatalogProduct] = []
