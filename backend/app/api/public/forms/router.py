@@ -16,7 +16,7 @@ from app.core.rate_limiter import limiter
 from app.services.recaptcha import verify_recaptcha
 from app.services.public_form_config import apply_form_config_to_submission
 from app.core.tenant_context import apply_tenant_rls, apply_bypass_rls
-from app.utils.upload_validation import read_and_validate_image, enforce_max_files
+from app.utils.upload_validation import read_and_validate_image, enforce_max_files, MAX_PUBLIC_FORM_PHOTOS
 from app.api.internal.integrations.models import TenantApiKey
 from app.api.internal.integrations.services import tenant_can_use_form_embed
 
@@ -117,7 +117,7 @@ async def submit_public_form(
 
     # 0.1 Validar archivos ANTES de crear nada en BD: límite de cantidad +
     # tamaño + tipo real (magic bytes). Evita submissions huérfanas y abuso.
-    enforce_max_files(files)
+    enforce_max_files(files, MAX_PUBLIC_FORM_PHOTOS)
     validated_files = []
     for f in files:
         content, ext = await read_and_validate_image(f)

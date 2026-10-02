@@ -14,6 +14,9 @@ interface Props {
 
 const SLOT_TITLES = ['Foto Principal', 'Segundo Recuerdo', 'Tercer Recuerdo'];
 
+// Fotos de los portarretratos del homenaje (certificado y memorial)
+export const MAX_MEMORIAL_PHOTOS = 2;
+
 export default function ImageUploadStep({ images, setImages, petName }: Props) {
     const [isDragging, setIsDragging] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -90,7 +93,7 @@ export default function ImageUploadStep({ images, setImages, petName }: Props) {
 
         const files = Array.from(e.dataTransfer.files);
         if (files.length > 0) {
-            const firstEmptySlot = images.length < 3 ? images.length : 0;
+            const firstEmptySlot = images.length < MAX_MEMORIAL_PHOTOS ? images.length : 0;
             processFile(files[0], firstEmptySlot);
         }
     }, [images]);
@@ -111,7 +114,7 @@ export default function ImageUploadStep({ images, setImages, petName }: Props) {
                 setImages(updated);
             } else {
                 // Agregar al final
-                if (images.length < 3) {
+                if (images.length < MAX_MEMORIAL_PHOTOS) {
                     setImages([...images, newFile]);
                 }
             }
@@ -163,13 +166,13 @@ export default function ImageUploadStep({ images, setImages, petName }: Props) {
                             Portarretratos del Homenaje
                         </h3>
                         <p className="text-xs text-slate-400 dark:text-slate-500 font-normal">
-                            Sube hasta 3 fotos especiales para su certificado y memorial
+                            Sube hasta {MAX_MEMORIAL_PHOTOS} fotos especiales para su certificado y memorial
                         </p>
                     </div>
                 </div>
 
                 <div className="text-[11px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-3 py-1 rounded-full border border-amber-200/60 dark:border-amber-900/30 self-start sm:self-center">
-                    {images.length} de 3 enmarcadas
+                    {images.length} de {MAX_MEMORIAL_PHOTOS} enmarcadas
                 </div>
             </div>
 
@@ -179,9 +182,9 @@ export default function ImageUploadStep({ images, setImages, petName }: Props) {
                 </div>
             )}
 
-            {/* Grid de 3 Marcos Grandes */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {[0, 1, 2].map((index) => {
+            {/* Marcos grandes (MAX_MEMORIAL_PHOTOS) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto w-full">
+                {Array.from({ length: MAX_MEMORIAL_PHOTOS }, (_, index) => index).map((index) => {
                     const file = images[index];
                     const hasImage = !!file;
                     const previewUrl = hasImage ? URL.createObjectURL(file) : null;

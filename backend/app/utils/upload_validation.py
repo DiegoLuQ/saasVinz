@@ -12,6 +12,9 @@ from fastapi import HTTPException, UploadFile, status
 # Límite de tamaño por imagen (8 MB) y cantidad máxima de archivos por solicitud.
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_FILES_PER_SUBMISSION = 8
+# Formulario público de la familia: fotos de los portarretratos del homenaje
+# (frontend: MAX_MEMORIAL_PHOTOS en components/public/ImageUploadStep.tsx)
+MAX_PUBLIC_FORM_PHOTOS = 2
 
 
 def detect_image_type(content: bytes) -> Optional[str]:

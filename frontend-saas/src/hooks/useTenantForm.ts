@@ -4,6 +4,7 @@ import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 import { compressImages } from '@/lib/clientImageCompressor';
 import { Service } from '@/components/public/ServiceSelectionStep';
 import { saveDraftImages, loadDraftImages, clearDraftImages } from '@/lib/formDraftImages';
+import { MAX_MEMORIAL_PHOTOS } from '@/components/public/ImageUploadStep';
 import { resolveFormConfig, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
 
 export interface Tenant {
@@ -176,7 +177,8 @@ export function useTenantForm(
         let cancelled = false;
         loadDraftImages(storageKey).then((files) => {
             if (cancelled) return;
-            if (files.length > 0) setImages((prev) => (prev.length > 0 ? prev : files));
+            // Borradores antiguos podían tener más fotos que el máximo actual
+            if (files.length > 0) setImages((prev) => (prev.length > 0 ? prev : files.slice(0, MAX_MEMORIAL_PHOTOS)));
             imagesRestoredRef.current = true;
         });
         return () => { cancelled = true; };
@@ -457,7 +459,7 @@ export function useTenantForm(
 
         try {
             // Optimizar imágenes antes del envío
-            const compressed = await compressImages(images);
+            const compressed = await compressImages(images.slice(0, MAX_MEMORIAL_PHOTOS));
 
             const formData = new FormData();
             formData.append('tenant_id', String(tenant.id));
