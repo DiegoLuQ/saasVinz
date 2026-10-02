@@ -1,15 +1,28 @@
 "use client";
 
 import React, { useMemo, useState } from 'react';
-import { Cormorant_Garamond, Plus_Jakarta_Sans } from 'next/font/google';
+import localFont from 'next/font/local';
 import { DEFAULT_CATALOG_INTRO } from '@/lib/catalogDefaults';
 import type { WeightTier } from '@/lib/publicFormConfig';
 import {
     Check, ChevronDown, Facebook, Feather, Globe, Info, Instagram, Mail, MapPin, MessageCircle, Phone, Plus, Search, Share2, X,
 } from 'lucide-react';
 
-const serif = Cormorant_Garamond({ subsets: ['latin'], weight: ['500', '600', '700'], variable: '--cat-serif' });
-const sans = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'], variable: '--cat-sans' });
+// Fuentes autoalojadas (OFL, variables, subconjunto latino) en src/fonts.
+// Con next/font/google el build en Docker fallaba cuando Google entregaba URLs
+// "/l/font?kit=…&skey=…" que Turbopack no procesa; así el build no depende de Google.
+const serif = localFont({
+    src: '../../../fonts/CormorantGaramond-Variable-latin.woff2',
+    weight: '300 700',
+    display: 'swap',
+    variable: '--cat-serif',
+});
+const sans = localFont({
+    src: '../../../fonts/PlusJakartaSans-Variable-latin.woff2',
+    weight: '200 800',
+    display: 'swap',
+    variable: '--cat-sans',
+});
 
 export interface PublicPlanItem {
     name: string;
