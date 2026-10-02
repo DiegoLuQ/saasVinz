@@ -5,6 +5,7 @@ import html2canvas from 'html2canvas';
 import { Download, Loader2, Heart } from 'lucide-react';
 import FarewellPreview from '@/app/(tenant)/tenant/dashboard/documentos/disenos/components/FarewellPreview';
 import { getImageUrl } from '@/lib/tenant/api';
+import { useCurrentTenant } from '@/hooks/useSessionBootstrap';
 
 /** Config de plantilla de homenaje (forma libre; la interpreta FarewellPreview). */
 type FarewellConfig = { format?: string; elements?: Record<string, unknown>; [key: string]: unknown };
@@ -43,17 +44,28 @@ interface Props {
 export default function FarewellCardSection({ templateConfig, petName, dedication, photoUrl }: Props) {
     const exportRef = useRef<HTMLDivElement>(null);
     const [downloading, setDownloading] = useState(false);
+    const tenant = useCurrentTenant();
 
+    // Datos del crematorio (logo, nombre, web/redes) igual que el seguimiento
+    // público y el formulario: sin ellos la plantilla los dejaba vacíos o con
+    // los textos de ejemplo.
     const base: FarewellConfig = (templateConfig as FarewellConfig) || DEFAULT_CONFIG;
+    const baseEls = (base.elements || {}) as Record<string, unknown>;
+    const socialMedia = tenant?.social_media || {};
     const config: FarewellConfig = {
         ...base,
         elements: {
-            ...(base.elements || {}),
+            ...baseEls,
             petName: petName || 'Tu Angelito',
             subtitle: '',
             farewellText: dedication || DEFAULT_TEXT,
             image2Url: photoUrl ? getImageUrl(photoUrl) : null,
+            tenantLogoUrl: tenant?.logo_url ? getImageUrl(tenant.logo_url) : null,
+            tenantName: (baseEls.tenantName && String(baseEls.tenantName).trim()) || tenant?.name || '',
+            tenantWebsite: (baseEls.tenantWebsite && String(baseEls.tenantWebsite).trim()) || '{sitio_web}',
+            tenantSocialMedia: socialMedia,
         },
+        tenantSocialMedia: socialMedia,
     };
     const dims = cardDims(config.format || '1:1');
     const scale = 0.5;
