@@ -8,7 +8,7 @@ import { formatCLP } from '@/lib/publicFormConfig';
 // y de los tramos de peso "hasta X kg" del crematorio. Los tramos también
 // calculan el recargo por peso de las órdenes internas.
 
-const MAX_TIERS = 12;
+const MAX_TIERS = 20;
 
 // Columnas: nombre del campo (se ajusta) | Mostrar | Obligatorio (ancho fijo)
 const FIELD_GRID = 'grid grid-cols-[minmax(0,1fr)_4.5rem_5.5rem] items-center gap-x-2';

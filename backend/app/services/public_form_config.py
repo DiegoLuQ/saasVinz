@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app import models
 
-MAX_WEIGHT_TIERS = 12
+MAX_WEIGHT_TIERS = 20
 
 # key -> (sección, etiqueta, visible por defecto, obligatorio por defecto)
 DEFAULT_FIELDS: dict[str, tuple[str, str, bool, bool]] = {
