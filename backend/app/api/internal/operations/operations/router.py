@@ -695,42 +695,60 @@ def revert_order_step(
     tenant_id: int = Depends(get_tenant_id),
     current_user: models.User = Depends(get_current_user)
 ):
-    """Retrocede la orden al paso anterior del flujo y elimina el registro de tiempo del paso actual (Solo Admin/Op)."""
+    """Retrocede la orden UN paso (solo el dueño del crematorio):
+
+    - Entregada -> en proceso, en la última fase (se borra la hora de término de esa fase).
+    - Fase N -> fase N-1 (se borra la hora de término de la fase N-1).
+    - Primera fase (o en proceso sin fase) -> pendiente, sin fase.
+    Las fotos y notas de evidencia se conservan.
+    """
+    if not board.is_owner(current_user):
+        raise HTTPException(status_code=403, detail="Solo el administrador del crematorio puede retroceder una orden")
+
     cremation = db.query(models.Cremation).filter(models.Cremation.id == cremation_id, models.Cremation.tenant_id == tenant_id).first()
     if not cremation:
         raise HTTPException(status_code=404, detail="Orden no encontrada")
 
-    # Obtener todos los pasos ordenados
+    rank = board.status_rank(cremation.status)
+    if rank is None:
+        raise HTTPException(status_code=400, detail="La orden está cancelada")
+
     steps = db.query(models.WorkflowStep).filter(
         models.WorkflowStep.tenant_id == tenant_id,
         models.WorkflowStep.is_active == True
     ).order_by(models.WorkflowStep.order_index).all()
 
     tech = cremation.technical
-    if not steps or not tech or not tech.step_id:
-        raise HTTPException(status_code=400, detail="No se puede retroceder")
+    current_index = next((i for i, s in enumerate(steps) if tech and s.id == tech.step_id), -1)
 
-    # Buscar índice actual
-
-    current_index = next((i for i, s in enumerate(steps) if s.id == tech.step_id), -1)
-    
-    if current_index > 0:
-        # Eliminar el registro de tiempo del paso anterior
-        previous_step_id = str(steps[current_index - 1].id)
-        meta = dict(tech.timeline or {})
-        if previous_step_id in meta:
-            del meta[previous_step_id]
+    def _drop_time(step_id):
+        if tech and tech.timeline and str(step_id) in tech.timeline:
+            meta = dict(tech.timeline)
+            del meta[str(step_id)]
             tech.timeline = meta
-        
-        # Retroceder al anterior
-        tech.step_id = steps[current_index - 1].id
-        
-        # New: Reset status if reverting from a final state
-        if cremation.status in ["entregado", "completado", "delivered", "completed"]:
-            cremation.status = "en_proceso"
+
+    if rank == 2:
+        # Entregada -> en proceso (queda en la fase donde terminó)
+        if tech and current_index >= 0:
+            _drop_time(tech.step_id)
+        if tech:
+            tech.end_at = None
+        if cremation.scheduling:
+            cremation.scheduling.completed_at = None
+        cremation.status = "en_proceso" if current_index >= 0 else "pendiente"
+    elif current_index > 0:
+        prev = steps[current_index - 1]
+        _drop_time(prev.id)
+        tech.step_id = prev.id
+    elif rank == 1 or current_index == 0:
+        # Primera fase -> pendiente (por iniciar)
+        if tech:
+            tech.step_id = None
+            tech.start_at = None
+            tech.end_at = None
+        cremation.status = "pendiente"
     else:
-        # Ya está en el primero
-        raise HTTPException(status_code=400, detail="Ya está en el primer paso")
+        raise HTTPException(status_code=400, detail="La orden ya está pendiente")
 
     db.commit()
     db.refresh(cremation)

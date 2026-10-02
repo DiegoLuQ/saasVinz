@@ -5,6 +5,8 @@ import { useOrderForm } from '@/hooks/tenant/useOrderForm';
 import CancellationModal from '@/components/tenant/CancellationModal';
 import ImageCropper from '@/components/tenant/ImageCropper';
 import ReplacementConfirmationModal from '@/components/tenant/orders/ReplacementConfirmationModal';
+import DeleteOrderModal from '@/components/tenant/orders/DeleteOrderModal';
+import RevertOrderModal, { canRevertStatus } from '@/components/tenant/operations/RevertOrderModal';
 import OrderFormSkeleton from '@/components/tenant/orders/OrderFormSkeleton';
 import ProfileCard from '@/components/tenant/orders/ProfileCard';
 import LogisticsCard from '@/components/tenant/orders/LogisticsCard';
@@ -16,12 +18,13 @@ import ChangeDiffBadge, { getChangedFields } from '@/components/tenant/orders/Ch
 import QuickPetModal from '@/components/tenant/crm/QuickPetModal';
 import QuickCreatePartnerModal from '@/components/tenant/partners/QuickCreatePartnerModal';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
-import { statusLabels, statusColors } from '@/lib/tenant/orders/types';
-import { ArrowLeft, PawPrint, Truck, Camera, Receipt, Loader2, ChevronRight, ChevronLeft, Check, Sparkles, Activity, Share2, Copy, ExternalLink, MessageCircle } from 'lucide-react';
+import { statusLabels, statusColors, normalizeOrderStatus } from '@/lib/tenant/orders/types';
+import { ArrowLeft, PawPrint, Truck, Camera, Receipt, Loader2, ChevronRight, ChevronLeft, Check, Sparkles, Activity, Share2, Copy, ExternalLink, MessageCircle, Trash2, Undo2 } from 'lucide-react';
 import Modal from '@/components/tenant/Modal';
 import { copyToClipboard } from '@/lib/clipboard';
 import { buildTrackingUrl } from '@/lib/publicUrls';
-import { useCurrentTenant } from '@/hooks/useSessionBootstrap';
+import { useCurrentTenant, useIsOwner } from '@/hooks/useSessionBootstrap';
+import { usePermissions } from '@/app/(tenant)/tenant/context/PermissionContext';
 
 type TabId = 'angelito' | 'logistica' | 'evidencia' | 'comercial';
 
@@ -110,6 +113,7 @@ export default function RegisterServicePage() {
 
         // Handlers
         handleStatusChange,
+        applySavedStatus,
         handleConfirmCancel,
         handlePetChange,
         syncAddressFromCustomer,
@@ -157,6 +161,10 @@ export default function RegisterServicePage() {
     // ==========================================
     const [isQuickPetModalOpen, setIsQuickPetModalOpen] = useState(false);
     const [isQuickPartnerModalOpen, setIsQuickPartnerModalOpen] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showRevertModal, setShowRevertModal] = useState(false);
+    const isOwner = useIsOwner();
+    const { canDelete } = usePermissions();
 
     // ==========================================
     // Diff tracking for edit mode
@@ -393,6 +401,29 @@ export default function RegisterServicePage() {
                                 >
                                     Cancelar
                                 </button>
+                                {/* Retroceder un paso: solo el dueño del crematorio, según el estado guardado */}
+                                {editId && isOwner && canRevertStatus(normalizeOrderStatus(originalCremation?.status)) && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowRevertModal(true)}
+                                        disabled={isSaving}
+                                        className="w-full h-9 rounded-xl border border-amber-500/20 text-amber-400 font-bold uppercase text-[9px] tracking-[0.18em] hover:bg-amber-500/10 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                    >
+                                        <Undo2 size={12} />
+                                        Retroceder estado
+                                    </button>
+                                )}
+                                {editId && canDelete('ordenes') && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowDeleteModal(true)}
+                                        disabled={isSaving}
+                                        className="w-full h-9 rounded-xl border border-rose-500/20 text-rose-400 font-bold uppercase text-[9px] tracking-[0.18em] hover:bg-rose-500/10 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                    >
+                                        <Trash2 size={12} />
+                                        Eliminar orden
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -417,6 +448,7 @@ export default function RegisterServicePage() {
                                     pendingPhotoPreview={pendingPetPhoto && pendingPetPhoto.petId === currentCremation?.pet_id ? pendingPetPhoto.preview : null}
                                     onPetPhotoPicked={(blob) => currentCremation?.pet_id && setPendingPetPhoto(currentCremation.pet_id, blob)}
                                     onPetPhotoDiscard={() => currentCremation?.pet_id && setPendingPetPhoto(currentCremation.pet_id, null)}
+                                    savedStatus={editId ? originalCremation?.status : null}
                                 />
                                 <div className="flex justify-end pt-2">
                                     <button
@@ -551,6 +583,23 @@ export default function RegisterServicePage() {
             />
 
             {/* Modals */}
+            {editId && showRevertModal && (
+                <RevertOrderModal
+                    isOpen={showRevertModal}
+                    orderId={Number(editId)}
+                    onClose={() => setShowRevertModal(false)}
+                    onReverted={(status) => status && applySavedStatus(status)}
+                />
+            )}
+            {editId && showDeleteModal && (
+                <DeleteOrderModal
+                    isOpen={showDeleteModal}
+                    orderId={Number(editId)}
+                    onClose={() => setShowDeleteModal(false)}
+                    onDeleted={() => router.push('/dashboard/recepcion-pedidos')}
+                />
+            )}
+
             <CancellationModal
                 isOpen={showCancelModal}
                 onClose={() => {

@@ -70,6 +70,39 @@ def resolve_certificate_template(db: Session, tenant: Optional[models.Tenant], t
     return None, "basica"
 
 
+def _order_cert_number(cremation, now) -> str:
+    """Número del certificado de una orden: su código de seguimiento (el mismo del
+    panel y del seguimiento público). Órdenes antiguas sin código: CREM-AAAA-NNNN."""
+    if cremation.verification_code:
+        return cremation.verification_code
+    return f"CREM-{now.year}-{(cremation.oc_number or cremation.id):04d}"
+
+
+def _upsert_certificate(db: Session, tenant_id: int, cremation_id: Optional[int], cert_type: str, number: str, html: str, now) -> None:
+    """Guarda el certificado. Una orden tiene un solo certificado por tipo: al
+    volver a emitir se reemplaza (y toma el número actual) en vez de duplicarse."""
+    q = db.query(models.Certificate).filter(models.Certificate.tenant_id == tenant_id)
+    existing = None
+    if cremation_id:
+        existing = q.filter(models.Certificate.cremation_id == cremation_id, models.Certificate.type == cert_type).first()
+    if not existing:
+        existing = q.filter(models.Certificate.number == number).first()
+    if existing:
+        existing.number = number
+        existing.html_content = html
+        existing.issue_date = now
+    else:
+        db.add(models.Certificate(
+            tenant_id=tenant_id,
+            cremation_id=cremation_id,
+            type=cert_type,
+            number=number,
+            html_content=html,
+            issue_date=now,
+        ))
+    db.commit()
+
+
 def _render_preview(request: Request, tenant: models.Tenant, template: Optional[models.CertificateTemplate], tenant_overrides: Optional[dict] = None) -> dict:
     """Renderiza la plantilla con una mascota de ejemplo y los datos reales de la
     empresa (o los aún no guardados que llegan en tenant_overrides)."""
@@ -319,8 +352,7 @@ def generar_certificado(
             cert_number = req.cert_number
             if not cert_number:
                 if cremation:
-                    oc_num = cremation.oc_number or cremation.id
-                    cert_number = f"CREM-{now.year}-{oc_num:04d}"
+                    cert_number = _order_cert_number(cremation, now)
                 else:
                     cert_number = f"CERT-{now.strftime('%Y%m%d%H%M%S')}"
 
@@ -354,23 +386,7 @@ def generar_certificado(
             # crear certificados). Emitir requiere persist=True.
             if not req.persist:
                 return result
-            existing_cert = db.query(models.Certificate).filter(
-                models.Certificate.number == cert_number,
-                models.Certificate.tenant_id == tenant_id
-            ).first()
-            if existing_cert:
-                existing_cert.html_content = result["html_content"]
-                existing_cert.issue_date = now
-            else:
-                db.add(models.Certificate(
-                    tenant_id=tenant_id,
-                    cremation_id=req.cremation_id,
-                    type=req.certificate_type,
-                    number=cert_number,
-                    html_content=result["html_content"],
-                    issue_date=now,
-                ))
-            db.commit()
+            _upsert_certificate(db, tenant_id, req.cremation_id if cremation else None, req.certificate_type, cert_number, result["html_content"], now)
             return result
 
         # 3. Inicializar variables con prioridad: Request > Template > Code Defaults
@@ -410,11 +426,13 @@ def generar_certificado(
         
         # 4. Autocompletar si hay cremation_id
         if req.cremation_id:
-            cremation = db.query(models.Cremation).filter(models.Cremation.id == req.cremation_id).first()
+            cremation = db.query(models.Cremation).filter(
+                models.Cremation.id == req.cremation_id,
+                models.Cremation.tenant_id == tenant_id
+            ).first()
             if cremation:
                 if not req.cert_number:
-                    oc_num = cremation.oc_number or cremation.id
-                    data["cert_number"] = f"CREM-{now.year}-{oc_num:04d}"
+                    data["cert_number"] = _order_cert_number(cremation, now)
                 
                 pet = db.query(models.Pet).filter(models.Pet.id == cremation.pet_id).first()
                 if pet:
@@ -435,25 +453,7 @@ def generar_certificado(
         # 6. Guardar en DB para historial (persist=False -> solo vista previa)
         if not req.persist:
             return result
-        existing_cert = db.query(models.Certificate).filter(
-            models.Certificate.number == data["cert_number"],
-            models.Certificate.tenant_id == tenant_id
-        ).first()
-        if existing_cert:
-            existing_cert.html_content = result["html_content"]
-            existing_cert.issue_date = now
-        else:
-            db_cert = models.Certificate(
-                tenant_id=tenant_id,
-                cremation_id=req.cremation_id,
-                type=data["certificate_type"],
-                number=data["cert_number"],
-                html_content=result["html_content"],
-                issue_date=now
-            )
-            db.add(db_cert)
-        db.commit()
-        
+        _upsert_certificate(db, tenant_id, req.cremation_id, data["certificate_type"], data["cert_number"], result["html_content"], now)
         return result
     except Exception as e:
         import traceback

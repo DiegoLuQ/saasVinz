@@ -72,6 +72,20 @@ def get_weight_tiers(db: Session, tenant_id: int) -> list:
     return sorted(rules, key=lambda r: (r.max_weight is None, r.max_weight or 0))
 
 
+def weight_surcharge(tiers: list, weight: float | None) -> float:
+    """Recargo por peso (misma regla que calculateWeightPrice del frontend): el
+    primer tramo, por máximo ascendente, cuyo máximo cubre el peso. Bajo el
+    mínimo del primer tramo no hay recargo. `tiers` viene de get_weight_tiers."""
+    if not weight or weight <= 0 or not tiers:
+        return 0.0
+    if weight < (tiers[0].min_weight or 0):
+        return 0.0
+    for r in tiers:
+        if r.max_weight is None or weight <= r.max_weight:
+            return r.price or 0.0
+    return 0.0
+
+
 def _fmt_kg(value: float) -> str:
     return f"{value:g}".replace(".", ",")
 

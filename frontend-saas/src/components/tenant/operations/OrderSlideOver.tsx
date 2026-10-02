@@ -6,17 +6,20 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     Activity, User, Dog, Copy, Check, FileText, ExternalLink, Loader2, Edit, Building2,
     MessageCircle, Compass, ArrowRight, CircleDot,
-    BookHeart, Receipt, AlertCircle, Lock,
+    BookHeart, Receipt, AlertCircle, Lock, Download, Undo2,
 } from 'lucide-react';
 import SlideOver from '@/components/tenant/SlideOver';
 import type { Cremation } from '@/hooks/useCremations';
 import { apiRequest, getImageUrl } from '@/lib/tenant/api';
 import { copyToClipboard } from '@/lib/clipboard';
 import { buildTrackingUrl } from '@/lib/publicUrls';
+import { downloadHtmlAsPdf, pdfFileName } from '@/lib/certPdf';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import FarewellCardSection from './expediente/FarewellCardSection';
 import DedicationSection from './expediente/DedicationSection';
 import StageTimeline, { type Stage } from './expediente/StageTimeline';
+import RevertOrderModal, { canRevertStatus } from './RevertOrderModal';
+import { useIsOwner } from '@/hooks/useSessionBootstrap';
 import { usePermissions } from '@/app/(tenant)/tenant/context/PermissionContext';
 
 // --- Tipos de GET /api/internal/cremations/{id}/expediente ---------------------
@@ -29,8 +32,8 @@ interface Expediente {
     };
     pet: { id?: number | null; name?: string | null; species?: string | null; breed?: string | null; dedication?: string | null; dedication_source?: 'orden' | 'formulario' | null; photos: string[] };
     customer: { name?: string | null; phone?: string | null; email?: string | null };
-    items: { tipo: string; nombre: string; cantidad: number; precio: number }[];
-    financial: { total: number; discount?: number };
+    items: { tipo: 'servicio' | 'plan' | 'producto' | 'peso'; nombre: string; cantidad: number; precio: number; incluye?: string[] }[];
+    financial: { subtotal?: number; total: number; discount?: number };
     timeline: (Stage & { photo_url?: string | null; comments: string[]; at?: string | null })[];
     partner: { name: string; commission: { amount: number; status: string; paid_at?: string | null } | null } | null;
     deliverables: {
@@ -82,6 +85,9 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
     const { canEdit } = usePermissions();
     const [copied, setCopied] = useState<string | null>(null);
     const [acting, setActing] = useState(false);
+    const [downloadingCertId, setDownloadingCertId] = useState<number | null>(null);
+    const [showRevert, setShowRevert] = useState(false);
+    const isOwner = useIsOwner();
 
     const orderId = cremation?.id;
     const { data: exp, isLoading, isError } = useQuery<Expediente>({
@@ -147,6 +153,19 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
             });
         } catch (err: unknown) {
             showToast(err instanceof Error ? err.message : 'No se pudo abrir el certificado', 'error');
+        }
+    };
+
+    const downloadCertificate = async (certId: number, number: string) => {
+        if (downloadingCertId) return;
+        setDownloadingCertId(certId);
+        try {
+            const res = await apiRequest(`/api/internal/ops-records/certificates/${certId}/content`);
+            await downloadHtmlAsPdf(res.html_content, pdfFileName(`certificado_${petName}_${number}`));
+        } catch (err: unknown) {
+            showToast(err instanceof Error ? err.message : 'No se pudo descargar el certificado', 'error');
+        } finally {
+            setDownloadingCertId(null);
         }
     };
 
@@ -233,16 +252,32 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                     <Edit size={14} /> Editar orden
                                 </Link>
                             </div>
-                            {exp.next_action && (
-                                <button
-                                    type="button"
-                                    onClick={runNextAction}
-                                    disabled={busy}
-                                    className="w-full py-3 px-4 rounded-xl bg-primary text-white text-sm font-bold transition hover:brightness-110 flex items-center justify-center gap-2 disabled:opacity-50"
-                                >
-                                    {busy ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} />}
-                                    {exp.next_action.label}
-                                </button>
+                            {(exp.next_action || (isOwner && canRevertStatus(exp.order.status_group))) && (
+                                <div className="flex gap-2">
+                                    {/* Retroceder: solo el dueño del crematorio (el backend también lo exige) */}
+                                    {isOwner && canRevertStatus(exp.order.status_group) && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowRevert(true)}
+                                            disabled={busy}
+                                            className={`${exp.next_action ? '' : 'flex-1 '}py-3 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-bold text-white transition flex items-center justify-center gap-2 disabled:opacity-50`}
+                                            title="Retroceder un paso"
+                                        >
+                                            <Undo2 size={16} /> Retroceder
+                                        </button>
+                                    )}
+                                    {exp.next_action && (
+                                        <button
+                                            type="button"
+                                            onClick={runNextAction}
+                                            disabled={busy}
+                                            className="flex-1 py-3 px-4 rounded-xl bg-primary text-white text-sm font-bold transition hover:brightness-110 flex items-center justify-center gap-2 disabled:opacity-50"
+                                        >
+                                            {busy ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} />}
+                                            {exp.next_action.label}
+                                        </button>
+                                    )}
+                                </div>
                             )}
                         </div>
 
@@ -305,14 +340,25 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                 {exp.items.length === 0 ? (
                                     <p className="text-muted-foreground">Sin servicios registrados.</p>
                                 ) : exp.items.map((it, i) => (
-                                    <div key={`${it.tipo}-${i}`} className="flex items-center justify-between gap-3">
-                                        <span className="text-white truncate">
-                                            {it.cantidad > 1 ? `${it.cantidad} × ` : ''}{it.nombre}
-                                            <span className="ml-2 text-[10px] uppercase text-muted-foreground">{it.tipo}</span>
-                                        </span>
-                                        <span className="text-muted-foreground tabular-nums">{clp.format(it.precio * it.cantidad)}</span>
+                                    <div key={`${it.tipo}-${i}`}>
+                                        <div className="flex items-center justify-between gap-3">
+                                            <span className="text-white truncate">
+                                                {it.cantidad > 1 ? `${it.cantidad} × ` : ''}{it.nombre}
+                                                {it.tipo !== 'peso' && <span className="ml-2 text-[10px] uppercase text-muted-foreground">{it.tipo}</span>}
+                                            </span>
+                                            <span className="text-muted-foreground tabular-nums">{clp.format(it.precio * it.cantidad)}</span>
+                                        </div>
+                                        {!!it.incluye?.length && (
+                                            <p className="mt-0.5 text-[11px] text-muted-foreground">Incluye: {it.incluye.join(', ')}</p>
+                                        )}
                                     </div>
                                 ))}
+                                {!!exp.financial.discount && (
+                                    <div className="flex justify-between text-muted-foreground">
+                                        <span>Descuento ({exp.financial.discount}%)</span>
+                                        <span className="tabular-nums">−{clp.format((exp.financial.subtotal || 0) - exp.financial.total)}</span>
+                                    </div>
+                                )}
                                 <div className="pt-2 border-t border-white/5 flex justify-between font-bold text-sm">
                                     <span className="text-white">Total</span>
                                     <span className="text-white tabular-nums">{clp.format(exp.financial.total || 0)}</span>
@@ -394,14 +440,26 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                 ) : (
                                     <div className="flex flex-wrap items-center gap-2">
                                         {exp.deliverables.certificate.issued.map((c) => (
-                                            <button
-                                                key={c.id}
-                                                type="button"
-                                                onClick={() => viewCertificate(c.id)}
-                                                className="px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 text-xs font-semibold transition flex items-center gap-1.5"
-                                            >
-                                                <ExternalLink size={14} /> {c.number}
-                                            </button>
+                                            <div key={c.id} className="flex items-stretch rounded-xl border border-emerald-500/20 overflow-hidden">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => viewCertificate(c.id)}
+                                                    className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-semibold transition flex items-center gap-1.5"
+                                                    title="Ver certificado"
+                                                >
+                                                    <ExternalLink size={14} /> {c.number}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => downloadCertificate(c.id, c.number)}
+                                                    disabled={downloadingCertId !== null}
+                                                    className="px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-l border-emerald-500/20 text-xs font-semibold transition flex items-center gap-1.5 disabled:opacity-50"
+                                                    title="Descargar PDF"
+                                                    aria-label={`Descargar ${c.number} en PDF`}
+                                                >
+                                                    {downloadingCertId === c.id ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} PDF
+                                                </button>
+                                            </div>
                                         ))}
                                         <button
                                             type="button"
@@ -441,6 +499,13 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                     </>
                 )}
             </div>
+            {showRevert && (
+                <RevertOrderModal
+                    isOpen={showRevert}
+                    orderId={cremation.id}
+                    onClose={() => setShowRevert(false)}
+                />
+            )}
         </SlideOver>
     );
 }

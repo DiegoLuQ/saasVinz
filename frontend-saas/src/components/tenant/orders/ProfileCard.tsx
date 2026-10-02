@@ -7,7 +7,7 @@ import { API_URL } from '@/lib/tenant/api';
 import SearchableSelect from '@/components/tenant/SearchableSelect';
 import PetPhotoUploader from './PetPhotoUploader';
 import PetDatesEditor from './PetDatesEditor';
-import { statusColors, statusOptions, normalizeOrderStatus } from '@/lib/tenant/orders/types';
+import { statusColors, forwardStatusOptions, normalizeOrderStatus } from '@/lib/tenant/orders/types';
 import type { Cremation, Pet, Customer, Partner } from '@/lib/tenant/orders/types';
 
 interface ProfileCardProps {
@@ -25,6 +25,8 @@ interface ProfileCardProps {
     pendingPhotoPreview?: string | null;
     onPetPhotoPicked?: (blob: Blob) => void;
     onPetPhotoDiscard?: () => void;
+    /** Estado guardado: el selector no ofrece estados anteriores (retroceder es otra acción) */
+    savedStatus?: string | null;
 }
 
 export default function ProfileCard({
@@ -40,6 +42,7 @@ export default function ProfileCard({
     pendingPhotoPreview,
     onPetPhotoPicked,
     onPetPhotoDiscard,
+    savedStatus,
 }: ProfileCardProps) {
     const hasPet = !!currentCremation?.pet_id && !!selectedPet;
     const petPhoto = selectedPet?.images?.[0] || selectedPet?.image_url || null;
@@ -76,8 +79,9 @@ export default function ProfileCard({
                             Estado Operativo
                         </label>
                         <SearchableSelect
-                            // Solo estados vigentes; los legados se muestran como su equivalente
-                            options={statusOptions}
+                            // Solo estados vigentes; los legados se muestran como su equivalente.
+                            // Sin estados anteriores al guardado: retroceder es el botón «Retroceder».
+                            options={forwardStatusOptions(savedStatus)}
                             value={normalizeOrderStatus(currentCremation?.status)}
                             onChange={onStatusChange}
                             placeholder="Seleccionar estado..."

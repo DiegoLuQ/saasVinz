@@ -86,10 +86,10 @@ export const useDeleteCremation = () => {
             // sin esto seguía mostrando la lista cacheada tras crear/editar/borrar.
             queryClient.invalidateQueries({ queryKey: ['cremations'] });
             queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
-            showToast('Servicio eliminado correctamente', 'success');
+            showToast('Orden eliminada correctamente', 'success');
         },
         onError: (err: any) => {
-            showToast(err.message || 'Error al eliminar servicio', 'error');
+            showToast(err.message || 'Error al eliminar la orden', 'error');
         },
     });
 };

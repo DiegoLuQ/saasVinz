@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
 from app.database import get_db
 from app import schemas
-from app.api.deps import get_tenant_id
+from app.api.deps import get_current_user, get_tenant_id
+from app.api.internal.operations.operations import board
 from app.api.internal.admin.rbac.router import check_permission
 from app.api.deps_limits import check_resource_limit
 from app.api.internal.operations.services import CremationService
@@ -114,6 +115,7 @@ def obtener_expediente(
     from app import models
     from app.api.internal.memorials.models import Memorial
     from app.api.public.tenants.router import resolve_farewell_template
+    from app.services.public_form_config import get_weight_tiers, weight_surcharge
 
     C = models.Cremation
     oc = db.query(C).options(
@@ -147,9 +149,24 @@ def obtener_expediente(
     for s_ in (oc.servicios or []):
         items.append({"tipo": "servicio", "nombre": getattr(s_.service, "name", "Servicio"), "cantidad": s_.cantidad or 1, "precio": s_.precio_venta or 0})
     for p_ in (oc.planes or []):
-        items.append({"tipo": "plan", "nombre": getattr(p_.plan, "name", "Plan"), "cantidad": getattr(p_, "cantidad", 1) or 1, "precio": p_.precio_venta or 0})
+        # Lo que trae el plan (servicios y productos incluidos, sin precio aparte)
+        incluye = []
+        if p_.plan:
+            incluye = [s.name for s in (p_.plan.services or []) if s and s.name] + \
+                      [pr.name for pr in (p_.plan.products or []) if pr and pr.name]
+        items.append({"tipo": "plan", "nombre": getattr(p_.plan, "name", "Plan"), "cantidad": getattr(p_, "cantidad", 1) or 1,
+                      "precio": p_.precio_venta or 0, "incluye": incluye})
     for pr in (oc.productos or []):
         items.append({"tipo": "producto", "nombre": getattr(pr.product, "name", "Producto"), "cantidad": pr.cantidad or 1, "precio": pr.precio_venta or 0})
+
+    # Recargo por peso: igual que el formulario de registro, se deriva de los
+    # tramos vigentes (las órdenes del formulario público / Registro Rápido o con
+    # peso editado en Operaciones guardan weight_price = 0). Sin tramos, el guardado.
+    tiers = get_weight_tiers(db, tenant_id)
+    weight_price = weight_surcharge(tiers, oc.weight) if tiers else ((oc.financial.weight_price or 0) if oc.financial else 0)
+    if weight_price:
+        items.append({"tipo": "peso", "nombre": f"Recargo por peso ({oc.weight:g} kg)".replace(".", ","),
+                      "cantidad": 1, "precio": weight_price})
 
     # Etapas del crematorio con su evidencia (misma lógica que el seguimiento público).
     steps = db.query(models.WorkflowStep).filter(
@@ -240,7 +257,12 @@ def obtener_expediente(
     else:
         next_action = {"key": "entregar", "label": "Marcar como entregado"}
 
+    # Total como lo calcula el registro (calculateGrandTotal): ítems + recargo por
+    # peso, menos el descuento %. El total_price guardado puede venir sin el recargo.
     fin = oc.financial
+    discount_pct = (fin.discount or 0) if fin else 0
+    subtotal = sum(i["precio"] * i["cantidad"] for i in items)
+    total = subtotal - subtotal * discount_pct / 100
     return {
         "order": {
             "id": oc.id, "oc_number": oc.oc_number, "status": oc.status, "status_group": group,
@@ -265,8 +287,9 @@ def obtener_expediente(
         },
         "items": items,
         "financial": {
-            "total": fin.total_price if fin else sum(i["precio"] * i["cantidad"] for i in items),
-            "discount": fin.discount if fin else 0,
+            "subtotal": subtotal,
+            "total": total,
+            "discount": discount_pct,
         },
         "timeline": timeline,
         "partner": partner,
@@ -306,9 +329,16 @@ def actualizar_cremacion(
     cremation_in: schemas.CremationOCUpdate,
     tenant_id: int = Depends(get_tenant_id),
     service: CremationService = Depends(get_cremation_service),
+    current_user=Depends(get_current_user),
     _: bool = Depends(check_permission("ordenes", "edit"))
 ):
     """Actualiza una OC y sus asociaciones (servicios, planes, productos)."""
+    # Retroceder el estado (p. ej. entregado -> pendiente) es solo del dueño.
+    if cremation_in.status and not board.is_owner(current_user):
+        current = service.get_by_id(tenant_id, cremation_id)
+        old_rank, new_rank = board.status_rank(current.status), board.status_rank(cremation_in.status)
+        if old_rank is not None and new_rank is not None and new_rank < old_rank:
+            raise HTTPException(status_code=403, detail="Solo el administrador del crematorio puede retroceder el estado de una orden")
     return service.update(tenant_id, cremation_id, cremation_in)
 
 @router.delete("/{cremation_id}")
@@ -320,6 +350,54 @@ def eliminar_cremacion(
 ):
     """Elimina una OC y sus registros asociados (con restauración de stock y limpieza de archivos)."""
     return service.delete(tenant_id, cremation_id)
+
+@router.get("/{cremation_id}/delete-preview")
+def vista_previa_eliminacion(
+    cremation_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    _: bool = Depends(check_permission("ordenes", "delete"))
+):
+    """Lo que se borra junto con la OC (para el aviso de confirmación). Debe
+    coincidir con CremationService.delete y las cascadas de CremationOC."""
+    from fastapi import HTTPException
+    from app import models
+
+    C = models.Cremation
+    oc = db.query(C).filter(C.id == cremation_id, C.tenant_id == tenant_id).first()
+    if not oc:
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
+
+    other_orders = db.query(C).filter(C.pet_id == oc.pet_id, C.id != oc.id).count() if oc.pet_id else 0
+    pet = oc.pet
+    pet_photos = 0
+    if pet and other_orders == 0:
+        pet_photos = (1 if pet.image_url else 0) + len([u for u in (pet.images or []) if u and u != pet.image_url])
+    evidence_photos = len([e for e in (oc.evidence or []) if e.photo_url])
+    order_photos = len((oc.details.images if oc.details else None) or [])
+    comm = oc.commission
+
+    return {
+        "oc_number": oc.oc_number,
+        "verification_code": oc.verification_code,
+        "status": oc.status,
+        "pet_name": pet.name if pet else None,
+        "customer_name": pet.customer.name if pet and pet.customer else None,
+        "servicios": len(oc.servicios or []),
+        "planes": len(oc.planes or []),
+        "productos": sum((p.cantidad or 0) for p in (oc.productos or [])),
+        "certificados": len(oc.certificates or []),
+        "documentos": len(oc.documents or []),
+        "evidencias": len(oc.evidence or []),
+        "fotos": order_photos + evidence_photos,
+        "tareas_logistica": len(oc.logistics_tasks or []),
+        "comision": {
+            "amount": comm.amount,
+            "status": str(getattr(comm.status, "value", comm.status)),
+        } if comm else None,
+        # Si es la única orden de la mascota, el servicio borra también sus fotos
+        "fotos_mascota": pet_photos,
+    }
 
 @router.post("/upload-image")
 async def upload_image(

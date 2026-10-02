@@ -485,6 +485,13 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
         }
     }, [currentCremation.status]);
 
+    // Estado ya guardado en el servidor por otra vía (p. ej. «Retroceder»): se
+    // aplica también al snapshot para que no figure como cambio pendiente.
+    const applySavedStatus = useCallback((status: string) => {
+        setCurrentCremation(prev => ({ ...prev, status }));
+        setOriginalCremation(prev => (prev ? { ...prev, status } : prev));
+    }, []);
+
     const handleConfirmCancel = useCallback(() => {
         if (tempStatus) {
             setCurrentCremation(prev => ({ ...prev, status: tempStatus }));
@@ -1316,6 +1323,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
 
         // Handlers
         handleStatusChange,
+        applySavedStatus,
         handleConfirmCancel,
         handlePetChange,
         syncAddressFromCustomer,

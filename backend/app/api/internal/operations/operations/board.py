@@ -21,6 +21,28 @@ ACTIVE_STATUSES = NOT_STARTED_STATUSES + IN_PROGRESS_STATUSES
 FINAL_STATUSES = ["completed", "delivered", "completado", "entregado"]
 CANCELED_STATUSES = ["cancelado", "canceled", "cancelled", "rejected", "rechazado", "rechazado_por_cliente"]
 
+# Dueño del crematorio: solo él puede retroceder una orden (espejo de
+# OWNER_ROLES en frontend-saas/src/lib/tenant/roles.ts)
+OWNER_ROLES = [models.UserRole.admin, models.UserRole.creator]
+
+
+def is_owner(user) -> bool:
+    return getattr(user, "role", None) in OWNER_ROLES
+
+
+def status_rank(status: Optional[str]) -> Optional[int]:
+    """Posición en el flujo: 0 por iniciar, 1 en proceso, 2 entregada.
+    None = cancelada (no forma parte del avance)."""
+    s = (status or "").strip().lower()
+    if s in CANCELED_STATUSES:
+        return None
+    if s in FINAL_STATUSES:
+        return 2
+    if s in IN_PROGRESS_STATUSES:
+        return 1
+    return 0
+
+
 OPS_ROLES = [
     models.UserRole.admin,
     models.UserRole.driver,

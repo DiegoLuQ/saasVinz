@@ -17,7 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Modal from '@/components/tenant/Modal';
 import { useDocuments, useDeleteDocument, fetchDocumentContent, DocumentItem } from '@/hooks/useDocuments';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
-import { extractCertSpec, renderCertSpecToCanvas } from '@/lib/certImageDraw';
+import { downloadHtmlAsPdf, pdfFileName } from '@/lib/certPdf';
 
 export default function DocumentsPage() {
     // Queries & Mutations
@@ -86,48 +86,11 @@ export default function DocumentsPage() {
         }
     };
 
-    const blobToDataURL = (blob: Blob): Promise<string> =>
-        new Promise((resolve, reject) => {
-            const fr = new FileReader();
-            fr.onload = () => resolve(fr.result as string);
-            fr.onerror = reject;
-            fr.readAsDataURL(blob);
-        });
-
-    // Reemplaza los src de <img> por dataURL (descargando vía fetch->blob) para
-    // que html2canvas pueda capturarlas aunque vengan de R2 (cross-origin).
-    const inlineImages = async (html: string): Promise<string> => {
-        const urls = new Set<string>();
-        const re = /<img\b[^>]*?\bsrc="([^"]+)"/gi;
-        let m: RegExpExecArray | null;
-        while ((m = re.exec(html)) !== null) {
-            const u = m[1];
-            if (u && !u.startsWith('data:')) urls.add(u);
-        }
-        const entries = await Promise.all([...urls].map(async (u) => {
-            try {
-                const resp = await fetch(u, { mode: 'cors', cache: 'no-cache' });
-                if (!resp.ok) return null;
-                const blob = await resp.blob();
-                return [u, await blobToDataURL(blob)] as const;
-            } catch {
-                return null;
-            }
-        }));
-        for (const e of entries) {
-            if (!e) continue;
-            html = html.split(`src="${e[0]}"`).join(`src="${e[1]}"`);
-        }
-        return html;
-    };
-
-    // Descarga el documento como PDF (sin diálogo de impresión). Renderiza el HTML
-    // guardado en un iframe oculto y lo captura con html2canvas -> jsPDF. Misma
-    // idea que "Descargar PDF" de la emisión, pero a partir del HTML almacenado.
+    // Descarga el documento como PDF (sin diálogo de impresión) a partir del HTML
+    // almacenado.
     const handleDownloadPdf = async (doc: DocumentItem) => {
         if (downloadingId) return;
         setDownloadingId(doc.id);
-        let iframe: HTMLIFrameElement | null = null;
         try {
             let html = doc.html_content;
             if (!html && doc.is_generated) {
@@ -137,77 +100,11 @@ export default function DocumentsPage() {
                 showToast('El contenido del documento no está disponible.', 'error');
                 return;
             }
-
-            // Camino preferido: si el HTML trae el spec estructurado (certificadoImg),
-            // redibujamos en canvas con TODOS los efectos (borde/halo/feather), que
-            // html2canvas no soporta.
-            const spec = extractCertSpec(html);
-            if (spec) {
-                const canvas = await renderCertSpecToCanvas(spec, 816, 3);
-                const { default: JsPDF } = await import('jspdf');
-                const w = canvas.width, h = canvas.height;
-                const pdf = new JsPDF({ unit: 'px', format: [w, h], orientation: w >= h ? 'landscape' : 'portrait' });
-                pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
-                pdf.save(`${(doc.number || doc.pet_name || 'documento').replace(/[^\w-]/g, '_')}.pdf`);
-                return;
-            }
-
-            // Fallback (certificados HTML por secciones / recibos): capturar el HTML.
-            // Hacer relativas las URLs de /storage y /static para same-origin (proxy).
-            html = html.replace(/https?:\/\/[^/"')\s]+(\/(?:storage|static)\/)/g, '$1');
-
-            // Incrustar las imágenes (<img src>) como dataURL. Las imágenes del
-            // fondo/fotos viven en R2 (cross-origin); si no se incrustan, el canvas
-            // queda "tainted" y salen en blanco. Mismo enfoque fetch->blob que la
-            // emisión.
-            html = await inlineImages(html);
-
-            iframe = document.createElement('iframe');
-            iframe.style.position = 'fixed';
-            iframe.style.left = '-10000px';
-            iframe.style.top = '0';
-            iframe.style.width = '816px'; // ancho base ~A4 a 96dpi
-            iframe.style.border = '0';
-            document.body.appendChild(iframe);
-
-            const idoc = iframe.contentWindow!.document;
-            idoc.open();
-            idoc.write(html);
-            idoc.close();
-
-            // Esperar carga del documento
-            await new Promise<void>((resolve) => {
-                if (idoc.readyState === 'complete') resolve();
-                else iframe!.contentWindow!.addEventListener('load', () => resolve());
-            });
-            // Esperar fuentes
-            try { await (idoc as any).fonts?.ready; } catch { /* noop */ }
-            // Esperar imágenes
-            const imgs = Array.from(idoc.images);
-            await Promise.all(imgs.map((im) => im.complete ? Promise.resolve() : new Promise((r) => { im.onload = im.onerror = () => r(null); })));
-
-            const target = (idoc.querySelector('.cert-canvas') as HTMLElement) || idoc.body;
-            iframe.style.height = `${Math.max(target.scrollHeight, 200)}px`;
-
-            const html2canvas = (await import('html2canvas')).default;
-            const canvas = await html2canvas(target, {
-                useCORS: true,
-                backgroundColor: '#ffffff',
-                scale: 2,
-                logging: false,
-            });
-
-            const { default: JsPDF } = await import('jspdf');
-            const w = canvas.width, h = canvas.height;
-            const pdf = new JsPDF({ unit: 'px', format: [w, h], orientation: w >= h ? 'landscape' : 'portrait' });
-            pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
-            const fileName = `${(doc.number || doc.pet_name || 'documento').replace(/[^\w-]/g, '_')}.pdf`;
-            pdf.save(fileName);
+            await downloadHtmlAsPdf(html, pdfFileName(doc.number || doc.pet_name || 'documento'));
         } catch (error: any) {
             console.error('Error al generar PDF:', error);
             showToast('Error al generar el PDF: ' + (error?.message || ''), 'error');
         } finally {
-            if (iframe) document.body.removeChild(iframe);
             setDownloadingId(null);
         }
     };

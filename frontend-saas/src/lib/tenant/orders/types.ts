@@ -168,6 +168,23 @@ export function normalizeOrderStatus(raw?: string | null): string {
 
 export const statusOptions = EDITABLE_STATUSES.map((key) => ({ value: key, label: statusLabels[key] }));
 
+/** Posición en el flujo (pendiente 0, en proceso 1, entregado 2); cancelado = null. Espejo de board.status_rank. */
+export function statusRank(raw?: string | null): number | null {
+    const v = normalizeOrderStatus(raw);
+    if (v === 'cancelado') return null;
+    return v === 'entregado' ? 2 : v === 'en_proceso' ? 1 : 0;
+}
+
+/** Opciones del selector sin retroceder respecto del estado guardado (retroceder = botón «Retroceder», solo dueño). */
+export function forwardStatusOptions(savedStatus?: string | null) {
+    const min = statusRank(savedStatus);
+    if (min === null) return statusOptions;
+    return statusOptions.filter((o) => {
+        const r = statusRank(o.value);
+        return r === null || r >= min;
+    });
+}
+
 export const statusColors: Record<string, string> = {
     'pendiente': 'bg-yellow-500/10 text-yellow-500',
     'en_proceso': 'bg-blue-500/10 text-blue-500',
