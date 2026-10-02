@@ -74,10 +74,11 @@ const EXPIRATION_OPTIONS: Record<CatalogType, ExpirationOption[]> = {
         { label: '30 Días', value: 720, badge: null },
         { label: 'Permanente', value: null, badge: 'Sin vencimiento' },
     ],
-    // El catálogo de planes solo se comparte por 30 días o 1 año (el backend lo exige)
+    // El catálogo de planes solo se comparte por 10 días, 1 año o sin vencimiento (el backend lo exige)
     plans: [
-        { label: '30 Días', value: 720, badge: 'Recomendado' },
+        { label: '10 Días', value: 240, badge: 'Recomendado' },
         { label: '1 Año', value: 8760, badge: null },
+        { label: 'Permanente', value: null, badge: 'Sin vencimiento' },
     ],
 };
 
@@ -231,7 +232,7 @@ export default function ShareCatalogModal({
                         </div>
 
                         {/* Opciones de expiración */}
-                        <div className={`grid gap-2.5 ${isPlans ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'}`}>
+                        <div className={`grid gap-2.5 ${isPlans ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3'}`}>
                             {expirationOptions.map((opt) => {
                                 const isSelected = selectedHours === opt.value;
                                 return (

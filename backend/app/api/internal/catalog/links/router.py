@@ -11,8 +11,8 @@ from app.api.internal.admin.rbac.router import check_permission
 from app.api.internal.catalog.models import CatalogShareToken
 from app.api.internal.catalog.schemas import CatalogType
 
-# Catálogo de planes: vigencias permitidas (30 días, 1 año)
-PLANS_EXPIRATION_HOURS = {720, 8760}
+# Catálogo de planes: vigencias permitidas (10 días, 1 año; sin valor = permanente)
+PLANS_EXPIRATION_HOURS = {240, 8760}
 from app.utils import tz
 
 router = APIRouter()
@@ -87,9 +87,9 @@ def create_catalog_share_link(
     now = tz.get_now()
     expires_at = None
 
-    # Catálogo de planes: solo vigencias de 30 días o 1 año
-    if data.catalog_type == "plans" and data.expires_in_hours not in PLANS_EXPIRATION_HOURS:
-        raise HTTPException(status_code=400, detail="La vigencia del catálogo de planes debe ser 30 días o 1 año.")
+    # Catálogo de planes: solo 10 días, 1 año o permanente (None / 0)
+    if data.catalog_type == "plans" and data.expires_in_hours and data.expires_in_hours not in PLANS_EXPIRATION_HOURS:
+        raise HTTPException(status_code=400, detail="La vigencia del catálogo de planes debe ser 10 días, 1 año o permanente.")
 
     if data.expires_in_hours and data.expires_in_hours > 0:
         expires_at = now + timedelta(hours=data.expires_in_hours)
