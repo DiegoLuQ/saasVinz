@@ -9,7 +9,7 @@ from app import schemas, models
 from app.api.deps import get_tenant_id, get_current_user
 from app.api.internal.admin.rbac.router import check_permission
 from app.api.internal.catalog.models import CatalogShareToken
-from app.api.internal.catalog.schemas import CatalogType
+from app.api.internal.catalog.schemas import CatalogType, CatalogShareTokenBulkUpdate
 
 # Catálogo de planes: vigencias permitidas (10 días, 1 año; sin valor = permanente)
 PLANS_EXPIRATION_HOURS = {240, 8760}
@@ -116,6 +116,38 @@ def create_catalog_share_link(
     db.refresh(new_token)
 
     return _to_dto(new_token, now)
+
+
+@router.put("/bulk", response_model=List[schemas.CatalogShareTokenInDB])
+def bulk_update_catalog_share_links(
+    data: CatalogShareTokenBulkUpdate,
+    tenant_id: int = Depends(get_tenant_id),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Aplica la etiqueta y el mensaje indicados a todos los enlaces del tipo (vacío = quitar)."""
+    _authorize(db, current_user, tenant_id, data.catalog_type, "edit")
+
+    name = (data.name or "").strip() or None
+    message = ((data.message or "").strip() or None) if data.catalog_type == "plans" else None
+
+    tokens = (
+        db.query(CatalogShareToken)
+        .filter(
+            CatalogShareToken.tenant_id == tenant_id,
+            CatalogShareToken.catalog_type == data.catalog_type,
+        )
+        .order_by(CatalogShareToken.created_at.desc())
+        .all()
+    )
+    for item in tokens:
+        item.name = name
+        if data.catalog_type == "plans":
+            item.message = message
+    db.commit()
+
+    now = tz.get_now()
+    return [_to_dto(item, now) for item in tokens]
 
 
 @router.delete("/{token_id}", status_code=status.HTTP_204_NO_CONTENT)

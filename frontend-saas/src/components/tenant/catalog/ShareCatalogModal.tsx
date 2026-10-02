@@ -14,6 +14,7 @@ import {
     Sparkles,
     MessageCircle,
     Plus,
+    RefreshCw,
     X,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/tenant/api';
@@ -101,6 +102,7 @@ export default function ShareCatalogModal({
     const [linkLabel, setLinkLabel] = useState('');
     const [linkMessage, setLinkMessage] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isUpdatingAll, setIsUpdatingAll] = useState(false);
     const [links, setLinks] = useState<CatalogLink[]>([]);
     const [loadingLinks, setLoadingLinks] = useState(false);
     const [copiedToken, setCopiedToken] = useState<string | null>(null);
@@ -157,6 +159,31 @@ export default function ShareCatalogModal({
             showToast(err.message || 'Error al generar el enlace', 'error');
         } finally {
             setIsGenerating(false);
+        }
+    };
+
+    // Aplica la etiqueta (y el mensaje, en planes) del formulario a todos los enlaces existentes
+    const handleUpdateAll = async () => {
+        if (links.length === 0) return;
+        const fields = isPlans ? 'la etiqueta y el mensaje' : 'la etiqueta';
+        if (!confirm(`¿Aplicar ${fields} a los ${links.length} enlaces generados? Los campos vacíos se quitarán de todos.`)) return;
+        setIsUpdatingAll(true);
+        try {
+            const res = await apiRequest('/api/internal/catalog/links/bulk', {
+                method: 'PUT',
+                body: JSON.stringify({
+                    catalog_type: catalogType,
+                    name: linkLabel.trim() || null,
+                    message: isPlans ? linkMessage.trim() || null : undefined,
+                }),
+            });
+            if (Array.isArray(res)) setLinks(res);
+            showToast(`Se actualizaron ${links.length} enlaces`, 'success');
+        } catch (err: any) {
+            console.error('Error updating catalog links:', err);
+            showToast(err.message || 'Error al actualizar los enlaces', 'error');
+        } finally {
+            setIsUpdatingAll(false);
         }
     };
 
@@ -316,6 +343,28 @@ export default function ShareCatalogModal({
                                 </>
                             )}
                         </button>
+
+                        {links.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={handleUpdateAll}
+                                disabled={isUpdatingAll || isGenerating}
+                                className="w-full py-2.5 px-4 rounded-xl border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 text-amber-300 font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                                title={isPlans ? 'Aplica la etiqueta y el mensaje a todos los enlaces generados' : 'Aplica la etiqueta a todos los enlaces generados'}
+                            >
+                                {isUpdatingAll ? (
+                                    <>
+                                        <Loader2 size={15} className="animate-spin" />
+                                        <span>Actualizando enlaces...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <RefreshCw size={15} />
+                                        <span>Actualizar todos los enlaces ({links.length})</span>
+                                    </>
+                                )}
+                            </button>
+                        )}
                     </form>
 
                     {/* Enlace recién generado */}

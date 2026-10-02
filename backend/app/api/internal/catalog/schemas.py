@@ -199,6 +199,12 @@ class CatalogShareTokenCreate(BaseModel):
     # Solo catálogo de planes: mensaje visible para la familia
     message: Optional[str] = Field(default=None, max_length=CATALOG_MESSAGE_MAX)
 
+class CatalogShareTokenBulkUpdate(BaseModel):
+    """Aplica la misma etiqueta y mensaje a todos los enlaces de un tipo (vacío = quitar)."""
+    catalog_type: CatalogType = "products"
+    name: Optional[str] = Field(default=None, max_length=100)
+    message: Optional[str] = Field(default=None, max_length=CATALOG_MESSAGE_MAX)
+
 class CatalogShareTokenInDB(BaseModel):
     id: int
     tenant_id: int
