@@ -83,6 +83,10 @@ def update_memorial_admin(
     
     if update_data.valid_until is not None:
         memorial.valid_until = update_data.valid_until
+
+    # Plan Eterno = pago único, sin vencimiento
+    if update_data.plan is not None and update_data.plan.strip().lower() == "eterno":
+        memorial.valid_until = None
         
     if update_data.status is not None:
         memorial.status = update_data.status

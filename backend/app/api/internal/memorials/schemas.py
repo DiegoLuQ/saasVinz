@@ -130,6 +130,16 @@ class MemorialCardResponse(BaseModel):
     pet_birth_date: Optional[datetime] = None
     pet_death_date: Optional[datetime] = None
     tenant_name: str
-    
+    tenant_logo_url: Optional[str] = None
+
     class Config:
         from_attributes = True
+
+
+class PublicCrematoriumResponse(BaseModel):
+    """Crematorio con memoriales públicos (landing del memorial)"""
+    name: str
+    logo_url: Optional[str] = None
+    city: Optional[str] = None
+    region: Optional[str] = None
+    memorials_count: int

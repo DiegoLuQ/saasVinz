@@ -103,20 +103,72 @@ def list_public_memorials(
             pet_image_url=normalize_image_url(m.main_image_url or (m.pet.image_url if m.pet else None)),
             pet_birth_date=m.pet.birth_date if m.pet else None,
             pet_death_date=m.pet.death_date if m.pet else None,
-            tenant_name=m.tenant.name if m.tenant else "Empresa"
+            tenant_name=m.tenant.name if m.tenant else "Empresa",
+            tenant_logo_url=normalize_image_url(m.tenant.logo_url) if m.tenant and m.tenant.logo_url else None,
         )
         for m in memorials
     ]
+
+
+@router.get("/crematorios", response_model=list[mem_schemas.PublicCrematoriumResponse])
+def list_public_crematoria(limit: int = 24, db: Session = Depends(get_db)):
+    """Crematorios activos con al menos un memorial público y vigente (landing).
+    Solo datos que ya son visibles en las tarjetas públicas: nombre, logo y ubicación."""
+    from sqlalchemy import func
+    limit = max(1, min(limit, 48))
+    rows = (
+        db.query(models.Tenant, func.count(mem_models.Memorial.id))
+        .join(mem_models.Memorial, mem_models.Memorial.id_tenant == models.Tenant.id)
+        .filter(
+            mem_models.Memorial.es_privado == False,
+            mem_models.Memorial.status == mem_models.MemorialStatus.active,
+            models.Tenant.status == models.TenantStatus.active,
+        )
+        .group_by(models.Tenant.id)
+        .order_by(func.count(mem_models.Memorial.id).desc(), models.Tenant.name.asc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        mem_schemas.PublicCrematoriumResponse(
+            name=t.name,
+            logo_url=normalize_image_url(t.logo_url) if t.logo_url else None,
+            city=t.city,
+            region=t.region,
+            memorials_count=count,
+        )
+        for t, count in rows
+    ]
+
+
+# Planes de la landing del memorial (USD, venta asistida). Sus límites se leen
+# de rec_plans por name_db; los planes previos mantienen su mapeo heredado.
+LANDING_MEMORIAL_PLANS = {"mensual", "anual", "eterno"}
+
+
+def _landing_plan(memorial: mem_models.Memorial, db: Session):
+    """rec_plans del plan Mensual/Anual/Eterno asignado al memorial, si aplica."""
+    name = (memorial.plan or "").strip().lower()
+    if name not in LANDING_MEMORIAL_PLANS:
+        return None
+    return db.query(mem_models.MemorialPlan).filter(mem_models.MemorialPlan.name_db == name).first()
+
 
 def _get_memorial_limit(memorial: mem_models.Memorial, db: Session) -> int:
     # 1. Check if linked to a specific plan
     if memorial.memorial_plan:
          features = memorial.memorial_plan.features or {}
          return features.get("velas", features.get("max_dedications", 0))
-    
+
+    # 1b. Planes Mensual / Anual / Eterno
+    landing = _landing_plan(memorial, db)
+    if landing:
+         features = landing.features or {}
+         return features.get("velas", features.get("max_dedications", 0))
+
     # 2. Fallback to name matching in MemorialPlan (legacy support)
     plan_name = memorial.plan or (memorial.tenant.subscription_plan.name if memorial.tenant and memorial.tenant.subscription_plan else "FREE")
-    
+
     # Map common names to name_db
     pn = plan_name.upper().strip()
     db_name = None
@@ -145,7 +197,12 @@ def _get_memorial_img_limit(memorial: mem_models.Memorial, db: Session) -> int:
          result = features.get("max_images", 3)
          print(f"[LIMIT DEBUG] -> via memorial_plan features={features}, returns {result}")
          return result
-    
+
+    # 1b. Planes Mensual / Anual / Eterno
+    landing = _landing_plan(memorial, db)
+    if landing:
+         return (landing.features or {}).get("max_images", 3)
+
     # 2. Fallback to name matching (priority order):
     #    a) memorial.plan (snapshot at creation)
     #    b) tenant.subscription_plan.name (new subscription system)

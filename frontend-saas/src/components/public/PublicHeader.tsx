@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Globe, Menu, X, ChevronRight } from 'lucide-react';
-import { getTranslations, type Locale } from '@/lib/translations';
+import type { Locale } from '@/lib/translations';
+import { getLandingContent, LANDING_SECTIONS } from '@/lib/memorialLanding';
 
 export interface PublicHeaderProps {
     isDark?: boolean;
@@ -121,15 +122,33 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
         window.dispatchEvent(new Event('localeChange'));
     };
 
-    const t = getTranslations(locale);
+    const lc = getLandingContent(locale);
 
+    // Landing one-page: anclas a las secciones de la portada. Desde otras
+    // páginas (/memorials, memorial, gestión) llevan a la portada en esa sección.
     const pathname = usePathname();
-    const navItems = [
-        { href: '/memorials', label: t.nav_gallery },
-        { href: '/our-services', label: t.nav_services },
-        { href: '/planning', label: t.nav_planning },
-    ];
-    const isActive = (href: string) => pathname === href || pathname?.startsWith(`${href}/`);
+    const onLanding = pathname === '/' || pathname === '/public';
+    const navItems = LANDING_SECTIONS.map(id => ({ id, href: onLanding ? `#${id}` : `/#${id}`, label: lc.nav[id] }));
+    const [activeSection, setActiveSection] = useState<string | null>(null);
+    const isActive = (id: string) => onLanding && activeSection === id;
+
+    // Resalta la sección visible al hacer scroll (solo en la portada)
+    useEffect(() => {
+        if (!onLanding) return;
+        const sections = LANDING_SECTIONS
+            .map(id => document.getElementById(id))
+            .filter((el): el is HTMLElement => !!el);
+        if (sections.length === 0) return;
+        const observer = new IntersectionObserver(
+            entries => {
+                const visible = entries.filter(e => e.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+                if (visible) setActiveSection(visible.target.id);
+            },
+            { rootMargin: '-40% 0px -50% 0px', threshold: [0, 0.25, 0.5] }
+        );
+        sections.forEach(s => observer.observe(s));
+        return () => observer.disconnect();
+    }, [onLanding]);
 
     // Helper to detect brightness for custom background colors
     const isColorDark = (hex?: string) => {
@@ -156,7 +175,7 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
         >
             {/* Header Outer Glow/Border effect */}
             <div className={`
-                w-auto md:w-full max-w-6xl relative
+                w-auto md:w-full max-w-6xl xl:max-w-7xl relative
                 ${effectiveIsDark 
                     ? 'bg-slate-950/70 border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.4)]' 
                     : 'bg-white/80 border-slate-200/60 shadow-[0_8px_32px_0_rgba(31,38,135,0.08)]'}
@@ -166,43 +185,41 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                 {/* Subtle golden ambient top line on hover/scroll */}
                 <div className={`absolute top-0 inset-x-12 h-px bg-gradient-to-r from-transparent via-[#c5a059]/50 to-transparent transition-opacity duration-500 ${isScrolled ? 'opacity-100' : 'opacity-0'}`} />
 
-                <div className="relative h-14 flex items-center justify-between gap-8 md:gap-0">
+                <div className="relative h-14 flex items-center justify-between gap-4">
 
                     {/* LOGO - Lado Izquierdo */}
                     <Link
                         href="/"
                         onClick={() => setIsMobileMenuOpen(false)}
-                        className="flex items-center gap-3 group transition-all duration-300 active:scale-95"
+                        className="flex shrink-0 items-center gap-3 group transition-all duration-300 active:scale-95"
                     >
-                        <div className="relative w-11 h-11 bg-black rounded-full flex items-center justify-center shadow-lg shadow-black/30 ring-2 ring-white/10 overflow-hidden transition-all duration-500 group-hover:scale-105 group-hover:ring-[#c5a059]/50 group-hover:shadow-[#c5a059]/20">
-                            <img
-                                src={`https://pub-${process.env.NEXT_PUBLIC_CLOUDFLARE_R2}/library/gallery/69632b5a-b655-4452-8d25-ddfe7ced4e86.webp`}
-                                alt="Paw Memory Logo"
-                                className="w-full h-full object-cover mix-blend-screen scale-125 transition-transform duration-700 group-hover:rotate-12 group-hover:scale-135"
-                            />
-                            {/* Inner golden glow */}
-                            <div className="absolute inset-0 rounded-full border border-[#c5a059]/25 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                        </div>
+                        <img
+                            src="/logo-vinzer.webp"
+                            alt="Vinzer"
+                            width={92}
+                            height={45}
+                            className="h-9 w-auto transition-transform duration-500 group-hover:scale-105"
+                        />
                         <div className="flex flex-col">
                             <span className={`text-xl font-serif italic font-extrabold tracking-tight transition-all duration-300 ${effectiveIsDark ? 'text-white group-hover:text-[#c5a059]' : 'text-slate-900 group-hover:text-[#c5a059]'}`}>
-                                Paw Memory
+                                Vinzer
                             </span>
-                            <span className="text-[7px] uppercase tracking-widest text-[#c5a059] font-bold opacity-80 group-hover:opacity-100 transition-opacity duration-300 -mt-1">
-                                Eternal Tribute
+                            <span className="text-[7px] uppercase tracking-[0.3em] text-[#c5a059] font-bold opacity-80 group-hover:opacity-100 transition-opacity duration-300 -mt-1">
+                                Memorial
                             </span>
                         </div>
                     </Link>
 
                     {/* NAVEGACIÓN CENTRAL */}
-                    <nav className="hidden md:flex items-center gap-2 absolute left-1/2 -translate-x-1/2">
+                    <nav className="hidden xl:flex flex-1 min-w-0 items-center justify-center gap-0.5">
                         {navItems.map((item) => {
-                            const active = isActive(item.href);
+                            const active = isActive(item.id);
                             return (
                                 <Link
-                                    key={item.href}
+                                    key={item.id}
                                     href={item.href}
-                                    aria-current={active ? 'page' : undefined}
-                                    className={`group relative px-5 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-full transition-all duration-300 z-10
+                                    aria-current={active ? 'location' : undefined}
+                                    className={`group relative px-2.5 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] whitespace-nowrap rounded-full transition-all duration-300 z-10
                                         ${active ? 'text-[#c5a059]' : `${textMutedClass} hover:text-[#c5a059]`}`}
                                 >
                                     {active && (
@@ -228,13 +245,13 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                         aria-label="Abrir menú"
                         aria-expanded={isMobileMenuOpen}
                         aria-controls="mobile-menu"
-                        className={`md:hidden p-3 rounded-full transition-all duration-300 ${textMainClass} hover:bg-white/10 active:scale-90 border ${effectiveIsDark ? 'border-white/5 bg-white/5' : 'border-slate-200/50 bg-slate-50/50'}`}
+                        className={`xl:hidden p-3 rounded-full transition-all duration-300 ${textMainClass} hover:bg-white/10 active:scale-90 border ${effectiveIsDark ? 'border-white/5 bg-white/5' : 'border-slate-200/50 bg-slate-50/50'}`}
                     >
                         <Menu size={20} className="text-[#c5a059]" />
                     </button>
 
                     {/* ACCIONES - Lado Derecho */}
-                    <div className="hidden md:flex items-center gap-4">
+                    <div className="hidden xl:flex shrink-0 items-center gap-3">
                         {/* Language Toggle Premium */}
                         <button
                             onClick={toggleLocale}
@@ -260,7 +277,7 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                                     ? 'border-white/10 text-white bg-white/5 hover:bg-[#c5a059]/10 hover:border-[#c5a059]' 
                                     : 'border-slate-200 text-slate-800 bg-slate-50 hover:bg-[#c5a059]/10 hover:border-[#c5a059]'}`}
                         >
-                            {t.nav_login}
+                            {lc.nav_login}
                         </Link>
 
                         {/* Botón CTA (Estilo Nomad Gear) */}
@@ -271,7 +288,7 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                                 ? 'bg-white text-black hover:bg-[#c5a059] hover:text-white hover:shadow-[#c5a059]/25 hover:shadow-lg'
                                 : 'bg-slate-900 text-white hover:bg-[#c5a059] hover:shadow-[#c5a059]/25 hover:shadow-lg'}`}
                         >
-                            {t.nav_cta}
+                            {lc.nav_cta}
                         </Link>
                     </div>
                 </div>
@@ -280,7 +297,7 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
             {/* Mobile Bottom Sheet */}
             <AnimatePresence>
             {isMobileMenuOpen && (
-                <div className="md:hidden">
+                <div className="xl:hidden">
                     {/* Backdrop */}
                     <motion.div
                         initial={{ opacity: 0 }}
@@ -319,16 +336,10 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                             {/* Marca */}
                             <motion.div variants={itemVariants} className="flex items-center justify-between mb-5">
                                 <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center ring-2 ring-[#c5a059]/30 overflow-hidden">
-                                        <img
-                                            src={`https://pub-${process.env.NEXT_PUBLIC_CLOUDFLARE_R2}/library/gallery/69632b5a-b655-4452-8d25-ddfe7ced4e86.webp`}
-                                            alt="Paw Memory Logo"
-                                            className="w-full h-full object-cover mix-blend-screen scale-125"
-                                        />
-                                    </div>
+                                    <img src="/logo-vinzer.webp" alt="Vinzer" width={82} height={40} className="h-8 w-auto" />
                                     <div className="flex flex-col">
-                                        <span className="text-lg font-serif italic font-bold tracking-tight text-white">Paw Memory</span>
-                                        <span className="text-[7px] uppercase tracking-widest text-[#c5a059] font-bold opacity-80 -mt-0.5">Eternal Tribute</span>
+                                        <span className="text-lg font-serif italic font-bold tracking-tight text-white">Vinzer</span>
+                                        <span className="text-[7px] uppercase tracking-[0.3em] text-[#c5a059] font-bold opacity-80 -mt-0.5">Memorial</span>
                                     </div>
                                 </Link>
                                 <button
@@ -343,13 +354,13 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                             {/* Enlaces */}
                             <nav className="flex flex-col">
                                 {navItems.map((item, index) => {
-                                    const active = isActive(item.href);
+                                    const active = isActive(item.id);
                                     return (
-                                        <motion.div key={item.href} variants={itemVariants}>
+                                        <motion.div key={item.id} variants={itemVariants}>
                                             <Link
                                                 href={item.href}
                                                 onClick={() => setIsMobileMenuOpen(false)}
-                                                aria-current={active ? 'page' : undefined}
+                                                aria-current={active ? 'location' : undefined}
                                                 className={`group flex items-center justify-between py-4 border-b border-white/5 transition-colors ${active ? 'text-[#c5a059]' : 'text-white/90 hover:text-[#c5a059]'}`}
                                             >
                                                 <span className="flex items-baseline gap-3">
@@ -383,14 +394,14 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                                     onClick={() => setIsMobileMenuOpen(false)}
                                     className="px-8 py-3.5 border border-white/10 text-white rounded-full text-xs font-black uppercase tracking-widest bg-white/5 hover:bg-[#c5a059]/10 hover:border-[#c5a059] transition-all text-center"
                                 >
-                                    {t.nav_login}
+                                    {lc.nav_login}
                                 </Link>
                                 <Link
                                     href="/#planes"
                                     onClick={() => setIsMobileMenuOpen(false)}
                                     className="px-8 py-3.5 bg-[#c5a059] text-white rounded-full text-xs font-black uppercase tracking-widest shadow-lg shadow-[#c5a059]/20 hover:bg-[#b38f4d] hover:shadow-xl transition-all text-center"
                                 >
-                                    {t.nav_cta}
+                                    {lc.nav_cta}
                                 </Link>
                             </motion.div>
                         </div>
