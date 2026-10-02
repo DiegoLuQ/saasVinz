@@ -377,7 +377,9 @@ const FarewellPreview = forwardRef<HTMLDivElement, FarewellPreviewProps>(({ conf
                         left: px(config.frame.margin, 0),
                         right: px(config.frame.margin, 0),
                         bottom: px(config.frame.margin, 0),
-                        border: `${Math.max(1, px(config.frame.width, 1))}px solid ${config.frame.color}`,
+                        border: `${Math.max(1, px(config.frame.width, 1))}px ${config.frame.style || 'solid'} ${config.frame.color}`,
+                        borderRadius: `${px(config.frame.radius, 0)}px`,
+                        opacity: typeof config.frame.opacity === 'number' ? config.frame.opacity : 1,
                         boxShadow: 'inset 0 0 20px rgba(0,0,0,0.1)',
                     }}
                 />
@@ -700,6 +702,10 @@ const FarewellPreview = forwardRef<HTMLDivElement, FarewellPreviewProps>(({ conf
                     'www.crematorio.com'
                 );
                 if (!websiteText) return null;
+                const wf = config.tenantWebsiteFormatting || {};
+                // Grosor: fontWeight numérico (editor) o el antiguo booleano bold
+                const weight = wf.fontWeight ?? (wf.bold ? 700 : 400);
+                const bg = wf.backgroundColor || '';
                 return (
                     <div
                         className="absolute w-full text-center pointer-events-none"
@@ -713,14 +719,21 @@ const FarewellPreview = forwardRef<HTMLDivElement, FarewellPreviewProps>(({ conf
                     >
                         <p
                             style={{
-                                fontFamily,
-                                fontSize: `${px(config.tenantWebsiteFormatting?.fontSize, 11)}px`,
-                                fontWeight: config.tenantWebsiteFormatting?.bold ? 'bold' : 'normal',
-                                fontStyle: config.tenantWebsiteFormatting?.italic ? 'italic' : 'normal',
-                                letterSpacing: `${px(config.tenantWebsiteFormatting?.letterSpacing, 0.5)}px`,
-                                color: config.tenantWebsiteFormatting?.color || config.styles?.color || 'inherit',
-                                opacity: config.tenantWebsiteFormatting?.opacity ?? 0.75,
+                                fontFamily: wf.fontFamily || fontFamily,
+                                fontSize: `${px(wf.fontSize, 11)}px`,
+                                fontWeight: weight,
+                                fontStyle: wf.italic ? 'italic' : 'normal',
+                                letterSpacing: `${px(wf.letterSpacing, 0.5)}px`,
+                                color: wf.color || config.styles?.color || 'inherit',
+                                // Con fondo, el texto va opaco (la opacidad lavaba el fondo)
+                                opacity: bg ? 1 : (wf.opacity ?? 0.75),
                                 margin: 0,
+                                ...(bg ? {
+                                    display: 'inline-block',
+                                    backgroundColor: bg,
+                                    padding: `${px(4, 4)}px ${px(12, 12)}px`,
+                                    borderRadius: `${px(999, 999)}px`,
+                                } : {}),
                             }}
                         >
                             {websiteText}

@@ -668,6 +668,21 @@ const PET_NAME_FONTS = [
     { value: 'Montserrat', label: 'Montserrat (Sans Moderna)' },
 ];
 
+const FRAME_STYLES = [
+    { value: 'solid', label: 'Continua' },
+    { value: 'double', label: 'Doble' },
+    { value: 'dashed', label: 'Guiones' },
+    { value: 'dotted', label: 'Puntos' },
+];
+
+const WEBSITE_WEIGHTS = [
+    { value: 300, label: 'Delgada' },
+    { value: 400, label: 'Normal' },
+    { value: 600, label: 'Semi negrita' },
+    { value: 700, label: 'Negrita' },
+    { value: 800, label: 'Extra negrita' },
+];
+
 const PRESET_COLORS = [
     '#FDFBF7', '#F5F5F0', '#FFFFFF',
     '#1a2332', '#121212', '#0f172a',
@@ -789,6 +804,11 @@ function EditModal({
     const [frameColor, setFrameColor] = useState<string>(baseConfig.frame?.color || '#d4af37');
     const [frameWidth, setFrameWidth] = useState<number>(baseConfig.frame?.width ?? 8);
     const [frameMargin, setFrameMargin] = useState<number>(baseConfig.frame?.margin ?? 8);
+    const [frameRadius, setFrameRadius] = useState<number>(baseConfig.frame?.radius ?? 0);
+    const [frameOpacity, setFrameOpacity] = useState<number>(
+        typeof baseConfig.frame?.opacity === 'number' ? baseConfig.frame.opacity : 1
+    );
+    const [frameStyle, setFrameStyle] = useState<string>(baseConfig.frame?.style || 'solid');
 
     const [petNameFontSize, setPetNameFontSize] = useState<number>(baseConfig.petNameFormatting?.fontSize ?? 36);
     const [petNameX, setPetNameX] = useState<number>(baseConfig.elements?.petNameX ?? 0);
@@ -848,6 +868,20 @@ function EditModal({
     );
     const [tenantWebsiteX, setTenantWebsiteX] = useState<number>(baseConfig.elements?.tenantWebsiteX ?? 0);
     const [tenantWebsiteY, setTenantWebsiteY] = useState<number>(baseConfig.elements?.tenantWebsiteY ?? 222);
+    const [tenantWebsiteWeight, setTenantWebsiteWeight] = useState<number>(
+        baseConfig.tenantWebsiteFormatting?.fontWeight ?? (baseConfig.tenantWebsiteFormatting?.bold ? 700 : 400)
+    );
+    const [tenantWebsiteFontFamily, setTenantWebsiteFontFamily] = useState<string>(
+        baseConfig.tenantWebsiteFormatting?.fontFamily || ''
+    );
+    // '' = color general del diseño
+    const [tenantWebsiteColor, setTenantWebsiteColor] = useState<string>(
+        baseConfig.tenantWebsiteFormatting?.color || ''
+    );
+    // '' = sin fondo
+    const [tenantWebsiteBg, setTenantWebsiteBg] = useState<string>(
+        baseConfig.tenantWebsiteFormatting?.backgroundColor || ''
+    );
 
     const [previewZoom, setPreviewZoom] = useState<number>(0.55);
 
@@ -928,6 +962,9 @@ function EditModal({
                 color: frameColor,
                 width: frameWidth,
                 margin: frameMargin,
+                radius: frameRadius,
+                opacity: frameOpacity,
+                style: frameStyle,
             },
             tenantLogo: {
                 ...(prev.tenantLogo || {}),
@@ -949,6 +986,11 @@ function EditModal({
                 ...(prev.tenantWebsiteFormatting || {}),
                 enabled: tenantWebsiteEnabled,
                 fontSize: tenantWebsiteFontSize,
+                fontWeight: tenantWebsiteWeight,
+                bold: tenantWebsiteWeight >= 600,
+                fontFamily: tenantWebsiteFontFamily || undefined,
+                color: tenantWebsiteColor || undefined,
+                backgroundColor: tenantWebsiteBg || undefined,
             },
             imageSettings: {
                 ...imageSettingsBase,
@@ -1019,6 +1061,11 @@ function EditModal({
                 ...(c.tenantWebsiteFormatting || {}),
                 enabled: tenantWebsiteEnabled,
                 fontSize: tenantWebsiteFontSize,
+                fontWeight: tenantWebsiteWeight,
+                bold: tenantWebsiteWeight >= 600,
+                fontFamily: tenantWebsiteFontFamily || undefined,
+                color: tenantWebsiteColor || undefined,
+                backgroundColor: tenantWebsiteBg || undefined,
             },
             imageSettings: {
                 ...c.imageSettings,
@@ -1029,7 +1076,7 @@ function EditModal({
             },
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [format, bgColor, textColor, font, bgUrl, bgOpacity, photoShape, photoBorderColor, photoBorderWidth, glowEnabled, glowColor, glowSize, frameEnabled, frameColor, frameWidth, frameMargin, petNamePlaceholder, subtitleText, farewellDefault, photoSize, photoX, photoY, petNameFontSize, petNameX, petNameY, subtitleFontSize, subtitleX, subtitleY, farewellFontSize, farewellX, farewellY, farewellWidth, petNameFontFamily, logoEnabled, logoPosition, logoSize, logoX, logoY, logoOpacity, tenantNameEnabled, tenantNameText, tenantNameFontSize, tenantNameX, tenantNameY, tenantNameBold, tenantNameUppercase, tenantWebsiteEnabled, tenantWebsiteText, tenantWebsiteFontSize, tenantWebsiteX, tenantWebsiteY]);
+    }, [format, bgColor, textColor, font, bgUrl, bgOpacity, photoShape, photoBorderColor, photoBorderWidth, glowEnabled, glowColor, glowSize, frameEnabled, frameColor, frameWidth, frameMargin, frameRadius, frameOpacity, frameStyle, petNamePlaceholder, subtitleText, farewellDefault, photoSize, photoX, photoY, petNameFontSize, petNameX, petNameY, subtitleFontSize, subtitleX, subtitleY, farewellFontSize, farewellX, farewellY, farewellWidth, petNameFontFamily, logoEnabled, logoPosition, logoSize, logoX, logoY, logoOpacity, tenantNameEnabled, tenantNameText, tenantNameFontSize, tenantNameX, tenantNameY, tenantNameBold, tenantNameUppercase, tenantWebsiteEnabled, tenantWebsiteText, tenantWebsiteFontSize, tenantWebsiteX, tenantWebsiteY, tenantWebsiteWeight, tenantWebsiteFontFamily, tenantWebsiteColor, tenantWebsiteBg]);
 
     const handleSave = async () => {
         if (!name.trim()) {
@@ -1612,6 +1659,61 @@ function EditModal({
                                             />
                                         </div>
                                     </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className="text-[10px] font-black text-white/60 uppercase tracking-[0.16em]">Esquinas redondeadas</label>
+                                                <span className="text-[10px] font-mono text-white/50">{frameRadius}px</span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min={0}
+                                                max={60}
+                                                step={1}
+                                                value={frameRadius}
+                                                onChange={(e) => setFrameRadius(Number(e.target.value))}
+                                                className="w-full accent-primary"
+                                            />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className="text-[10px] font-black text-white/60 uppercase tracking-[0.16em]">Opacidad</label>
+                                                <span className="text-[10px] font-mono text-white/50">{Math.round(frameOpacity * 100)}%</span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min={0.1}
+                                                max={1}
+                                                step={0.05}
+                                                value={frameOpacity}
+                                                onChange={(e) => setFrameOpacity(Number(e.target.value))}
+                                                className="w-full accent-primary"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-white/60 uppercase tracking-[0.16em] mb-1.5">Tipo de línea</label>
+                                        <div className="grid grid-cols-4 gap-2">
+                                            {FRAME_STYLES.map((fs) => (
+                                                <button
+                                                    key={fs.value}
+                                                    type="button"
+                                                    onClick={() => setFrameStyle(fs.value)}
+                                                    className={`h-12 rounded-lg border text-[10px] font-bold flex flex-col items-center justify-center gap-1 transition ${
+                                                        frameStyle === fs.value
+                                                            ? 'border-primary/60 bg-primary/10 text-white'
+                                                            : 'border-white/10 bg-white/5 text-white/60 hover:bg-white/10'
+                                                    }`}
+                                                >
+                                                    <span className="w-8 h-0" style={{ borderTop: `${fs.value === 'double' ? 4 : 2}px ${fs.value} currentColor` }} />
+                                                    {fs.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {frameStyle === 'double' && frameWidth < 3 && (
+                                            <p className="text-[10px] text-white/40 mt-1.5">La línea doble necesita un grosor de 3px o más.</p>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </Section>
@@ -1948,6 +2050,69 @@ function EditModal({
                                                 onChange={(e) => setTenantWebsiteY(Number(e.target.value))}
                                                 className="w-full accent-primary"
                                             />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label htmlFor="website-weight" className="block text-[10px] font-black text-white/60 uppercase tracking-[0.16em] mb-1.5">Grosor</label>
+                                            <select
+                                                id="website-weight"
+                                                value={tenantWebsiteWeight}
+                                                onChange={(e) => setTenantWebsiteWeight(Number(e.target.value))}
+                                                className="w-full h-10 bg-black/40 border border-white/10 rounded-lg px-3 text-white text-xs outline-none focus:border-primary/40 cursor-pointer"
+                                            >
+                                                {WEBSITE_WEIGHTS.map((w) => (
+                                                    <option key={w.value} value={w.value} className="bg-[#0a192f] text-white">{w.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label htmlFor="website-font" className="block text-[10px] font-black text-white/60 uppercase tracking-[0.16em] mb-1.5">Tipo de letra</label>
+                                            <select
+                                                id="website-font"
+                                                value={tenantWebsiteFontFamily}
+                                                onChange={(e) => setTenantWebsiteFontFamily(e.target.value)}
+                                                className="w-full h-10 bg-black/40 border border-white/10 rounded-lg px-3 text-white text-xs outline-none focus:border-primary/40 cursor-pointer"
+                                                style={{ fontFamily: tenantWebsiteFontFamily || undefined }}
+                                            >
+                                                {PET_NAME_FONTS.map((f) => (
+                                                    <option key={f.value} value={f.value} className="bg-[#0a192f] text-white" style={{ fontFamily: f.value || undefined }}>
+                                                        {f.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="flex items-center gap-2 cursor-pointer text-xs text-white/80">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={!!tenantWebsiteColor}
+                                                    onChange={(e) => setTenantWebsiteColor(e.target.checked ? (textColor || '#2D3748') : '')}
+                                                    className="w-4 h-4 accent-primary"
+                                                />
+                                                Color de texto propio
+                                            </label>
+                                            {tenantWebsiteColor
+                                                ? <ColorField label="Color de texto" value={tenantWebsiteColor} onChange={setTenantWebsiteColor} />
+                                                : <p className="text-[10px] text-white/40">Usa el color general del diseño.</p>}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="flex items-center gap-2 cursor-pointer text-xs text-white/80">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={!!tenantWebsiteBg}
+                                                    onChange={(e) => setTenantWebsiteBg(e.target.checked ? '#FFFFFF' : '')}
+                                                    className="w-4 h-4 accent-primary"
+                                                />
+                                                Con color de fondo
+                                            </label>
+                                            {tenantWebsiteBg
+                                                ? <ColorField label="Color de fondo" value={tenantWebsiteBg} onChange={setTenantWebsiteBg} />
+                                                : <p className="text-[10px] text-white/40">Sin fondo (texto sobre el diseño).</p>}
                                         </div>
                                     </div>
                                 </div>
