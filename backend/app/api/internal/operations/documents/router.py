@@ -10,6 +10,7 @@ from app.api.deps_features import check_feature
 from typing import List, Optional
 import shutil
 import os
+import re
 import uuid
 
 from datetime import datetime
@@ -136,6 +137,7 @@ def _render_preview(request: Request, tenant: models.Tenant, template: Optional[
             tenant_id=tenant.id if tenant else 0,
             base_url=base_url,
             verification_code="YZAEAQ7TMV",
+            text_values=(tenant.cert_text_values if tenant else None),
         )
 
     t = template
@@ -380,6 +382,7 @@ def generar_certificado(
                 tenant_id=tenant_id,
                 base_url=base_url,
                 verification_code=(cremation.verification_code if cremation else "") or "",
+                text_values=(tenant.cert_text_values if tenant else None),
             )
 
             # persist=False -> solo vista previa (Documentos la pide en vivo sin
@@ -460,6 +463,47 @@ def generar_certificado(
         error_details = traceback.format_exc()
         print(f"Error en generar_certificado: {error_details}")
         raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
+
+CERT_TEXT_CODE_RE = re.compile(r"^[A-Z0-9_]{1,40}$")
+CERT_TEXT_MAX_LEN = 1000
+
+
+@router.get("/text-values")
+def obtener_textos_certificado(
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    _perm: bool = Depends(check_permission("certificados", "view")),
+):
+    """Textos con código que el crematorio guardó ({código: texto})."""
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    return {"values": (tenant.cert_text_values if tenant else None) or {}}
+
+
+@router.put("/text-values")
+def guardar_textos_certificado(
+    payload: schemas.CertTextValuesUpdate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    _perm: bool = Depends(check_permission("certificados", "create")),
+):
+    """Guarda (fusiona) textos con código. Un valor null borra el guardado y el
+    campo vuelve al texto por defecto del diseño."""
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Crematorio no encontrado")
+    current = dict(tenant.cert_text_values or {})
+    for code, value in payload.values.items():
+        if not CERT_TEXT_CODE_RE.match(code):
+            raise HTTPException(status_code=422, detail=f"Código inválido: {code}")
+        if value is None:
+            current.pop(code, None)
+        else:
+            current[code] = value[:CERT_TEXT_MAX_LEN]
+    # Reasignar (no mutar) para que SQLAlchemy detecte el cambio en la columna JSON
+    tenant.cert_text_values = current or None
+    db.commit()
+    return {"values": current}
+
 
 @router.post("/receipt")
 def generar_recibo(

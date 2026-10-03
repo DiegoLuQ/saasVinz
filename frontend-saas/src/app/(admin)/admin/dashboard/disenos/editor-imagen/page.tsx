@@ -87,6 +87,10 @@ interface DesignField extends TextBg {
     bold?: boolean;
     format?: 'short' | 'long' | 'year' | 'month_year';
     value?: string; // solo texto_fijo: el texto escrito por el admin
+    // solo texto_fijo: clave (MAYÚSCULAS_Y_GUIONES). Con código, el tenant puede
+    // guardar su propio texto (sys_tenants.cert_text_values) y `value` queda
+    // como valor por defecto.
+    code?: string;
     // imagen
     slot?: number;
     w?: number; // % ancho
@@ -1215,6 +1219,23 @@ function EditorImagenContent() {
                                                         className="w-full bg-black/40 border border-white/5 rounded-xl py-2 px-3 text-xs font-medium text-white outline-none focus:border-primary/50 resize-y leading-relaxed"
                                                     />
                                                     <p className="text-[10px] text-white/20 font-medium">Texto fijo con soporte de múltiples líneas y saltos automáticos.</p>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[9px] font-black uppercase text-white/30">Código (opcional)</label>
+                                                    <input
+                                                        value={selectedField.code ?? ''}
+                                                        onChange={(e) => {
+                                                            const code = e.target.value.toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '').slice(0, 40);
+                                                            updateField(selectedField.id, { code: code || undefined });
+                                                        }}
+                                                        placeholder="Ej: REG_SAG"
+                                                        className="w-full bg-black/40 border border-white/5 rounded-xl py-2 px-3 text-xs font-mono font-bold text-white outline-none focus:border-primary/50"
+                                                    />
+                                                    <p className="text-[10px] text-white/20 font-medium">
+                                                        {selectedField.code
+                                                            ? 'El crematorio puede cambiar este texto y guardarlo para sus certificados. El texto de arriba queda como valor por defecto. Un mismo código comparte el texto entre diseños.'
+                                                            : 'Sin código, el crematorio solo puede cambiar el texto en cada certificado, sin guardarlo.'}
+                                                    </p>
                                                 </div>
                                                 <div className="space-y-1.5">
                                                     <div className="flex justify-between">

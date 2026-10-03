@@ -94,6 +94,9 @@ class Tenant(Base):
     # Se genera en cualquier vía de creación del tenant.
     public_token = Column(String, unique=True, index=True, default=lambda: secrets.token_urlsafe(12))
     default_certificate_template_id = Column(Integer, nullable=True)
+    # Textos con código de los certificados con imagen: {código: texto} que el
+    # crematorio guardó (NULL / clave ausente = texto por defecto del diseño).
+    cert_text_values = Column(JSON, nullable=True)
     # Tarjeta de homenaje del formulario público (NULL = global predeterminada)
     form_farewell_template_id = Column(Integer, ForeignKey("ops_farewell_templates.id", ondelete="SET NULL"), nullable=True)
     

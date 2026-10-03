@@ -34,7 +34,8 @@ interface DesignField extends TextBg {
     align?: 'left' | 'center' | 'right';
     bold?: boolean;
     format?: 'short' | 'long' | 'year' | 'month_year';
-    value?: string; // solo texto_fijo
+    value?: string; // solo texto_fijo: texto por defecto del diseño
+    code?: string; // solo texto_fijo: con código, el crematorio puede guardar su texto
     slot?: number;
     w?: number;
     shape?: 'circle' | 'rect';
@@ -125,6 +126,10 @@ export default function EmitirDocumentosPage() {
     // Texto libre editable por el tenant al emitir. El diseño trae el texto por
     // defecto; aquí se guarda el cambio, sin tocar la plantilla del admin.
     const [textOverrides, setTextOverrides] = useState<Record<string, string>>({});
+    // Textos guardados por el crematorio para los campos con código: { código: texto }
+    const [savedTexts, setSavedTexts] = useState<Record<string, string>>({});
+    // ¿Guardar el texto de este campo (con código) para próximos certificados? { fieldId: bool }
+    const [saveTextToggles, setSaveTextToggles] = useState<Record<string, boolean>>({});
     // Visibilidad elegida por el tenant para cada elemento decorativo: { elementId: bool }
     const [elementToggles, setElementToggles] = useState<Record<string, boolean>>({});
     // Visibilidad elegida por el tenant para cada campo: { fieldId: bool }
@@ -159,11 +164,13 @@ export default function EmitirDocumentosPage() {
     useEffect(() => {
         (async () => {
             try {
-                const [globalData, localData, me] = await Promise.all([
+                const [globalData, localData, me, texts] = await Promise.all([
                     apiRequest('/api/internal/ops-records/templates/global'),
                     apiRequest('/api/internal/ops-records/templates').catch(() => []),
                     apiRequest('/api/internal/tenants/me').catch(() => null),
+                    apiRequest('/api/internal/ops-records/text-values').catch(() => null),
                 ]);
+                if (texts?.values) setSavedTexts(texts.values);
 
                 const localImg = (localData || []).filter((t: any) => t.category === 'certificadoImg');
                 const globalImg = (globalData || []).filter((t: any) => t.category === 'certificadoImg');
@@ -193,12 +200,17 @@ export default function EmitirDocumentosPage() {
         setSelectedCremId(null);
         setDateOverrides({});
         setPhotoOverrides({});
-        // Se precarga con el texto del diseño para que el tenant lo vea y edite.
+        // Se precarga con el texto guardado por el crematorio (si el campo tiene
+        // código) o, si no, con el texto del diseño, para que el tenant lo edite.
         const initTexts: Record<string, string> = {};
+        const initSave: Record<string, boolean> = {};
         (tpl.sections_config?.fields || []).forEach((f) => {
-            if (f.type === 'texto_fijo') initTexts[f.id] = f.value ?? '';
+            if (f.type !== 'texto_fijo') return;
+            initTexts[f.id] = (f.code && f.code in savedTexts) ? savedTexts[f.code] : (f.value ?? '');
+            if (f.code) initSave[f.id] = true;
         });
         setTextOverrides(initTexts);
+        setSaveTextToggles(initSave);
         // Inicializar marcos con el del diseño (el tenant puede cambiarlos)
         const initFrames: Record<string, CertFrame> = {};
         (tpl.sections_config?.fields || []).forEach((f) => {
@@ -371,10 +383,33 @@ export default function EmitirDocumentosPage() {
             setResultHtml(res.html_content);
             setPreviewHtml(res.html_content);
             showToast('Certificado generado correctamente', 'success');
+            await saveCodedTexts();
         } catch (err: any) {
             showToast('Error al generar: ' + (err.message || ''), 'error');
         } finally {
             setGenerating(false);
+        }
+    };
+
+    // Guarda los textos con código marcados "para próximos certificados".
+    // Volver al texto del diseño borra lo guardado (null), así el crematorio
+    // vuelve a recibir el valor por defecto si el admin lo cambia.
+    const saveCodedTexts = async () => {
+        const changes: Record<string, string | null> = {};
+        textFields.forEach((f) => {
+            if (!f.code || !saveTextToggles[f.id]) return;
+            const v = textOverrides[f.id] ?? f.value ?? '';
+            const next = v === (f.value ?? '') ? null : v;
+            const prev = f.code in savedTexts ? savedTexts[f.code] : null;
+            if (next !== prev) changes[f.code] = next;
+        });
+        if (!Object.keys(changes).length) return;
+        try {
+            const res = await apiRequest('/api/internal/ops-records/text-values', { method: 'PUT', body: { values: changes } });
+            setSavedTexts(res?.values || {});
+            showToast('Textos guardados para tus próximos certificados', 'success');
+        } catch (err: unknown) {
+            showToast('No se pudieron guardar los textos: ' + (err instanceof Error ? err.message : ''), 'error');
         }
     };
 
@@ -571,9 +606,18 @@ export default function EmitirDocumentosPage() {
                                         <label className="text-[10px] font-black uppercase tracking-widest text-white/40 flex items-center gap-2"><Type size={12} /> Textos</label>
                                         {textFields.map((f, i) => (
                                             <div key={f.id} className="space-y-1.5">
-                                                <span className="text-[10px] text-white/40 font-bold uppercase">
-                                                    {textFields.length > 1 ? `Texto #${i + 1}` : 'Texto libre'}
-                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    {f.code ? (
+                                                        <span className="text-[10px] font-mono font-black text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">{f.code}</span>
+                                                    ) : (
+                                                        <span className="text-[10px] text-white/40 font-bold uppercase">
+                                                            {textFields.length > 1 ? `Texto #${i + 1}` : 'Texto libre'}
+                                                        </span>
+                                                    )}
+                                                    {f.code && f.code in savedTexts && (textOverrides[f.id] ?? '') === savedTexts[f.code] && (
+                                                        <span className="text-[10px] text-emerald-400 font-bold">Guardado</span>
+                                                    )}
+                                                </div>
                                                 <textarea
                                                     value={textOverrides[f.id] ?? f.value ?? ''}
                                                     onChange={(e) => setTextOverrides((prev) => ({ ...prev, [f.id]: e.target.value }))}
@@ -589,9 +633,24 @@ export default function EmitirDocumentosPage() {
                                                         Restaurar el texto del diseño
                                                     </button>
                                                 )}
+                                                {f.code && (
+                                                    <label className="flex items-center gap-2 text-[11px] text-white/60 cursor-pointer select-none">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={!!saveTextToggles[f.id]}
+                                                            onChange={(e) => setSaveTextToggles((prev) => ({ ...prev, [f.id]: e.target.checked }))}
+                                                            className="accent-primary"
+                                                        />
+                                                        Guardar para próximos certificados
+                                                    </label>
+                                                )}
                                             </div>
                                         ))}
-                                        <p className="text-[10px] text-white/20 font-medium">Solo cambia este certificado; el diseño original no se modifica.</p>
+                                        <p className="text-[10px] text-white/20 font-medium">
+                                            {textFields.some((f) => f.code)
+                                                ? 'Los textos con código marcados se guardan al generar el certificado. El diseño original no se modifica.'
+                                                : 'Solo cambia este certificado; el diseño original no se modifica.'}
+                                        </p>
                                     </div>
                                 )}
 

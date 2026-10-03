@@ -1000,6 +1000,7 @@ def generate_image_certificate_html(
     paper_format: str = "Carta",
     base_url: str = "http://localhost:8000",
     verification_code: str = "",
+    text_values: dict = None,
     **kwargs,
 ) -> dict:
     """Genera el HTML de un certificado basado en imagen con campos posicionados.
@@ -1013,8 +1014,12 @@ def generate_image_certificate_html(
     - overrides: dict opcional {field_id: {format, image_url, value, enabled,
       frame}} elegido por el tenant al emitir (no mueve posiciones, solo ajusta
       valores). `value` reescribe el texto de un campo "texto_fijo".
+    - text_values: {código: texto} guardados por el tenant
+      (sys_tenants.cert_text_values). Un "texto_fijo" con `code` usa ese texto
+      en vez del valor por defecto del diseño.
     """
     fields = fields or []
+    text_values = text_values if isinstance(text_values, dict) else {}
     elements = elements or []
     overrides = overrides or {}
     pet_images = pet_images or []
@@ -1180,10 +1185,16 @@ def generate_image_certificate_html(
         elif ftype == "fecha_actual":
             value = _img_format_date(current_date, ov.get("format") or field.get("format"))
         elif ftype == "texto_fijo":
-            # El tenant puede reescribir el texto al emitir; si no lo toca, se
-            # usa el que definio el admin en el diseno.
+            # Prioridad: lo escrito al emitir > lo guardado por el tenant para el
+            # codigo del campo > el texto que definio el admin en el diseno.
             ov_value = ov.get("value")
-            value = ov_value if ov_value is not None else field.get("value", "")
+            saved = text_values.get(field.get("code")) if field.get("code") else None
+            if ov_value is not None:
+                value = ov_value
+            elif saved is not None:
+                value = saved
+            else:
+                value = field.get("value", "")
         elif ftype == "nombre_empresa":
             value = tenant_name or ""
         elif ftype == "rut_tenant":

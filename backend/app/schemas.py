@@ -42,6 +42,7 @@ from app.api.internal.operations.schemas import (
     DashboardStatData, DashboardLimitItem, DashboardLimitsData, DashboardRecentActivity, DashboardSummarySchema,
     DocumentBase, DocumentCreate, DocumentInDB,
     CertificateGenerateRequest, CertificateGenerateMetadata, CertificateGenerateResponse,
+    CertTextValuesUpdate,
     DailyOrderSchema, OpsBoardCounts, OpsBoardResponse
 )
 

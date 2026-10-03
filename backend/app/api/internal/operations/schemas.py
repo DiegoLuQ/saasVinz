@@ -452,6 +452,10 @@ class CertificateGenerateResponse(BaseModel):
     metadata: CertificateGenerateMetadata
     html_content: str
 
+class CertTextValuesUpdate(BaseModel):
+    """{código: texto} a guardar; null borra el valor guardado del código."""
+    values: dict[str, Optional[str]] = Field(default_factory=dict, max_length=50)
+
 class CertificateGenerateRequest(BaseModel):
     cremation_id: Optional[int] = None
     template_id: Optional[int] = None
