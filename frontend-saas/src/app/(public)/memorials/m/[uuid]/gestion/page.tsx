@@ -29,6 +29,7 @@ import {
     Quote,
     ExternalLink,
     Snowflake,
+    Flower2,
     Star,
     Lock,
     Crown,
@@ -36,6 +37,7 @@ import {
 } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { getTranslations, type Locale, type TranslationKeys } from '@/lib/translations';
+import { isPlaceholderFarewell } from '@/lib/memorialDesign';
 import { PaymentInterface } from '@/components/payments/PaymentInterface';
 import ImageCropper from '@/components/tenant/ImageCropper';
 import DedicationModal from '@/components/memorial/DedicationModal';
@@ -152,6 +154,8 @@ export default function GestionMemorialPage() {
             particulas: 'ninguna',
             tipo_diseno: 'normal',
             portada_url: '',
+            // Cédulas de la plantilla Galería: { url de la foto: "Su primera playa, 2018" }
+            captions: {} as Record<string, string>,
         },
         private_mode: false,
         pin: '',
@@ -212,12 +216,14 @@ export default function GestionMemorialPage() {
 
             const design = data.diseno || {};
             setForm({
-                msg_despedida: data.msg_despedida || '',
+                // El texto de relleno del sistema no se muestra como si lo hubiera escrito la familia
+                msg_despedida: isPlaceholderFarewell(data.msg_despedida) ? '' : data.msg_despedida,
                 diseno: {
                     tema: design.tema || 'claro',
                     particulas: design.particulas || 'ninguna',
                     tipo_diseno: design.tipo_diseno || 'normal',
                     portada_url: design.portada_url || '',
+                    captions: (design.captions && typeof design.captions === 'object') ? design.captions : {},
                 },
                 private_mode: data.private_mode || false,
                 pin: data.pin || '',
@@ -383,8 +389,10 @@ export default function GestionMemorialPage() {
     const rawPlan = memorial.plan || 'PRO';
     const planName = rawPlan.toUpperCase().trim();
 
+    // Límites reales del plan (rec_plans.features) entregados por el backend.
+    // El mapeo por nombre queda solo como respaldo para respuestas antiguas.
     // Define limits: ULTRA/PARAISO=33, PRO/VINCULO=21, NORMAL/HUELLA=9, FREE/RECUERDO=0
-    const limit = (planName === 'ULTRA' || planName === 'PARAISO')
+    const legacyLimit = (planName === 'ULTRA' || planName === 'PARAISO')
         ? 33
         : (planName === 'NORMAL' || planName === 'HUELLA')
             ? 9
@@ -393,13 +401,16 @@ export default function GestionMemorialPage() {
                 : 21; // PRO/VINCULO/PRO+ default to 21
 
     // IMAGE LIMITS: ULTRA/PARAISO=5, PRO/VINCULO/PRO+=3, NORMAL/HUELLA=2, FREE/RECUERDO=1
-    const imgLimit = (planName === 'ULTRA' || planName === 'PARAISO')
+    const legacyImgLimit = (planName === 'ULTRA' || planName === 'PARAISO')
         ? 5
         : (planName === 'NORMAL' || planName === 'HUELLA')
             ? 2
             : (planName === 'FREE' || planName === 'RECUERDO')
                 ? 1
                 : 3; // PRO/VINCULO/PRO+ default to 3
+
+    const limit: number = memorial.dedication_limit ?? legacyLimit;
+    const imgLimit: number = memorial.img_limit || legacyImgLimit;
 
     const approved = dedicatorias.filter(d => d.estado === 'aprobado').length;
 
@@ -660,7 +671,8 @@ export default function GestionMemorialPage() {
                                                                 { id: 'constelacion', label: locale === 'es' ? 'Constelación' : 'Constellation', icon: '🌌', plan: 'ULTRA', desc: locale === 'es' ? 'Una estrella en el cielo' : 'A star in the sky' },
                                                                 { id: 'galeria', label: locale === 'es' ? 'Galería' : 'Gallery', icon: '🖼️', plan: 'ULTRA', desc: locale === 'es' ? 'Museo y obra de arte' : 'Museum & artwork' },
                                                             ].map((d) => {
-                                                                const planRanks: Record<string, number> = { FREE: 0, RECUERDO: 0, NORMAL: 1, HUELLA: 1, PRO: 2, VINCULO: 2, 'PRO+': 2, ULTRA: 3, PARAISO: 3 };
+                                                                // Planes de la landing (USD): Mensual = altares PRO; Anual y Eterno = todos.
+                                                                const planRanks: Record<string, number> = { FREE: 0, RECUERDO: 0, NORMAL: 1, HUELLA: 1, PRO: 2, VINCULO: 2, 'PRO+': 2, ULTRA: 3, PARAISO: 3, MENSUAL: 2, ANUAL: 3, ETERNO: 3 };
                                                                 const requiredRank = planRanks[d.plan] || 0;
                                                                 const currentRank = planRanks[planName] ?? 0;
                                                                 const isLocked = currentRank < requiredRank;
@@ -788,6 +800,37 @@ export default function GestionMemorialPage() {
                                                 )}
                                             </div>
 
+                                            {/* Cédulas por foto: solo las muestra la plantilla Galería */}
+                                            {form.diseno.tipo_diseno === 'galeria' && (memorial?.lista_imagenes || []).some((img: string) => img && img.startsWith('http')) && (
+                                                <div className={`mt-4 p-4 rounded-2xl border space-y-3 ${isDark ? 'bg-slate-900/40 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                                                    <p className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                        {locale === 'es' ? 'Cédula de cada obra (opcional)' : 'Caption for each piece (optional)'}
+                                                    </p>
+                                                    {(memorial?.lista_imagenes || [])
+                                                        .filter((img: string) => img && img.startsWith('http'))
+                                                        .map((img: string, i: number) => (
+                                                            <div key={img} className="flex items-center gap-3">
+                                                                <img src={img} alt={`Obra ${i + 1}`} className="w-11 h-11 rounded-lg object-cover shrink-0" />
+                                                                <input
+                                                                    value={form.diseno.captions?.[img] || ''}
+                                                                    maxLength={60}
+                                                                    onChange={(e) => setForm({
+                                                                        ...form,
+                                                                        diseno: {
+                                                                            ...form.diseno,
+                                                                            captions: { ...(form.diseno.captions || {}), [img]: e.target.value },
+                                                                        },
+                                                                    })}
+                                                                    placeholder={locale === 'es' ? 'Ej: Su primera playa, 2018' : 'E.g. Their first beach, 2018'}
+                                                                    className={`flex-1 min-w-0 rounded-xl border px-3 py-2.5 text-base sm:text-sm outline-none transition-colors ${isDark
+                                                                        ? 'bg-slate-900 border-slate-700 text-slate-100 placeholder:text-slate-500 focus:border-sky-500/50'
+                                                                        : 'bg-white border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-sky-300'}`}
+                                                                />
+                                                            </div>
+                                                        ))}
+                                                </div>
+                                            )}
+
 
                                         </div>
 
@@ -879,11 +922,12 @@ export default function GestionMemorialPage() {
                                                 <Sparkles size={16} className="opacity-60" />
                                                 {t.mg_visual_effect}
                                             </label>
-                                            <div className="grid grid-cols-3 gap-3">
+                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                                 {([
                                                     { id: 'ninguna', label: t.mg_effect_none, icon: <X size={20} />, desc: locale === 'es' ? 'Sin efecto' : 'No effect' },
                                                     { id: 'nieve', label: t.mg_effect_snow, icon: <Snowflake size={20} />, desc: locale === 'es' ? 'Copos suaves' : 'Soft flakes' },
                                                     { id: 'estrellas', label: t.mg_effect_stars, icon: <Star size={20} />, desc: locale === 'es' ? 'Cielo estrellado' : 'Starry sky' },
+                                                    { id: 'flores', label: locale === 'es' ? 'Flores' : 'Flowers', icon: <Flower2 size={20} />, desc: locale === 'es' ? 'Pétalos al viento' : 'Falling petals' },
                                                 ] as const).map((p) => {
                                                     const isActive = form.diseno.particulas === p.id;
                                                     return (
@@ -995,7 +1039,7 @@ export default function GestionMemorialPage() {
                                                     <span className={`text-[9px] font-black uppercase tracking-widest leading-none mb-1 ${approved >= limit ? (isDark ? 'text-red-400' : 'text-red-600') : (isDark ? 'text-sky-400' : 'text-sky-600')}`}>{locale === 'es' ? 'Uso' : 'Usage'}</span>
                                                     <div className="flex items-baseline gap-1">
                                                         <span className={`text-xl font-black tabular-nums ${approved >= limit ? (isDark ? 'text-red-200' : 'text-red-700') : (isDark ? 'text-sky-200' : 'text-sky-700')}`}>{approved}</span>
-                                                        <span className={`text-xs font-bold opacity-40 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>/ {limit}</span>
+                                                        <span className={`text-xs font-bold opacity-40 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>/ {limit >= 10000 ? '∞' : limit}</span>
                                                     </div>
                                                 </div>
                                             </div>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Heart, Crown, Star, Check } from 'lucide-react';
-import { PaymentInterface } from '@/components/payments/PaymentInterface';
+import { Sparkles, Heart, Crown, Star, Check, MessageCircle } from 'lucide-react';
+import { getLandingContent, whatsappLink, type PlanId } from '@/lib/memorialLanding';
 
 interface ExpirationModalProps {
     isOpen: boolean;
@@ -11,6 +11,14 @@ interface ExpirationModalProps {
     locale?: 'es' | 'en';
     status?: string;
 }
+
+// Estilo visual por plan; precios, textos y beneficios vienen de la landing
+// (lib/memorialLanding.ts) para que el memorial y la landing vendan lo mismo.
+const PLAN_STYLE: Record<PlanId, { color: string; Icon: typeof Heart }> = {
+    mensual: { color: 'from-blue-400 to-cyan-300', Icon: Heart },
+    anual: { color: 'from-indigo-400 to-purple-300', Icon: Star },
+    eterno: { color: 'from-amber-400 to-orange-300', Icon: Crown },
+};
 
 export const ExpirationModal: React.FC<ExpirationModalProps> = ({
     isOpen,
@@ -23,79 +31,43 @@ export const ExpirationModal: React.FC<ExpirationModalProps> = ({
     if (!isOpen) return null;
 
     const isEn = locale === 'en';
+    const { plans } = getLandingContent(locale);
 
     let title = isEn ? 'A Space in Heaven' : 'Un Espacio en el Cielo';
     let message = isEn
-        ? `The memorial for ${petName} is waiting to be renewed. Choose a plan to keep their light shining forever.`
-        : `El memorial de ${petName} está esperando ser renovado. Elige un plan para mantener su luz brillando para siempre.`;
+        ? `The memorial for ${petName} is waiting to be renewed. Choose a plan to keep their light shining.`
+        : `El memorial de ${petName} está esperando ser renovado. Elige un plan para mantener su luz encendida.`;
+    let action = isEn ? 'renew' : 'renovar';
 
     if (status === 'pending') {
         title = isEn ? 'Pending Activation' : 'Pendiente de Activación';
         message = isEn
-            ? `The memorial for ${petName} is pending activation. Choose a plan to publish it and share their memory.`
-            : `El memorial de ${petName} está pendiente de activación. Elige un plan para publicarlo y compartir su memoria.`;
+            ? `The memorial for ${petName} is almost ready. Choose a plan to publish it and share their memory.`
+            : `El memorial de ${petName} está casi listo. Elige un plan para publicarlo y compartir su memoria.`;
+        action = isEn ? 'activate' : 'activar';
     } else if (status === 'archived') {
         title = isEn ? 'Memorial Archived' : 'Memorial Archivado';
         message = isEn
-            ? `The memorial for ${petName} has been archived. Select a plan to restore it.`
-            : `El memorial de ${petName} ha sido archivado. Selecciona un plan para restaurarlo.`;
+            ? `The memorial for ${petName} has been archived. Choose a plan to restore it.`
+            : `El memorial de ${petName} ha sido archivado. Elige un plan para restaurarlo.`;
+        action = isEn ? 'restore' : 'restaurar';
     }
 
-    // Plan Configuration
-    const plans = [
-        {
-            id: 'NORMAL',
-            name: 'Plan Huella',
-            priceCLP: '$5.990',
-            priceUSD: '7',
-            productId: 'PLACEHOLDER_HUELLA_ID',
-            concept: isEn ? 'A gesture of love forever.' : 'Un gesto de amor para siempre.',
-            features: [
-                isEn ? '1 Main Photo' : '1 Fotografía principal',
-                isEn ? '1 Special Dedication' : '1 Dedicatoria especial',
-                isEn ? 'Space for 5 candles' : 'Espacio para 5 velas'
-            ],
-            color: 'from-blue-400 to-cyan-300',
-            bg: 'bg-blue-500/10',
-            border: 'border-blue-500/20',
-            Icon: Heart
-        },
-        {
-            id: 'PRO',
-            name: 'Plan Vínculo',
-            priceCLP: '$14.990',
-            priceUSD: '17',
-            productId: '1651066b-559e-4682-a8f1-608e48ff6675',
-            concept: isEn ? 'Our stories with yours.' : 'Nuestras historias con la tuya.',
-            features: [
-                isEn ? 'Gallery of 3 Photos' : 'Galería de 3 Fotos',
-                isEn ? 'Space for 21 candles' : 'Espacio para 21 velas',
-                isEn ? 'Custom Background' : 'Fondo Personalizado'
-            ],
-            color: 'from-indigo-400 to-purple-300',
-            bg: 'bg-indigo-500/10',
-            border: 'border-indigo-500/20',
-            popular: true,
-            Icon: Star
-        },
-        {
-            id: 'ULTRA',
-            name: 'Plan Paraíso',
-            priceCLP: '$19.990',
-            priceUSD: '22',
-            productId: 'dd0e2fd6-aae7-4910-8c11-f3033c9462de',
-            concept: isEn ? 'The peace of having them always close.' : 'La paz de tenerlos siempre cerca.',
-            duration: isEn ? '2 Years' : 'Por 2 años',
-            features: [
-                isEn ? 'Gallery of 5 Photos' : 'Galería de 5 Fotos',
-                isEn ? '3D Altar + Premium Design' : 'Altar 3D + Diseño Premium'
-            ],
-            color: 'from-amber-400 to-orange-300',
-            bg: 'bg-amber-500/10',
-            border: 'border-amber-500/20',
-            Icon: Crown
-        }
-    ];
+    // Beneficios por plan tomados de la tabla comparativa (columna = índice del
+    // plan): primero los que varían (fotos, velas, permanencia), luego uno incluido.
+    // Se omite la primera fila (facturación), que ya se ve en el precio.
+    const featuresFor = (idx: number) => {
+        const rows = plans.rows.slice(1);
+        const varying = rows.filter(row => row.values[idx] !== true);
+        const included = rows.filter(row => row.values[idx] === true);
+        return [...varying, ...included]
+            .slice(0, 4)
+            .map(row => (row.values[idx] === true ? row.label : `${row.label}: ${row.values[idx]}`));
+    };
+
+    const waText = (planName: string) => isEn
+        ? `Hi, I would like to ${action} the memorial of ${petName} with the ${planName} plan. Memorial ID: ${memorialId}`
+        : `Hola, quiero ${action} el memorial de ${petName} con el Plan ${planName}. ID del memorial: ${memorialId}`;
 
     return (
         <AnimatePresence>
@@ -133,75 +105,73 @@ export const ExpirationModal: React.FC<ExpirationModalProps> = ({
 
                             {/* Plans Grid */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
-                                {plans.map((plan, idx) => (
-                                    <motion.div
-                                        key={plan.id}
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: 0.3 + (idx * 0.1) }}
-                                        className={`relative group rounded-3xl p-1 bg-[#0f172a] border border-white/10 hover:border-white/20 transition-all duration-300 h-full flex flex-col`}
-                                    >
-                                        <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent rounded-3xl pointer-events-none" />
+                                {plans.list.map((plan, idx) => {
+                                    const { color, Icon } = PLAN_STYLE[plan.id];
+                                    return (
+                                        <motion.div
+                                            key={plan.id}
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: 0.3 + (idx * 0.1) }}
+                                            className={`relative group rounded-3xl p-1 bg-[#0f172a] border transition-all duration-300 h-full flex flex-col ${plan.highlight ? 'border-amber-400/40 shadow-[0_0_40px_rgba(251,191,36,0.12)]' : 'border-white/10 hover:border-white/20'}`}
+                                        >
+                                            <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent rounded-3xl pointer-events-none" />
 
-                                        <div className="relative h-full flex flex-col p-6 md:p-8">
-                                            {/* Badge */}
-                                            {plan.popular && (
-                                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-[10px] font-bold uppercase tracking-widest text-white shadow-lg border border-white/20">
-                                                    {isEn ? 'Most Popular' : 'Más Popular'}
-                                                </div>
-                                            )}
+                                            <div className="relative h-full flex flex-col p-6 md:p-8">
+                                                {/* Badge */}
+                                                {plan.tag && (
+                                                    <div className={`absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg border border-white/20 whitespace-nowrap ${plan.highlight ? 'bg-gradient-to-r from-amber-400 to-orange-400 text-amber-950' : 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white'}`}>
+                                                        {plan.tag}
+                                                    </div>
+                                                )}
 
-                                            {/* Icon & Title */}
-                                            <div className="flex items-center gap-4 mb-6">
-                                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-gradient-to-br ${plan.color} shadow-lg text-white`}>
-                                                    <plan.Icon size={24} />
+                                                {/* Icon & Title */}
+                                                <div className="flex items-center gap-4 mb-6">
+                                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-gradient-to-br ${color} shadow-lg text-white`}>
+                                                        <Icon size={24} />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="text-xl font-medium text-white">{plan.name}</h3>
+                                                        <p className="text-xs text-slate-400 uppercase tracking-wider font-medium opacity-80">
+                                                            {plan.note}
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <h3 className="text-xl font-medium text-white">{plan.name}</h3>
-                                                    <p className="text-xs text-slate-400 uppercase tracking-wider font-medium opacity-80">
-                                                        {(plan as any).duration || (isEn ? '1 Year' : 'Por 1 año')}
-                                                    </p>
+
+                                                {/* Price */}
+                                                <div className="mb-6 flex items-baseline gap-2">
+                                                    <span className="text-4xl font-light text-white tracking-tight">
+                                                        {plan.price} USD
+                                                    </span>
+                                                    <span className="text-sm text-slate-400">{plan.period}</span>
+                                                </div>
+
+                                                {/* Features */}
+                                                <ul className="space-y-4 mb-8 flex-1">
+                                                    {featuresFor(idx).map((feature, i) => (
+                                                        <li key={i} className="flex items-start gap-3 text-sm text-slate-300">
+                                                            <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                                                            <span className="leading-tight">{feature}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+
+                                                {/* Action: venta asistida por WhatsApp, igual que la landing */}
+                                                <div className="mt-auto pt-6 border-t border-white/5">
+                                                    <a
+                                                        href={whatsappLink(waText(plan.name))}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${plan.highlight ? 'bg-amber-400 text-amber-950 hover:bg-amber-300' : 'bg-white/10 text-white border border-white/10 hover:bg-white/20'}`}
+                                                    >
+                                                        <MessageCircle size={16} />
+                                                        {plan.cta}
+                                                    </a>
                                                 </div>
                                             </div>
-
-                                            {/* Price */}
-                                            <div className="mb-6">
-                                                <span className="text-4xl font-light text-white tracking-tight">
-                                                    {isEn ? `$${plan.priceUSD}` : plan.priceCLP}
-                                                </span>
-                                            </div>
-
-                                            {/* Concept */}
-                                            <p className="text-sm text-slate-400 italic mb-8 border-l-2 border-white/10 pl-4">
-                                                "{plan.concept}"
-                                            </p>
-
-                                            {/* Features */}
-                                            <ul className="space-y-4 mb-8 flex-1">
-                                                {plan.features.map((feature, i) => (
-                                                    <li key={i} className="flex items-start gap-3 text-sm text-slate-300">
-                                                        <Check className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
-                                                        <span className="leading-tight">{feature}</span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-
-                                            {/* Action */}
-                                            <div className="mt-auto pt-6 border-t border-white/5">
-                                                <PaymentInterface
-                                                    productId={plan.productId}
-                                                    targetResource="memorial"
-                                                    targetId={memorialId}
-                                                    action={`upgrade_to_${plan.id.toLowerCase()}`}
-                                                    buttonText={isEn ? 'Select Plan' : 'Seleccionar Plan'}
-                                                    isDark={true}
-                                                    variant="default" // Use default variant but styled via CSS if needed
-                                                    successUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/checkout/success?type=memorial&id=${memorialId}&plan=${plan.id}`}
-                                                />
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                ))}
+                                        </motion.div>
+                                    );
+                                })}
                             </div>
 
                             {onClose && (

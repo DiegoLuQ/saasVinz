@@ -174,3 +174,22 @@ class Dedication(Base):
     fecha = Column(DateTime(timezone=True), default=tz.get_now)
 
     memorial = relationship("Memorial", back_populates="dedications")
+
+
+class RitualKind(str, enum.Enum):
+    vela = "vela"
+    flor = "flor"
+    estrella = "estrella"
+    beso = "beso"
+
+
+class Ritual(Base):
+    """Gesto simbólico de un visitante (vela, flor, estrella, beso).
+    Sin relationship en Memorial: el borrado lo resuelve el ON DELETE CASCADE."""
+    __tablename__ = "rec_rituals"
+    id = Column(Integer, primary_key=True, index=True)
+    id_recuerdo = Column(Integer, ForeignKey("rec_recuerdos.id", ondelete="CASCADE"), nullable=False)
+    kind = Column(String(20), nullable=False)
+    name = Column(String(60), nullable=True)  # solo estrellas: "Encendida por …"
+    ip_hash = Column(String(64), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=tz.get_now)

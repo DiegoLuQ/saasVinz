@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from app.api.internal.memorials.models import Memorial, MemorialPlan
+from app.api.internal.memorials.services import merge_diseno
 from app.api.internal.crm.models import Pet, Customer
 from app.api.internal.admin.models import Tenant
 from app import models, auth
@@ -104,7 +105,7 @@ def update_memorial_admin(
         memorial.main_image_url = update_data.main_image_url
 
     if update_data.diseno is not None:
-        memorial.diseno = update_data.diseno
+        memorial.diseno = merge_diseno(memorial.diseno, update_data.diseno)
 
     if update_data.access_key is not None:
         memorial.access_key = update_data.access_key

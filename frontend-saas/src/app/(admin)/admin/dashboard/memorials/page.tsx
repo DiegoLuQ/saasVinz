@@ -19,6 +19,7 @@ import { Loader2, Search, Edit, Calendar, Sparkles, Smartphone, Monitor } from '
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getMemorialBaseUrl } from '@/lib/publicUrls';
+import { normalizeMemorialBg } from '@/lib/memorialDesign';
 
 interface Memorial {
     id: number;
@@ -51,6 +52,54 @@ interface MemorialPlan {
     name_db: string;
 }
 
+const LAYOUTS = [
+    { id: 'normal', label: 'Normal' },
+    { id: 'altar', label: 'Altar' },
+    { id: 'editorial', label: 'Editorial' },
+    { id: 'carta', label: 'Carta' },
+    { id: 'cielo', label: 'Cielo' },
+    { id: 'cinematico', label: 'Cinemático' },
+    { id: 'constelacion', label: 'Constelación' },
+    { id: 'galeria', label: 'Galería' },
+];
+
+// Los ids se mantienen (están guardados en la DB); solo cambia la etiqueta.
+const THEMES = [
+    { id: 'claro', label: 'Claro' },
+    { id: 'oscuro', label: 'Oscuro' },
+    { id: 'esmeralda', label: 'Esmeralda' },
+    { id: 'dorado', label: 'Dorado' },
+    { id: 'rosado', label: 'Rosado' },
+    { id: 'safiro', label: 'Zafiro' },
+    { id: 'orange', label: 'Naranja' },
+];
+
+// Mismas opciones que la gestión familiar y el modal del crematorio.
+const PARTICLES = [
+    { id: 'ninguna', label: 'Ninguna' },
+    { id: 'nieve', label: 'Nieve' },
+    { id: 'estrellas', label: 'Estrellas' },
+    { id: 'flores', label: 'Flores' },
+];
+
+const normalizeParticles = (p?: string) =>
+    p && PARTICLES.some(opt => opt.id === p) ? p : 'ninguna';
+
+const previewUrl = (
+    m: Memorial,
+    f: { tipo_diseno: string; tema: string; particulas: string; color_fondo: string }
+) => {
+    const params = new URLSearchParams({
+        preview_layout: f.tipo_diseno,
+        preview_theme: f.tema,
+        preview_particles: f.particulas,
+        // Siempre presente: vacío = previsualizar sin color propio
+        preview_bg: f.color_fondo || '',
+    });
+    const slug = m.pet_name.toLowerCase().replace(/\s+/g, '-');
+    return `${getMemorialBaseUrl()}/memorials/v/${m.tenant_slug}/${slug}/${m.id_recuerdo}?${params.toString()}`;
+};
+
 export default function AdminMemorialsPage() {
     const { showToast } = useToast();
     const [memorials, setMemorials] = useState<Memorial[]>([]);
@@ -74,8 +123,8 @@ export default function AdminMemorialsPage() {
         lista_imagenes: [] as string[],
         tipo_diseno: 'normal',
         tema: 'claro',
-        particulas: 'flores',
-        color_fondo: '#ffffff',
+        particulas: 'ninguna',
+        color_fondo: '',
         access_key: ''
     });
 
@@ -125,8 +174,8 @@ export default function AdminMemorialsPage() {
             lista_imagenes: memorial.lista_imagenes || [],
             tipo_diseno: memorial.diseno?.tipo_diseno || 'normal',
             tema: memorial.diseno?.tema || 'claro',
-            particulas: memorial.diseno?.particulas || 'flores',
-            color_fondo: memorial.diseno?.color_fondo || '#ffffff',
+            particulas: normalizeParticles(memorial.diseno?.particulas),
+            color_fondo: normalizeMemorialBg(memorial.diseno?.color_fondo),
             access_key: memorial.access_key || ''
         });
         setIsEditOpen(true);
@@ -178,11 +227,13 @@ export default function AdminMemorialsPage() {
                     main_image_url: formData.main_image_url || null,
                     dedicatoria: formData.dedicatoria || null,
                     access_key: formData.access_key || null,
+                    // El backend combina el diseño: se conservan portada y demás
+                    // claves elegidas por la familia. null = sin color propio.
                     diseno: {
                         tipo_diseno: formData.tipo_diseno,
                         tema: formData.tema,
                         particulas: formData.particulas,
-                        color_fondo: formData.color_fondo
+                        color_fondo: formData.color_fondo || null
                     }
                 })
             });
@@ -481,7 +532,7 @@ export default function AdminMemorialsPage() {
                                 <div className="space-y-3">
                                     <label className="text-[10px] font-bold uppercase text-white/40 tracking-widest block">Layout / Diseño Visual</label>
                                     <div className="grid grid-cols-4 gap-2">
-                                        {['normal', 'altar', 'editorial', 'carta', 'cielo', 'cinematico', 'constelacion', 'galeria'].map((layout) => (
+                                        {LAYOUTS.map(({ id: layout, label }) => (
                                             <button
                                                 key={layout}
                                                 type="button"
@@ -491,7 +542,7 @@ export default function AdminMemorialsPage() {
                                                     : 'bg-black/20 border-white/10 text-white/60 hover:bg-white/5'
                                                     }`}
                                             >
-                                                {layout}
+                                                {label}
                                             </button>
                                         ))}
                                     </div>
@@ -501,7 +552,7 @@ export default function AdminMemorialsPage() {
                                     <div className="space-y-3">
                                         <label className="text-[10px] font-bold uppercase text-white/40 tracking-widest block">Tema de Color</label>
                                         <div className="grid grid-cols-4 gap-1.5">
-                                            {['claro', 'oscuro', 'esmeralda', 'dorado', 'rosado', 'safiro', 'orange'].map((t) => (
+                                            {THEMES.map(({ id: t, label }) => (
                                                 <button
                                                     key={t}
                                                     type="button"
@@ -511,7 +562,7 @@ export default function AdminMemorialsPage() {
                                                         : 'bg-black/20 border-white/10 text-white/50 hover:bg-white/5'
                                                         }`}
                                                 >
-                                                    {t}
+                                                    {label}
                                                 </button>
                                             ))}
                                         </div>
@@ -519,8 +570,8 @@ export default function AdminMemorialsPage() {
 
                                     <div className="space-y-3">
                                         <label className="text-[10px] font-bold uppercase text-white/40 tracking-widest block">Partículas</label>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {['nieve', 'estrellas', 'flores'].map((p) => (
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {PARTICLES.map(({ id: p, label }) => (
                                                 <button
                                                     key={p}
                                                     type="button"
@@ -530,7 +581,7 @@ export default function AdminMemorialsPage() {
                                                         : 'bg-black/20 border-white/10 text-white/60 hover:bg-white/5'
                                                         }`}
                                                 >
-                                                    {p}
+                                                    {label}
                                                 </button>
                                             ))}
                                         </div>
@@ -539,7 +590,17 @@ export default function AdminMemorialsPage() {
 
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-bold uppercase text-white/40 tracking-widest block">Color de Fondo Personalizado</label>
-                                    <div className="flex gap-3 items-center">
+                                    <div className="flex gap-3 items-center flex-wrap">
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, color_fondo: '' })}
+                                            className={`h-10 px-3 rounded-lg border text-[9px] uppercase font-bold tracking-widest transition-all ${!formData.color_fondo
+                                                ? 'bg-primary border-primary text-primary-foreground font-black'
+                                                : 'bg-black/20 border-white/10 text-white/60 hover:bg-white/5'
+                                                }`}
+                                        >
+                                            Sin color (usar tema)
+                                        </button>
                                         <input
                                             type="color"
                                             value={formData.color_fondo || '#ffffff'}
@@ -550,9 +611,12 @@ export default function AdminMemorialsPage() {
                                             value={formData.color_fondo || ''}
                                             onChange={(e) => setFormData({ ...formData, color_fondo: e.target.value })}
                                             className="bg-black/20 border-white/10 text-white h-10 font-mono w-32"
-                                            placeholder="#ffffff"
+                                            placeholder="Sin color"
                                         />
                                     </div>
+                                    <p className="text-[9px] text-white/30">
+                                        Un color propio reemplaza el fondo del tema y ajusta el texto a claro u oscuro según su brillo.
+                                    </p>
                                 </div>
                             </div>
 
@@ -608,14 +672,14 @@ export default function AdminMemorialsPage() {
                                 <div className="flex-1 overflow-hidden relative flex items-center justify-center p-2 bg-[#080a12]/30">
                                     {previewMode === 'mobile' ? (
                                         <iframe
-                                            src={`${getMemorialBaseUrl()}/memorials/v/${editingMemorial.tenant_slug}/${editingMemorial.pet_name.toLowerCase().replace(/\s+/g, '-')}/${editingMemorial.id_recuerdo}?preview_layout=${formData.tipo_diseno}&preview_theme=${formData.tema}&preview_particles=${formData.particulas}&preview_bg=${encodeURIComponent(formData.color_fondo)}`}
+                                            src={previewUrl(editingMemorial, formData)}
                                             className="w-[375px] h-[550px] border border-white/10 rounded-3xl shadow-2xl bg-[#faf9f6] transition-all duration-300"
                                             title="Live Preview Mobile"
                                         />
                                     ) : (
                                         <div className="w-[1024px] h-[1250px] origin-top scale-[0.43] transition-all duration-300 border border-white/10 rounded-2xl shadow-2xl overflow-hidden bg-[#faf9f6] absolute top-4">
                                             <iframe
-                                                src={`${getMemorialBaseUrl()}/memorials/v/${editingMemorial.tenant_slug}/${editingMemorial.pet_name.toLowerCase().replace(/\s+/g, '-')}/${editingMemorial.id_recuerdo}?preview_layout=${formData.tipo_diseno}&preview_theme=${formData.tema}&preview_particles=${formData.particulas}&preview_bg=${encodeURIComponent(formData.color_fondo)}`}
+                                                src={previewUrl(editingMemorial, formData)}
                                                 className="w-full h-full border-0"
                                                 title="Live Preview Desktop"
                                             />

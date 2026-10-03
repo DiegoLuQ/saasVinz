@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Any
 from datetime import datetime
 from uuid import UUID
-from .models import MemorialStatus, DedicationStatus
+from .models import MemorialStatus, DedicationStatus, RitualKind
 
 class DedicationBase(BaseModel):
     mensajero: str = Field(..., max_length=100)
@@ -23,6 +23,19 @@ class DedicationResponse(DedicationBase):
 
     class Config:
         from_attributes = True
+
+class RitualCreate(BaseModel):
+    kind: RitualKind
+    # Solo se guarda para estrellas ("Encendida por …"); opcional
+    name: Optional[str] = Field(None, max_length=40)
+
+class LitStar(BaseModel):
+    id: int
+    name: Optional[str] = None
+
+class RitualStateResponse(BaseModel):
+    counts: dict = {}
+    stars: List[LitStar] = []
 
 class MemorialBase(BaseModel):
     msg_despedida: str = Field(..., max_length=500)
@@ -74,6 +87,9 @@ class MemorialPublicResponse(BaseModel):
     tenant: TenantPublic = Field(alias="tenant_info")
     plan: Optional[str] = None
     dedication_limit: int = 0
+    img_limit: int = 0
+    ritual_counts: dict = {}
+    lit_stars: List[LitStar] = []
     dedications_count: int = 0
     dedicatorias: List[DedicationResponse] = Field(default_factory=list, validation_alias="dedications", serialization_alias="dedicatorias")
     branding: Optional[dict] = {}
@@ -110,6 +126,9 @@ class MemorialManageResponse(BaseModel):
     tenant: TenantPublic = Field(alias="tenant_info")
     plan: Optional[str] = None
     dedication_limit: int = 0
+    img_limit: int = 0
+    ritual_counts: dict = {}
+    lit_stars: List[LitStar] = []
     dedications_count: int = 0
     dedicatorias: List[DedicationResponse] = Field(default_factory=list, validation_alias="dedications", serialization_alias="dedicatorias")
     branding: Optional[dict] = {}

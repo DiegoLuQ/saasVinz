@@ -221,7 +221,12 @@ export default function SocialShareCard({ memorial, mascota, tenant_info, locale
                 document.body
             )}
 
-            {/* Hidden Export Container - Matching base proportions exactly */}
+            {/* Hidden Export Container - Matching base proportions exactly.
+                Solo se monta con el modal abierto: montado siempre se veía como
+                un nombre "fantasma" arriba a la izquierda del memorial (y sumaba
+                un <h1> extra por cada grupo de botones). No se mueve fuera de
+                pantalla porque html-to-image captura con su posición real. */}
+            {showPreview && (
             <div
                 ref={exportRef}
                 style={{
@@ -248,6 +253,7 @@ export default function SocialShareCard({ memorial, mascota, tenant_info, locale
                     getProxiedUrl={getProxiedUrl}
                 />
             </div>
+            )}
         </>
     );
 }

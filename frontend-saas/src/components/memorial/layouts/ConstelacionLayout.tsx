@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, Star, Moon } from 'lucide-react';
 import Image from 'next/image';
 import MemorialActionButtons from '@/components/memorial/MemorialActionButtons';
+import { getLifeDates, isDarkSurface, nameSizeClass, seededRandom } from '@/lib/memorialDesign';
+import { ritualLabel, type RitualProps } from '@/lib/memorialRituals';
 
 /**
  * Plantilla ULTRA "Constelación": cielo nocturno profundo donde la mascota
@@ -16,25 +18,55 @@ export default function ConstelacionLayout(props: any) {
     } = props;
 
     const [litStars, setLitStars] = useState(0);
-    const isDarkTheme = themeConfig?.text?.includes('white') || themeConfig?.text?.includes('50') || themeConfig?.text?.includes('slate-200');
     const portadaUrl = memorial?.diseno?.portada_url;
+    // Sin portada ni color propio se pinta el cielo nocturno: el texto debe ser claro
+    // aunque el tema elegido sea "claro".
+    const usesNightSky = !portadaUrl && !memorial?.diseno?.color_fondo;
+    // Sobre portada se aplica un velo oscuro: el texto siempre va claro
+    const isDarkTheme = usesNightSky || isDarkSurface(themeConfig, portadaUrl);
 
-    // Estrellas fijas generadas una sola vez (posiciones estables entre renders)
-    const stars = useMemo(() =>
-        Array.from({ length: 90 }, (_, i) => ({
+    // Estrellas deterministas (mismas en servidor y cliente) animadas con CSS:
+    // 90 nodos de framer-motion costaban mucho en celulares de gama baja.
+    const stars = useMemo(() => {
+        const rand = seededRandom(90);
+        return Array.from({ length: 90 }, (_, i) => ({
             id: i,
-            size: Math.random() * 2.5 + 1,
-            top: Math.random() * 100,
-            left: Math.random() * 100,
-            duration: Math.random() * 4 + 2,
-            delay: Math.random() * 4,
-        })), []);
+            size: rand() * 2.5 + 1,
+            top: rand() * 100,
+            left: rand() * 100,
+            duration: rand() * 4 + 2,
+            delay: rand() * 4,
+        }));
+    }, []);
 
-    const years = `${mascota?.birth_date ? new Date(mascota.birth_date).getFullYear() : '...'} — ${mascota?.death_date ? new Date(mascota.death_date).getFullYear() : '...'}`;
+    const petName = mascota?.name || '';
+    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale);
 
-    const handleLightStar = (e: React.MouseEvent) => {
+    const rituals: RitualProps | undefined = props.rituals;
+    const starCount = rituals?.counts.estrella || 0;
+    const [askingName, setAskingName] = useState(false);
+    const [starName, setStarName] = useState('');
+    const [activeStar, setActiveStar] = useState<number | null>(null);
+
+    // Cada estrella encendida queda en el cielo, en una posición estable según
+    // su id (franja superior, lejos del retrato y del texto).
+    const litStarPositions = useMemo(() => (rituals?.stars || []).map(st => {
+        const rand = seededRandom(Math.abs(st.id) + 7);
+        const side = rand() < 0.5;
+        return {
+            ...st,
+            top: 4 + rand() * 40,
+            left: side ? 3 + rand() * 25 : 72 + rand() * 25,
+            size: 10 + rand() * 6,
+        };
+    }), [rituals?.stars]);
+
+    const confirmStar = () => {
+        const name = starName.trim();
         setLitStars(prev => prev + 1);
-        onSendKiss?.(e);
+        setAskingName(false);
+        setStarName('');
+        rituals?.send('estrella', name || undefined);
     };
 
     return (
@@ -46,15 +78,24 @@ export default function ConstelacionLayout(props: any) {
                 ...(portadaUrl ? { backgroundImage: `url(${portadaUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {})
             }}
         >
+            <style>{`
+                @keyframes constelacion-twinkle { 0%, 100% { opacity: .15 } 50% { opacity: .9 } }
+                @media (prefers-reduced-motion: reduce) { .constelacion-star { animation: none !important; opacity: .5 } }
+            `}</style>
+
+            {/* Velo para que el texto se lea sobre cualquier portada */}
+            {portadaUrl && <div className="absolute inset-0 bg-[#050816]/55 pointer-events-none" />}
+
             {/* ─── CIELO ESTRELLADO ─── */}
             <div className="absolute inset-0 pointer-events-none">
                 {stars.map(s => (
-                    <motion.div
+                    <div
                         key={s.id}
-                        className={`absolute rounded-full ${isDarkTheme ? 'bg-white' : 'bg-slate-400/40'}`}
-                        style={{ width: s.size, height: s.size, top: `${s.top}%`, left: `${s.left}%` }}
-                        animate={{ opacity: [0.15, 0.9, 0.15] }}
-                        transition={{ duration: s.duration, delay: s.delay, repeat: Infinity }}
+                        className={`constelacion-star absolute rounded-full ${isDarkTheme ? 'bg-white' : 'bg-slate-400/40'}`}
+                        style={{
+                            width: s.size, height: s.size, top: `${s.top}%`, left: `${s.left}%`,
+                            animation: `constelacion-twinkle ${s.duration}s ease-in-out ${s.delay}s infinite`,
+                        }}
                     />
                 ))}
 
@@ -69,13 +110,39 @@ export default function ConstelacionLayout(props: any) {
                     />
                 ))}
 
+                {/* Estrellas encendidas por los visitantes */}
+                {litStarPositions.map(st => (
+                    <button
+                        key={st.id}
+                        type="button"
+                        onClick={() => setActiveStar(activeStar === st.id ? null : st.id)}
+                        className="absolute pointer-events-auto -translate-x-1/2 -translate-y-1/2 focus:outline-none"
+                        style={{ top: `${st.top}%`, left: `${st.left}%` }}
+                        aria-label={st.name
+                            ? (locale === 'es' ? `Estrella encendida por ${st.name}` : `Star lit by ${st.name}`)
+                            : (locale === 'es' ? 'Estrella encendida' : 'Lit star')}
+                    >
+                        <Star
+                            size={st.size}
+                            className="text-amber-200 fill-amber-200 drop-shadow-[0_0_6px_rgba(253,230,138,0.9)]"
+                        />
+                        {activeStar === st.id && (
+                            <span className="absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/60 px-3 py-1 text-[11px] text-amber-100 backdrop-blur-sm">
+                                {st.name
+                                    ? (locale === 'es' ? `Encendida por ${st.name}` : `Lit by ${st.name}`)
+                                    : (locale === 'es' ? 'Una estrella para siempre' : 'A star forever')}
+                            </span>
+                        )}
+                    </button>
+                ))}
+
                 {/* Luna creciente decorativa */}
                 <div className={`absolute top-10 right-8 sm:top-16 sm:right-20 ${isDarkTheme ? 'text-amber-100/30' : 'text-slate-400/20'}`}>
                     <Moon size={44} fill="currentColor" />
                 </div>
             </div>
 
-            <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-16 sm:py-24 flex flex-col items-center text-center">
+            <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-16 sm:py-24 flex flex-col items-center text-center pointer-events-none [&>*]:pointer-events-auto">
                 {/* ─── RETRATO CON HALO ─── */}
                 <motion.div
                     initial={{ opacity: 0, scale: 0.8 }}
@@ -138,7 +205,11 @@ export default function ConstelacionLayout(props: any) {
                     initial={{ opacity: 0, y: 24 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.8, duration: 1.2 }}
-                    className={`text-5xl sm:text-7xl md:text-8xl font-bold mb-5 bg-gradient-to-b bg-clip-text text-transparent drop-shadow-[0_0_25px_rgba(165,180,252,0.4)] ${
+                    className={`${nameSizeClass(petName, {
+                        short: 'text-5xl sm:text-7xl md:text-8xl',
+                        long: 'text-4xl sm:text-6xl md:text-7xl',
+                        xlong: 'text-3xl sm:text-5xl md:text-6xl',
+                    })} font-bold mb-5 leading-tight break-words max-w-full bg-gradient-to-b bg-clip-text text-transparent drop-shadow-[0_0_25px_rgba(165,180,252,0.4)] ${
                         isDarkTheme ? 'from-white via-indigo-100 to-indigo-300/80' : 'from-[#1a2151] via-indigo-950 to-indigo-900'
                     }`}
                     style={{ fontFamily: "'Cinzel', serif" }}
@@ -146,20 +217,30 @@ export default function ConstelacionLayout(props: any) {
                     {mascota?.name}
                 </motion.h1>
 
+                {dates.years && (
                 <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 1.2, duration: 1 }}
-                    className={`inline-flex items-center gap-3 px-5 py-2 rounded-full border text-xs sm:text-sm font-bold uppercase tracking-[0.25em] mb-10 ${
+                    className={`inline-flex items-center gap-3 px-5 py-2 rounded-full border text-xs sm:text-sm font-bold uppercase tracking-[0.25em] ${dates.yearsOfLove ? 'mb-3' : 'mb-10'} ${
                         isDarkTheme
                             ? 'border-indigo-300/20 bg-indigo-400/10 text-indigo-100/80'
                             : 'border-indigo-600/10 bg-indigo-600/5 text-indigo-900/85'
                     }`}
                 >
                     <Star size={12} fill="currentColor" className={isDarkTheme ? 'text-amber-200' : 'text-indigo-600'} />
-                    {years}
+                    {dates.years}
                     <Star size={12} fill="currentColor" className={isDarkTheme ? 'text-amber-200' : 'text-indigo-600'} />
                 </motion.div>
+                )}
+                {dates.yearsOfLove && (
+                    <p
+                        className={`mb-10 text-base sm:text-lg italic ${isDarkTheme ? 'text-indigo-100/70' : 'text-slate-600'}`}
+                        style={{ fontFamily: "'Cormorant Garamond', serif" }}
+                    >
+                        {dates.yearsOfLove}
+                    </p>
+                )}
 
                 {/* ─── MENSAJE ─── */}
                 <motion.p
@@ -178,9 +259,34 @@ export default function ConstelacionLayout(props: any) {
                 </motion.p>
 
                 {/* ─── ENCENDER UNA ESTRELLA ─── */}
-                <div className="relative mb-12">
+                <div className="relative mb-12 flex flex-col items-center">
+                    {askingName ? (
+                        <form
+                            onSubmit={(e) => { e.preventDefault(); confirmStar(); }}
+                            className={`flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-2 rounded-3xl sm:rounded-full border w-full max-w-md ${
+                                isDarkTheme ? 'bg-white/5 border-indigo-300/30' : 'bg-white/70 border-indigo-600/20'
+                            }`}
+                        >
+                            <input
+                                autoFocus
+                                value={starName}
+                                maxLength={40}
+                                onChange={(e) => setStarName(e.target.value)}
+                                placeholder={locale === 'es' ? 'Tu nombre (opcional)' : 'Your name (optional)'}
+                                className={`flex-1 min-w-0 bg-transparent px-4 py-2.5 outline-none text-base ${
+                                    isDarkTheme ? 'text-white placeholder:text-indigo-200/50' : 'text-slate-800 placeholder:text-slate-400'
+                                }`}
+                            />
+                            <button
+                                type="submit"
+                                className="px-6 py-2.5 rounded-full bg-amber-200 text-indigo-950 text-xs font-bold uppercase tracking-widest hover:bg-amber-100 transition-colors"
+                            >
+                                {locale === 'es' ? 'Encender' : 'Light'}
+                            </button>
+                        </form>
+                    ) : (
                     <button
-                        onClick={handleLightStar}
+                        onClick={() => setAskingName(true)}
                         className={`group px-8 sm:px-10 py-4 rounded-full border font-bold text-sm uppercase tracking-widest transition-all hover:scale-105 active:scale-95 flex items-center gap-3 shadow-[0_0_30px_rgba(129,140,248,0.2)] ${
                             isDarkTheme
                                 ? 'bg-gradient-to-r from-indigo-400/20 to-purple-400/20 hover:from-indigo-400/30 hover:to-purple-400/30 border-indigo-300/30 text-indigo-100'
@@ -189,9 +295,18 @@ export default function ConstelacionLayout(props: any) {
                     >
                         <Star size={18} className={litStars > 0 ? 'fill-amber-200 text-amber-200' : (isDarkTheme ? 'text-indigo-200 group-hover:text-amber-200 transition-colors' : 'text-indigo-600 group-hover:text-indigo-800 transition-colors')} />
                         {litStars > 0
-                            ? (locale === 'es' ? `Brillando (${litStars})` : `Shining (${litStars})`)
+                            ? (locale === 'es' ? 'Encender otra estrella' : 'Light another star')
                             : (locale === 'es' ? 'Encender una estrella' : 'Light a star')}
                     </button>
+                    )}
+                    {starCount > 0 && (
+                        <p className={`mt-3 text-sm italic ${isDarkTheme ? 'text-indigo-100/70' : 'text-slate-600'}`}
+                            style={{ fontFamily: "'Cormorant Garamond', serif" }}>
+                            ⭐ {locale === 'es'
+                                ? `${ritualLabel('estrella', starCount, locale)} en su cielo`
+                                : `${ritualLabel('estrella', starCount, locale)} in their sky`}
+                        </p>
+                    )}
                     <AnimatePresence>
                         {litStars > 0 && (
                             <motion.div

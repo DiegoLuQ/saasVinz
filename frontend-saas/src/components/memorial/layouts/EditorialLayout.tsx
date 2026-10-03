@@ -6,6 +6,8 @@ import {
     Flower2
 } from 'lucide-react';
 import MemorialActionButtons from '@/components/memorial/MemorialActionButtons';
+import { getLifeDates, nameSizeClass } from '@/lib/memorialDesign';
+import { ritualLabel, type RitualProps } from '@/lib/memorialRituals';
 
 export default function EditorialLayout(props: any) {
     const {
@@ -15,8 +17,22 @@ export default function EditorialLayout(props: any) {
     const [depositedFlower, setDepositedFlower] = useState(false);
     const [roses, setRoses] = useState<any[]>([]);
 
+    const petName = mascota?.name || '';
+    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale);
+    const deathYear = mascota?.death_date ? new Date(mascota.death_date).getUTCFullYear() : null;
+    const bio: string = memorial?.msg_despedida || '';
+    // "Edición especial · 2026" en vez del antiguo "Memorial Issue • Vol. IV"
+    const issueLabel = locale === 'en'
+        ? (deathYear ? `Special edition · ${deathYear}` : 'Special edition')
+        : (deathYear ? `Edición especial · ${deathYear}` : 'Edición especial');
+
+    const rituals: RitualProps | undefined = props.rituals;
+    const flowerCount = rituals?.counts.flor || 0;
+
     const leaveRose = () => {
+        if (depositedFlower) return;
         setDepositedFlower(true);
+        rituals?.send('flor');
         const newRoses = Array.from({ length: 12 }).map((_, i) => ({
             id: Date.now() + i,
             x: Math.random() * 200 - 100,
@@ -52,38 +68,44 @@ export default function EditorialLayout(props: any) {
                 </div>
 
                 {/* Text Column */}
-                <div className={`flex flex-col justify-center py-8 ${themeConfig.text} ${
+                <div className={`flex flex-col justify-center py-8 ${memorial?.diseno?.portada_url ? "text-white" : themeConfig.text} ${
                     memorial?.diseno?.portada_url 
                         ? 'bg-black/40 backdrop-blur-md p-8 sm:p-12 rounded-3xl border border-white/10 shadow-2xl' 
                         : ''
                 }`}>
                     <div className="text-center mb-8 pb-4 border-b border-current/10 w-fit mx-auto">
-                        <span className="text-[0.7rem] uppercase tracking-[0.4em] opacity-50">Memorial Issue • Vol. IV</span>
+                        <span className="text-[0.7rem] uppercase tracking-[0.4em] opacity-60">{issueLabel}</span>
                     </div>
 
-                    <h1 className="text-6xl md:text-8xl font-serif text-center mb-4 leading-none tracking-tight"
+                    <h1 className={`${nameSizeClass(petName, {
+                        short: 'text-6xl md:text-8xl',
+                        long: 'text-5xl md:text-7xl',
+                        xlong: 'text-4xl md:text-6xl',
+                    })} font-serif text-center mb-4 leading-none tracking-tight break-words`}
                         style={{
                             fontFamily: "'Cinzel', serif",
                             textShadow: memorial?.diseno?.portada_url 
                                 ? '0 2px 10px rgba(0,0,0,0.8), 0 0 30px rgba(0,0,0,0.4)' 
                                 : '0 10px 30px rgba(0,0,0,0.2)'
                         }}>
-                        {mascota?.name}
+                        {petName}
                     </h1>
 
-                    <div className="text-center text-2xl md:text-3xl mb-12 opacity-80" style={{ fontFamily: "'Pinyon Script', cursive" }}>
-                        {mascota?.birth_date ? new Date(mascota.birth_date).getFullYear() : '...'} — {mascota?.death_date ? new Date(mascota.death_date).getFullYear() : '...'}
-                    </div>
+                    {dates.years ? (
+                        <div className="text-center text-2xl md:text-3xl mb-12 opacity-80" style={{ fontFamily: "'Pinyon Script', cursive" }}>
+                            {dates.years}
+                        </div>
+                    ) : <div className="mb-10" />}
 
-                    <div className="text-[1.1rem] md:text-[1.25rem] leading-[2] text-justify relative mb-16 px-4 font-serif opacity-90 italic">
-                        <span className="float-left text-[5rem] leading-[0.7] pr-4 pt-2 text-[#c5a059]" style={{ fontFamily: "'Cinzel', serif" }}>
-                            {memorial.msg_despedida?.[0] || 'E'}
+                    <div className="text-[1.1rem] md:text-[1.25rem] leading-[2] text-left md:text-justify relative mb-16 px-4 font-serif opacity-90 italic">
+                        <span className="float-left text-[5rem] leading-[0.7] pr-4 pt-2 text-[#c5a059] not-italic" style={{ fontFamily: "'Cinzel', serif" }}>
+                            {bio.charAt(0)}
                         </span>
-                        {memorial.msg_despedida?.substring(1) || t.philosophy_text}
+                        {bio.substring(1)}
                     </div>
 
                     <div className="flex flex-col items-center gap-12 w-full">
-                        <div className="flex justify-center relative w-full">
+                        <div className="flex flex-col items-center gap-3 relative w-full">
                             <button
                                 onClick={leaveRose}
                                 className={`px-10 py-4 border-2 border-[#c5a059] text-[#c5a059] rounded-full uppercase tracking-widest text-xs hover:bg-[#c5a059] hover:text-[#1a1a1a] transition-all duration-500 font-bold flex items-center gap-3 bg-white/5 backdrop-blur-sm shadow-xl ${depositedFlower ? 'pointer-events-none opacity-40 grayscale' : 'hover:-translate-y-1'}`}
@@ -108,6 +130,9 @@ export default function EditorialLayout(props: any) {
                                     </motion.div>
                                 ))}
                             </AnimatePresence>
+                            {flowerCount > 0 && (
+                                <span className="text-sm italic opacity-70">🌹 {ritualLabel('flor', flowerCount, locale)}</span>
+                            )}
                         </div>
 
                         {/* Action Buttons Integration */}

@@ -37,8 +37,7 @@ export default function MemorialSetupModal({ isOpen, onClose, pet, tenantName }:
 
     const [form, setForm] = useState({
         msg_despedida: '',
-        color_fondo: '#ffffff',
-        particulas: 'flores',
+        particulas: 'ninguna',
         tema: 'claro',
         es_privado: false
     });
@@ -61,15 +60,16 @@ export default function MemorialSetupModal({ isOpen, onClose, pet, tenantName }:
                 method: 'POST',
                 body: JSON.stringify({
                     id_mascota: pet.id,
-                    msg_despedida: 'Estamos preparando un lugar especial para recordar a ' + pet.name,
-                    diseno: { color_fondo: '#ffffff', particulas: 'flores', tema: 'claro' }
+                    // Sin mensaje: el memorial público muestra un epitafio de consuelo
+                    // hasta que la familia o el crematorio escriban el suyo.
+                    msg_despedida: '',
+                    diseno: { particulas: 'ninguna', tema: 'claro' }
                 })
             });
             setMemorial(res);
             setForm({
                 msg_despedida: res.msg_despedida || '',
-                color_fondo: res.diseno?.color_fondo || '#ffffff',
-                particulas: res.diseno?.particulas || 'flores',
+                particulas: res.diseno?.particulas || 'ninguna',
                 tema: res.diseno?.tema || 'claro',
                 es_privado: res.es_privado || false
             });
@@ -94,8 +94,9 @@ export default function MemorialSetupModal({ isOpen, onClose, pet, tenantName }:
                 method: 'PATCH',
                 body: JSON.stringify({
                     msg_despedida: form.msg_despedida,
+                    // Solo las claves que edita este modal: el backend combina el
+                    // diseño y conserva fondo/portada/layout definidos por otros.
                     diseno: {
-                        color_fondo: form.color_fondo,
                         particulas: form.particulas,
                         tema: form.tema
                     },
@@ -252,14 +253,14 @@ export default function MemorialSetupModal({ isOpen, onClose, pet, tenantName }:
                             </label>
                             <textarea
                                 value={form.msg_despedida}
-                                onChange={(e) => setForm({ ...form, msg_despedida: e.target.value.slice(0, 1000) })}
-                                maxLength={1000}
+                                onChange={(e) => setForm({ ...form, msg_despedida: e.target.value.slice(0, 500) })}
+                                maxLength={500}
                                 onPaste={(e) => {
                                     setTimeout(() => {
                                         setForm(prev => {
-                                            if (prev.msg_despedida.length > 1000) {
-                                                alert('Tu mensaje ha sido ajustado al límite de 1000 caracteres.');
-                                                return { ...prev, msg_despedida: prev.msg_despedida.slice(0, 1000) };
+                                            if (prev.msg_despedida.length > 500) {
+                                                alert('Tu mensaje ha sido ajustado al límite de 500 caracteres.');
+                                                return { ...prev, msg_despedida: prev.msg_despedida.slice(0, 500) };
                                             }
                                             return prev;
                                         });
@@ -268,7 +269,7 @@ export default function MemorialSetupModal({ isOpen, onClose, pet, tenantName }:
                                 className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-5 outline-none focus:border-primary/50 transition-all text-sm min-h-[120px]"
                                 placeholder="Escribe unas palabras de despedida..."
                             />
-                            <p className="text-[10px] text-right text-muted-foreground">{form.msg_despedida.length}/1000</p>
+                            <p className="text-[10px] text-right text-muted-foreground">{form.msg_despedida.length}/500</p>
                         </div>
 
                         <div className="space-y-4">
@@ -276,8 +277,8 @@ export default function MemorialSetupModal({ isOpen, onClose, pet, tenantName }:
                                 <Sparkles size={16} className="text-primary" />
                                 Efecto de Partículas
                             </label>
-                            <div className="grid grid-cols-3 gap-2">
-                                {['nieve', 'estrellas'].map((p) => (
+                            <div className="grid grid-cols-2 gap-2">
+                                {['ninguna', 'nieve', 'estrellas', 'flores'].map((p) => (
                                     <button
                                         key={p}
                                         onClick={() => setForm({ ...form, particulas: p })}

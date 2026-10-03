@@ -19,6 +19,7 @@ from collections import defaultdict
 import time
 from app.api.internal.common.media_service import MediaService
 from app.core.rate_limiter import limiter
+from .services import merge_diseno
 
 # ─── Rate Limiting (in-memory, per-IP) ───
 _rate_limit_store: dict[str, list[float]] = defaultdict(list)
@@ -191,11 +192,9 @@ def _get_memorial_limit(memorial: mem_models.Memorial, db: Session) -> int:
 
 def _get_memorial_img_limit(memorial: mem_models.Memorial, db: Session) -> int:
     # 1. Check if linked to a specific plan (MemorialPlan in DB)
-    print(f"[LIMIT DEBUG] memorial_plan={memorial.memorial_plan}, memorial.plan={memorial.plan!r}")
     if memorial.memorial_plan:
          features = memorial.memorial_plan.features or {}
          result = features.get("max_images", 3)
-         print(f"[LIMIT DEBUG] -> via memorial_plan features={features}, returns {result}")
          return result
 
     # 1b. Planes Mensual / Anual / Eterno
@@ -214,7 +213,6 @@ def _get_memorial_img_limit(memorial: mem_models.Memorial, db: Session) -> int:
     
     plan_name = memorial.plan or tenant_sub_plan or tenant_legacy_plan or "FREE"
     pn = plan_name.upper().strip()
-    print(f"[LIMIT DEBUG] tenant_sub_plan={tenant_sub_plan!r}, tenant_legacy_plan={tenant_legacy_plan!r}, final plan_name={plan_name!r}, pn={pn!r}")
 
     # Plan Tier mapping: ULTRA/PARAISO=5, PRO/VINCULO=3, NORMAL/HUELLA=2, FREE/RECUERDO=1
     if "ULTRA" in pn or "PARAISO" in pn: return 5
@@ -224,9 +222,35 @@ def _get_memorial_img_limit(memorial: mem_models.Memorial, db: Session) -> int:
     return 3 # Default to PRO/VINCULO tier
 
 
+_MAX_LIT_STARS = 60          # estrellas con nombre que se dibujan en Constelación
+_RITUALS_PER_IP_HOUR = 30     # tope antiabuso por memorial e IP
+
+
+def _ritual_state(memorial_id: int, db: Session) -> dict:
+    """Totales por tipo de ritual + últimas estrellas encendidas (con nombre)."""
+    from sqlalchemy import func
+    rows = db.query(mem_models.Ritual.kind, func.count(mem_models.Ritual.id)).filter(
+        mem_models.Ritual.id_recuerdo == memorial_id
+    ).group_by(mem_models.Ritual.kind).all()
+    counts = {k.value: 0 for k in mem_models.RitualKind}
+    counts.update({kind: n for kind, n in rows})
+
+    stars = db.query(mem_models.Ritual.id, mem_models.Ritual.name).filter(
+        mem_models.Ritual.id_recuerdo == memorial_id,
+        mem_models.Ritual.kind == mem_models.RitualKind.estrella.value,
+    ).order_by(mem_models.Ritual.id.desc()).limit(_MAX_LIT_STARS).all()
+    return {"counts": counts, "stars": [{"id": sid, "name": name} for sid, name in stars]}
+
+
 def _apply_memorial_limit(memorial: mem_models.Memorial, db: Session):
     limit = _get_memorial_limit(memorial, db)
     setattr(memorial, "dedication_limit", limit)
+    # Fotos permitidas por el plan (el frontend ya no infiere límites por nombre)
+    setattr(memorial, "img_limit", _get_memorial_img_limit(memorial, db))
+    # Contadores de rituales (velas, flores, estrellas, besos) para la prueba social
+    state = _ritual_state(memorial.id, db)
+    setattr(memorial, "ritual_counts", state["counts"])
+    setattr(memorial, "lit_stars", state["stars"])
     
     # Count approved + pending dedications for accurate limit enforcement
     count = db.query(mem_models.Dedication).filter(
@@ -368,6 +392,94 @@ def get_public_memorial(
 
     return _apply_memorial_limit(memorial, db)
 
+
+@router.get("/{recuerdo_uuid}/og-image.jpg")
+@limiter.limit("60/minute")
+def get_memorial_og_image(
+    request: Request,
+    recuerdo_uuid: UUID,
+    db: Session = Depends(get_db)
+):
+    """Tarjeta JPEG con la foto de la mascota para el preview al compartir el
+    memorial (WhatsApp no previsualiza los .webp guardados en R2)."""
+    from fastapi import Response
+    from app.api.public.tracking.router import _compose_og_card
+
+    memorial = _load_memorial_scoped(db, recuerdo_uuid)
+    # Mismas reglas de visibilidad que la vista pública
+    if (not memorial or memorial.es_privado
+            or memorial.status == mem_models.MemorialStatus.archived):
+        raise HTTPException(status_code=404, detail="Sin imagen disponible")
+
+    image_url = normalize_image_url(
+        memorial.main_image_url or (memorial.pet.image_url if memorial.pet else None)
+    )
+    if not image_url or not str(image_url).lower().startswith(("http://", "https://")):
+        raise HTTPException(status_code=404, detail="Sin imagen disponible")
+
+    try:
+        import requests
+        resp = requests.get(image_url, timeout=8)
+        if resp.status_code != 200 or not resp.content:
+            raise HTTPException(status_code=404, detail="Sin imagen disponible")
+        jpeg = _compose_og_card(resp.content)
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error generando og-image de memorial: {e}")
+        raise HTTPException(status_code=404, detail="Sin imagen disponible")
+
+    return Response(
+        content=jpeg,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+@router.post("/{recuerdo_uuid}/rituals", response_model=mem_schemas.RitualStateResponse)
+@limiter.limit("20/minute")
+def create_ritual(
+    request: Request,
+    recuerdo_uuid: UUID,
+    ritual_in: mem_schemas.RitualCreate,
+    db: Session = Depends(get_db)
+):
+    """Registra un gesto del visitante (vela, flor, estrella, beso) y devuelve
+    los contadores actualizados. Público y sin login, como las dedicatorias."""
+    import hashlib
+    from app.core.client_ip import get_client_ip
+    from app.core.config import settings
+    from app.utils import tz
+
+    memorial = _load_memorial_scoped(db, recuerdo_uuid)
+    if (memorial.es_privado
+            or memorial.status != mem_models.MemorialStatus.active
+            or (memorial.valid_until and memorial.valid_until < datetime.now())):
+        raise HTTPException(status_code=403, detail="Este memorial no recibe rituales en este momento.")
+
+    ip_hash = hashlib.sha256(f"{settings.SECRET_KEY}:{get_client_ip(request)}".encode()).hexdigest()
+    recent = db.query(mem_models.Ritual).filter(
+        mem_models.Ritual.id_recuerdo == memorial.id,
+        mem_models.Ritual.ip_hash == ip_hash,
+        mem_models.Ritual.created_at >= tz.get_now() - timedelta(hours=1),
+    ).count()
+    if recent >= _RITUALS_PER_IP_HOUR:
+        raise HTTPException(status_code=429, detail="Gracias por tanto cariño. Intenta de nuevo más tarde.")
+
+    name = None
+    if ritual_in.kind == mem_models.RitualKind.estrella and ritual_in.name:
+        name = (sanitize_text(ritual_in.name) or "").strip()[:40] or None
+
+    db.add(mem_models.Ritual(
+        id_recuerdo=memorial.id,
+        kind=ritual_in.kind.value,
+        name=name,
+        ip_hash=ip_hash,
+    ))
+    db.commit()
+    return _ritual_state(memorial.id, db)
+
+
 @router.post("/{recuerdo_uuid}/dedicatorias", response_model=mem_schemas.DedicationResponse)
 def create_dedication(
     recuerdo_uuid: UUID,
@@ -476,6 +588,11 @@ def update_memorial_settings(
                 status_code=400,
                 detail="La imagen seleccionada no es válida o no pertenece a este memorial."
             )
+
+    # El diseño se combina: la familia solo envía sus claves y no debe borrar
+    # las que fijó el crematorio/admin (ni viceversa).
+    if "diseno" in update_data:
+        update_data["diseno"] = merge_diseno(memorial.diseno, update_data["diseno"])
 
     for key, value in update_data.items():
         setattr(memorial, key, value)

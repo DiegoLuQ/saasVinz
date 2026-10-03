@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import LimitReachedModal from '@/components/memorial/LimitReachedModal';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import {
     Heart,
     Globe,
@@ -33,9 +33,12 @@ import DedicationModal from '@/components/memorial/DedicationModal';
 import Snowflakes from '@/components/memorial/Snowflakes';
 import TwinklingStars from '@/components/memorial/TwinklingStars';
 import { ExpirationModal } from '@/components/memorial/ExpirationModal';
-import MemorialReactions from '@/components/memorial/MemorialReactions';
+import RitualSummary from '@/components/memorial/RitualSummary';
+import FloatingPetals from '@/components/memorial/FloatingPetals';
+import type { RitualKind, RitualState } from '@/lib/memorialRituals';
 import { publicApiRequest } from '@/lib/api/public';
 import CelestialBackground from '@/components/memorial/CelestialBackground';
+import { normalizeMemorialBg, getMemorialEpitaph, pageBackgroundHex } from '@/lib/memorialDesign';
 
 const NormalLayout = dynamic(() => import('@/components/memorial/layouts/NormalLayout'), { loading: () => <Loader2 className="animate-spin" /> });
 const AltarLayout = dynamic(() => import('@/components/memorial/layouts/AltarLayout'), { loading: () => <Loader2 className="animate-spin" /> });
@@ -58,12 +61,15 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
     const computedDiseno = useMemo(() => {
         if (!memorial) return {};
         const d = memorial.diseno || {};
+        // preview_bg presente (aunque vacío) manda: el admin previsualiza "sin color".
+        const rawBg = searchParams.has('preview_bg') ? searchParams.get('preview_bg') : d.color_fondo;
         return {
-            color_fondo: searchParams.get('preview_bg') || d.color_fondo || '#ffffff',
-            particulas: searchParams.get('preview_particles') || d.particulas || 'flores',
+            color_fondo: normalizeMemorialBg(rawBg),
+            particulas: searchParams.get('preview_particles') || d.particulas || 'ninguna',
             tema: searchParams.get('preview_theme') || d.tema || 'claro',
             tipo_diseno: searchParams.get('preview_layout') || d.tipo_diseno || 'normal',
             portada_url: d.portada_url || '',
+            captions: (d.captions && typeof d.captions === 'object') ? d.captions : {},
         };
     }, [memorial, searchParams]);
 
@@ -153,7 +159,10 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 isValidityPast = validUntilDate < now;
             }
 
-            if (isExpired || isPending || isArchived || isValidityPast) {
+            // La vista previa del admin (iframe con preview_*) no debe quedar tapada
+            const isAdminPreview = searchParams.has('preview_layout');
+
+            if (!isAdminPreview && (isExpired || isPending || isArchived || isValidityPast)) {
                 let finalStatus = status;
                 // If validity is past but status is technically 'active', treat as expired for modal
                 if (isValidityPast && status === 'active') {
@@ -163,10 +172,18 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 setShowExpirationModal(true);
             }
         }
-    }, [memorial]);
+    }, [memorial, searchParams]);
 
     // State for Limit Reached Modal
     const [showLimitModal, setShowLimitModal] = useState(false);
+
+    // Rituales (velas, flores, estrellas, besos): lo que llega del backend con el
+    // memorial, más lo que el visitante va sumando en esta visita.
+    const [ritualOverride, setRitualOverride] = useState<RitualState | null>(null);
+    const ritualView: RitualState = ritualOverride || {
+        counts: memorial?.ritual_counts || {},
+        stars: memorial?.lit_stars || [],
+    };
 
     const handleSubmitDedication = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -242,7 +259,8 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 footerBorder: 'border-slate-200',
                 vinzer: 'bg-slate-100 border-slate-200 text-slate-800',
                 input: 'border-slate-300 text-slate-900 placeholder:text-slate-400 opacity-100',
-                button: 'bg-slate-900 text-white hover:bg-slate-800'
+                button: 'bg-slate-900 text-white hover:bg-slate-800',
+                dark: false
             },
             oscuro: {
                 bg: 'bg-[#0a192f]',
@@ -254,7 +272,8 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 footerBorder: 'border-white/5',
                 vinzer: 'bg-white/5 border-white/5 text-white',
                 input: 'border-white/10 text-white placeholder:text-white/30',
-                button: 'bg-[#c3b091] text-[#0a192f] hover:opacity-90'
+                button: 'bg-[#c3b091] text-[#0a192f] hover:opacity-90',
+                dark: true
             },
             esmeralda: {
                 bg: 'bg-[#064e3b]',
@@ -266,7 +285,8 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 footerBorder: 'border-white/5',
                 vinzer: 'bg-white/5 border-white/5 text-emerald-50',
                 input: 'border-emerald-700/30 text-white placeholder:text-emerald-100/30',
-                button: 'bg-emerald-500 text-emerald-950 hover:bg-emerald-400'
+                button: 'bg-emerald-500 text-emerald-950 hover:bg-emerald-400',
+                dark: true
             },
             dorado: {
                 bg: 'bg-[#451a03]',
@@ -278,7 +298,8 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 footerBorder: 'border-white/5',
                 vinzer: 'bg-white/5 border-white/5 text-amber-50',
                 input: 'border-amber-700/30 text-white placeholder:text-amber-100/30',
-                button: 'bg-amber-500 text-amber-950 hover:bg-amber-400'
+                button: 'bg-amber-500 text-amber-950 hover:bg-amber-400',
+                dark: true
             },
             rosado: {
                 bg: 'bg-[#500724]',
@@ -290,7 +311,8 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 footerBorder: 'border-white/5',
                 vinzer: 'bg-white/5 border-white/5 text-pink-50',
                 input: 'border-pink-700/30 text-white placeholder:text-pink-100/30',
-                button: 'bg-pink-500 text-pink-950 hover:bg-pink-400'
+                button: 'bg-pink-500 text-pink-950 hover:bg-pink-400',
+                dark: true
             },
             safiro: {
                 bg: 'bg-[#1e3a8a]',
@@ -302,7 +324,8 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 footerBorder: 'border-white/5',
                 vinzer: 'bg-white/5 border-white/5 text-blue-50',
                 input: 'border-blue-700/30 text-white placeholder:text-blue-100/30',
-                button: 'bg-blue-500 text-blue-950 hover:bg-blue-400'
+                button: 'bg-blue-500 text-blue-950 hover:bg-blue-400',
+                dark: true
             },
             orange: {
                 bg: 'bg-[#7c2d12]',
@@ -314,7 +337,8 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 footerBorder: 'border-white/5',
                 vinzer: 'bg-white/5 border-white/5 text-orange-50',
                 input: 'border-orange-700/30 text-white placeholder:text-orange-100/30',
-                button: 'bg-orange-500 text-orange-950 hover:bg-orange-400'
+                button: 'bg-orange-500 text-orange-950 hover:bg-orange-400',
+                dark: true
             }
         };
 
@@ -325,6 +349,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
             const selectedBase = isDark ? configs.oscuro : configs.claro;
             return {
                 ...selectedBase,
+                dark: isDark,
                 isCustom: true,
                 titleColor: customTheme.title_color,
                 subtitleColor: customTheme.subtitle_color,
@@ -343,6 +368,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
             <>
                 {computedMemorial.diseno.particulas === 'nieve' && <Snowflakes color={themeConfig.particle} />}
                 {computedMemorial.diseno.particulas === 'estrellas' && <TwinklingStars color={themeConfig.particle} />}
+                {computedMemorial.diseno.particulas === 'flores' && <FloatingPetals />}
             </>
         );
     }, [computedMemorial?.diseno?.particulas, themeConfig?.particle]);
@@ -353,7 +379,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
     const useBrandingVinzer = branding?.vinzer_logo || tenant_status !== 'active';
 
     // Prioritize listed images from memorial, fallback to pet's general images
-    // Cap at 5 images max, filter out broken/empty URLs
+    // Cap at the plan's photo limit (img_limit from rec_plans), filter out broken/empty URLs
     const galleryImages = useMemo(() => {
         if (!memorial) return [];
         const raw = (lista_imagenes && lista_imagenes.length > 0)
@@ -361,7 +387,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
             : (mascota?.images || []);
         return raw
             .filter((url: string) => url && url.trim() !== '' && url !== '#' && url.startsWith('http'))
-            .slice(0, 5);
+            .slice(0, memorial?.img_limit || 5);
     }, [memorial, lista_imagenes, mascota?.images]);
 
     // Randomly select a main image from gallery on each page load
@@ -389,10 +415,14 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
     };
 
     // Interleave photos and dedications for a better rhythm
+    // Estos altares ya exhiben la galería: el feed inferior no repite las fotos
+    const layoutShowsGallery = ['galeria', 'cinematico', 'constelacion', 'carta']
+        .includes(computedMemorial?.diseno?.tipo_diseno || 'normal');
+
     const mixedItems = useMemo(() => {
         const result: { type: 'image' | 'dedication', data: any }[] = [];
         const dedics = [...dedicatorias];
-        const imgs = [...galleryImages];
+        const imgs = layoutShowsGallery ? [] : [...galleryImages];
 
         // Interleave: 1 image every 2 dedications (if available)
         while (dedics.length > 0 || imgs.length > 0) {
@@ -406,7 +436,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
             }
         }
         return result;
-    }, [dedicatorias, galleryImages]);
+    }, [dedicatorias, galleryImages, layoutShowsGallery]);
 
     const formRef = useRef<HTMLDivElement>(null);
     const scrollToForm = () => formRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -420,6 +450,19 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 : (['NORMAL', 'HUELLA'].includes(planName) ? 9 : 0)));
 
     const canAddMore = dedicatorias.length < dedicationLimit;
+
+    // Modo de la página (tema, color propio o paleta de la portada): decide los
+    // colores de la sección de dedicatorias, que antes era siempre clara.
+    const isDarkMode = !!themeConfig?.dark;
+
+    // Nunca mostrar texto de relleno ni publicidad como epitafio
+    const memorialView = useMemo(() => {
+        if (!computedMemorial) return null;
+        return {
+            ...computedMemorial,
+            msg_despedida: getMemorialEpitaph(computedMemorial.msg_despedida, mascota?.name, uuid, locale),
+        };
+    }, [computedMemorial, mascota?.name, uuid, locale]);
 
     if (loading) {
         return (
@@ -475,7 +518,28 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
         }
     };
 
+    // Registro optimista: el +1 se ve al instante y luego se reconcilia con el
+    // backend. En la vista previa del admin no se registra nada.
+    const sendRitual = async (kind: RitualKind, name?: string) => {
+        const base = ritualOverride || ritualView;
+        setRitualOverride({
+            counts: { ...base.counts, [kind]: (base.counts[kind] || 0) + 1 },
+            stars: kind === 'estrella' ? [{ id: -Date.now(), name: name || null }, ...base.stars] : base.stars,
+        });
+        if (searchParams.has('preview_layout')) return;
+        try {
+            const res = await publicApiRequest(`/api/internal/memorials/${uuid}/rituals`, {
+                method: 'POST',
+                body: JSON.stringify({ kind, name: name || null }),
+            });
+            if (res?.counts) setRitualOverride({ counts: res.counts, stars: res.stars || [] });
+        } catch {
+            // Sin conexión o límite alcanzado: se conserva el gesto local
+        }
+    };
+
     const handleSendKiss = (e: React.MouseEvent) => {
+        sendRitual('beso');
         // Create floating effect (Heart/Star)
         const btn = e.currentTarget as HTMLButtonElement;
         const particle = document.createElement('div');
@@ -511,7 +575,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
         const tipo = computedMemorial?.diseno?.tipo_diseno || 'normal';
 
         const commonProps = {
-            memorial: computedMemorial,
+            memorial: memorialView,
             mascota,
             randomMainImage,
             galleryImages,
@@ -541,7 +605,8 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
             onSendKiss: handleSendKiss,
             // Pass themeConfig if needed (NormalLayout uses it)
             themeConfig,
-            isUltra // Pass isUltra flag
+            isUltra, // Pass isUltra flag
+            rituals: { counts: ritualView.counts, stars: ritualView.stars, send: sendRitual },
         };
 
 
@@ -567,6 +632,8 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
     };
 
     return (
+        // Respeta "reducir movimiento" del sistema en todas las animaciones del altar
+        <MotionConfig reducedMotion="user">
         <div
             className={`min-h-screen relative flex flex-col font-sans transition-colors duration-1000 overflow-hidden ${computedMemorial?.diseno?.color_fondo ? '' : themeConfig.bg} ${themeConfig.text}`}
             style={computedMemorial?.diseno?.color_fondo ? { backgroundColor: computedMemorial.diseno.color_fondo } : {}}>
@@ -724,14 +791,35 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
 
             {renderLayout()}
 
+            {/* Transición suave altar → dedicatorias (antes era un corte horizontal duro) */}
+            <div
+                aria-hidden
+                className="relative z-10 -mt-20 -mb-px h-20 pointer-events-none"
+                style={{
+                    background: `linear-gradient(to bottom, transparent, ${isDarkMode
+                        ? pageBackgroundHex(themeConfig, computedMemorial?.diseno?.color_fondo, '#0a192f')
+                        : '#FDFBF7'})`
+                }}
+            />
+
             {/* --- UNIVERSAL DEDICATIONS SECTION --- */}
-            <div className="relative w-full bg-gradient-to-b from-[#FDFBF7] via-[#F2F5F8] to-[#E1E7EE] py-24 z-10 overflow-hidden">
+            <div className={`relative w-full py-24 z-10 overflow-hidden ${isDarkMode
+                ? 'bg-gradient-to-b from-transparent via-black/15 to-black/30'
+                : 'bg-gradient-to-b from-[#FDFBF7] via-[#F2F5F8] to-[#E1E7EE] text-slate-900'}`}>
                 {/* Partículas de destellos de luz con opacidad reducida (máx 15%) */}
                 <div className="absolute inset-0 pointer-events-none opacity-[0.15] z-0">
                     {particles}
                 </div>
 
                 <div className="relative w-full max-w-6xl mx-auto px-4 sm:px-6 md:px-8 flex flex-col items-center z-10">
+                    {/* 1. Prueba social: gestos de cariño de los visitantes */}
+                    <RitualSummary
+                        rituals={ritualView}
+                        petName={mascota?.name || ''}
+                        locale={locale}
+                        isDarkMode={isDarkMode}
+                    />
+
                     {/* 2. Dedications Feed (Shared) */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 items-stretch w-full">
                     <AnimatePresence mode="popLayout">
@@ -751,17 +839,17 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                                             setIsDedicationModalOpen(true);
                                         }}
                                         className={`group cursor-pointer p-6 sm:p-8 rounded-3xl border shadow-sm hover:shadow-md transition-all duration-300 h-full flex flex-col justify-between min-h-[260px] ${
-                                            themeConfig.card.includes('bg-white') 
-                                                ? 'bg-white/90 border-slate-100 hover:border-slate-200 shadow-slate-100/50' 
+                                            !isDarkMode
+                                                ? 'bg-white/90 border-slate-100 hover:border-slate-200 shadow-slate-100/50'
                                                 : 'bg-white/5 border-white/10 hover:border-white/20'
                                         } backdrop-blur-md`}
                                     >
                                         <div className="space-y-5">
                                             <div className="flex items-center justify-between">
-                                                <div className={`w-10 h-10 ${temaActual === 'claro' ? 'bg-slate-50 text-slate-400 border border-slate-100' : 'bg-white/5 border border-white/10'} rounded-full flex items-center justify-center`}>
+                                                <div className={`w-10 h-10 ${!isDarkMode ? 'bg-slate-50 text-slate-400 border border-slate-100' : 'bg-white/5 border border-white/10'} rounded-full flex items-center justify-center`}>
                                                     <Quote size={16} fill="currentColor" className="opacity-40" />
                                                 </div>
-                                                <span className={`text-[10px] font-bold uppercase tracking-widest opacity-50 ${temaActual === 'claro' ? 'bg-slate-50 text-slate-600 border border-slate-100' : 'bg-white/5 border border-white/10'} px-3 py-1 rounded-full`}>
+                                                <span className={`text-[10px] font-bold uppercase tracking-widest opacity-50 ${!isDarkMode ? 'bg-slate-50 text-slate-600 border border-slate-100' : 'bg-white/5 border border-white/10'} px-3 py-1 rounded-full`}>
                                                     {new Date(item.data.fecha).toLocaleDateString()}
                                                 </span>
                                             </div>
@@ -839,7 +927,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                                 viewport={{ once: true }}
                                 className="mt-24 text-center max-w-xl mx-auto px-6"
                             >
-                                <div className="p-8 rounded-2xl bg-black/30 backdrop-blur-sm border border-white/10">
+                                <div className={`p-8 rounded-2xl backdrop-blur-sm border ${isDarkMode ? 'bg-black/30 border-white/10' : 'bg-white/80 border-slate-200'}`}>
                                     <h3 className="text-xl font-serif italic opacity-90 mb-2">{t.mem_limit_full}</h3>
                                     <p className="text-sm opacity-60 uppercase tracking-widest">{t.mem_limit_reached}</p>
                                 </div>
@@ -857,14 +945,14 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                             ref={formRef}
                             className="mt-16 sm:mt-24 md:mt-32 max-w-2xl w-full px-2 sm:px-0"
                         >
-                            <div className={`p-5 sm:p-8 md:p-12 rounded-3xl sm:rounded-[2rem] backdrop-blur-md border shadow-2xl relative overflow-hidden ${themeConfig.card}`}>
+                            <div className={`p-5 sm:p-8 md:p-12 rounded-3xl sm:rounded-[2rem] backdrop-blur-md border shadow-2xl relative overflow-hidden ${isDarkMode ? themeConfig.card : 'bg-white border-slate-300 shadow-md'}`}>
 
                                 {/* Decorative Elements */}
                                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-50" />
 
                                 <div className="relative z-10 space-y-6 sm:space-y-8">
                                     <div className="text-center space-y-3">
-                                        <h2 className={`text-2xl sm:text-3xl md:text-5xl font-bold tracking-wider ${temaActual === 'claro' ? '' : 'drop-shadow-sm'}`} style={{ fontFamily: "'Cinzel', serif" }}>
+                                        <h2 className={`text-2xl sm:text-3xl md:text-5xl font-bold tracking-wider ${isDarkMode ? 'drop-shadow-sm' : ''}`} style={{ fontFamily: "'Cinzel', serif" }}>
                                             {t.mem_leave_message}
                                         </h2>
                                         <p className="font-serif text-base sm:text-lg opacity-80 italic tracking-wide">
@@ -881,7 +969,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                                                 value={newDedication.nombre}
                                                 onChange={e => setNewDedication({ ...newDedication, nombre: e.target.value })}
                                                 placeholder={t.form_name_placeholder}
-                                                className={`w-full px-5 sm:px-6 py-4 min-h-[52px] rounded-xl border-b-2 border-transparent bg-black/10 focus:bg-black/20 focus:border-current/30 transition-all outline-none font-serif text-base sm:text-lg ${themeConfig.input || ''}`}
+                                                className={`w-full px-5 sm:px-6 py-4 min-h-[52px] rounded-xl border-b-2 border-transparent bg-black/10 focus:bg-black/20 focus:border-current/30 transition-all outline-none font-serif text-base sm:text-lg ${isDarkMode ? (themeConfig.input || '') : 'border-slate-300 text-slate-900 placeholder:text-slate-400'}`}
                                                 required
                                             />
                                         </div>
@@ -899,7 +987,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                                                 placeholder={t.form_msg_placeholder}
                                                 rows={5}
                                                 maxLength={300}
-                                                className={`w-full px-5 sm:px-6 py-4 rounded-xl border-b-2 border-transparent bg-black/10 focus:bg-black/20 focus:border-current/30 transition-all outline-none font-serif text-base sm:text-lg resize-none ${themeConfig.input || ''}`}
+                                                className={`w-full px-5 sm:px-6 py-4 rounded-xl border-b-2 border-transparent bg-black/10 focus:bg-black/20 focus:border-current/30 transition-all outline-none font-serif text-base sm:text-lg resize-none ${isDarkMode ? (themeConfig.input || '') : 'border-slate-300 text-slate-900 placeholder:text-slate-400'}`}
                                                 required
                                             />
                                         </div>
@@ -908,7 +996,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                                             <button
                                                 type="submit"
                                                 disabled={isSubmitting}
-                                                className={`w-full min-h-[52px] py-5 rounded-xl font-bold uppercase tracking-[0.25em] text-xs shadow-xl hover:scale-[1.01] hover:shadow-2xl transition-all disabled:opacity-50 relative overflow-hidden group ${themeConfig.button || 'bg-slate-900 text-white'}`}
+                                                className={`w-full min-h-[52px] py-5 rounded-xl font-bold uppercase tracking-[0.25em] text-xs shadow-xl hover:scale-[1.01] hover:shadow-2xl transition-all disabled:opacity-50 relative overflow-hidden group ${isDarkMode ? (themeConfig.button || 'bg-slate-900 text-white') : 'bg-slate-900 text-white hover:bg-slate-800'}`}
                                             >
                                                 <span className="relative z-10 flex items-center justify-center gap-3">
                                                     {isSubmitting ? (
@@ -934,27 +1022,27 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 {/* Tenant Attribution Section (Only for active tenants) */}
                 {tenant_status === 'active' && (
                     <div className="flex flex-col items-center py-16 text-center relative z-10">
-                        <div className={`h-px ${temaActual === 'claro' ? 'bg-slate-200' : 'bg-white/10'} w-24 mb-10`} />
+                        <div className={`h-px ${!isDarkMode ? 'bg-slate-200' : 'bg-white/10'} w-24 mb-10`} />
 
-                        <span className={`text-[11px] md:text-[13px] uppercase tracking-[0.5em] ${temaActual === 'claro' ? 'text-slate-500' : 'text-white/50'} font-light italic mb-6`}
-                            style={temaActual === 'claro' ? {} : { textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
+                        <span className={`text-[11px] md:text-[13px] uppercase tracking-[0.5em] ${!isDarkMode ? 'text-slate-500' : 'text-white/50'} font-light italic mb-6`}
+                            style={!isDarkMode ? {} : { textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
                             {t.footer_courtesy_of}
                         </span>
 
                         <div className="flex flex-col items-center group">
                             {tenant_info?.logo && (
                                 <div className="w-24 h-24 md:w-32 md:h-32 mb-8 transition-transform duration-700 group-hover:scale-105 flex items-center justify-center relative">
-                                    <div className={`absolute inset-0 ${temaActual === 'claro' ? 'bg-black/5' : 'bg-white/5'} rounded-full blur-2xl opacity-50 group-hover:opacity-80 transition-opacity`} />
+                                    <div className={`absolute inset-0 ${!isDarkMode ? 'bg-black/5' : 'bg-white/5'} rounded-full blur-2xl opacity-50 group-hover:opacity-80 transition-opacity`} />
                                     <img
                                         src={tenant_info.logo}
                                         alt={tenant_info.name}
-                                        className={`w-full h-full object-contain ${temaActual === 'claro' ? 'opacity-90' : 'grayscale opacity-60'} group-hover:grayscale-0 group-hover:opacity-100 transition-all rounded-full border ${temaActual === 'claro' ? 'border-slate-200' : 'border-white/20'} shadow-2xl p-4 relative z-10`}
+                                        className={`w-full h-full object-contain ${!isDarkMode ? 'opacity-90' : 'grayscale opacity-60'} group-hover:grayscale-0 group-hover:opacity-100 transition-all rounded-full border ${!isDarkMode ? 'border-slate-200' : 'border-white/20'} shadow-2xl p-4 relative z-10`}
                                     />
                                 </div>
                             )}
 
-                            <h3 className={`text-3xl md:text-5xl font-serif tracking-widest font-medium transition-colors duration-700 ${themeConfig.text}`}
-                                style={temaActual === 'claro' ? {} : { textShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
+                            <h3 className={`text-3xl md:text-5xl font-serif tracking-widest font-medium transition-colors duration-700 ${isDarkMode ? themeConfig.text : 'text-slate-900'}`}
+                                style={!isDarkMode ? {} : { textShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
                                 {tenant_info?.name}
                             </h3>
 
@@ -965,7 +1053,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                                         href={formatInstagramUrl(tenant_info.social_instagram)}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className={`flex items-center gap-2 text-[10px] md:text-xs uppercase tracking-[0.3em] ${temaActual === 'claro' ? 'text-slate-500 hover:text-slate-900' : 'text-white/40 hover:text-white/100'} transition-all group/link`}
+                                        className={`flex items-center gap-2 text-[10px] md:text-xs uppercase tracking-[0.3em] ${!isDarkMode ? 'text-slate-500 hover:text-slate-900' : 'text-white/40 hover:text-white/100'} transition-all group/link`}
                                     >
                                         <Instagram size={14} className="transition-transform group-hover/link:-translate-y-0.5" /> Instagram
                                     </a>
@@ -975,7 +1063,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                                         href={ensureAbsoluteUrl(tenant_info.website)}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className={`flex items-center gap-2 text-[10px] md:text-xs uppercase tracking-[0.3em] ${temaActual === 'claro' ? 'text-slate-500 hover:text-slate-900' : 'text-white/40 hover:text-white/100'} transition-all group/link`}
+                                        className={`flex items-center gap-2 text-[10px] md:text-xs uppercase tracking-[0.3em] ${!isDarkMode ? 'text-slate-500 hover:text-slate-900' : 'text-white/40 hover:text-white/100'} transition-all group/link`}
                                     >
                                         <Globe size={14} className="transition-transform group-hover/link:-translate-y-0.5" /> {locale === 'es' ? 'Sitio Web' : 'Website'}
                                     </a>
@@ -985,7 +1073,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
 
                         <button
                             onClick={() => router.push(`/memorials/m/${uuid}/login`)}
-                            className={`mt-12 text-[10px] uppercase font-bold tracking-[0.5em] ${temaActual === 'claro' ? 'text-slate-500 hover:text-slate-900 border-slate-300 hover:border-slate-500 bg-slate-100/50' : 'text-white/40 hover:text-white/90 border-white/10 hover:border-white/20 bg-white/[0.03]'} transition-all flex items-center gap-3 py-3 px-8 rounded-full border backdrop-blur-md shadow-xl hover:-translate-y-1`}
+                            className={`mt-12 text-[10px] uppercase font-bold tracking-[0.5em] ${!isDarkMode ? 'text-slate-500 hover:text-slate-900 border-slate-300 hover:border-slate-500 bg-slate-100/50' : 'text-white/40 hover:text-white/90 border-white/10 hover:border-white/20 bg-white/[0.03]'} transition-all flex items-center gap-3 py-3 px-8 rounded-full border backdrop-blur-md shadow-xl hover:-translate-y-1`}
                         >
                             <ShieldCheck size={14} /> {t.footer_management}
                         </button>
@@ -1061,7 +1149,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 onClose={() => setIsDedicationModalOpen(false)}
                 dedication={selectedDedication}
                 locale={locale}
-                themeConfig={themeConfig.card.includes('bg-white') ? {
+                themeConfig={!isDarkMode ? {
                     card: 'bg-white border-slate-200 shadow-2xl',
                     text: 'text-slate-800',
                     divider: 'border-slate-100',
@@ -1074,5 +1162,6 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 }}
             />
         </div>
+        </MotionConfig>
     );
 }

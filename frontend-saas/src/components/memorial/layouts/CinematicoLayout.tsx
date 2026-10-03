@@ -1,8 +1,9 @@
 import React, { useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { Heart, ChevronDown, Quote } from 'lucide-react';
+import { Heart, ChevronDown } from 'lucide-react';
 import Image from 'next/image';
 import MemorialActionButtons from '@/components/memorial/MemorialActionButtons';
+import { getLifeDates, nameSizeClass, pageBackgroundHex } from '@/lib/memorialDesign';
 
 /**
  * Plantilla ULTRA "Cinemático": héroe a pantalla completa con efecto Ken Burns,
@@ -20,29 +21,19 @@ export default function CinematicoLayout(props: any) {
         offset: ['start start', 'end start']
     });
     const imageY = useTransform(scrollYProgress, [0, 1], ['0%', '25%']);
-    const overlayOpacity = useTransform(scrollYProgress, [0, 0.8], [0, 0.85]);
 
-    const isDarkTheme = themeConfig?.text?.includes('white') || themeConfig?.text?.includes('50') || themeConfig?.text?.includes('slate-200');
-    const colorFondo = memorial?.diseno?.color_fondo;
-
-    const topGradientStyle = colorFondo
-        ? { background: `linear-gradient(to bottom, ${colorFondo} 0%, ${colorFondo}99 50%, transparent 100%)` }
-        : { background: 'linear-gradient(to bottom, black 0%, rgba(0,0,0,0.6) 50%, transparent 100%)' };
-
-    const bottomGradientStyle = colorFondo
-        ? { background: `linear-gradient(to top, ${colorFondo} 0%, ${colorFondo}B3 50%, transparent 100%)` }
-        : { background: 'linear-gradient(to top, black 0%, rgba(0,0,0,0.7) 50%, transparent 100%)' };
-
-    const overlayStyle = colorFondo
-        ? { backgroundColor: colorFondo }
-        : { backgroundColor: 'black' };
-
-    const years = `${mascota?.birth_date ? new Date(mascota.birth_date).getFullYear() : '...'} — ${mascota?.death_date ? new Date(mascota.death_date).getFullYear() : '...'}`;
+    // El epitafio y la galería se pintan con el fondo real de la página (tema o
+    // color propio); antes eran crema y negro fijos, sin importar el tema.
+    const isDarkPage = !!themeConfig?.dark;
+    const pageBg = pageBackgroundHex(themeConfig, memorial?.diseno?.color_fondo);
+    const petName = mascota?.name || '';
+    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale);
+    const heroImage = memorial?.diseno?.portada_url || randomMainImage;
 
     return (
-        <div 
-            className={`relative z-10 w-full ${colorFondo ? '' : 'bg-black'} ${isDarkTheme ? 'text-white' : 'text-slate-900'}`} 
-            style={{ fontFamily: "'Marcellus', serif" }}
+        <div
+            className={`relative z-10 w-full ${isDarkPage ? 'text-white' : 'text-slate-900'}`}
+            style={{ fontFamily: "'Marcellus', serif", backgroundColor: pageBg }}
         >
             {/* ─── HERO CINEMATOGRÁFICO ─── */}
             <div ref={heroRef} className="relative h-[100svh] w-full overflow-hidden flex flex-col items-center justify-center">
@@ -53,43 +44,40 @@ export default function CinematicoLayout(props: any) {
                         animate={{ scale: [1, 1.08] }}
                         transition={{ duration: 24, repeat: Infinity, repeatType: 'reverse', ease: 'linear' }}
                     >
-                    {(() => {
-                        const heroImage = memorial?.diseno?.portada_url || randomMainImage;
-                        return heroImage ? (
+                        {heroImage ? (
                             <Image
                                 src={heroImage}
-                                alt={mascota?.name || 'Memorial'}
+                                alt={petName || 'Memorial'}
                                 fill
                                 priority
                                 sizes="100vw"
                                 className="object-cover object-center"
                             />
                         ) : (
-                            <div className={`w-full h-full flex items-center justify-center ${isDarkTheme ? 'bg-gradient-to-br from-zinc-900 to-black' : 'bg-stone-200'}`}>
-                                <Heart size={120} className={isDarkTheme ? 'text-white/10' : 'text-black/5'} fill="currentColor" />
+                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-800 to-black">
+                                <Heart size={120} className="text-white/10" fill="currentColor" />
                             </div>
-                        );
-                    })()}
+                        )}
                     </motion.div>
                 </motion.div>
 
-                {/* Overlays para evitar banding y garantizar legibilidad */}
-                {/* Desvanecimiento superior sutil */}
-                <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-black/40 via-black/10 to-transparent pointer-events-none z-1" />
-                
-                {/* Oscurecimiento central sutil y desenfoque ligero para legibilidad sobre nubes */}
-                <div className="absolute inset-0 bg-black/15 backdrop-blur-[0.5px] pointer-events-none z-1" />
-                
-                {/* Desvanecimiento inferior suave que se disuelve en la niebla celestial de la segunda sección */}
-                <div className="absolute inset-x-0 bottom-0 h-96 bg-gradient-to-t from-[#FDFBF7] via-[#FDFBF7]/90 to-transparent pointer-events-none z-1" />
+                {/* Velo de póster: oscurece la foto para que el título blanco se lea
+                    sobre cualquier imagen (antes: título casi negro con brillo blanco) */}
+                <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/30 to-black/55 pointer-events-none z-[1]" />
+
+                {/* Desvanecimiento inferior hacia el color del epitafio */}
+                <div
+                    className="absolute inset-x-0 bottom-0 h-72 pointer-events-none z-[1]"
+                    style={{ background: `linear-gradient(to top, ${pageBg} 0%, ${pageBg} 18%, transparent 100%)` }}
+                />
 
                 {/* Título y créditos centrados vertical y horizontalmente en el héroe */}
-                <div className="relative z-10 flex flex-col items-center text-center px-4 max-w-4xl select-none">
+                <div className="relative z-10 flex flex-col items-center text-center px-4 max-w-4xl select-none text-white">
                     <motion.p
                         initial={{ opacity: 0, letterSpacing: '0.2em' }}
                         animate={{ opacity: 0.85, letterSpacing: '0.45em' }}
                         transition={{ duration: 2, delay: 0.4 }}
-                        className="text-xs sm:text-sm uppercase mb-6 text-white font-light tracking-[0.45em]"
+                        className="text-xs sm:text-sm uppercase mb-6 font-light tracking-[0.45em]"
                         style={{ fontFamily: "'Quicksand', sans-serif" }}
                     >
                         {locale === 'es' ? 'En memoria de' : 'In loving memory of'}
@@ -99,58 +87,52 @@ export default function CinematicoLayout(props: any) {
                         initial={{ opacity: 0, y: 30 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 1.5, delay: 0.8, ease: 'easeOut' }}
-                        className="text-5xl sm:text-7xl md:text-8xl lg:text-9xl leading-none mb-8 text-[#0f172a] font-normal drop-shadow-[0_2px_15px_rgba(255,255,255,0.7)]"
-                        style={{ 
+                        className={`${nameSizeClass(petName, {
+                            short: 'text-6xl sm:text-7xl md:text-8xl lg:text-9xl',
+                            long: 'text-5xl sm:text-6xl md:text-7xl lg:text-8xl',
+                            xlong: 'text-4xl sm:text-5xl md:text-6xl lg:text-7xl',
+                        })} leading-none break-words max-w-full mb-8 font-normal`}
+                        style={{
                             fontFamily: "'Cormorant Garamond', serif",
-                            textShadow: '0 2px 10px rgba(255, 255, 255, 0.9), 0 0 40px rgba(255, 255, 255, 0.5)'
+                            textShadow: '0 2px 18px rgba(0,0,0,0.55), 0 0 2px rgba(0,0,0,0.3)'
                         }}
                     >
-                        {mascota?.name}
+                        {petName}
                     </motion.h1>
 
-                    <motion.div
-                        initial={{ opacity: 0, scaleX: 0 }}
-                        animate={{ opacity: 0.8, scaleX: 1 }}
-                        transition={{ duration: 1.2, delay: 1.5 }}
-                        className="flex items-center gap-6 text-sm sm:text-base tracking-[0.3em] text-[#3a3a3a] font-semibold"
-                        style={{ fontFamily: "'Quicksand', sans-serif" }}
-                    >
-                        <span className="h-[2px] w-8 sm:w-16 bg-[#3a3a3a]/40" />
-                        {years}
-                        <span className="h-[2px] w-8 sm:w-16 bg-[#3a3a3a]/40" />
-                    </motion.div>
+                    {dates.years && (
+                        <motion.div
+                            initial={{ opacity: 0, scaleX: 0 }}
+                            animate={{ opacity: 0.9, scaleX: 1 }}
+                            transition={{ duration: 1.2, delay: 1.5 }}
+                            className="flex items-center gap-6 text-sm sm:text-base tracking-[0.3em] font-semibold"
+                            style={{ fontFamily: "'Quicksand', sans-serif", textShadow: '0 1px 8px rgba(0,0,0,0.5)' }}
+                        >
+                            <span className="h-[2px] w-8 sm:w-16 bg-white/50" />
+                            {dates.years}
+                            <span className="h-[2px] w-8 sm:w-16 bg-white/50" />
+                        </motion.div>
+                    )}
                 </div>
 
-                {/* Indicador de scroll (Chevron inferior) - Faro de guía en transición */}
+                {/* Indicador de scroll */}
                 <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center">
                     <motion.div
-                        animate={{ 
-                            y: [0, 6, 0],
-                            opacity: [0.4, 0.85, 0.4]
-                        }}
-                        transition={{ 
-                            duration: 3, 
-                            repeat: Infinity, 
-                            ease: 'easeInOut' 
-                        }}
-                        className="text-[#5a5045] hover:text-[#2c2217] transition-colors cursor-pointer"
+                        animate={{ y: [0, 6, 0], opacity: [0.4, 0.85, 0.4] }}
+                        transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                        className={isDarkPage ? 'text-white/70' : 'text-[#5a5045]'}
                     >
                         <ChevronDown size={36} strokeWidth={1.5} />
                     </motion.div>
                 </div>
             </div>
 
-            {/* ─── EPITAFIO (Niebla Celestial) ─── */}
-            <div className="relative w-full bg-[#FDFBF7] py-24 sm:py-32 overflow-hidden">
-                {/* Textura de partículas / Nubes de fondo sutiles */}
-                <div className="absolute inset-0 pointer-events-none opacity-[0.04] mix-blend-overlay bg-repeat" 
-                     style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.8\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\'/%3E%3C/svg%3E")' }} />
-                
+            {/* ─── EPITAFIO ─── */}
+            <div className="relative w-full -mt-px py-24 sm:py-32 overflow-hidden" style={{ backgroundColor: pageBg }}>
                 <div className="relative max-w-4xl mx-auto px-6 text-center z-10 flex flex-col items-center">
-                    {/* Icono de comillas minimalista en color champaña/dorado apagado */}
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, scale: 0.8 }}
-                        whileInView={{ opacity: 0.15, scale: 1 }}
+                        whileInView={{ opacity: 0.25, scale: 1 }}
                         viewport={{ once: true }}
                         transition={{ duration: 1 }}
                         className="mb-8 text-[#C5A880]"
@@ -165,21 +147,28 @@ export default function CinematicoLayout(props: any) {
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true, margin: '-80px' }}
                         transition={{ duration: 1.4, ease: 'easeOut' }}
-                        className="text-2xl sm:text-3xl md:text-4xl leading-relaxed italic text-[#3E3E3E] font-light px-4"
+                        className={`text-2xl sm:text-3xl md:text-4xl leading-relaxed italic font-light px-4 ${isDarkPage ? 'text-white/90' : 'text-[#3E3E3E]'}`}
                         style={{ fontFamily: "'Cormorant Garamond', serif" }}
                     >
-                        {memorial?.msg_despedida || t.philosophy_text || (locale === 'es'
-                            ? 'Las grandes historias nunca terminan; solo cambian de escenario.'
-                            : 'Great stories never end; they only change their stage.')}
+                        {memorial?.msg_despedida}
                     </motion.p>
 
-                    {/* Botones de acción flotantes (Estilo Éter/Glassmorphism) */}
+                    {dates.yearsOfLove && (
+                        <p className={`mt-6 text-xs uppercase tracking-[0.4em] ${isDarkPage ? 'text-white/50' : 'text-slate-500'}`}
+                            style={{ fontFamily: "'Quicksand', sans-serif" }}>
+                            {dates.yearsOfLove}
+                        </p>
+                    )}
+
                     <motion.div
                         initial={{ opacity: 0, y: 15 }}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
                         transition={{ duration: 1, delay: 0.4 }}
-                        className="mt-16 w-full flex justify-center [&_button]:!bg-white/45 [&_button]:!backdrop-blur-md [&_button]:!text-[#3E3E3E] [&_button]:!border-white/80 [&_button]:!shadow-[0_4px_20px_rgba(0,0,0,0.02)] [&_button:hover]:!bg-white/90 [&_button:hover]:!-translate-y-0.5"
+                        className={`mt-16 w-full flex justify-center ${isDarkPage
+                            ? '[&_button]:!bg-white/10 [&_button]:!backdrop-blur-md [&_button]:!text-white [&_button]:!border-white/20 [&_button:hover]:!bg-white/20'
+                            : '[&_button]:!bg-white/45 [&_button]:!backdrop-blur-md [&_button]:!text-[#3E3E3E] [&_button]:!border-white/80 [&_button]:!shadow-[0_4px_20px_rgba(0,0,0,0.02)] [&_button:hover]:!bg-white/90'
+                        } [&_button:hover]:!-translate-y-0.5`}
                     >
                         <MemorialActionButtons
                             onSendKiss={onSendKiss}
@@ -197,8 +186,8 @@ export default function CinematicoLayout(props: any) {
 
             {/* ─── TIRA DE FOTOGRAMAS (galería) ─── */}
             {galleryImages?.length > 1 && (
-                <div className="relative pb-20 sm:pb-28">
-                    <p className={`text-center text-[10px] uppercase tracking-[0.5em] mb-8 ${isDarkTheme ? 'text-white/30' : 'text-slate-900/30'}`}>
+                <div className="relative pb-24 sm:pb-28">
+                    <p className={`text-center text-[10px] uppercase tracking-[0.5em] mb-8 ${isDarkPage ? 'text-white/40' : 'text-slate-900/40'}`}>
                         {locale === 'es' ? 'Escenas de una vida' : 'Scenes from a life'}
                     </p>
                     {/* scrollbar oculto inline: la utilidad .no-scrollbar solo existe en el CSS del grupo tenant */}
@@ -212,10 +201,12 @@ export default function CinematicoLayout(props: any) {
                                 initial={{ opacity: 0, y: 20 }}
                                 whileInView={{ opacity: 1, y: 0 }}
                                 viewport={{ once: true }}
-                                transition={{ delay: i * 0.12 }}
-                                className={`relative shrink-0 w-40 sm:w-52 aspect-[3/4] rounded-sm overflow-hidden border-y-4 border-black ring-1 grayscale hover:grayscale-0 transition-all duration-700 hover:scale-[1.03] ${isDarkTheme ? 'ring-white/15' : 'ring-black/10'}`}
+                                transition={{ delay: Math.min(i, 6) * 0.12 }}
+                                // En táctil no hay hover: las fotos van a color; el blanco
+                                // y negro "de película" queda solo para escritorio.
+                                className={`relative shrink-0 w-40 sm:w-52 aspect-[3/4] rounded-sm overflow-hidden border-y-4 border-black ring-1 md:grayscale md:hover:grayscale-0 transition-all duration-700 hover:scale-[1.03] ${isDarkPage ? 'ring-white/15' : 'ring-black/10'}`}
                             >
-                                <Image src={img} alt={`${mascota?.name} ${i + 1}`} fill sizes="208px" className="object-cover" />
+                                <Image src={img} alt={`${petName} ${i + 1}`} fill sizes="208px" className="object-cover" />
                             </motion.div>
                         ))}
                     </div>

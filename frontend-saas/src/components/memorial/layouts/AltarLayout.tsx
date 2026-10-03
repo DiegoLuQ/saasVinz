@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import MemorialActionButtons from '@/components/memorial/MemorialActionButtons';
+import { getLifeDates, isDarkSurface, nameSizeClass } from '@/lib/memorialDesign';
+import { ritualLabel, type RitualProps } from '@/lib/memorialRituals';
 
 export default function AltarLayout(props: any) {
     const {
@@ -17,13 +19,25 @@ export default function AltarLayout(props: any) {
         newDedication, setNewDedication, handleSubmitDedication, isSubmitting, canAddMore, formRef,
         setSelectedDedication, setIsDedicationModalOpen
     } = props;
-    const [lit, setLit] = useState(true);
+    const rituals: RitualProps | undefined = props.rituals;
+    const candleCount = rituals?.counts.vela || 0;
+
+    // Encender la vela registra el gesto (una vez por visita) y suma al contador
+    const lightCandle = () => {
+        if (lit) return;
+        setLit(true);
+        rituals?.send('vela');
+    };
+    // La vela empieza apagada: encenderla es el gesto del visitante
+    const [lit, setLit] = useState(false);
 
     const petName = mascota?.name || '';
     const bio = memorial?.msg_despedida || t?.philosophy_text || "Tu espíritu gentil y amor incondicional enriquecieron nuestras vidas de maneras que nunca podremos expresar. Te extrañamos profundamente y siempre te guardaremos en nuestros corazones. Descansa en paz, dulce amigo.";
     
-    const isDarkTheme = themeConfig?.text?.includes('white') || themeConfig?.text?.includes('50') || themeConfig?.text?.includes('slate-200');
     const portadaUrl = memorial?.diseno?.portada_url;
+    // Sobre portada hay un velo oscuro: el texto debe ir claro aunque el tema sea claro
+    const isDarkTheme = isDarkSurface(themeConfig, portadaUrl);
+    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale);
 
     return (
         <div
@@ -45,7 +59,7 @@ export default function AltarLayout(props: any) {
                 BACKGROUND LAYERS
             ═══════════════════════════════════════════════ */}
             {/* Base warm gradient — hidden when portada is set */}
-            {!portadaUrl && !memorial?.diseno?.color_fondo && (!themeConfig || themeConfig.bg.includes('faf9f6')) && (
+            {!portadaUrl && !memorial?.diseno?.color_fondo && (!themeConfig || !themeConfig.dark) && (
                 <div
                     className="absolute inset-0"
                     style={{
@@ -63,7 +77,9 @@ export default function AltarLayout(props: any) {
             <div
                 className="absolute inset-0 pointer-events-none"
                 style={{
-                    background: memorial?.diseno?.color_fondo
+                    // Sobre fondo de color, portada o tema oscuro el resplandor fuerte
+                    // "lavaba" el panel y el nombre perdía contraste
+                    background: (memorial?.diseno?.color_fondo || isDarkTheme)
                         ? 'radial-gradient(ellipse 60% 70% at 50% 55%, rgba(255,248,230,0.25) 0%, rgba(245,235,210,0.1) 30%, rgba(215,200,170,0.03) 60%, transparent 85%)'
                         : 'radial-gradient(ellipse 60% 70% at 50% 55%, rgba(255,248,230,0.9) 0%, rgba(245,235,210,0.6) 30%, rgba(215,200,170,0.2) 60%, transparent 85%)',
                 }}
@@ -88,11 +104,11 @@ export default function AltarLayout(props: any) {
             {/* ═══════════════════════════════════════════════
                 MAIN GLASSMORPHIC PANEL
             ═══════════════════════════════════════════════ */}
-            <div className="relative z-10 w-full max-w-[780px] mx-4 md:mx-8 mt-[10px] mb-12">
+            <div className="relative z-10 w-full max-w-[780px] mx-4 md:mx-8 mt-[10px] mb-24">
 
                 {/* The frosted glass card */}
                 <div
-                    className="relative bg-white/30 backdrop-blur-xl border border-white/40 shadow-[0_25px_80px_rgba(0,0,0,0.08),_0_8px_30px_rgba(0,0,0,0.04)] overflow-visible"
+                    className={`relative backdrop-blur-xl border shadow-[0_25px_80px_rgba(0,0,0,0.08),_0_8px_30px_rgba(0,0,0,0.04)] overflow-visible ${isDarkTheme ? 'bg-black/25 border-white/15' : 'bg-white/30 border-white/40'}`}
                     style={{
                         borderRadius: '24px',
                     }}
@@ -102,7 +118,7 @@ export default function AltarLayout(props: any) {
                         className="absolute inset-0 pointer-events-none"
                         style={{
                             borderRadius: '24px',
-                            background: 'radial-gradient(ellipse 80% 60% at 50% 30%, rgba(255,255,255,0.4) 0%, transparent 60%)',
+                            background: `radial-gradient(ellipse 80% 60% at 50% 30%, rgba(255,255,255,${isDarkTheme ? 0.07 : 0.4}) 0%, transparent 60%)`,
                         }}
                     />
 
@@ -116,13 +132,31 @@ export default function AltarLayout(props: any) {
                             initial={{ opacity: 0, y: -20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-                            className={`text-4xl md:text-5xl lg:text-6xl font-light tracking-[0.12em] leading-none mb-8 md:mb-10 ${
+                            className={`${nameSizeClass(petName, {
+                                short: 'text-4xl md:text-5xl lg:text-6xl',
+                                long: 'text-3xl md:text-4xl lg:text-5xl',
+                                xlong: 'text-2xl md:text-3xl lg:text-4xl',
+                            })} text-center break-words max-w-full font-light tracking-[0.12em] leading-tight ${dates.full ? 'mb-3' : 'mb-8 md:mb-10'} ${
                                 isDarkTheme ? 'text-white/95' : 'text-[#3a3228]'
                             }`}
                             style={{ fontFamily: "'Cinzel', serif" }}
                         >
                             {petName.toUpperCase()}
                         </motion.h1>
+
+                        {/* ── FECHAS ── */}
+                        {dates.full && (
+                            <motion.p
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ duration: 0.8, delay: 0.3 }}
+                                className={`mb-8 md:mb-10 text-center text-base md:text-lg italic ${isDarkTheme ? 'text-white/75' : 'text-[#5a4e3c]'}`}
+                                style={{ fontFamily: "'Cormorant Garamond', serif" }}
+                            >
+                                {dates.full}
+                                {dates.yearsOfLove && <span className="block text-sm opacity-80">{dates.yearsOfLove}</span>}
+                            </motion.p>
+                        )}
 
                         {/* ── ARCHED PHOTO FRAME ── */}
                         <motion.div
@@ -191,7 +225,7 @@ export default function AltarLayout(props: any) {
                             className="relative flex flex-col items-center -mt-2 z-20"
                         >
                             <button
-                                onClick={() => setLit(true)}
+                                onClick={lightCandle}
                                 className="group relative flex flex-col items-center focus:outline-none cursor-pointer"
                                 aria-label={lit ? (t?.mem_candle_lit || 'Vela encendida') : (t?.mem_candle_light || 'Encender vela')}
                             >
@@ -286,6 +320,24 @@ export default function AltarLayout(props: any) {
                                         boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
                                     }}
                                 />
+
+                                {/* Invitación / confirmación del ritual */}
+                                <span
+                                    className={`mt-4 text-[11px] tracking-[0.25em] uppercase transition-opacity ${lit ? 'opacity-70' : 'opacity-90 group-hover:opacity-100'} ${isDarkTheme ? 'text-white' : 'text-[#5a4e3c]'}`}
+                                    style={{ fontFamily: "'Quicksand', sans-serif" }}
+                                >
+                                    {lit
+                                        ? (locale === 'en' ? 'Their light is shining' : 'Su luz está encendida')
+                                        : (locale === 'en' ? 'Tap to light their candle' : 'Toca para encender su luz')}
+                                </span>
+                                {candleCount > 0 && (
+                                    <span
+                                        className={`mt-1.5 text-xs italic ${isDarkTheme ? 'text-white/70' : 'text-[#6b5d48]'}`}
+                                        style={{ fontFamily: "'Cormorant Garamond', serif" }}
+                                    >
+                                        🕯️ {ritualLabel('vela', candleCount, locale)}
+                                    </span>
+                                )}
                             </button>
                         </motion.div>
 
@@ -339,17 +391,6 @@ export default function AltarLayout(props: any) {
                     </div>
                 </div>
 
-                {/* ── FOOTER ── */}
-                <div className="text-center mt-8 mb-4">
-                    <span
-                        className={`text-[10px] tracking-[0.3em] uppercase opacity-30 ${
-                            isDarkTheme ? 'text-white' : 'text-[#5a4e3c]'
-                        }`}
-                        style={{ fontFamily: "'Quicksand', sans-serif" }}
-                    >
-                        © {new Date().getFullYear()} {tenant_info?.name || 'Memorial'}
-                    </span>
-                </div>
             </div>
         </div>
     );

@@ -1,19 +1,21 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Heart, Flame, Share2 } from 'lucide-react';
+import { Heart, Flame, Share2, PawPrint } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import SocialShareCard from '../SocialShareCard';
+import { getLifeDates, isDarkSurface, nameSizeClass } from '@/lib/memorialDesign';
 
 export default function CartaLayout(props: any) {
     const { memorial, mascota, randomMainImage, galleryImages, t, onShare, scrollToForm, tenant_info, locale, themeConfig } = props;
 
     const petName = mascota?.nombre || mascota?.name || '';
-    const birthDate = mascota?.birth_date ? new Date(mascota.birth_date).toLocaleDateString() : null;
-    const deathDate = mascota?.death_date ? new Date(mascota.death_date).toLocaleDateString() : null;
-    const bio = memorial?.msg_despedida || t?.philosophy_text || '';
+    // Formato estable (UTC) en vez de toLocaleDateString(), que variaba según el navegador
+    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale);
+    const bio = memorial?.msg_despedida || '';
 
-    const isDarkBg = !!memorial?.diseno?.portada_url;
+    // Portada o tema oscuro/de color: botones claros sobre el panel de la foto
+    const isDarkBg = isDarkSurface(themeConfig, memorial?.diseno?.portada_url);
 
     const btnClass = isDarkBg
         ? "flex items-center gap-1.5 px-4 py-2.5 rounded-full border border-white/20 bg-white/20 backdrop-blur-md text-white text-[11.5px] font-semibold uppercase tracking-wider hover:bg-white/35 transition-all shadow-md"
@@ -54,7 +56,7 @@ export default function CartaLayout(props: any) {
 
                 {/* ── LEFT — photo panel (inherits page bg) ── */}
                 <div className="w-full md:w-[42%] flex flex-col items-center justify-center gap-5 p-8"
-                    style={{ background: 'rgba(0,0,0,0.3)' }}>
+                    style={{ background: isDarkBg ? 'rgba(0,0,0,0.3)' : 'rgba(197,160,89,0.10)' }}>
 
                     {/* Main photo with crossfade on change */}
                     <div className="w-full max-w-[240px] aspect-[3/4] rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 relative">
@@ -94,15 +96,6 @@ export default function CartaLayout(props: any) {
 
                     {/* Action buttons */}
                     <div className="flex flex-col gap-2.5 w-full max-w-[240px] mt-2">
-                        {scrollToForm && (
-                            <button
-                                onClick={scrollToForm}
-                                className={`${btnClass} w-full justify-center`}
-                            >
-                                <Flame size={13} className="text-[#c5a059]" />
-                                {t?.mem_leave_message || 'Dedicatoria'}
-                            </button>
-                        )}
                         {onShare && (
                             <button
                                 onClick={onShare}
@@ -134,26 +127,46 @@ export default function CartaLayout(props: any) {
                         <div className="text-[#c5a059] mb-4 text-lg">✦</div>
 
                         {/* Name */}
-                        <h1 className="text-4xl md:text-5xl font-light text-[#3d2f1f] mb-1 leading-tight">
+                        <h1 className={`${nameSizeClass(petName, {
+                            short: 'text-4xl md:text-5xl',
+                            long: 'text-3xl md:text-4xl',
+                            xlong: 'text-2xl md:text-3xl',
+                        })} font-light text-[#3d2f1f] mb-1 leading-tight break-words`}>
                             {petName}
                         </h1>
 
                         {/* Dates */}
-                        {(birthDate || deathDate) && (
+                        {dates.full ? (
                             <p className="text-xs tracking-widest text-[#9b8b7a] mb-5 uppercase">
-                                {birthDate || '...'} — {deathDate || '...'}
+                                {dates.full}
+                                {dates.yearsOfLove && <span className="normal-case tracking-normal italic"> · {dates.yearsOfLove}</span>}
                             </p>
-                        )}
+                        ) : <div className="mb-5" />}
 
                         {/* Divider */}
                         <div className="w-full h-px bg-[#c5a059]/30 mb-6" />
 
-                        {/* Bio — full text */}
+                        {/* Carta: encabezado, texto y firma con sello de cera */}
+                        <p className="text-2xl text-[#8a6e3b] mb-3" style={{ fontFamily: "'Pinyon Script', cursive" }}>
+                            {locale === 'en' ? `For you, ${petName}:` : `Para ti, ${petName}:`}
+                        </p>
                         {bio && (
-                            <p className="text-base md:text-lg leading-relaxed text-[#5c4a38] italic mb-8">
+                            <p className="text-base md:text-lg leading-relaxed text-[#5c4a38] italic mb-6">
                                 {bio}
                             </p>
                         )}
+                        <div className="flex items-center justify-end gap-3 mb-8">
+                            <span className="text-xl text-[#8a6e3b]" style={{ fontFamily: "'Pinyon Script', cursive" }}>
+                                {locale === 'en' ? 'With love, your family' : 'Con amor, tu familia'}
+                            </span>
+                            <span
+                                aria-hidden
+                                className="w-11 h-11 rounded-full flex items-center justify-center text-[#f6d9c9] shadow-[0_3px_8px_rgba(110,20,20,0.35)] rotate-[-8deg]"
+                                style={{ background: 'radial-gradient(circle at 35% 30%, #c0392b 0%, #962d22 55%, #6e1f17 100%)' }}
+                            >
+                                <PawPrint size={18} />
+                            </span>
+                        </div>
 
                         {/* CTA */}
                         {scrollToForm && (

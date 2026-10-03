@@ -3,22 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Check,
     PawPrint,
-    Quote,
     Heart,
-    Flame,
-    Star,
-    Share2,
-    BookOpen,
-    Image as ImageIcon,
-    MessageCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 
 import MemorialActionButtons from '@/components/memorial/MemorialActionButtons';
-import MemorialReactions from '@/components/memorial/MemorialReactions';
+import { getLifeDates, nameSizeClass } from '@/lib/memorialDesign';
+import { ritualLabel, type RitualProps } from '@/lib/memorialRituals';
 
 export default function NormalLayout(props: any) {
     const {
@@ -32,6 +25,15 @@ export default function NormalLayout(props: any) {
 
     const [showScrollTop, setShowScrollTop] = useState(false);
     const [lit, setLit] = useState(false);
+    const rituals: RitualProps | undefined = props.rituals;
+    const candleCount = rituals?.counts.vela || 0;
+
+    // Encender la vela registra el gesto (una vez por visita) y suma al contador
+    const lightCandle = () => {
+        if (lit) return;
+        setLit(true);
+        rituals?.send('vela');
+    };
 
     useEffect(() => {
         const handleScroll = () => setShowScrollTop(window.scrollY > 300);
@@ -71,9 +73,8 @@ export default function NormalLayout(props: any) {
     };
 
     const petName = mascota?.name || '';
-    const birthYear = mascota?.birth_date ? new Date(mascota.birth_date).getFullYear() : null;
-    const deathYear = mascota?.death_date ? new Date(mascota.death_date).getFullYear() : null;
-    const bio = memorial?.msg_despedida || t?.philosophy_text || "Miramos al cielo y sonreímos, porque sabemos que ahora corres libre entre nubes de algodón.";
+    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale);
+    const bio = memorial?.msg_despedida || '';
 
     return (
         <div
@@ -106,24 +107,6 @@ export default function NormalLayout(props: any) {
                         </span>
                     </div>
 
-                    {/* Navigation Links */}
-                    <nav className="hidden md:flex items-center gap-8">
-                        {[
-                            { label: locale === 'es' ? 'Inicio' : 'Home', icon: <Heart size={12} /> },
-                            { label: locale === 'es' ? 'Tributo' : 'Tribute', icon: <BookOpen size={12} />, action: () => document.getElementById('tribute-section')?.scrollIntoView({ behavior: 'smooth' }) },
-                            { label: locale === 'es' ? 'Galería' : 'Gallery', icon: <ImageIcon size={12} />, action: () => document.getElementById('gallery-section')?.scrollIntoView({ behavior: 'smooth' }) },
-                            { label: locale === 'es' ? 'Dedicatoria' : 'Tribute', icon: <MessageCircle size={12} />, action: scrollToForm },
-                        ].map((item, idx) => (
-                            <button
-                                key={idx}
-                                onClick={item.action || (() => window.scrollTo({ top: 0, behavior: 'smooth' }))}
-                                className="text-xs tracking-[0.2em] uppercase opacity-50 hover:opacity-100 transition-opacity duration-300 flex items-center gap-1.5"
-                                style={{ fontFamily: "'Quicksand', sans-serif" }}
-                            >
-                                {item.label}
-                            </button>
-                        ))}
-                    </nav>
                 </div>
 
                 {/* Thin separator */}
@@ -199,7 +182,11 @@ export default function NormalLayout(props: any) {
                         {/* Pet Name — Large Serif */}
                         <div className="space-y-4">
                             <h1
-                                className="text-5xl md:text-7xl lg:text-8xl font-light tracking-[0.08em] leading-none"
+                                className={`${nameSizeClass(petName, {
+                                    short: 'text-5xl md:text-7xl lg:text-8xl',
+                                    long: 'text-4xl md:text-6xl lg:text-7xl',
+                                    xlong: 'text-3xl md:text-5xl lg:text-6xl',
+                                })} font-light tracking-[0.08em] leading-tight break-words`}
                                 style={{ 
                                     fontFamily: "'Cinzel', serif",
                                     textShadow: memorial?.diseno?.portada_url
@@ -220,19 +207,24 @@ export default function NormalLayout(props: any) {
                         </p>
 
                         {/* Dates */}
-                        {(birthYear || deathYear) && (
-                            <p
-                                className="text-sm tracking-[0.25em] opacity-50 font-medium"
-                                style={{ fontFamily: "'Quicksand', sans-serif" }}
-                            >
-                                {birthYear || '...'} — {deathYear || '...'}.
-                            </p>
+                        {dates.full && (
+                            <div className="space-y-1">
+                                <p
+                                    className="text-sm tracking-[0.2em] opacity-60 font-medium"
+                                    style={{ fontFamily: "'Quicksand', sans-serif" }}
+                                >
+                                    {dates.full}
+                                </p>
+                                {dates.yearsOfLove && (
+                                    <p className="text-lg italic opacity-70">{dates.yearsOfLove}</p>
+                                )}
+                            </div>
                         )}
 
                         {/* ── Candle ── */}
                         <div className="flex flex-col items-center pt-4">
                             <button
-                                onClick={() => setLit(true)}
+                                onClick={lightCandle}
                                 className="group relative flex flex-col items-center focus:outline-none"
                                 aria-label={lit ? t?.mem_candle_lit : t?.mem_candle_light}
                             >
@@ -286,6 +278,11 @@ export default function NormalLayout(props: any) {
                                         ? (t?.mem_candle_lit || 'Luz Perpetua Encendida')
                                         : (t?.mem_candle_light || 'Encender una Vela')}
                                 </span>
+                                {candleCount > 0 && (
+                                    <span className="mt-1.5 text-sm italic opacity-70">
+                                        🕯️ {ritualLabel('vela', candleCount, locale)}
+                                    </span>
+                                )}
                             </button>
                         </div>
 
@@ -306,20 +303,7 @@ export default function NormalLayout(props: any) {
                 </div>
             </div>
 
-            {/* ═══════════════════════════════════════════════
-                FOOTER
-            ═══════════════════════════════════════════════ */}
-            <footer className="relative z-10 w-full py-6">
-                <div className="w-full h-px opacity-10 bg-current" />
-                <div className="flex items-center justify-center py-5">
-                    <span
-                        className="text-[10px] tracking-[0.3em] uppercase opacity-30"
-                        style={{ fontFamily: "'Quicksand', sans-serif" }}
-                    >
-                        © {new Date().getFullYear()} {tenant_info?.name || 'Memorial'}
-                    </span>
-                </div>
-            </footer>
+            <div className="relative z-10 h-24" />
 
             {/* Back to Top */}
             <AnimatePresence>
