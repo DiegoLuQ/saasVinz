@@ -2,7 +2,7 @@
 // Los planes en USD se venden de forma asistida por WhatsApp; el SuperAdmin
 // los asigna al memorial (rec_plans: mensual, anual, eterno — migración
 // e3b5d7f9a124), que es donde se aplican los límites de fotos y dedicatorias.
-// Los planes de la página de gestión del memorial (TributePlans) no cambian.
+// La gestión familiar del memorial (MemorialPlanUpgrade) usa estos mismos planes.
 
 import type { Locale } from './translations';
 

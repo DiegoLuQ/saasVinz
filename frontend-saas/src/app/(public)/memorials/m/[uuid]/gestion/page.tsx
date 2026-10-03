@@ -41,7 +41,7 @@ import { isPlaceholderFarewell } from '@/lib/memorialDesign';
 import { PaymentInterface } from '@/components/payments/PaymentInterface';
 import ImageCropper from '@/components/tenant/ImageCropper';
 import DedicationModal from '@/components/memorial/DedicationModal';
-import { TributePlans } from '@/components/memorial/TributePlans';
+import MemorialPlanUpgrade, { memorialPlanDisplay } from '@/components/memorial/MemorialPlanUpgrade';
 import { HuellasFooter } from '@/components/public/HuellasFooter';
 import NextImage from 'next/image';
 // Altar3D removed — feature deprecated
@@ -733,7 +733,7 @@ export default function GestionMemorialPage() {
                                             <div className="flex items-center justify-between ml-1">
                                                 <label className={`text-sm font-black uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{t.mg_main_image}</label>
                                                 <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${isDark ? 'bg-sky-500/10 border-sky-500/20 text-sky-400' : 'bg-sky-50 border-sky-100 text-sky-600'}`}>
-                                                    {t.mg_plan_limit.replace('{plan}', planName).replace('{limit}', imgLimit.toString())}
+                                                    {t.mg_plan_limit.replace('{plan}', memorialPlanDisplay(memorial.plan, locale).name).replace('{limit}', imgLimit.toString())}
                                                 </span>
                                             </div>
                                             <div className="grid grid-cols-5 gap-2">
@@ -1021,7 +1021,7 @@ export default function GestionMemorialPage() {
                                                 <div>
                                                     <h2 className={`text-3xl font-serif font-black tracking-tight mb-1 ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{t.mg_moderate}</h2>
                                                     <div className="flex items-center gap-3">
-                                                        <span className={`text-[10px] font-bold uppercase tracking-[0.2em] ${isDark ? 'text-sky-400' : 'text-sky-600'}`}>{planName} PLAN</span>
+                                                        <span className={`text-[10px] font-bold uppercase tracking-[0.2em] ${isDark ? 'text-sky-400' : 'text-sky-600'}`}>{locale === 'es' ? `Plan ${memorialPlanDisplay(memorial.plan, locale).name}` : `${memorialPlanDisplay(memorial.plan, locale).name} plan`}</span>
                                                         <div className={`w-1 h-1 rounded-full ${isDark ? 'bg-slate-700' : 'bg-slate-300'}`} />
                                                         <span className={`text-[10px] font-bold uppercase tracking-[0.2em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                                                             {memorial.valid_until ? `${locale === 'es' ? 'Vence' : 'Expires'}: ${new Date(memorial.valid_until).toLocaleDateString()}` : ''}
@@ -1182,15 +1182,19 @@ export default function GestionMemorialPage() {
                     </div>
                 </main>
 
-                {/* ─── Consagración del Memorial ─── */}
-                <TributePlans
-                    currentPlan={planName}
-                    uuid={uuid}
+                {/* ─── Plan del memorial: estado, vigencia y mejoras (planes USD de la landing) ─── */}
+                <MemorialPlanUpgrade
+                    plan={memorial.plan}
+                    validUntil={memorial.valid_until}
+                    photosUsed={(memorial?.lista_imagenes || []).filter((img: string) => img && img.startsWith('http')).length}
+                    photoLimit={imgLimit}
+                    dedicationsUsed={approved}
+                    dedicationLimit={limit}
+                    gestures={Object.values(memorial?.ritual_counts || {}).reduce((acc: number, n: any) => acc + (Number(n) || 0), 0)}
                     petName={mascota?.nombre || mascota?.name || ''}
-                    t={(key) => (t as any)[key]}
-                    isDark={isDark}
+                    uuid={uuid}
                     locale={locale}
-                    showCurrent={true}
+                    isDark={isDark}
                 />
 
                 <AnimatePresence>
