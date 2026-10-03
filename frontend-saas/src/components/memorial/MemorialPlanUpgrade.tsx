@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Check, Crown, Heart, Infinity as InfinityIcon, MessageCircle, Sparkles, Star, Clock, AlertTriangle } from 'lucide-react';
+import { ArrowRight, Check, Crown, Heart, Infinity as InfinityIcon, MessageCircle, Sparkles, Star, Clock, AlertTriangle, ShieldCheck, Lock } from 'lucide-react';
 import { getLandingContent, whatsappLink, type PlanId } from '@/lib/memorialLanding';
 
 /**
@@ -93,24 +93,37 @@ export default function MemorialPlanUpgrade({
     // Con 3 opciones, el estado va arriba a lo ancho y las opciones en 3 columnas
     const stacked = offers.length >= 3;
 
-    const gainsFor = (id: PlanId): string[] => {
+    type Gain = { label: string; from?: string; to?: string };
+    const gainsFor = (id: PlanId): Gain[] => {
         const spec = PLAN_SPECS[id];
-        const out: string[] = [];
-        if (id === 'eterno') out.push(en ? 'No expiration date, ever' : 'Sin fecha de vencimiento, nunca');
-        if (isRenewal(id)) out.push(en ? '12 more months for their altar' : '12 meses más para su altar');
+        const out: Gain[] = [];
+        if (id === 'eterno') out.push({ label: en ? 'No expiration date, ever' : 'Sin fecha de vencimiento, nunca' });
+        if (isRenewal(id)) out.push({ label: en ? '12 more months for their altar' : '12 meses más para su altar' });
         if (spec.photos > photoLimit) {
-            out.push(en ? `Photos: from ${photoLimit} to ${spec.photos}` : `Fotos: de ${photoLimit} a ${spec.photos}`);
+            out.push({ label: en ? 'Photos' : 'Fotos', from: String(photoLimit), to: String(spec.photos) });
         }
         if (spec.dedications > dedicationLimit && dedicationLimit < UNLIMITED) {
-            out.push(spec.dedications === Infinity
-                ? (en ? `Dedications: from ${dedicationLimit} to unlimited` : `Dedicatorias: de ${dedicationLimit} a ilimitadas`)
-                : (en ? `Dedications: from ${dedicationLimit} to ${spec.dedications}` : `Dedicatorias: de ${dedicationLimit} a ${spec.dedications}`));
+            out.push({
+                label: en ? 'Dedications' : 'Dedicatorias',
+                from: String(dedicationLimit),
+                to: spec.dedications === Infinity ? '∞' : String(spec.dedications),
+            });
         }
         if (current.tier === 'free' || isExpired) {
-            out.push(en ? 'All altar designs and effects' : 'Todos los diseños y efectos del altar');
+            out.push({ label: en ? 'All altar designs and effects' : 'Todos los diseños y efectos del altar' });
         }
         return out;
     };
+
+    // Comparación concreta de Eterno frente a seguir renovando el Anual
+    const anualPrice = plans.list.find(p => p.id === 'anual')?.price ?? 0;
+    const eternoPrice = plans.list.find(p => p.id === 'eterno')?.price ?? 0;
+    const breakEvenYears = anualPrice > 0 ? Math.ceil(eternoPrice / anualPrice) : 0;
+    const eternoNote = breakEvenYears > 0
+        ? (en
+            ? `${breakEvenYears} years of Yearly add up to ${breakEvenYears * anualPrice} USD. Eternal is paid once.`
+            : `${breakEvenYears} años de Anual suman ${breakEvenYears * anualPrice} USD. Eterno se paga una sola vez.`)
+        : null;
 
     const concept: Record<PlanId, string> = {
         mensual: en ? 'Their altar lit, month by month.' : 'Su altar encendido, mes a mes.',
@@ -163,13 +176,13 @@ export default function MemorialPlanUpgrade({
                 )}
             </div>
 
-            <div className={`grid gap-6 items-start ${!offers.length ? 'max-w-xl mx-auto' : stacked ? 'max-w-4xl mx-auto' : 'lg:grid-cols-[minmax(0,340px)_1fr]'}`}>
+            <div className={`grid gap-6 items-stretch ${!offers.length ? 'max-w-xl mx-auto' : stacked ? 'max-w-4xl mx-auto' : 'lg:grid-cols-[minmax(0,340px)_1fr]'}`}>
                 {/* ── Estado del plan ── */}
                 <motion.div
                     initial={{ opacity: 0, y: 16 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    className={`rounded-[2rem] border p-6 sm:p-7 shadow-xl backdrop-blur-xl ${card}`}
+                    className={`flex flex-col rounded-[2rem] border p-6 sm:p-7 shadow-xl backdrop-blur-xl ${card}`}
                 >
                     <p className={`text-xs font-bold uppercase tracking-[0.2em] mb-2 ${muted}`}>{en ? 'Current plan' : 'Plan actual'}</p>
                     <div className="flex items-center gap-3 mb-5">
@@ -223,10 +236,30 @@ export default function MemorialPlanUpgrade({
                                             style={{ width: unlimited ? '100%' : `${pct}%`, opacity: unlimited ? 0.35 : 1 }}
                                         />
                                     </div>
+                                    {!unlimited && u.limit > 0 && (
+                                        <p className={`text-xs mt-1 ${full ? (isDark ? 'text-red-300' : 'text-red-600') : muted}`}>
+                                            {full
+                                                ? (en ? 'Limit reached' : 'Llegaste al límite')
+                                                : en
+                                                    ? `${u.limit - u.used} left`
+                                                    : (u.limit - u.used === 1 ? 'Queda 1' : `Quedan ${u.limit - u.used}`)}
+                                        </p>
+                                    )}
                                 </div>
                             );
                         })}
                     </div>
+
+                    {offers.length > 0 && (
+                        <div className={`mt-auto pt-6 text-xs flex items-start gap-2 ${muted}`}>
+                            <ShieldCheck size={15} className="mt-0.5 shrink-0 text-emerald-500" />
+                            <span>
+                                {en
+                                    ? 'When you upgrade you keep everything: photos, dedications, design and the same link.'
+                                    : 'Al mejorar conservas todo: fotos, dedicatorias, diseño y el mismo enlace.'}
+                            </span>
+                        </div>
+                    )}
 
                     {isForever && (
                         <a
@@ -296,7 +329,7 @@ export default function MemorialPlanUpgrade({
                                     </div>
                                     <p className={`text-xs mb-5 ${muted}`}>
                                         {highlight
-                                            ? (en ? 'Less than 2 years of the yearly plan' : 'Menos que 2 años del plan anual')
+                                            ? (eternoNote ?? p.note)
                                             : renewal && extendedLabel
                                                 ? (en ? `New validity: until ${extendedLabel}` : `Nueva vigencia: hasta el ${extendedLabel}`)
                                                 : p.note}
@@ -305,9 +338,20 @@ export default function MemorialPlanUpgrade({
                                     {gains.length > 0 && (
                                         <ul className="space-y-2.5 mb-6 flex-1">
                                             {gains.map(g => (
-                                                <li key={g} className={`flex items-start gap-2.5 text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                                                    <Check size={16} className={`mt-0.5 shrink-0 ${highlight ? 'text-amber-500' : 'text-sky-500'}`} />
-                                                    <span>{g}</span>
+                                                <li key={g.label} className={`flex items-center gap-2.5 text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                                                    <Check size={16} className={`shrink-0 ${highlight ? 'text-amber-500' : 'text-sky-500'}`} />
+                                                    <span className="flex-1">{g.label}</span>
+                                                    {g.to && (
+                                                        <span className="inline-flex items-center gap-1.5 tabular-nums whitespace-nowrap">
+                                                            <span className={`line-through ${muted}`}>{g.from}</span>
+                                                            <ArrowRight size={12} className={muted} />
+                                                            <span className={`font-bold px-2 py-0.5 rounded-md ${
+                                                                highlight
+                                                                    ? (isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-700')
+                                                                    : (isDark ? 'bg-sky-500/15 text-sky-300' : 'bg-sky-50 text-sky-700')
+                                                            }`}>{g.to}</span>
+                                                        </span>
+                                                    )}
                                                 </li>
                                             ))}
                                         </ul>
@@ -340,11 +384,18 @@ export default function MemorialPlanUpgrade({
             </div>
 
             {offers.length > 0 && (
-                <p className={`text-center text-xs sm:text-sm mt-8 ${muted}`}>
-                    {en
-                        ? 'Prices in USD. A person from our team will help you by WhatsApp to arrange the payment and apply the change.'
-                        : 'Precios en USD. Una persona del equipo te atiende por WhatsApp para coordinar el pago y aplicar el cambio.'}
-                </p>
+                <div className={`mt-10 max-w-4xl mx-auto grid gap-3 sm:grid-cols-3 text-xs sm:text-sm ${muted}`}>
+                    {[
+                        { Icon: MessageCircle, text: en ? 'A real person helps you by WhatsApp' : 'Te atiende una persona real por WhatsApp' },
+                        { Icon: Lock, text: en ? 'No automatic charges or hidden fees' : 'Sin cobros automáticos ni costos ocultos' },
+                        { Icon: ShieldCheck, text: en ? 'Prices in USD, payment arranged with you' : 'Precios en USD, el pago se coordina contigo' },
+                    ].map(({ Icon, text }) => (
+                        <div key={text} className={`flex items-center justify-center gap-2 rounded-2xl px-4 py-3 border ${isDark ? 'border-slate-700/50 bg-slate-800/30' : 'border-white bg-white/50'}`}>
+                            <Icon size={15} className="shrink-0" />
+                            <span>{text}</span>
+                        </div>
+                    ))}
+                </div>
             )}
         </section>
     );
