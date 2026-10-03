@@ -204,27 +204,41 @@ export default function TenantFormPage() {
         const tenantDigits = (tenant.phone || '').replace(/\D/g, '');
         const tenantWa = /^9\d{8}$/.test(tenantDigits) ? `56${tenantDigits}` : tenantDigits;
         const tierText = tenant.weight_tiers?.find((t) => String(t.id) === petData.weightTierId)?.range_text;
-        const chosenNames = services.filter((s) => selectedServices.includes(s.id)).map((s) => s.name);
+        const chosen = services.filter((s) => selectedServices.includes(s.id));
+        const money = (n?: number) => (n ? ` — $${Math.round(n).toLocaleString('es-CL')}` : '');
+        const chosenPlans = chosen.filter((s) => s.category === 'plan').map((s) => `• ${s.name}${money(s.price)}`);
+        const chosenExtras = chosen.filter((s) => s.category !== 'plan').map((s) => `• ${s.name}${money(s.price)}`);
         const contactLabel = ownerData.contactPreference === 'whatsapp' ? 'WhatsApp' : ownerData.contactPreference === 'phone' ? 'Llamada' : ownerData.contactPreference === 'any' ? 'WhatsApp o llamada' : '';
-        // null = línea omitida; '' = línea en blanco entre bloques
+        const joinAddr = (...parts: (string | undefined)[]) => parts.map((p) => (p || '').trim()).filter(Boolean).join(', ');
+        const pickupAddr = joinAddr(ownerData.veterinary, ownerData.pickupCommune, ownerData.pickupRegion);
+        const deliveryAddr = joinAddr(ownerData.address, ownerData.commune, ownerData.region);
+        const line = (label: string, value?: string | null) => (value && value.trim() ? `*${label}:* ${value.trim()}` : null);
+        // null = línea omitida; '' = línea en blanco entre bloques. *texto* = negrita en WhatsApp.
         const tenantWaText = [
-            `Hola ${tenant.name}, acabo de enviar el formulario.`,
-            submissionCode ? `Código de solicitud: ${submissionCode}` : null,
+            `Hola *${tenant.name}*, acabo de enviar el formulario de servicio. 🐾`,
+            line('Código de solicitud', submissionCode),
             '',
-            '*Tutor*',
-            `Nombre: ${ownerData.fullName}`,
-            ownerData.phone ? `Teléfono: ${ownerData.phone}` : null,
-            ownerData.email ? `Email: ${ownerData.email}` : null,
-            contactLabel ? `Prefiere contacto por: ${contactLabel}` : null,
+            '👤 *DATOS DEL TUTOR*',
+            line('Nombre', ownerData.fullName),
+            line('RUT', ownerData.rut),
+            line('Celular', ownerData.phone),
+            line('Email', ownerData.email),
+            line('Prefiere contacto por', contactLabel),
             '',
-            '*Mascota*',
-            `Nombre: ${petData.name}`,
-            petData.type ? `Especie: ${petData.type}${petData.breed ? ` (${petData.breed})` : ''}` : null,
-            (tierText || petData.weightKg) ? `Peso: ${tierText || `${petData.weightKg} kg`}` : null,
-            ownerData.veterinary ? `Retiro: ${[ownerData.veterinary, ownerData.pickupCommune].filter(Boolean).join(', ')}` : null,
-            chosenNames.length > 0 ? `Servicio: ${chosenNames.join(', ')}` : null,
-            ownerData.comments ? `Comentarios: ${ownerData.comments}` : null,
-            trackUrl ? `\nSeguimiento: ${trackUrl}` : null,
+            '🐶 *DATOS DE LA MASCOTA*',
+            line('Nombre', petData.name),
+            line('Especie', petData.type ? `${petData.type}${petData.breed ? ` (${petData.breed})` : ''}` : ''),
+            line('Edad', petData.age ? `${petData.age} años` : ''),
+            line('Peso', tierText || (petData.weightKg ? `${petData.weightKg} kg` : '')),
+            line('Fecha de fallecimiento', petData.deathDate),
+            '',
+            '📍 *DIRECCIONES*',
+            line('Retiro', pickupAddr || 'Por coordinar'),
+            line('Entrega', deliveryAddr || 'Por coordinar'),
+            ...(chosenPlans.length ? ['', '📦 *PLAN ELEGIDO*', ...chosenPlans] : []),
+            ...(chosenExtras.length ? ['', '➕ *SERVICIOS ADICIONALES*', ...chosenExtras] : []),
+            ...(ownerData.comments?.trim() ? ['', '📝 *COMENTARIOS*', ownerData.comments.trim()] : []),
+            ...(trackUrl ? ['', '🔗 *Seguimiento:*', trackUrl] : []),
         ].filter((l): l is string => l !== null).join('\n');
         const tenantWaUrl = tenantWa.length >= 8 ? `https://wa.me/${tenantWa}?text=${encodeURIComponent(tenantWaText)}` : '';
 
