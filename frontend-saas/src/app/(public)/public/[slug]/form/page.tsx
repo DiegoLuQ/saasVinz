@@ -6,6 +6,7 @@ import { buildTrackingUrl } from '@/lib/publicUrls';
 import { API_BASE_URL } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
+    MessageCircle,
     Loader2,
     AlertCircle,
     ChevronRight,
@@ -197,6 +198,35 @@ export default function TenantFormPage() {
         const trackUrl = submissionCode ? buildTrackingUrl(tenant.slug, petData.name, submissionCode) : '';
         const whatsappShareText = `Hola, acabo de registrar el servicio para ${petData.name || 'mi mascota'} en ${tenant.name}. Mi código de solicitud es: ${submissionCode}. Pueden ver el seguimiento en vivo aquí: ${trackUrl}`;
         const whatsappShareUrl = `https://wa.me/?text=${encodeURIComponent(whatsappShareText)}`;
+
+        // Resumen de la solicitud enviado directo al WhatsApp del crematorio.
+        // Teléfono solo dígitos; un celular chileno sin código (9XXXXXXXX) se prefija con 56.
+        const tenantDigits = (tenant.phone || '').replace(/\D/g, '');
+        const tenantWa = /^9\d{8}$/.test(tenantDigits) ? `56${tenantDigits}` : tenantDigits;
+        const tierText = tenant.weight_tiers?.find((t) => String(t.id) === petData.weightTierId)?.range_text;
+        const chosenNames = services.filter((s) => selectedServices.includes(s.id)).map((s) => s.name);
+        const contactLabel = ownerData.contactPreference === 'whatsapp' ? 'WhatsApp' : ownerData.contactPreference === 'phone' ? 'Llamada' : ownerData.contactPreference === 'any' ? 'WhatsApp o llamada' : '';
+        // null = línea omitida; '' = línea en blanco entre bloques
+        const tenantWaText = [
+            `Hola ${tenant.name}, acabo de enviar el formulario.`,
+            submissionCode ? `Código de solicitud: ${submissionCode}` : null,
+            '',
+            '*Tutor*',
+            `Nombre: ${ownerData.fullName}`,
+            ownerData.phone ? `Teléfono: ${ownerData.phone}` : null,
+            ownerData.email ? `Email: ${ownerData.email}` : null,
+            contactLabel ? `Prefiere contacto por: ${contactLabel}` : null,
+            '',
+            '*Mascota*',
+            `Nombre: ${petData.name}`,
+            petData.type ? `Especie: ${petData.type}${petData.breed ? ` (${petData.breed})` : ''}` : null,
+            (tierText || petData.weightKg) ? `Peso: ${tierText || `${petData.weightKg} kg`}` : null,
+            ownerData.veterinary ? `Retiro: ${[ownerData.veterinary, ownerData.pickupCommune].filter(Boolean).join(', ')}` : null,
+            chosenNames.length > 0 ? `Servicio: ${chosenNames.join(', ')}` : null,
+            ownerData.comments ? `Comentarios: ${ownerData.comments}` : null,
+            trackUrl ? `\nSeguimiento: ${trackUrl}` : null,
+        ].filter((l): l is string => l !== null).join('\n');
+        const tenantWaUrl = tenantWa.length >= 8 ? `https://wa.me/${tenantWa}?text=${encodeURIComponent(tenantWaText)}` : '';
 
         const primaryImageBlobUrl = images && images.length > 0 && typeof window !== 'undefined'
             ? URL.createObjectURL(images[0])
@@ -455,6 +485,18 @@ export default function TenantFormPage() {
                             ))}
                         </div>
                     </motion.div>
+
+                    {tenantWaUrl && (
+                        <a
+                            href={tenantWaUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mb-3 w-full inline-flex items-center justify-center gap-2.5 py-4 px-5 bg-[#25D366] hover:bg-[#20bd5a] text-white font-black text-xs uppercase tracking-[0.15em] rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-[#25D366]/20 cursor-pointer"
+                        >
+                            <MessageCircle size={16} />
+                            Enviar mis datos a {tenant.name}
+                        </a>
+                    )}
 
                     <button
                         onClick={() => window.location.reload()}
