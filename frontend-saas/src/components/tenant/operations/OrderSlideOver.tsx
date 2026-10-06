@@ -19,6 +19,7 @@ import FarewellCardSection from './expediente/FarewellCardSection';
 import DedicationSection from './expediente/DedicationSection';
 import StageTimeline, { type Stage } from './expediente/StageTimeline';
 import RevertOrderModal, { canRevertStatus } from './RevertOrderModal';
+import CertificateTextsModal, { ISSUE_TEMPLATE_QUERY_KEY, issueTextFields, loadIssueTemplate } from './CertificateTextsModal';
 import { useIsOwner } from '@/hooks/useSessionBootstrap';
 import { usePermissions } from '@/app/(tenant)/tenant/context/PermissionContext';
 
@@ -87,6 +88,7 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
     const [acting, setActing] = useState(false);
     const [downloadingCertId, setDownloadingCertId] = useState<number | null>(null);
     const [showRevert, setShowRevert] = useState(false);
+    const [showCertTexts, setShowCertTexts] = useState(false);
     const isOwner = useIsOwner();
 
     const orderId = cremation?.id;
@@ -95,6 +97,17 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
         queryFn: () => apiRequest(`/api/internal/cremations/${orderId}/expediente`),
         enabled: isOpen && !!orderId,
         staleTime: 30_000,
+    });
+
+    // Diseño con el que se emite el certificado: se precarga al abrir el
+    // expediente para decidir, en el mismo clic, si hay textos libres que
+    // editar (modal) o se emite directo (la pestaña debe abrirse sin esperar).
+    const certEnabled = !!exp?.deliverables.certificate.enabled;
+    const { data: issueTpl, isLoading: issueTplLoading } = useQuery({
+        queryKey: ISSUE_TEMPLATE_QUERY_KEY,
+        queryFn: loadIssueTemplate,
+        enabled: isOpen && certEnabled,
+        staleTime: 60_000,
     });
 
     if (!cremation) return null;
@@ -169,29 +182,41 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
         }
     };
 
-    const issueCertificate = async () => {
+    const issueCertificate = async (templateId?: number, overrides?: Record<string, { value: string }>): Promise<boolean> => {
         setActing(true);
         try {
             await openCertificateHtml(async () => {
                 const res = await apiRequest('/api/internal/ops-records/generate', {
                     method: 'POST',
-                    body: { cremation_id: cremation.id, persist: true },
+                    body: { cremation_id: cremation.id, template_id: templateId, image_overrides: overrides, persist: true },
                 });
                 return res.html_content;
             });
             showToast('Certificado emitido', 'success');
             await refresh();
+            return true;
         } catch (err: unknown) {
             showToast(err instanceof Error ? err.message : 'No se pudo emitir el certificado', 'error');
+            return false;
         } finally {
             setActing(false);
         }
     };
 
+    // Con textos libres en el diseño (o aún sin saberlo) se abre el modal para
+    // editarlos; si no hay, se emite directo como siempre.
+    const startIssueCertificate = () => {
+        if (!issueTpl || issueTextFields(issueTpl).length > 0) {
+            setShowCertTexts(true);
+            return;
+        }
+        issueCertificate();
+    };
+
     const runNextAction = async () => {
         if (!exp?.next_action) return;
         const key = exp.next_action.key;
-        if (key === 'emitir_certificado') return issueCertificate();
+        if (key === 'emitir_certificado') return startIssueCertificate();
         setActing(true);
         try {
             if (key === 'entregar') {
@@ -463,7 +488,7 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                         ))}
                                         <button
                                             type="button"
-                                            onClick={issueCertificate}
+                                            onClick={startIssueCertificate}
                                             disabled={busy}
                                             className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition flex items-center gap-1.5 disabled:opacity-50"
                                         >
@@ -499,6 +524,18 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                     </>
                 )}
             </div>
+            {showCertTexts && (
+                <CertificateTextsModal
+                    isOpen={showCertTexts}
+                    onClose={() => setShowCertTexts(false)}
+                    cremationId={cremation.id}
+                    hasIssued={!!exp?.deliverables.certificate.issued.length}
+                    data={issueTpl}
+                    isLoading={issueTplLoading}
+                    onIssue={issueCertificate}
+                    onTextsSaved={() => queryClient.invalidateQueries({ queryKey: ISSUE_TEMPLATE_QUERY_KEY })}
+                />
+            )}
             {showRevert && (
                 <RevertOrderModal
                     isOpen={showRevert}
