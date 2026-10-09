@@ -20,7 +20,8 @@ import {
     BookOpen,
     Share2,
     Star,
-    AlertCircle
+    AlertCircle,
+    Sparkles,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { API_URL } from '@/lib/tenant/api';
@@ -50,6 +51,10 @@ interface Service {
     price: number;
     cost: number;
     is_active: boolean;
+    /** Servicio especial (eutanasia, exhumación…): adicional en el formulario público */
+    is_special?: boolean;
+    /** Si la familia lo ve en el formulario (Configuración → Formulario y Pesos) */
+    show_in_form?: boolean;
 }
 
 
@@ -144,7 +149,7 @@ export default function ServicesPage() {
             setShowLimitModal(true);
             return;
         }
-        setCurrentService(service || { name: '', description: '', price: 0, cost: 0, is_active: true });
+        setCurrentService(service || { name: '', description: '', price: 0, cost: 0, is_active: true, is_special: false, show_in_form: true });
         setIsModalOpen(true);
     };
 
@@ -360,6 +365,12 @@ export default function ServicesPage() {
                                         </div>
 
                                         <div className="flex-1 space-y-2.5">
+                                            {service.is_special && (
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/15">
+                                                    <Sparkles size={10} />
+                                                    Especial{service.show_in_form === false ? ' · oculto en formulario' : ''}
+                                                </span>
+                                            )}
                                             <h3 className="text-lg font-bold group-hover:text-amber-400 transition-colors duration-300">{service.name}</h3>
                                             <p className="text-sm text-muted-foreground/80 leading-relaxed line-clamp-2">{service.description || 'Sin descripción'}</p>
                                         </div>
@@ -661,6 +672,20 @@ export default function ServicesPage() {
                                         placeholder="Seleccionar estado..."
                                     />
                                 </div>
+                                <label className="md:col-span-2 flex items-start gap-3 rounded-2xl border border-white/10 bg-black/10 p-4 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={!!currentService?.is_special}
+                                        onChange={(e) => setCurrentService({ ...currentService, is_special: e.target.checked })}
+                                        className="mt-0.5 w-4 h-4 accent-amber-500 cursor-pointer"
+                                    />
+                                    <span>
+                                        <span className="block text-sm font-bold">Servicio especial</span>
+                                        <span className="block text-[11px] text-muted-foreground mt-0.5">
+                                            Ej: eutanasia, exhumación. Se ofrece como adicional en el formulario de la familia, después de elegir el plan. Puede ir también dentro de un plan.
+                                        </span>
+                                    </span>
+                                </label>
                             </div>
                         </div>
 

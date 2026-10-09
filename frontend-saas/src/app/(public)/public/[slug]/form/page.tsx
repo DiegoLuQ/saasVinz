@@ -670,6 +670,7 @@ export default function TenantFormPage() {
                                         services={services}
                                         selectedServices={selectedServices}
                                         toggleService={toggleService}
+                                        showPrices={formConfig.show_service_prices}
                                     />
                                 )}
                                 {currentStep === 4 && (

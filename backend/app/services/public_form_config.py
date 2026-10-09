@@ -49,7 +49,11 @@ def normalize_form_config(raw: Any) -> dict:
         visible = bool(saved.get("visible", def_visible))
         required = bool(saved.get("required", def_required)) and visible
         fields[key] = {"visible": visible, "required": required}
-    return {"fields": fields, "show_weight_prices": bool(raw.get("show_weight_prices", False))}
+    return {
+        "fields": fields,
+        "show_weight_prices": bool(raw.get("show_weight_prices", False)),
+        "show_service_prices": bool(raw.get("show_service_prices", False)),
+    }
 
 
 def form_config_with_meta(raw: Any) -> dict:
@@ -61,6 +65,7 @@ def form_config_with_meta(raw: Any) -> dict:
             for key, (section, label, _v, _r) in DEFAULT_FIELDS.items()
         ],
         "show_weight_prices": cfg["show_weight_prices"],
+        "show_service_prices": cfg["show_service_prices"],
     }
 
 

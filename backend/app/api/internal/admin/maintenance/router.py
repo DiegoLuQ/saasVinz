@@ -155,6 +155,7 @@ class FormFieldSetting(BaseModel):
 class FormConfigUpdate(BaseModel):
     fields: Dict[str, FormFieldSetting] = Field(default_factory=dict)
     show_weight_prices: bool = False
+    show_service_prices: bool = False
 
 @router.get("/form-config")
 def get_form_config(
@@ -186,6 +187,7 @@ def update_form_config(
     tenant.form_config = normalize_form_config({
         "fields": {k: v.model_dump() for k, v in payload.fields.items()},
         "show_weight_prices": payload.show_weight_prices,
+        "show_service_prices": payload.show_service_prices,
     })
     db.commit()
     return form_config_with_meta(tenant.form_config)

@@ -347,6 +347,17 @@ async def submit_public_form(
             # Fallback: store just the ID if enrichment fails? 
             # Better to skip or store minimal info to avoid breaking the array structure
 
+    # Un servicio (p. ej. especial) que ya viene dentro del plan elegido no se cobra dos veces.
+    in_plan_ids = {
+        it["origin_id"]
+        for e in enriched_services if e.get("type") == "plan"
+        for it in e.get("items", []) if it.get("type") == "service"
+    }
+    enriched_services = [
+        e for e in enriched_services
+        if not (e.get("type") == "service" and e.get("id") in in_plan_ids)
+    ]
+
     # 4. Create Submission Record (Pending)
     # Store partner_id in owner_data as fallback since model might not have the column enabled
     if partner_id:

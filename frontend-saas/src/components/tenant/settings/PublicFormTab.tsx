@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Lock, Plus, Save, Scale, Trash2, User, PawPrint } from 'lucide-react';
+import Link from 'next/link';
+import { Lock, Plus, Save, Scale, Trash2, User, PawPrint, Tag, Sparkles, X } from 'lucide-react';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { apiRequest } from '@/lib/tenant/api';
 import { formatCLP } from '@/lib/publicFormConfig';
@@ -12,6 +13,11 @@ const MAX_TIERS = 20;
 
 // Columnas: nombre del campo (se ajusta) | Mostrar | Obligatorio (ancho fijo)
 const FIELD_GRID = 'grid grid-cols-[minmax(0,1fr)_4.5rem_5.5rem] items-center gap-x-2';
+
+// Rangos de peso en escritorio: nombre | desde | hasta | recargo | eliminar.
+// Literal completo para que Tailwind genere también la variante md:.
+const TIER_GRID = 'grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_2.5rem]';
+const TIER_GRID_MD = 'md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_2.5rem]';
 
 const TIER_PLACEHOLDERS = ['Mini', 'Pequeño', 'Mediano', 'Grande', 'Extra grande', 'Gigante'];
 
@@ -39,6 +45,18 @@ const SECTIONS: { key: FieldRow['section']; title: string; icon: typeof User }[]
     { key: 'owner', title: 'Datos del cliente', icon: User },
     { key: 'pet', title: 'Datos de la mascota', icon: PawPrint },
 ];
+
+interface SpecialService {
+    id: number;
+    name: string;
+    description: string | null;
+    price: number;
+    is_active: boolean;
+    is_special?: boolean;
+    show_in_form?: boolean;
+}
+
+const EMPTY_SPECIAL = { name: '', description: '', price: '' };
 
 interface SavedTier {
     label: string | null;
@@ -79,7 +97,13 @@ export function PublicFormTab() {
     const [saving, setSaving] = useState(false);
     const [fields, setFields] = useState<FieldRow[]>([]);
     const [showPrices, setShowPrices] = useState(false);
+    const [showServicePrices, setShowServicePrices] = useState(false);
     const [tiers, setTiers] = useState<TierRow[]>([]);
+    // Servicios especiales del catálogo: visibilidad editable aquí, guardada con el resto.
+    const [specials, setSpecials] = useState<SpecialService[]>([]);
+    const [savedSpecialVisibility, setSavedSpecialVisibility] = useState<Record<number, boolean>>({});
+    const [newSpecial, setNewSpecial] = useState<typeof EMPTY_SPECIAL | null>(null);
+    const [creatingSpecial, setCreatingSpecial] = useState(false);
 
     useEffect(() => {
         (async () => {
@@ -90,7 +114,13 @@ export function PublicFormTab() {
                 ]);
                 setFields(cfg.fields);
                 setShowPrices(!!cfg.show_weight_prices);
+                setShowServicePrices(!!cfg.show_service_prices);
                 setTiers(toTierRows(rules as SavedTier[]));
+                // Sin permiso sobre Servicios la tarjeta queda vacía, sin bloquear el resto.
+                const services = await apiRequest('/api/internal/services/').catch(() => []) as SpecialService[];
+                const sp = services.filter(sv => sv.is_special);
+                setSpecials(sp);
+                setSavedSpecialVisibility(Object.fromEntries(sp.map(sv => [sv.id, sv.show_in_form !== false])));
             } catch (err: unknown) {
                 showToast((err as Error)?.message || 'Error al cargar la configuración del formulario', 'error');
             } finally {
@@ -119,6 +149,38 @@ export function PublicFormTab() {
     };
 
     const removeTier = (idx: number) => setTiers(prev => prev.filter((_, i) => i !== idx));
+
+    const createSpecial = async () => {
+        if (!newSpecial) return;
+        const name = newSpecial.name.trim();
+        if (!name) {
+            showToast('Indica el nombre del servicio especial', 'error');
+            return;
+        }
+        setCreatingSpecial(true);
+        try {
+            const created = await apiRequest('/api/internal/services/', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name,
+                    description: newSpecial.description.trim() || null,
+                    price: parseFloat(newSpecial.price || '0') || 0,
+                    cost: 0,
+                    is_active: true,
+                    is_special: true,
+                    show_in_form: true,
+                }),
+            }) as SpecialService;
+            setSpecials(prev => [...prev, created]);
+            setSavedSpecialVisibility(prev => ({ ...prev, [created.id]: true }));
+            setNewSpecial(null);
+            showToast('Servicio especial creado', 'success');
+        } catch (err: unknown) {
+            showToast((err as Error)?.message || 'Error al crear el servicio', 'error');
+        } finally {
+            setCreatingSpecial(false);
+        }
+    };
 
     // Mismas reglas que el backend: desde ≥ hasta del rango anterior (sin solapes),
     // hasta > desde, y solo el último rango puede quedar sin "hasta".
@@ -157,6 +219,7 @@ export function PublicFormTab() {
                 body: JSON.stringify({
                     fields: Object.fromEntries(fields.map(f => [f.key, { visible: f.visible, required: f.required }])),
                     show_weight_prices: showPrices,
+                    show_service_prices: showServicePrices,
                 }),
             });
             const saved = await apiRequest('/api/internal/maintenance/weight-pricing', {
@@ -171,6 +234,12 @@ export function PublicFormTab() {
                 }),
             });
             setTiers(toTierRows(saved as SavedTier[]));
+            const changed = specials.filter(sv => (sv.show_in_form !== false) !== savedSpecialVisibility[sv.id]);
+            await Promise.all(changed.map(sv => apiRequest(`/api/internal/services/${sv.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ show_in_form: sv.show_in_form !== false }),
+            })));
+            setSavedSpecialVisibility(Object.fromEntries(specials.map(sv => [sv.id, sv.show_in_form !== false])));
             showToast('Configuración del formulario guardada', 'success');
         } catch (err: unknown) {
             showToast((err as Error)?.message || 'Error al guardar la configuración', 'error');
@@ -253,21 +322,15 @@ export function PublicFormTab() {
 
             {/* Tramos de peso */}
             <div className="glass-card p-5 sm:p-6 rounded-3xl space-y-5">
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <Scale size={18} className="text-primary" />
-                            <h4 className="font-bold">Rangos de peso</h4>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1 max-w-xl">
-                            Hasta {MAX_TIERS} rangos. Escribe desde y hasta cuántos kg (ej. 0 – 4, 4,1 – 7); un rango no puede empezar antes de que termine el anterior. Deja vacío el “hasta” del último para “desde X kg”.
-                            Se usan en el formulario, en el catálogo de planes y para el recargo por peso de las órdenes.
-                        </p>
+                <div>
+                    <div className="flex items-center gap-2">
+                        <Scale size={18} className="text-primary" />
+                        <h4 className="font-bold">Rangos de peso</h4>
                     </div>
-                    <label className="flex items-center gap-3 text-sm font-medium shrink-0 cursor-pointer">
-                        <Toggle label="Mostrar precio de los rangos al público" checked={showPrices} onChange={setShowPrices} />
-                        Mostrar precio al público
-                    </label>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-xl">
+                        Hasta {MAX_TIERS} rangos. Escribe desde y hasta cuántos kg (ej. 0 – 4, 4,1 – 7); un rango no puede empezar antes de que termine el anterior. Deja vacío el “hasta” del último para “desde X kg”.
+                        Se usan en el formulario, en el catálogo de planes y para el recargo por peso de las órdenes.
+                    </p>
                 </div>
 
                 {tiers.length === 0 ? (
@@ -276,49 +339,61 @@ export function PublicFormTab() {
                     </p>
                 ) : (
                     <div className="space-y-3">
-                        <div className="hidden sm:grid grid-cols-[1.4fr_0.8fr_1fr_1fr_auto] gap-3 px-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        <div className={`hidden md:grid ${TIER_GRID} gap-3 px-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground`}>
                             <span>Nombre (opcional)</span>
-                            <span>Desde (kg)</span>
-                            <span>Hasta (kg)</span>
-                            <span>Recargo ($)</span>
-                            <span className="w-9" />
+                            <span>Desde</span>
+                            <span>Hasta</span>
+                            <span>Recargo</span>
+                            <span className="w-10" />
                         </div>
                         {tiers.map((t, idx) => {
                             const isLast = idx === tiers.length - 1;
                             return (
-                                <div key={idx} className="grid grid-cols-2 sm:grid-cols-[1.4fr_0.8fr_1fr_1fr_auto] gap-3 items-center">
-                                    <div className="col-span-2 sm:col-span-1">
-                                        <FormInputLite placeholder={`Ej: ${TIER_PLACEHOLDERS[idx] ?? `Rango ${idx + 1}`}`} value={t.label} maxLength={40} onChange={v => updateTier(idx, { label: v })} />
+                                // Móvil: una tarjeta por rango (nombre arriba, desde/hasta lado a
+                                // lado, recargo abajo). Escritorio: fila alineada con la cabecera.
+                                <div key={idx} className={`grid grid-cols-2 gap-x-3 gap-y-2.5 rounded-2xl border border-foreground/10 p-3 ${TIER_GRID_MD} md:items-start md:gap-3 md:rounded-none md:border-0 md:p-0`}>
+                                    <div className="col-span-2 md:col-span-1 flex items-end gap-2 min-w-0">
+                                        <div className="flex-1 min-w-0">
+                                            <TierLabel>Rango {idx + 1} · Nombre (opcional)</TierLabel>
+                                            <FormInputLite placeholder={`Ej: ${TIER_PLACEHOLDERS[idx] ?? `Rango ${idx + 1}`}`} value={t.label} maxLength={40} ariaLabel={`Rango ${idx + 1}: nombre`} onChange={v => updateTier(idx, { label: v })} />
+                                        </div>
+                                        <RemoveTierButton idx={idx} onClick={() => removeTier(idx)} className="flex md:hidden" />
                                     </div>
-                                    <FormInputLite
-                                        placeholder={idx === 0 ? 'Desde: 0' : `Desde: ${tiers[idx - 1].max_weight || '…'}`}
-                                        value={t.min_weight}
-                                        inputMode="decimal"
-                                        ariaLabel={`Rango ${idx + 1}: desde (kg)`}
-                                        onChange={v => updateTier(idx, { min_weight: v.replace(/[^\d.,]/g, '') })}
-                                    />
-                                    <FormInputLite
-                                        placeholder={isLast ? 'Hasta: o más' : 'Hasta: ej. 4'}
-                                        ariaLabel={`Rango ${idx + 1}: hasta (kg)`}
-                                        value={t.max_weight}
-                                        inputMode="decimal"
-                                        onChange={v => updateTier(idx, { max_weight: v.replace(/[^\d.,]/g, '') })}
-                                    />
-                                    <FormInputLite
-                                        placeholder="0"
-                                        value={t.price}
-                                        inputMode="numeric"
-                                        onChange={v => updateTier(idx, { price: v.replace(/\D/g, '') })}
-                                        hint={t.price && showPrices ? formatCLP(parseFloat(t.price) || 0) : undefined}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => removeTier(idx)}
-                                        aria-label={`Eliminar rango ${idx + 1}`}
-                                        className="justify-self-end p-2 text-red-400 hover:bg-red-500/10 rounded-xl transition-all"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
+                                    <div className="min-w-0">
+                                        <TierLabel>Desde</TierLabel>
+                                        <FormInputLite
+                                            placeholder={idx === 0 ? '0' : tiers[idx - 1].max_weight || '…'}
+                                            value={t.min_weight}
+                                            inputMode="decimal"
+                                            suffix="kg"
+                                            ariaLabel={`Rango ${idx + 1}: desde (kg)`}
+                                            onChange={v => updateTier(idx, { min_weight: v.replace(/[^\d.,]/g, '') })}
+                                        />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <TierLabel>Hasta</TierLabel>
+                                        <FormInputLite
+                                            placeholder={isLast ? 'o más' : 'ej. 4'}
+                                            ariaLabel={`Rango ${idx + 1}: hasta (kg)`}
+                                            value={t.max_weight}
+                                            inputMode="decimal"
+                                            suffix="kg"
+                                            onChange={v => updateTier(idx, { max_weight: v.replace(/[^\d.,]/g, '') })}
+                                        />
+                                    </div>
+                                    <div className="col-span-2 md:col-span-1 min-w-0">
+                                        <TierLabel>Recargo</TierLabel>
+                                        <FormInputLite
+                                            placeholder="0"
+                                            value={t.price}
+                                            inputMode="numeric"
+                                            prefix="$"
+                                            ariaLabel={`Rango ${idx + 1}: recargo ($)`}
+                                            onChange={v => updateTier(idx, { price: v.replace(/\D/g, '') })}
+                                            hint={parseFloat(t.price) > 0 ? formatCLP(parseFloat(t.price)) : undefined}
+                                        />
+                                    </div>
+                                    <RemoveTierButton idx={idx} onClick={() => removeTier(idx)} className="hidden md:flex" />
                                 </div>
                             );
                         })}
@@ -336,6 +411,111 @@ export function PublicFormTab() {
                 </button>
             </div>
 
+            {/* Servicios especiales (eutanasia, exhumación…) */}
+            <div className="glass-card p-5 sm:p-6 rounded-3xl space-y-4">
+                <div>
+                    <div className="flex items-center gap-2">
+                        <Sparkles size={18} className="text-primary" />
+                        <h4 className="font-bold">Servicios especiales</h4>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-xl">
+                        Servicios como eutanasia o exhumación. La familia los ve como adicionales después de elegir el plan y se suman al total;
+                        si el plan elegido ya incluye uno, aparece como “Incluido en tu plan”. Se guardan en el{' '}
+                        <Link href="/dashboard/gestion-servicios" className="text-primary font-semibold hover:underline">catálogo de servicios</Link>,
+                        donde también puedes editarlos o agregarlos a un plan.
+                    </p>
+                </div>
+
+                {specials.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-2">Aún no tienes servicios especiales.</p>
+                ) : (
+                    <div className="divide-y divide-foreground/5">
+                        {specials.map(sv => (
+                            <div key={sv.id} className="flex items-center justify-between gap-4 py-3">
+                                <div className="min-w-0">
+                                    <p className={`text-sm font-medium break-words ${sv.show_in_form !== false ? '' : 'text-muted-foreground'}`}>
+                                        {sv.name}
+                                        <span className="ml-2 text-xs font-semibold text-muted-foreground">{formatCLP(sv.price || 0)}</span>
+                                    </p>
+                                    <p className="text-[11px] text-muted-foreground mt-0.5 break-words">
+                                        {!sv.is_active ? 'Inactivo en el catálogo · ' : ''}{sv.description || 'Sin descripción'}
+                                    </p>
+                                </div>
+                                <Toggle
+                                    label={`Mostrar ${sv.name} en el formulario`}
+                                    checked={sv.show_in_form !== false}
+                                    onChange={v => setSpecials(prev => prev.map(x => (x.id === sv.id ? { ...x, show_in_form: v } : x)))}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {newSpecial ? (
+                    <div className="rounded-2xl border border-foreground/10 p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <p className="text-sm font-bold">Nuevo servicio especial</p>
+                            <button type="button" onClick={() => setNewSpecial(null)} aria-label="Cancelar" className="p-1.5 rounded-lg text-muted-foreground hover:bg-foreground/5">
+                                <X size={16} />
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-3">
+                            <FormInputLite placeholder="Nombre (ej: Eutanasia)" value={newSpecial.name} maxLength={80} ariaLabel="Nombre del servicio especial" onChange={v => setNewSpecial({ ...newSpecial, name: v })} />
+                            <FormInputLite placeholder="Precio" value={newSpecial.price} inputMode="numeric" prefix="$" ariaLabel="Precio del servicio especial" onChange={v => setNewSpecial({ ...newSpecial, price: v.replace(/\D/g, '') })} />
+                            <div className="sm:col-span-2">
+                                <FormInputLite placeholder="Descripción (opcional)" value={newSpecial.description} maxLength={200} ariaLabel="Descripción del servicio especial" onChange={v => setNewSpecial({ ...newSpecial, description: v })} />
+                            </div>
+                        </div>
+                        <div className="flex justify-end">
+                            <button
+                                type="button"
+                                onClick={createSpecial}
+                                disabled={creatingSpecial}
+                                className="bg-primary text-primary-foreground font-bold py-2 px-4 rounded-xl text-sm hover:opacity-90 transition-all disabled:opacity-60"
+                            >
+                                {creatingSpecial ? 'Creando…' : 'Crear servicio'}
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <button
+                        type="button"
+                        onClick={() => setNewSpecial(EMPTY_SPECIAL)}
+                        className="inline-flex items-center gap-2 text-sm font-bold text-primary hover:opacity-80"
+                    >
+                        <Plus size={16} />
+                        Agregar servicio especial
+                    </button>
+                )}
+            </div>
+
+            {/* Precios visibles para la familia */}
+            <div className="glass-card p-5 sm:p-6 rounded-3xl space-y-4">
+                <div>
+                    <div className="flex items-center gap-2">
+                        <Tag size={18} className="text-primary" />
+                        <h4 className="font-bold">Precios en el formulario</h4>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-xl">
+                        Elige qué precios ve la familia. Con alguno activo, el resumen final muestra el total estimado (plan elegido + servicios especiales + recargo por peso).
+                    </p>
+                </div>
+                <div className="divide-y divide-foreground/5">
+                    <PriceToggleRow
+                        title="Precio según el peso"
+                        description="Muestra el recargo de cada rango de peso (también en el catálogo de planes)."
+                        checked={showPrices}
+                        onChange={setShowPrices}
+                    />
+                    <PriceToggleRow
+                        title="Precio según el plan elegido"
+                        description="Muestra el precio de cada plan y de los servicios especiales al elegirlos."
+                        checked={showServicePrices}
+                        onChange={setShowServicePrices}
+                    />
+                </div>
+            </div>
+
             <div className="flex justify-end">
                 <button
                     type="button"
@@ -351,7 +531,37 @@ export function PublicFormTab() {
     );
 }
 
-function FormInputLite({ value, onChange, placeholder, maxLength, inputMode, hint, ariaLabel }: {
+function TierLabel({ children }: { children: React.ReactNode }) {
+    // Solo en móvil: en escritorio la cabecera de columnas ya nombra cada campo.
+    return <span className="md:hidden block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 ml-1">{children}</span>;
+}
+
+function RemoveTierButton({ idx, onClick, className = '' }: { idx: number; onClick: () => void; className?: string }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            aria-label={`Eliminar rango ${idx + 1}`}
+            className={`${className} h-[42px] w-10 shrink-0 items-center justify-center text-red-400 hover:bg-red-500/10 rounded-xl transition-all`}
+        >
+            <Trash2 size={16} />
+        </button>
+    );
+}
+
+function PriceToggleRow({ title, description, checked, onChange }: { title: string; description: string; checked: boolean; onChange: (v: boolean) => void }) {
+    return (
+        <div className="flex items-center justify-between gap-4 py-3">
+            <div className="min-w-0">
+                <p className="text-sm font-medium">{title}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{description}</p>
+            </div>
+            <Toggle label={title} checked={checked} onChange={onChange} />
+        </div>
+    );
+}
+
+function FormInputLite({ value, onChange, placeholder, maxLength, inputMode, hint, ariaLabel, prefix, suffix }: {
     value: string;
     onChange: (v: string) => void;
     placeholder?: string;
@@ -359,19 +569,25 @@ function FormInputLite({ value, onChange, placeholder, maxLength, inputMode, hin
     inputMode?: 'decimal' | 'numeric';
     hint?: string;
     ariaLabel?: string;
+    prefix?: string;
+    suffix?: string;
 }) {
     return (
         <div>
-            <input
-                type="text"
-                value={value}
-                onChange={e => onChange(e.target.value)}
-                placeholder={placeholder}
-                maxLength={maxLength}
-                inputMode={inputMode}
-                aria-label={ariaLabel}
-                className="w-full bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 rounded-xl py-2.5 px-3 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all text-sm dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-white/30 dark:focus:border-primary/50 dark:focus:ring-0"
-            />
+            <div className="relative">
+                {prefix && <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 dark:text-white/40">{prefix}</span>}
+                <input
+                    type="text"
+                    value={value}
+                    onChange={e => onChange(e.target.value)}
+                    placeholder={placeholder}
+                    maxLength={maxLength}
+                    inputMode={inputMode}
+                    aria-label={ariaLabel}
+                    className={`w-full min-w-0 bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 rounded-xl py-2.5 outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all text-sm dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-white/30 dark:focus:border-primary/50 dark:focus:ring-0 ${prefix ? 'pl-7' : 'pl-3'} ${suffix ? 'pr-9' : 'pr-3'}`}
+                />
+                {suffix && <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400 dark:text-white/40">{suffix}</span>}
+            </div>
             {hint && <p className="text-[10px] text-muted-foreground mt-1 ml-1">{hint}</p>}
         </div>
     );

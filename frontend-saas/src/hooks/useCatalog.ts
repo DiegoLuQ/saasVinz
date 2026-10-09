@@ -19,6 +19,10 @@ export interface Service {
     price: number;
     cost: number;
     is_active: boolean;
+    /** Servicio especial (eutanasia, exhumación…): adicional en el formulario público */
+    is_special?: boolean;
+    /** Si la familia lo ve en el formulario (Configuración → Formulario y Pesos) */
+    show_in_form?: boolean;
 }
 
 export interface Plan {

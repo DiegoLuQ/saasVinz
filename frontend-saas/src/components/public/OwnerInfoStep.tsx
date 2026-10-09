@@ -132,6 +132,73 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
         }
     }, [data.pickupSameAsOwner, data.address, data.region, data.commune, data.veterinary, data.pickupRegion, data.pickupCommune, updateData]);
 
+    // Retiro y entrega en la misma dirección: se pide una sola vez (en el bloque de
+    // retiro) y el bloque de "Dirección de Entrega" se oculta.
+    const sameAddress = !!data.pickupSameAsOwner && f.address.visible && f.pickup.visible;
+    const showDeliveryAddress = f.address.visible && !sameAddress;
+
+    const addressFields = (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Calle y Número{fieldSuffix(f.address)}</label>
+                <input
+                    type="text"
+                    value={data.address}
+                    onChange={(e) => updateData({ address: e.target.value.slice(0, 70) })}
+                    className={`input-emotional ${errors.address ? 'border-red-500/50 focus:ring-red-500/10' : ''}`}
+                    placeholder="Ej: Av. Providencia 1234"
+                    maxLength={70}
+                />
+                {errors.address && <p className="text-[10px] text-red-500 mt-2 font-bold uppercase tracking-tight ml-2">! {errors.address}</p>}
+            </div>
+            <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Región{f.address.required ? ' *' : ''}</label>
+                <div className="relative">
+                    <select
+                        value={data.region || ''}
+                        onChange={(e) => {
+                            updateData({ region: e.target.value, commune: '' });
+                        }}
+                        className="input-emotional appearance-none cursor-pointer text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-950 pr-9"
+                    >
+                        <option value="">Selecciona...</option>
+                        {availableRegions.map((r: any) => (
+                            <option key={r.isoCode} value={r.name}>{r.name}</option>
+                        ))}
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+                </div>
+            </div>
+            <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Comuna (Opcional)</label>
+                {availableCommunes.length > 0 ? (
+                    <div className="relative">
+                        <select
+                            value={data.commune || ''}
+                            onChange={(e) => updateData({ commune: e.target.value })}
+                            className="input-emotional appearance-none cursor-pointer text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-950 pr-9"
+                        >
+                            <option value="">Selecciona...</option>
+                            {availableCommunes.map((c: any) => (
+                                <option key={c.name} value={c.name}>{c.name}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+                    </div>
+                ) : (
+                    <input
+                        type="text"
+                        value={data.commune || ''}
+                        onChange={(e) => updateData({ commune: e.target.value.slice(0, 50) })}
+                        className="input-emotional"
+                        placeholder="Ej: Providencia"
+                        maxLength={50}
+                    />
+                )}
+            </div>
+        </div>
+    );
+
     useEffect(() => {
         const fetchPartners = async () => {
             try {
@@ -305,8 +372,10 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                             <Sparkles size={16} className="text-amber-600 dark:text-amber-400" />
                         </div>
                         <div>
-                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">Lugar de Retiro</h3>
-                            <p className="text-[10px] text-slate-400 dark:text-slate-500">¿Dónde se encuentra ahora tu mascota?</p>
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">{sameAddress ? 'Dirección de Retiro y Entrega' : 'Lugar de Retiro'}</h3>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                                {sameAddress ? 'Retiramos a tu mascota y entregamos las cenizas aquí' : '¿Dónde se encuentra ahora tu mascota?'}
+                            </p>
                         </div>
                     </div>
 
@@ -319,16 +388,18 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                             className="w-4 h-4 accent-amber-600 cursor-pointer"
                         />
                         <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                            El retiro es en la misma dirección del tutor (dirección de entrega)
+                            Retiro y entrega de cenizas en la misma dirección
                         </span>
                     </label>
                     )}
 
-                    {data.pickupSameAsOwner && f.address.visible ? (
-                        <p className="text-[11px] text-slate-400 dark:text-slate-500 ml-1">
-                            Usaremos la dirección de entrega que indiques abajo.
-                            {errors.veterinary && !data.address && <span className="block text-red-500 font-bold mt-1">! Completa la dirección de entrega</span>}
-                        </p>
+                    {sameAddress ? (
+                        <>
+                            {addressFields}
+                            {errors.veterinary && !data.address && !errors.address && (
+                                <p className="text-[10px] text-red-500 mt-2 font-bold uppercase tracking-tight ml-2">! Indica la dirección</p>
+                            )}
+                        </>
                     ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                         <div className="sm:col-span-2">
@@ -394,9 +465,9 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
             </div>
             )}
 
-            {(f.address.visible || f.comments.visible || (SHOW_SERVICE_CODE && !hideServiceCode)) && (
+            {(showDeliveryAddress || f.comments.visible || (SHOW_SERVICE_CODE && !hideServiceCode)) && (
             <div className="form-card space-y-6">
-                {f.address.visible && (
+                {showDeliveryAddress && (
                 <div>
                     <div className="flex items-center gap-2 mb-6">
                         <div className="p-2 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg">
@@ -408,65 +479,7 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                        <div className="sm:col-span-2">
-                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Calle y Número{fieldSuffix(f.address)}</label>
-                            <input
-                                type="text"
-                                value={data.address}
-                                onChange={(e) => updateData({ address: e.target.value.slice(0, 70) })}
-                                className={`input-emotional ${errors.address ? 'border-red-500/50 focus:ring-red-500/10' : ''}`}
-                                placeholder="Ej: Av. Providencia 1234"
-                                maxLength={70}
-                            />
-                            {errors.address && <p className="text-[10px] text-red-500 mt-2 font-bold uppercase tracking-tight ml-2">! {errors.address}</p>}
-                        </div>
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Región{f.address.required ? ' *' : ''}</label>
-                            <div className="relative">
-                                <select
-                                    value={data.region || ''}
-                                    onChange={(e) => {
-                                        updateData({ region: e.target.value, commune: '' });
-                                    }}
-                                    className="input-emotional appearance-none cursor-pointer text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-950 pr-9"
-                                >
-                                    <option value="">Selecciona...</option>
-                                    {availableRegions.map((r: any) => (
-                                        <option key={r.isoCode} value={r.name}>{r.name}</option>
-                                    ))}
-                                </select>
-                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Comuna (Opcional)</label>
-                            {availableCommunes.length > 0 ? (
-                                <div className="relative">
-                                    <select
-                                        value={data.commune || ''}
-                                        onChange={(e) => updateData({ commune: e.target.value })}
-                                        className="input-emotional appearance-none cursor-pointer text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-950 pr-9"
-                                    >
-                                        <option value="">Selecciona...</option>
-                                        {availableCommunes.map((c: any) => (
-                                            <option key={c.name} value={c.name}>{c.name}</option>
-                                        ))}
-                                    </select>
-                                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-                                </div>
-                            ) : (
-                                <input
-                                    type="text"
-                                    value={data.commune || ''}
-                                    onChange={(e) => updateData({ commune: e.target.value.slice(0, 50) })}
-                                    className="input-emotional"
-                                    placeholder="Ej: Providencia"
-                                    maxLength={50}
-                                />
-                            )}
-                        </div>
-                    </div>
+                    {addressFields}
                 </div>
                 )}
 
@@ -485,7 +498,7 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                 )}
 
                 {f.comments.visible && (
-                <div className={f.address.visible ? 'pt-4 border-t border-slate-50 dark:border-slate-800/50' : ''}>
+                <div className={showDeliveryAddress ? 'pt-4 border-t border-slate-50 dark:border-slate-800/50' : ''}>
                     <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Comentarios / Referencias{fieldSuffix(f.comments)}</label>
                     <textarea
                         value={data.comments || ''}

@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { User, PawPrint, Package, Heart, Pencil, ImageIcon, Check, Sparkles, Gem, ChevronDown, Camera, Eye, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import FarewellPreview from '@/app/(tenant)/tenant/dashboard/documentos/disenos/components/FarewellPreview';
-import { DEFAULT_FORM_CONFIG, formatCLP, tierDisplay, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
+import { DEFAULT_FORM_CONFIG, formatCLP, tierDisplay, tierForWeight, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
 
 interface OwnerData {
     fullName: string;
@@ -16,6 +16,7 @@ interface OwnerData {
     region?: string;
     pickupRegion?: string;
     pickupCommune?: string;
+    pickupSameAsOwner?: boolean;
     rut?: string;
     comments?: string;
     veterinary?: string;
@@ -51,6 +52,7 @@ interface ServiceItem {
     price?: number;
     category?: string;
     sub_items?: SubItem[] | null;
+    is_special?: boolean;
 }
 
 interface Props {
@@ -143,7 +145,7 @@ function DataRow({ label, value }: { label: string; value?: string }) {
     );
 }
 
-function PlanAccordionItem({ item }: { item: ServiceItem }) {
+function PlanAccordionItem({ item, showPrice }: { item: ServiceItem; showPrice: boolean }) {
     const isPlan = (item.category || '').toLowerCase() === 'plan';
     const hasSubItems = item.sub_items && item.sub_items.length > 0;
     const [isOpen, setIsOpen] = useState(false);
@@ -163,6 +165,12 @@ function PlanAccordionItem({ item }: { item: ServiceItem }) {
                         {item.name}
                     </span>
                 </div>
+
+                {showPrice && item.price != null && item.price > 0 && (
+                    <span className="ml-auto mr-3 shrink-0 text-sm font-bold text-emerald-700 dark:text-emerald-400">
+                        {formatCLP(item.price)}
+                    </span>
+                )}
 
                 {(hasSubItems || item.description) && (
                     <button
@@ -229,7 +237,24 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
     const tierText = tier
         ? `${tierDisplay(tier)}${formConfig.show_weight_prices && tier.price != null ? ` · ${formatCLP(tier.price)}` : ''}`
         : null;
-    const selectedItems = services.filter(s => selectedServices.includes(s.id));
+    const sameAddress = !!ownerData.pickupSameAsOwner && f.pickup.visible && f.address.visible;
+    // Un adicional que ya viene en el plan elegido no se lista ni se cobra aparte.
+    const includedInPlan = new Set(
+        services
+            .filter(s => (s.category || '').toLowerCase() === 'plan' && selectedServices.includes(s.id))
+            .flatMap(p => (p.sub_items || []).map(i => i.id))
+    );
+    const selectedItems = services.filter(s => selectedServices.includes(s.id) && !includedInPlan.has(s.id));
+
+    // Total estimado: plan/servicios (si el crematorio muestra sus precios) + recargo
+    // por peso (si muestra los de los rangos). Con peso exacto se usa el rango que lo cubre.
+    const showServicePrices = formConfig.show_service_prices;
+    const showWeightPrices = formConfig.show_weight_prices;
+    const servicesTotal = selectedItems.reduce((sum, s) => sum + (s.price || 0), 0);
+    const weightTierForPrice = tier ?? (petData.weightKg ? tierForWeight(weightTiers, parseFloat(petData.weightKg.replace(',', '.'))) : null);
+    const weightSurcharge = showWeightPrices && f.weight.visible ? (weightTierForPrice?.price ?? 0) : 0;
+    const showTotal = (showServicePrices && servicesTotal > 0) || weightSurcharge > 0;
+    const estimatedTotal = (showServicePrices ? servicesTotal : 0) + weightSurcharge;
     const [showFarewellModal, setShowFarewellModal] = useState(false);
 
     const primaryImageBlobUrl = useMemo(() => {
@@ -288,7 +313,7 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
                     <DataRow label="Teléfono" value={ownerData.phone} />
                     {f.rut.visible && ownerData.rut && <DataRow label="RUT" value={ownerData.rut} />}
                     {/* Retiro y entrega con la misma estructura: dirección, comuna, región */}
-                    {f.pickup.visible && ownerData.veterinary && (
+                    {f.pickup.visible && ownerData.veterinary && !sameAddress && (
                         <DataRow
                             label="Lugar de Retiro"
                             value={[ownerData.veterinary, ownerData.pickupCommune, ownerData.pickupRegion].filter(Boolean).join(', ')}
@@ -296,7 +321,7 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
                     )}
                     {f.address.visible && (
                         <DataRow
-                            label="Dirección Entrega"
+                            label={sameAddress ? 'Retiro y Entrega' : 'Dirección Entrega'}
                             value={[ownerData.address, ownerData.commune, ownerData.region].filter(Boolean).join(', ')}
                         />
                     )}
@@ -328,7 +353,7 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
                 {selectedItems.length > 0 ? (
                     <div className="space-y-3">
                         {selectedItems.map(item => (
-                            <PlanAccordionItem key={item.id} item={item} />
+                            <PlanAccordionItem key={item.id} item={item} showPrice={showServicePrices} />
                         ))}
                     </div>
                 ) : (
@@ -337,6 +362,37 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
                     </p>
                 )}
             </SectionCard>
+
+            {showTotal && (
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3, duration: 0.4 }}
+                    className="rounded-3xl border border-emerald-200/80 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/20 px-6 py-5"
+                >
+                    <div className="space-y-1.5 text-sm text-slate-600 dark:text-slate-300">
+                        {showServicePrices && selectedItems.filter(s => (s.price || 0) > 0).map(s => (
+                            <div key={s.id} className="flex justify-between gap-3">
+                                <span className="min-w-0 truncate">{s.name}</span>
+                                <span className="shrink-0">{formatCLP(s.price || 0)}</span>
+                            </div>
+                        ))}
+                        {weightSurcharge > 0 && (
+                            <div className="flex justify-between gap-3">
+                                <span className="min-w-0 truncate">Recargo por peso{weightTierForPrice ? ` (${weightTierForPrice.label || weightTierForPrice.range_text})` : ''}</span>
+                                <span className="shrink-0">{formatCLP(weightSurcharge)}</span>
+                            </div>
+                        )}
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-emerald-200/80 dark:border-emerald-900/40 flex items-baseline justify-between gap-3">
+                        <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">Total estimado</span>
+                        <span className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400">{formatCLP(estimatedTotal)}</span>
+                    </div>
+                    {!showWeightPrices && f.weight.visible && (
+                        <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">El crematorio confirmará el recargo por peso, si corresponde.</p>
+                    )}
+                </motion.div>
+            )}
 
             {/* 4. Fotos y Dedicatoria */}
             <SectionCard icon={Heart} title="Recuerdos" step={4} onEdit={onEditStep}>

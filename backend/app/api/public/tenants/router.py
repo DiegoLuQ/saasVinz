@@ -50,6 +50,7 @@ class ServicePublicInfo(BaseModel):
     category: str | None = None
     image_url: str | None = None  # Solo planes (catálogo); servicios/productos lo dejan None
     sub_items: list[dict] | None = None
+    is_special: bool = False  # adicional ofrecido tras elegir el plan
 
     class Config:
         from_attributes = True
@@ -75,13 +76,17 @@ def get_tenant_services(slug: str, db: Session = Depends(get_db)):
         models.Service.is_active == True
     ).all()
     for s in services:
+        # Un especial oculto en el formulario no se publica.
+        if s.is_special and not s.show_in_form:
+            continue
         all_items.append({
             "id": f"svc_{s.id}",
             "name": s.name,
             "description": s.description,
             "price": s.price,
             "category": "servicio",
-            "sub_items": None
+            "sub_items": None,
+            "is_special": bool(s.is_special),
         })
         
     # Fetch Plans

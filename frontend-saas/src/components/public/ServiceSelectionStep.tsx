@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import {
     Check,
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { API_BASE_URL } from '@/lib/api';
+import { formatCLP } from '@/lib/publicFormConfig';
 
 export interface SubItem {
     id: string;
@@ -30,12 +31,25 @@ export interface Service {
     category?: 'servicio' | 'plan' | 'producto';
     image_url?: string | null;
     sub_items?: SubItem[] | null;
+    /** Servicio especial (eutanasia, exhumación…): adicional tras elegir el plan */
+    is_special?: boolean;
+}
+
+/** ids de servicios ya incluidos en los planes seleccionados (no se cobran aparte). */
+export function servicesIncludedInPlans(services: Service[], selectedIds: string[]): Set<string> {
+    const ids = new Set<string>();
+    services
+        .filter(s => (s.category || '').toLowerCase() === 'plan' && selectedIds.includes(s.id))
+        .forEach(p => p.sub_items?.forEach(i => ids.add(i.id)));
+    return ids;
 }
 
 interface ServiceSelectionStepProps {
     services: Service[];
     selectedServices: string[];
     toggleService: (id: string, singleSelect?: boolean) => void;
+    /** El crematorio muestra el precio de planes/servicios (form_config.show_service_prices) */
+    showPrices?: boolean;
 }
 
 function resolveImageUrl(url?: string | null): string | null {
@@ -58,20 +72,31 @@ function getPlanThumbnail(service: Service | null | undefined): string | null {
 export default function ServiceSelectionStep({
     services,
     selectedServices,
-    toggleService
+    toggleService,
+    showPrices = false,
 }: ServiceSelectionStepProps) {
     const [viewingPlan, setViewingPlan] = useState<Service | null>(null);
 
-    const { itemsToShow, isFallback } = useMemo(() => {
+    const { itemsToShow, isFallback, specials } = useMemo(() => {
+        const specials = services.filter(s => s.is_special);
         const plans = services.filter(s => (s.category || '').toLowerCase() === 'plan');
-        const others = services.filter(s => (s.category || '').toLowerCase() !== 'plan');
-        if (plans.length > 0) return { itemsToShow: plans, isFallback: false };
-        return { itemsToShow: others, isFallback: true };
+        const others = services.filter(s => (s.category || '').toLowerCase() !== 'plan' && !s.is_special);
+        if (plans.length > 0) return { itemsToShow: plans, isFallback: false, specials };
+        return { itemsToShow: others, isFallback: true, specials };
     }, [services]);
+
+    const includedInPlan = useMemo(() => servicesIncludedInPlans(services, selectedServices), [services, selectedServices]);
+
+    // Si el plan elegido ya trae un adicional marcado, se desmarca (no se cobra dos veces).
+    useEffect(() => {
+        specials.forEach(s => {
+            if (includedInPlan.has(s.id) && selectedServices.includes(s.id)) toggleService(s.id);
+        });
+    }, [specials, includedInPlan, selectedServices, toggleService]);
 
     const planHeroImage = useMemo(() => getPlanThumbnail(viewingPlan), [viewingPlan]);
 
-    if (itemsToShow.length === 0) {
+    if (itemsToShow.length === 0 && specials.length === 0) {
         return (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="text-center mb-10">
@@ -167,6 +192,11 @@ export default function ServiceSelectionStep({
                                             }`}>
                                                 {service.name}
                                             </h3>
+                                            {showPrices && service.price != null && service.price > 0 && (
+                                                <p className="mt-1 text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                                                    {formatCLP(service.price)}
+                                                </p>
+                                            )}
                                             {service.description && (
                                                 <p className="text-sm text-slate-500 dark:text-slate-400 font-normal mt-1 leading-relaxed">
                                                     {service.description}
@@ -204,6 +234,55 @@ export default function ServiceSelectionStep({
                     );
                 })}
             </div>
+
+            {/* Servicios especiales: adicionales que se suman al plan */}
+            {specials.length > 0 && (
+                <div className="space-y-3 pt-2">
+                    <div className="text-center">
+                        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">¿Necesitas algún servicio adicional?</h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Opcional. Puedes elegir más de uno.</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {specials.map(s => {
+                            const included = includedInPlan.has(s.id);
+                            const isSelected = included || selectedServices.includes(s.id);
+                            return (
+                                <button
+                                    key={s.id}
+                                    type="button"
+                                    disabled={included}
+                                    aria-pressed={isSelected}
+                                    onClick={() => toggleService(s.id)}
+                                    className={`text-left rounded-2xl border-2 p-4 flex gap-3 transition-all ${
+                                        isSelected
+                                            ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/20'
+                                            : 'border-slate-200 bg-white dark:bg-slate-900/80 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-500/50'
+                                    } ${included ? 'cursor-default opacity-90' : 'cursor-pointer'}`}
+                                >
+                                    <span className={`shrink-0 mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center ${
+                                        isSelected ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950'
+                                    }`}>
+                                        {isSelected && <Check size={12} className="text-white" strokeWidth={3} />}
+                                    </span>
+                                    <span className="flex-1 min-w-0">
+                                        <span className="flex items-start justify-between gap-2">
+                                            <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{s.name}</span>
+                                            {included ? (
+                                                <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Incluido en tu plan</span>
+                                            ) : showPrices && s.price != null && s.price > 0 && (
+                                                <span className="shrink-0 text-sm font-bold text-emerald-600 dark:text-emerald-400">{formatCLP(s.price)}</span>
+                                            )}
+                                        </span>
+                                        {s.description && (
+                                            <span className="block text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{s.description}</span>
+                                        )}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* Modal Premium */}
             <AnimatePresence>
@@ -268,6 +347,11 @@ export default function ServiceSelectionStep({
                                         </h3>
                                     </div>
                                 </div>
+                            )}
+                            {showPrices && viewingPlan.price != null && viewingPlan.price > 0 && (
+                                <p className="px-6 sm:px-8 pt-5 text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                                    {formatCLP(viewingPlan.price)}
+                                </p>
                             )}
 
                             <div className="p-6 sm:p-8 space-y-6 overflow-y-auto">

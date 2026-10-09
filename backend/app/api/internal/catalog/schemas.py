@@ -60,6 +60,8 @@ class ServiceBase(BaseModel):
     price: float
     cost: float = 0.0
     is_active: bool = True
+    is_special: bool = False
+    show_in_form: bool = True
 
 class ServiceCreate(ServiceBase):
     pass
@@ -70,6 +72,8 @@ class ServiceUpdate(BaseModel):
     price: Optional[float] = None
     cost: Optional[float] = None
     is_active: Optional[bool] = None
+    is_special: Optional[bool] = None
+    show_in_form: Optional[bool] = None
 
 class ServiceInDB(ServiceBase):
     id: int

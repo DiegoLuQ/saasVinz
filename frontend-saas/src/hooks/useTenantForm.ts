@@ -260,11 +260,13 @@ export function useTenantForm(
                     setFarewellTemplate(farewellData);
                 }
 
-                // Si hay planes configurados, asegurar que solo haya máximo 1 plan seleccionado
-                const hasPlans = servicesData.some(s => (s.category || '').toLowerCase() === 'plan');
-                if (hasPlans) {
-                    setSelectedServices(prev => (prev.length > 1 ? [prev[0]] : prev));
-                }
+                // Máximo 1 plan seleccionado (los servicios adicionales se conservan)
+                // y fuera los ítems que ya no se publican.
+                const publishedIds = new Set(servicesData.map(s => s.id));
+                setSelectedServices(prev => {
+                    const firstPlan = prev.find(id => id.startsWith('plan_'));
+                    return prev.filter(id => publishedIds.has(id) && (!id.startsWith('plan_') || id === firstPlan));
+                });
 
                 if (tokenData?.expired) {
                     setIsExpired(true);
@@ -427,7 +429,10 @@ export function useTenantForm(
     const toggleService = useCallback((id: string, singleSelect: boolean = false) => {
         setSelectedServices(prev => {
             if (singleSelect) {
-                return prev.includes(id) ? [] : [id];
+                // Un solo ítem de su tipo (plan_*, svc_*…): los adicionales de otro tipo se mantienen.
+                const kind = id.split('_')[0];
+                const others = prev.filter(sid => sid.split('_')[0] !== kind);
+                return prev.includes(id) ? others : [...others, id];
             }
             return prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id];
         });

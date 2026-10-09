@@ -64,6 +64,9 @@ class Service(Base):
     price = Column(Float)
     cost = Column(Float, default=0.0)
     is_active = Column(Boolean, default=True)
+    # Servicio especial (eutanasia, exhumación…): adicional en el formulario público
+    is_special = Column(Boolean, nullable=False, default=False, server_default='false')
+    show_in_form = Column(Boolean, nullable=False, default=True, server_default='true')
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
 
     __table_args__ = (
