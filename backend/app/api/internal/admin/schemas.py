@@ -467,6 +467,7 @@ class SaaSConfigBase(BaseModel):
     pais: Optional[str] = None
     whatsapp: Optional[str] = None
     correo: Optional[str] = None
+    notification_email: Optional[str] = None
     redes_sociales: List[dict] = []
     imagenes: List[str] = []
 
@@ -487,8 +488,24 @@ class SaaSConfigUpdate(BaseModel):
     pais: Optional[str] = None
     whatsapp: Optional[str] = None
     correo: Optional[str] = None
+    notification_email: Optional[str] = None
     redes_sociales: Optional[List[dict]] = None
     imagenes: Optional[List[str]] = None
+
+    @field_validator('notification_email')
+    @classmethod
+    def _clean_notification_email(cls, v: Optional[str]) -> Optional[str]:
+        """Uno o varios correos separados por coma (máx. 5); vacío = usar MAIL_FROM."""
+        if v is None:
+            return None
+        import re
+        emails = [e.strip() for e in v.replace(';', ',').split(',') if e.strip()]
+        if len(emails) > 5:
+            raise ValueError('Máximo 5 correos.')
+        bad = [e for e in emails if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", e)]
+        if bad:
+            raise ValueError(f"Correo no válido: {bad[0]}")
+        return ', '.join(emails)
 
 class SaaSConfigInDB(SaaSConfigBase):
     id: int

@@ -5,7 +5,9 @@ export async function POST(request: NextRequest) {
     try {
         // Purge Next.js cache tags and paths associated with the landing page
         (revalidateTag as any)('landing-config');
+        (revalidateTag as any)('public-plans');
         revalidatePath('/vinzer');
+        revalidatePath('/vinzer/comparar-planes');
         revalidatePath('/');
 
         return NextResponse.json({

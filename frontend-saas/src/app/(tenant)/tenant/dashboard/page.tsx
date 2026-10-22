@@ -35,6 +35,7 @@ import { useDashboardSummary, type DashboardOrder, type DashboardSummary } from 
 import { useCurrentUser, useInitialSubmissions, type BootstrapSubmissionData } from '@/hooks/useSessionBootstrap';
 import QuickRegistrationModal from '@/components/tenant/dashboard/QuickRegistrationModal';
 import QuickTrackingModal from '@/components/tenant/dashboard/QuickTrackingModal';
+import DashboardHeroCarousel from '@/components/tenant/dashboard/DashboardHeroCarousel';
 import { useFeatures } from '@/hooks/useFeatures';
 
 const OWNER_ROLES = ['admin', 'contabilidad', 'creator'];
@@ -185,29 +186,8 @@ export default function DashboardPage() {
                 </button>
             </div>
 
-            {/* 1. HERO BANNER PANORÁMICO (Exacto al diseño de la imagen) */}
-            <div className="relative overflow-hidden rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 min-h-[190px] sm:min-h-[220px] flex items-center bg-[#D8EDFA] dark:bg-[#0B1628]">
-                {/* Imagen de fondo nubes & mascotas celestiales */}
-                <div
-                    className="absolute inset-0 bg-cover bg-no-repeat bg-right dark:opacity-75"
-                    style={{
-                        backgroundImage: `url('/images/vinzer-hero-banner.jpg')`,
-                        backgroundPosition: 'right 20% center',
-                    }}
-                />
-
-                {/* Degrade suave a la izquierda para máxima legibilidad del texto */}
-                <div className="absolute inset-0 bg-gradient-to-r from-[#D8EDFA] via-[#D8EDFA]/85 to-transparent sm:w-2/3 dark:from-[#0B1628] dark:via-[#0B1628]/85" />
-
-                <div className="relative z-10 px-6 sm:px-10 py-6 max-w-xl">
-                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#0A192F] tracking-tight leading-tight dark:text-white">
-                        Cada historia<br />merece un adiós digno
-                    </h1>
-                    <p className="mt-2.5 text-xs sm:text-sm text-slate-600 font-medium leading-relaxed max-w-md dark:text-slate-300">
-                        Gestiona de forma simple y segura todo el proceso de cremación de mascotas.
-                    </p>
-                </div>
-            </div>
+            {/* 1. Banner del inicio: carrusel editable desde el admin (Configuración → Banner del panel) */}
+            <DashboardHeroCarousel />
 
             {/* Solicitudes web pendientes (Alerta compacta si existen) */}
             {pendingSubmissions.length > 0 && (

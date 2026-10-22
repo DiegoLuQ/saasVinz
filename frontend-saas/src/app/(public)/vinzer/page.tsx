@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Metadata } from 'next';
 import VinzerLandingClient from '@/components/vinzer/VinzerLandingClient';
-import { fetchPublicPlans } from '@/lib/api/plans';
+import { fetchPlanHighlights, fetchPublicPlans } from '@/lib/api/plans';
 import { VINZER_FAQS } from '@/lib/vinzer-faqs';
 import { SITE_URL } from '@/lib/vinzer/site';
 
@@ -69,7 +69,7 @@ export default async function VinzerLandingPage() {
 
     // Los planes se leen en el servidor para que los precios queden en el HTML
     // (SEO) y salgan de la misma tabla que aplica los topes en el backend.
-    const plans = await fetchPublicPlans();
+    const [plans, highlights] = await Promise.all([fetchPublicPlans(), fetchPlanHighlights()]);
 
     try {
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -89,7 +89,7 @@ export default async function VinzerLandingPage() {
         <>
             {/* Structured Schema JSON-LD can be here */}
             <VinzerLandingPageSchema />
-            <VinzerLandingClient initialConfig={config} initialPlans={plans} />
+            <VinzerLandingClient initialConfig={config} initialPlans={plans} initialHighlights={highlights} />
         </>
     );
 }

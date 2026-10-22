@@ -63,7 +63,7 @@ function PlanSelectionCard({
                                             {plan.name}
                                         </h3>
                                         <p className="text-white/40 text-xs font-medium">
-                                            Hasta {plan.max_pets} mascotas/mes
+                                            Hasta {plan.max_orders} órdenes/mes
                                         </p>
                                     </div>
                                     <div className="text-right">

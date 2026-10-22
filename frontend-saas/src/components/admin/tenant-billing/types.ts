@@ -48,7 +48,7 @@ export interface PlanInfo {
     id: number | string;
     name: string;
     price: number;
-    max_pets?: number;
+    max_orders?: number;
 }
 
 export const getPlanStyle = (planName?: string) =>

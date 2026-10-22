@@ -1,8 +1,11 @@
 import React from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowLeft, Check, Minus, Star, Heart, Flame, Shield, HelpCircle } from 'lucide-react';
+import { ArrowLeft, Check, Minus, Star } from 'lucide-react';
 import { VinzerLogo } from '@/components/vinzer/VinzerLogo';
+import { fetchPlanHighlights, fetchPublicPlans, type PlanHighlight, type PublicPlan } from '@/lib/api/plans';
+import { planCta, VINZER_WHATSAPP, type PlanCtaKind } from '@/lib/vinzer/planCta';
+import { ComparePlansScroller } from '@/components/vinzer/ComparePlansScroller';
 
 export const metadata: Metadata = {
     title: 'Comparar Planes | Vinzer',
@@ -13,74 +16,109 @@ export const metadata: Metadata = {
     }
 };
 
-interface FeatureRow {
-    name: string;
-    description: string;
-    free: string | boolean;
-    track: string | boolean;
-    normal: string | boolean;
-    pro: string | boolean;
-    ultra: string | boolean;
-}
+const WHATSAPP_BASE = VINZER_WHATSAPP;
 
-interface FeatureCategory {
-    category: string;
-    features: FeatureRow[];
-}
+const CTA_CLASS: Record<PlanCtaKind, string> = {
+    free: 'bg-emerald-500 hover:bg-emerald-400 text-[#020210]',
+    self: 'bg-white hover:bg-slate-200 text-[#020210]',
+    recommended: 'bg-[#19B5FE] hover:bg-[#19B5FE]/90 text-[#020210] shadow-md shadow-[#19B5FE]/20',
+    sales: 'bg-[#E0B84D]/10 border border-[#E0B84D]/40 hover:bg-[#E0B84D] hover:text-[#020210] text-[#E0B84D]',
+};
 
-const comparisonData: FeatureCategory[] = [
-    {
-        category: "Precios y Facturación",
-        features: [
-            { name: "Precio Mensual", description: "Valor cobrado de forma mensual en pesos chilenos (CLP)", free: "$0 / mes", track: "$29.900 / mes", normal: "$39.900 / mes", pro: "$59.990 / mes", ultra: "$119.000 / mes" },
-            { name: "Pago Anual", description: "Valor anual equivalente (ahorro de hasta 2 meses)", free: "No disponible", track: "No disponible", normal: "$299.900 / año", pro: "$599.900 / año", ultra: "$999.900 / año" },
-            { name: "Periodo mínimo", description: "Compromiso mínimo de permanencia", free: "Sin contrato", track: "Sin contrato", normal: "Sin contrato", pro: "Sin contrato", ultra: "Sin contrato" },
-        ]
-    },
-    {
-        category: "Volumen y Capacidad",
-        features: [
-            { name: "Mascotas al mes", description: "Cantidad máxima de mascotas que puedes registrar por mes calendario", free: "10 / mes", track: "35 / mes", normal: "40 / mes", pro: "60 / mes", ultra: "200 / mes" },
-            { name: "Órdenes de cremación al mes", description: "Cantidad máxima de órdenes que puedes ingresar por mes calendario", free: "10 / mes", track: "35 / mes", normal: "40 / mes", pro: "60 / mes", ultra: "250 / mes" },
-            { name: "Usuarios incluidos", description: "Cuentas de usuario para tu personal con roles asignables", free: "2 usuarios", track: "2 usuarios", normal: "3 usuarios", pro: "4 usuarios", ultra: "5 usuarios" },
-            { name: "Clientes nuevos al mes", description: "Cantidad máxima de clientes que puedes dar de alta por mes calendario", free: "10 / mes", track: "35 / mes", normal: "40 / mes", pro: "60 / mes", ultra: "100 / mes" },
-        ]
-    },
-    {
-        category: "Módulos y Funciones Operativas",
-        features: [
-            { name: "CRM de Clientes y Mascotas", description: "Base de datos con datos de contacto, RUT, especie, raza y peso", free: true, track: false, normal: true, pro: true, ultra: true },
-            { name: "Catálogo y Servicios", description: "Configuración de productos, urnas, servicios adicionales y precios", free: true, track: true, normal: true, pro: true, ultra: true },
-            { name: "Control de Inventario", description: "Gestión de existencias de productos físicos y urnas", free: true, track: true, normal: true, pro: true, ultra: true },
-            { name: "Flujo Operativo (Workflow)", description: "Registro del paso a paso de cada servicio con firmas del operador", free: false, track: true, normal: true, pro: true, ultra: true },
-            { name: "Evidencia Fotográfica", description: "Subir fotografías de respaldo por cada fase completada", free: false, track: true, normal: true, pro: true, ultra: true },
-            { name: "Plan de Tracking Público", description: "Línea de tiempo pública con token único para que la familia vea el estado actual sin login", free: "Básico (sin fotos)", track: true, normal: true, pro: true, ultra: true },
-            { name: "Certificados de Cremación PDF", description: "Generación de certificado en PDF desde plantilla personalizable, con marca de agua y espacio de firma", free: false, track: false, normal: true, pro: true, ultra: true },
-            { name: "Memoriales Digitales Personalizados", description: "Homenaje digital para las familias con dedicatorias, fotos, encendido de velas y personalización", free: false, track: false, normal: true, pro: true, ultra: true },
-            { name: "Buzón de Dedicatorias Moderado", description: "Filtro de aprobación por el crematorio de los mensajes familiares antes de publicarse", free: false, track: false, normal: true, pro: true, ultra: true },
-        ]
-    },
-    {
-        category: "Administración y Seguridad",
-        features: [
-            { name: "Aislamiento de Datos Multi-Tenant", description: "Garantía de privacidad: tus datos están aislados lógicamente de otros crematorios", free: true, track: true, normal: true, pro: true, ultra: true },
-            { name: "Roles de Usuario Granulares (RBAC)", description: "Roles para administración, conductores, recepción, operadores, auditor, etc.", free: true, track: true, normal: true, pro: true, ultra: true },
-            { name: "Registro de Auditoría (Audit-Log)", description: "Registro interno de las acciones realizadas por cada usuario", free: true, track: true, normal: true, pro: true, ultra: true },
-            { name: "Exportación de Datos Excel/CSV", description: "Descarga de reportes operativos, financieros e información de clientes", free: false, track: false, normal: false, pro: true, ultra: true },
-            { name: "Analítica y Reportes Avanzados", description: "Gráficos de volumen de servicios, productos más vendidos y rendimientos de operarios", free: false, track: false, normal: false, pro: false, ultra: true },
-        ]
-    },
-    {
-        category: "Soporte y Garantías",
-        features: [
-            { name: "Soporte Técnico por Email", description: "Canal de soporte estándar", free: "Soporte Comunitario", track: "Soporte Regular", normal: "Soporte Regular", pro: "Soporte Prioritario", ultra: "Soporte Dedicado" },
-            { name: "Soporte por WhatsApp", description: "Comunicación directa por chat en tiempo real", free: false, track: false, normal: false, pro: true, ultra: true },
-            { name: "Capacitación de Personal", description: "Sesiones de onboarding para el uso de la plataforma por tu equipo", free: false, track: false, normal: "Videotutoriales", pro: "1 Sesión en Vivo", ultra: "Acompañamiento Completo" },
-        ]
+/** Mismo orden que las tarjetas de la landing; FREE va primero en la tabla. */
+const PLAN_ORDER = ['FREE', 'TRACK', 'NORMAL', 'PRO', 'ULTRA'];
+
+const formatCLP = (value: number) => new Intl.NumberFormat('es-CL').format(Math.round(value));
+
+type Cell = string | boolean;
+interface Row { name: string; description?: string; cells: Cell[] }
+interface Section { category: string; rows: Row[] }
+
+async function fetchAnnualDiscount(): Promise<{ pct: number; launch: boolean } | null> {
+    try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const r = await fetch(`${baseUrl}/api/public/plans/annual-discount`, { next: { revalidate: 300, tags: ['public-plans'] } });
+        return r.ok ? await r.json() : null;
+    } catch {
+        return null;
     }
-];
+}
 
-export default function CompararPlanesPage() {
+/**
+ * Tabla comparativa completa. Precios, topes y funciones salen de la base:
+ * las funciones son las marcadas en Admin → Planes → «Funciones en la web», y
+ * qué plan tiene cada una se calcula de sus módulos y características.
+ */
+export default async function CompararPlanesPage() {
+    const [rawPlans, highlights, discount] = await Promise.all([fetchPublicPlans(), fetchPlanHighlights(), fetchAnnualDiscount()]);
+    const plans: PublicPlan[] = [...(rawPlans ?? [])].sort((a, b) => {
+        const ia = PLAN_ORDER.indexOf(a.name.toUpperCase());
+        const ib = PLAN_ORDER.indexOf(b.name.toUpperCase());
+        if (ia === -1 && ib === -1) return a.price - b.price;
+        if (ia === -1) return 1;
+        if (ib === -1) return -1;
+        return ia - ib;
+    });
+    const pct = discount?.pct ?? 0;
+
+    // Créditos IA: precio del crédito adicional por plan (CLP con el tipo de cambio fijo).
+    const creditPrices = plans.map((p) => p.ai_extra_credit_clp ?? 0).filter((v) => v > 0);
+    const maxCredit = Math.max(0, ...creditPrices);
+    const minCredit = creditPrices.length ? Math.min(...creditPrices) : 0;
+    const usesAi = (p: PublicPlan) => (p.ai_monthly_credits ?? 0) > 0 || !!p.offers?.includes('certificados:redes');
+
+    const sections: Section[] = [
+        {
+            category: 'Precios y facturación',
+            rows: [
+                { name: 'Precio mensual', description: 'Valor mensual en pesos chilenos (CLP)', cells: plans.map((p) => (p.price > 0 ? `$${formatCLP(p.price)} / mes` : 'Gratis')) },
+                {
+                    name: 'Pago anual',
+                    description: pct > 0 ? `Pagando el año completo tienes ${pct} % de descuento` : 'Valor del año completo',
+                    cells: plans.map((p) => (p.price > 0 && p.annual_price ? `$${formatCLP(p.annual_price)} / año` : p.price > 0 ? 'Solo mensual' : 'No aplica')),
+                },
+                { name: 'Permanencia mínima', description: 'Compromiso de permanencia', cells: plans.map(() => 'Sin contrato') },
+            ],
+        },
+        {
+            category: 'Volumen y capacidad',
+            rows: [
+                { name: 'Órdenes de cremación al mes', description: 'Órdenes que puedes ingresar por mes calendario', cells: plans.map((p) => `${p.max_orders} / mes`) },
+                { name: 'Usuarios incluidos', description: 'Cuentas para tu equipo', cells: plans.map((p) => `${p.max_users} ${p.max_users === 1 ? 'usuario' : 'usuarios'}`) },
+                {
+                    name: 'Créditos de homenaje IA incluidos',
+                    description: '1 crédito = 1 diseño con IA para una mascota. Se renuevan cada mes.',
+                    cells: plans.map((p) => {
+                        const n = p.ai_monthly_credits ?? 0;
+                        return n > 0 ? `${n} créditos / mes · hasta ${n} ${n === 1 ? 'mascota' : 'mascotas'}` : 'No incluye';
+                    }),
+                },
+                {
+                    name: 'Valor crédito adicional (recarga)',
+                    description: 'Precio por crédito extra, en pesos chilenos. No vence.',
+                    cells: plans.map((p) => {
+                        const clp = p.ai_extra_credit_clp ?? 0;
+                        if (!clp) return false;
+                        const tier = creditPrices.length > 1 && clp === minCredit ? ' · tarifa mayorista'
+                            : clp < maxCredit ? ' · tarifa preferencial' : '';
+                        return `$${formatCLP(clp)} CLP c/u${tier}`;
+                    }),
+                },
+                {
+                    name: 'Intentos por diseño',
+                    description: 'Cada crédito permite volver a generar el diseño',
+                    cells: plans.map((p) => (usesAi(p) ? `Hasta ${p.ai_attempts_per_credit ?? 3} intentos por plantilla` : false)),
+                },
+            ],
+        },
+        ...groupHighlights(highlights ?? []).map(([group, items]) => ({
+            category: group,
+            rows: items.map((h) => ({ name: h.label, description: h.description || undefined, cells: plans.map((p) => !!p.offers?.includes(h.key)) })),
+        })),
+    ];
+
+    const highlightCol = plans.findIndex((p) => p.name.toUpperCase() === 'PRO');
+
     return (
         <div className="min-h-screen bg-[#020210] text-[#FFFFFF] font-sans antialiased overflow-x-hidden relative selection:bg-[#19B5FE]/30 selection:text-[#FFFFFF] pb-20">
             {/* Luces de Fondo (Glows) */}
@@ -94,17 +132,15 @@ export default function CompararPlanesPage() {
                 <Link href="/">
                     <VinzerLogo size="md" />
                 </Link>
-                <Link 
-                    href="/"
+                <Link
+                    href="/#planes"
                     className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-[#FFFFFF] transition-colors"
                 >
-                    <ArrowLeft size={14} /> Volver al inicio
+                    <ArrowLeft size={14} /> Volver a los planes
                 </Link>
             </header>
 
-            {/* Main Content */}
             <main className="relative z-10 max-w-7xl mx-auto px-6 mt-12 md:mt-20">
-                {/* Hero Section */}
                 <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#E0B84D]/10 border border-[#E0B84D]/20 rounded-full">
                         <Star size={12} className="text-[#E0B84D]" />
@@ -114,163 +150,112 @@ export default function CompararPlanesPage() {
                         Encuentra el plan perfecto para tu crematorio.
                     </h1>
                     <p className="text-slate-400 font-medium">
-                        Conoce las diferencias y límites detallados de cada una de nuestras versiones. Sin sorpresas, transparencia absoluta.
+                        Conoce las diferencias y límites detallados de cada plan. Sin sorpresas, transparencia absoluta.
                     </p>
-                </div>
- 
-                {/* Hint de scroll: en móvil la tabla (900px) excede el viewport y sin
-                    esta señal el usuario solo ve la columna FREE sin saber que hay más */}
-                <div className="xl:hidden flex items-center justify-center gap-2 mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                    Desliza para comparar los 5 planes
-                    <ArrowLeft size={12} className="rotate-180" />
+                    {pct > 0 && discount?.launch && (
+                        <p className="text-xs font-semibold text-emerald-300">
+                            Precio de lanzamiento: {pct} % de descuento pagando anual, para siempre mientras sigas con tu plan anual.
+                        </p>
+                    )}
                 </div>
 
-                {/* Table wrapper for responsiveness */}
-                <div className="w-full overflow-x-auto border border-white/10 rounded-3xl bg-[#0b0a24]/60 backdrop-blur-md shadow-2xl">
-                    <table className="w-full min-w-[900px] border-collapse text-left">
-                        {/* Table Header */}
-                        <thead>
-                            <tr className="border-b border-white/10 bg-[#020210]/80">
-                                {/* sticky: la columna de etiquetas queda fija al deslizar
-                                    horizontalmente (bg opaco para tapar las celdas de abajo) */}
-                                <th className="p-6 text-xs font-bold uppercase tracking-wider text-slate-400 w-1/4 min-w-[150px] sticky left-0 z-20 bg-[#020210]">Característica</th>
-                                
-                                {/* FREE Column */}
-                                <th className="p-6 text-center w-[15%]">
-                                    <div className="space-y-1">
-                                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Básico</span>
-                                        <h3 className="text-sm font-bold text-[#FFFFFF]">FREE</h3>
-                                        <p className="text-[10px] font-bold text-[#19B5FE]">$0 CLP / mes</p>
-                                        <a href="https://wa.me/56982395940?text=Hola,%20me%20gustaría%20solicitar%20el%20plan%20Free%20de%20Vinzer." target="_blank" rel="noopener noreferrer" className="inline-block mt-3 px-4 py-1.5 bg-white/5 hover:bg-white/10 text-[#FFFFFF] rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all border border-white/10">
-                                            Conversemos
-                                        </a>
-                                    </div>
-                                </th>
- 
-                                {/* TRACK Column */}
-                                <th className="p-6 text-center w-[15%] border-x border-white/5">
-                                    <div className="space-y-1">
-                                        <span className="text-[9px] font-bold text-[#19B5FE] uppercase tracking-widest">Operaciones</span>
-                                        <h3 className="text-sm font-bold text-[#FFFFFF]">TRACK</h3>
-                                        <p className="text-[10px] font-bold text-[#19B5FE]">$29.900 CLP</p>
-                                        <a href="https://wa.me/56982395940?text=Hola,%20me%20gustaría%20cotizar%20el%20plan%20Track%20de%20Vinzer." target="_blank" rel="noopener noreferrer" className="inline-block mt-3 px-4 py-1.5 bg-white/5 hover:bg-white/10 text-[#FFFFFF] rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all border border-[#19B5FE]/20">
-                                            Conversemos
-                                        </a>
-                                    </div>
-                                </th>
- 
-                                {/* NORMAL Column */}
-                                <th className="p-6 text-center w-[15%]">
-                                    <div className="space-y-1">
-                                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Profesional</span>
-                                        <h3 className="text-sm font-bold text-[#FFFFFF]">NORMAL</h3>
-                                        <p className="text-[10px] font-bold text-[#FFFFFF]">$39.900 CLP</p>
-                                        <a href="https://wa.me/56982395940?text=Hola,%20me%20gustaría%20cotizar%20el%20plan%20Normal%20de%20Vinzer." target="_blank" rel="noopener noreferrer" className="inline-block mt-3 px-4 py-1.5 bg-white/5 hover:bg-white/10 text-[#FFFFFF] rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all border border-white/10">
-                                            Conversemos
-                                        </a>
-                                    </div>
-                                </th>
- 
-                                {/* PRO Column (Highlighted) */}
-                                <th className="p-6 text-center w-[15%] bg-[#19B5FE]/5 border-x border-white/10 relative">
-                                    <div className="absolute top-0 inset-x-0 h-1 bg-[#19B5FE]" />
-                                    <div className="space-y-1">
-                                        <span className="text-[9px] font-bold text-[#19B5FE] uppercase tracking-widest">Recomendado</span>
-                                        <h3 className="text-sm font-bold text-[#FFFFFF]">PRO</h3>
-                                        <p className="text-[10px] font-bold text-[#19B5FE]">$59.990 CLP</p>
-                                        <a href="https://wa.me/56982395940?text=Hola,%20me%20gustaría%20cotizar%20el%20plan%20Pro%20de%20Vinzer." target="_blank" rel="noopener noreferrer" className="inline-block mt-3 px-4 py-1.5 bg-[#19B5FE] hover:bg-[#19B5FE]/90 text-[#020210] rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all shadow-md shadow-[#19B5FE]/20">
-                                            Conversemos
-                                        </a>
-                                    </div>
-                                </th>
- 
-                                {/* ULTRA Column */}
-                                <th className="p-6 text-center w-[15%]">
-                                    <div className="space-y-1">
-                                        <span className="text-[9px] font-bold text-[#E0B84D] uppercase tracking-widest">Corporativo</span>
-                                        <h3 className="text-sm font-bold text-[#FFFFFF]">ULTRA</h3>
-                                        <p className="text-[10px] font-bold text-[#E0B84D]">$119.000 CLP</p>
-                                        <a href="https://wa.me/56982395940?text=Hola,%20me%20gustaría%20cotizar%20el%20plan%20Ultra%20de%20Vinzer." target="_blank" rel="noopener noreferrer" className="inline-block mt-3 px-4 py-1.5 bg-[#E0B84D]/10 border border-[#E0B84D]/20 hover:bg-[#E0B84D] hover:text-[#020210] text-[#E0B84D] rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all border border-[#E0B84D]/30">
-                                            Conversemos
-                                        </a>
-                                    </div>
-                                </th>
-                            </tr>
-                        </thead>
+                {plans.length === 0 ? (
+                    <div className="rounded-3xl border border-white/10 bg-[#0b0a24]/60 p-10 text-center text-sm text-slate-300">
+                        No pudimos cargar los planes en este momento.{' '}
+                        <a href={`${WHATSAPP_BASE}${encodeURIComponent('Hola, quiero conocer los planes y precios de Vinzer.')}`} target="_blank" rel="noopener noreferrer" className="text-[#19B5FE] font-bold underline">
+                            Escríbenos por WhatsApp
+                        </a>.
+                    </div>
+                ) : (
+                    <>
+                        {/* Hint de scroll: en móvil la tabla excede el viewport */}
+                        <div className="xl:hidden flex items-center justify-center gap-2 mb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                            Desliza para comparar los {plans.length} planes · PRO al centro
+                            <ArrowLeft size={12} className="rotate-180" />
+                        </div>
 
-                        {/* Table Body */}
-                        <tbody>
-                            {comparisonData.map((section, sectionIdx) => (
-                                <React.Fragment key={sectionIdx}>
-                                    {/* Category Heading Row */}
-                                    <tr className="bg-[#020210]/40 border-b border-white/5">
-                                        <td colSpan={6} className="p-4 px-6 text-xs font-black uppercase tracking-widest text-[#E0B84D] bg-white/5">
-                                            {/* sticky interno: el título de categoría se mantiene
-                                                visible al desplazar la tabla horizontalmente */}
-                                            <div className="sticky left-6 w-max">{section.category}</div>
-                                        </td>
+                        <ComparePlansScroller className="w-full border border-white/10 rounded-3xl bg-[#0b0a24]/60 backdrop-blur-md shadow-2xl">
+                            <table className="w-full min-w-[900px] border-collapse text-left">
+                                <thead>
+                                    <tr className="border-b border-white/10 bg-[#020210]/80">
+                                        <th className="p-6 text-xs font-bold uppercase tracking-wider text-slate-400 w-1/4 min-w-[150px] sticky left-0 z-20 bg-[#020210]">Característica</th>
+                                        {plans.map((p, i) => {
+                                            const hl = i === highlightCol;
+                                            return (
+                                                <th key={p.name} {...(hl ? { 'data-highlight-col': '' } : {})}
+                                                    className={`p-6 text-center relative snap-center ${hl ? 'bg-[#19B5FE]/5 border-x border-white/10' : ''}`}>
+                                                    {hl && <div className="absolute top-0 inset-x-0 h-1 bg-[#19B5FE]" />}
+                                                    <div className="space-y-1">
+                                                        {hl && <span className="text-[9px] font-bold text-[#19B5FE] uppercase tracking-widest">Recomendado</span>}
+                                                        <h3 className="text-sm font-bold text-[#FFFFFF] uppercase">{p.name}</h3>
+                                                        <p className={`text-[10px] font-bold ${hl ? 'text-[#19B5FE]' : 'text-slate-300'}`}>
+                                                            {p.price > 0 ? `$${formatCLP(p.price)} CLP / mes` : '$0 CLP / mes'}
+                                                        </p>
+                                                        {(() => {
+                                                            const cta = planCta(p.name, p.price);
+                                                            return (
+                                                                <a
+                                                                    href={cta.href}
+                                                                    {...(cta.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                                                                    className={`inline-block mt-3 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all ${CTA_CLASS[cta.kind]}`}
+                                                                >
+                                                                    {cta.label}
+                                                                </a>
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                </th>
+                                            );
+                                        })}
                                     </tr>
+                                </thead>
 
-                                    {/* Features Rows */}
-                                    {section.features.map((feature, featureIdx) => (
-                                        <tr 
-                                            key={featureIdx} 
-                                            className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
-                                        >
-                                            {/* Feature Name & Description */}
-                                            <td className="p-5 px-6 align-top sticky left-0 z-10 bg-[#0b0a24]">
-                                                <div className="font-bold text-xs text-[#FFFFFF]">{feature.name}</div>
-                                                {/* En móvil solo la etiqueta: la descripción haría
-                                                    la columna fija demasiado ancha (viewport 375px) */}
-                                                <div className="hidden md:block text-[10px] text-slate-400 mt-1 leading-normal max-w-xs">{feature.description}</div>
-                                            </td>
-
-                                            {/* FREE Cell */}
-                                            <td className="p-5 text-center text-xs align-middle">
-                                                {renderCell(feature.free)}
-                                            </td>
-
-                                            {/* TRACK Cell */}
-                                            <td className="p-5 text-center text-xs align-middle border-x border-white/5">
-                                                {renderCell(feature.track)}
-                                            </td>
-
-                                            {/* NORMAL Cell */}
-                                            <td className="p-5 text-center text-xs align-middle">
-                                                {renderCell(feature.normal)}
-                                            </td>
-
-                                            {/* PRO Cell (Highlighted column) */}
-                                            <td className="p-5 text-center text-xs align-middle bg-[#19B5FE]/[0.02] border-x border-white/5">
-                                                {renderCell(feature.pro, true)}
-                                            </td>
-
-                                            {/* ULTRA Cell */}
-                                            <td className="p-5 text-center text-xs align-middle">
-                                                {renderCell(feature.ultra)}
-                                            </td>
-                                        </tr>
+                                <tbody>
+                                    {sections.map((section) => (
+                                        <React.Fragment key={section.category}>
+                                            <tr className="bg-[#020210]/40 border-b border-white/5">
+                                                <td colSpan={plans.length + 1} className="p-4 px-6 text-xs font-black uppercase tracking-widest text-[#E0B84D] bg-white/5">
+                                                    <div className="sticky left-6 w-max">{section.category}</div>
+                                                </td>
+                                            </tr>
+                                            {section.rows.map((row) => (
+                                                <tr key={row.name} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                                                    <td className="p-5 px-6 align-top sticky left-0 z-10 bg-[#0b0a24]">
+                                                        <div className="font-bold text-xs text-[#FFFFFF]">{row.name}</div>
+                                                        {row.description && (
+                                                            <div className="hidden md:block text-[10px] text-slate-400 mt-1 leading-normal max-w-xs">{row.description}</div>
+                                                        )}
+                                                    </td>
+                                                    {row.cells.map((cell, i) => (
+                                                        <td key={i} className={`p-5 text-center text-xs align-middle ${i === highlightCol ? 'bg-[#19B5FE]/[0.02] border-x border-white/5' : ''}`}>
+                                                            {renderCell(cell, i === highlightCol)}
+                                                        </td>
+                                                    ))}
+                                                </tr>
+                                            ))}
+                                        </React.Fragment>
                                     ))}
-                                </React.Fragment>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                                </tbody>
+                            </table>
+                        </ComparePlansScroller>
+                    </>
+                )}
 
-                {/* FAQ Quick Link / CTA */}
                 <div className="mt-16 bg-[#0b0a24] border border-white/10 rounded-[2rem] p-8 md:p-12 text-center max-w-4xl mx-auto space-y-6">
                     <h3 className="text-xl md:text-2xl font-black text-[#FFFFFF]">¿Tienes alguna duda sobre qué plan necesitas?</h3>
                     <p className="text-xs md:text-sm text-slate-400 max-w-2xl mx-auto leading-relaxed">
-                        Si tu crematorio tiene necesidades especiales, requiere más usuarios o mayor cupo mensual de mascotas, podemos crear una cotización personalizada adaptada a tu escala.
+                        Si tu crematorio tiene necesidades especiales, requiere más usuarios o mayor cupo mensual, podemos crear una cotización personalizada adaptada a tu escala.
                     </p>
-                    <div className="flex justify-center gap-4 pt-2">
-                        <a 
-                            href="mailto:soporte@vinzer.app"
+                    <div className="flex flex-wrap justify-center gap-4 pt-2">
+                        <a
+                            href={`${WHATSAPP_BASE}${encodeURIComponent('Hola, quiero hablar con un asesor sobre los planes de Vinzer.')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="bg-[#19B5FE] hover:bg-[#19B5FE]/90 text-[#020210] px-8 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
                         >
                             Hablar con un Asesor
                         </a>
-                        <Link 
+                        <Link
                             href="/#faqs"
                             className="border border-white/10 bg-white/5 hover:bg-white/10 text-[#FFFFFF] px-8 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
                         >
@@ -283,8 +268,18 @@ export default function CompararPlanesPage() {
     );
 }
 
-// Helper function to render table cells correctly
-function renderCell(val: string | boolean, isHighlighted = false) {
+/** Agrupa las funciones por su grupo, respetando el orden configurado. */
+function groupHighlights(items: PlanHighlight[]): [string, PlanHighlight[]][] {
+    const groups = new Map<string, PlanHighlight[]>();
+    for (const h of items) {
+        const list = groups.get(h.group) ?? [];
+        list.push(h);
+        groups.set(h.group, list);
+    }
+    return [...groups.entries()];
+}
+
+function renderCell(val: Cell, isHighlighted = false) {
     if (typeof val === 'boolean') {
         return val ? (
             <div className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#19B5FE]/10 text-[#19B5FE]">

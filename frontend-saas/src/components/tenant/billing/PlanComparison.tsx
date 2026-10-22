@@ -345,7 +345,7 @@ function LaunchNotice({ saving, same }: { saving: number; same: boolean }) {
                     Precio de lanzamiento: {same ? '' : 'hasta '}{saving}% de descuento pagando anual{same ? ' en todos los planes' : ''}
                 </p>
                 <p className="text-xs text-emerald-800/80 dark:text-emerald-300/70 mt-0.5">
-                    Beneficio exclusivo para los primeros crematorios que se suscriban. Al contratar el plan anual, mantienes este precio durante todo el año.
+                    Beneficio exclusivo para los primeros crematorios que se suscriban. Al contratar el plan anual, mantienes este precio para siempre mientras sigas con tu plan anual.
                 </p>
             </div>
         </div>

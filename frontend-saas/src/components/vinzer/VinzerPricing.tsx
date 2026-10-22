@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Star, ShieldCheck, Check, X, Gift } from 'lucide-react';
-import type { PublicPlan } from '@/lib/api/plans';
+import { Star, ShieldCheck, Check, Gift, Sparkles } from 'lucide-react';
+import Link from 'next/link';
+import type { PlanHighlight, PublicPlan } from '@/lib/api/plans';
+import { planCta, VINZER_WHATSAPP } from '@/lib/vinzer/planCta';
 
-const WHATSAPP_BASE = 'https://wa.me/56982395940?text=';
 
 /**
  * Copy comercial por plan. Los NÚMEROS nunca viven aquí: llegan desde
@@ -14,34 +15,28 @@ const WHATSAPP_BASE = 'https://wa.me/56982395940?text=';
 const PLAN_COPY: Record<string, {
     category: string;
     tagline: string;
-    whatsapp: string;
     highlight?: 'recommended' | 'top';
 }> = {
     FREE: {
         category: 'Para empezar',
         tagline: 'Ideal para crematorios que inician o quieren probar la plataforma sin riesgo.',
-        whatsapp: 'Hola, quiero solicitar el Plan GRATIS de Vinzer para mi crematorio.',
     },
     TRACK: {
         category: 'Operativo',
         tagline: 'Para crematorios que ya tienen CRM o facturación externos y solo necesitan trazabilidad y control de planta.',
-        whatsapp: 'Hola, quiero cotizar el Plan Track de Vinzer.',
     },
     NORMAL: {
         category: 'Profesional',
         tagline: 'Gestión completa para crematorios en crecimiento con flujo constante de servicios.',
-        whatsapp: 'Hola, quiero cotizar el Plan Normal de Vinzer.',
     },
     PRO: {
         category: 'Avanzado',
         tagline: 'Potencia y automatización para crematorios de alto volumen y operación exigente.',
-        whatsapp: 'Hola, quiero cotizar el Plan PRO de Vinzer.',
         highlight: 'recommended',
     },
     ULTRA: {
         category: 'Empresarial',
         tagline: 'Para empresas consolidadas que además buscan presencia de marca digital.',
-        whatsapp: 'Hola, quiero cotizar el Plan ULTRA de Vinzer, incluido el sitio web institucional.',
         highlight: 'top',
     },
 };
@@ -58,11 +53,35 @@ const formatCLP = (value: number) => new Intl.NumberFormat('es-CL').format(Math.
 interface VinzerPricingProps {
     theme?: 'dark' | 'light';
     initialPlans?: PublicPlan[] | null;
+    /** Funciones a comparar (Admin → Planes → «Funciones en la web»). */
+    initialHighlights?: PlanHighlight[] | null;
 }
 
-export function VinzerPricing({ theme = 'dark', initialPlans = null }: VinzerPricingProps) {
+export function VinzerPricing({ theme = 'dark', initialPlans = null, initialHighlights = null }: VinzerPricingProps) {
     const [isAnnual, setIsAnnual] = useState(false);
     const [plans, setPlans] = useState<PublicPlan[]>(initialPlans ?? []);
+    const [highlights, setHighlights] = useState<PlanHighlight[]>(initialHighlights ?? []);
+    useEffect(() => {
+        if (initialHighlights && initialHighlights.length > 0) return;
+        let cancelled = false;
+        fetch('/api/public/plans/highlights')
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => { if (!cancelled && Array.isArray(d)) setHighlights(d); })
+            .catch(() => { /* sin funciones: solo topes */ });
+        return () => { cancelled = true; };
+    }, [initialHighlights]);
+
+    // Descuento anual y aviso de lanzamiento (Configuración de Planes del SuperAdmin).
+    const [discount, setDiscount] = useState<{ pct: number; launch: boolean } | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        fetch('/api/public/plans/annual-discount')
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => { if (!cancelled && d && typeof d.pct === 'number') setDiscount(d); })
+            .catch(() => { /* sin dato: se muestran solo los montos */ });
+        return () => { cancelled = true; };
+    }, []);
 
     // El servidor ya entrega los planes en el HTML. Este fetch solo cubre el
     // caso de que la landing se haya renderizado sin ellos (API caída al build).
@@ -92,6 +111,10 @@ export function VinzerPricing({ theme = 'dark', initialPlans = null }: VinzerPri
         });
 
     const hasAnnualOffer = paidPlans.some((p) => p.annual_price != null && p.annual_price > 0);
+    const pct = hasAnnualOffer && discount && discount.pct > 0 ? discount.pct : 0;
+    // Lo que tienen todos los planes (incluido FREE) se dice una vez arriba.
+    const common = plans.length > 0 ? highlights.filter((h) => plans.every((p) => p.offers?.includes(h.key))) : [];
+    const commonKeys = new Set(common.map((h) => h.key));
 
 
     return (
@@ -123,8 +146,18 @@ export function VinzerPricing({ theme = 'dark', initialPlans = null }: VinzerPri
                     }`}>
                         <ShieldCheck size={16} className={`shrink-0 mt-0.5 sm:mt-0 ${isLight ? 'text-[#0284C7]' : 'text-[#19B5FE]'}`} />
                         <span className="text-[12px] leading-relaxed">
-                            Todos los planes incluyen <strong className={isLight ? 'text-slate-900' : 'text-white'}>tus datos aislados y privados</strong>, visibles
-                            solo para tu equipo, y el <strong className={isLight ? 'text-slate-900' : 'text-white'}>seguimiento en línea</strong> para las familias.
+                            Todos los planes incluyen{' '}
+                            {common.length > 0 ? common.map((h, i) => (
+                                <React.Fragment key={h.key}>
+                                    {i > 0 && (i === common.length - 1 ? ' y ' : ', ')}
+                                    <strong className={isLight ? 'text-slate-900' : 'text-white'}>{h.label.charAt(0).toLowerCase() + h.label.slice(1)}</strong>
+                                </React.Fragment>
+                            )) : (
+                                <>
+                                    <strong className={isLight ? 'text-slate-900' : 'text-white'}>tus datos aislados y privados</strong> y el{' '}
+                                    <strong className={isLight ? 'text-slate-900' : 'text-white'}>seguimiento en línea</strong> para las familias
+                                </>
+                            )}.
                         </span>
                     </div>
 
@@ -157,14 +190,36 @@ export function VinzerPricing({ theme = 'dark', initialPlans = null }: VinzerPri
                             }`}>
                                 Anual
                             </span>
+                            {pct > 0 && (
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                    isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-400/15 text-emerald-300'
+                                }`}>
+                                    −{pct} %
+                                </span>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Aviso de lanzamiento: solo si el SuperAdmin lo tiene activado */}
+                    {pct > 0 && discount?.launch && (
+                        <div className={`mx-auto max-w-xl flex items-start gap-3 text-left px-4 py-3 rounded-2xl border ${
+                            isLight ? 'bg-emerald-50 border-emerald-200' : 'bg-emerald-400/[0.07] border-emerald-400/25'
+                        }`}>
+                            <Sparkles size={16} className={`shrink-0 mt-0.5 ${isLight ? 'text-emerald-600' : 'text-emerald-300'}`} />
+                            <p className={`text-[12px] leading-relaxed ${isLight ? 'text-emerald-900' : 'text-emerald-100'}`}>
+                                <strong>Precio de lanzamiento: {pct} % de descuento pagando anual.</strong>{' '}
+                                Beneficio exclusivo para los primeros crematorios que se suscriban: mantienes este precio para siempre mientras sigas con tu plan anual.
+                            </p>
                         </div>
                     )}
                 </div>
 
                 {paidPlans.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-                        {paidPlans.map((plan) => (
-                            <PlanCard key={plan.name} plan={plan} isAnnual={isAnnual} isLight={isLight} />
+                        {paidPlans.map((plan, i) => (
+                            <PlanCard key={plan.name} plan={plan} prev={i === 0 ? freePlan : paidPlans[i - 1]}
+                                highlights={highlights.filter((h) => !commonKeys.has(h.key))}
+                                isAnnual={isAnnual} isLight={isLight} pct={pct} />
                         ))}
                     </div>
                 ) : (
@@ -178,7 +233,7 @@ export function VinzerPricing({ theme = 'dark', initialPlans = null }: VinzerPri
                             el detalle de precios al instante.
                         </p>
                         <a
-                            href={`${WHATSAPP_BASE}${encodeURIComponent('Hola, quiero conocer los planes y precios de Vinzer.')}`}
+                            href={`${VINZER_WHATSAPP}${encodeURIComponent('Hola, quiero conocer los planes y precios de Vinzer.')}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className={`inline-flex items-center justify-center min-h-[44px] px-6 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all ${
@@ -187,6 +242,19 @@ export function VinzerPricing({ theme = 'dark', initialPlans = null }: VinzerPri
                         >
                             Consultar precios por WhatsApp
                         </a>
+                    </div>
+                )}
+
+                {paidPlans.length > 0 && (
+                    <div className="text-center mt-6">
+                        <Link
+                            href="/comparar-planes"
+                            className={`inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider underline-offset-4 hover:underline ${
+                                isLight ? 'text-[#0284C7]' : 'text-[#19B5FE]'
+                            }`}
+                        >
+                            Ver comparación completa de planes →
+                        </Link>
                     </div>
                 )}
 
@@ -203,15 +271,18 @@ export function VinzerPricing({ theme = 'dark', initialPlans = null }: VinzerPri
     );
 }
 
-function PlanCard({ plan, isAnnual, isLight }: { plan: PublicPlan; isAnnual: boolean; isLight: boolean }) {
+
+function PlanCard({ plan, prev, highlights, isAnnual, isLight, pct }: {
+    plan: PublicPlan; prev: PublicPlan | null; highlights: PlanHighlight[]; isAnnual: boolean; isLight: boolean; pct: number;
+}) {
     const copy = PLAN_COPY[plan.name.toUpperCase()] ?? {
         category: 'Plan',
         tagline: plan.description ?? '',
-        whatsapp: `Hola, quiero cotizar el Plan ${plan.name} de Vinzer.`,
     };
 
     const isRecommended = copy.highlight === 'recommended';
     const isTop = copy.highlight === 'top';
+    const cta = planCta(plan.name, plan.price);
 
     // El anual solo se muestra si la BD tiene annual_price. Hoy Track no lo tiene:
     // esa tarjeta se queda en mensual en vez de inventar un precio.
@@ -224,20 +295,15 @@ function PlanCard({ plan, isAnnual, isLight }: { plan: PublicPlan; isAnnual: boo
             ? (isLight ? 'border-amber-400/60' : 'border-[#E0B84D]/40')
             : (isLight ? 'border-slate-200' : 'border-white/5');
 
-    const features: Array<{ label: string; on: boolean }> = [
-        { label: `${plan.max_orders} órdenes al mes`, on: true },
-        { label: `${plan.max_users} ${plan.max_users === 1 ? 'usuario' : 'usuarios'} de acceso`, on: true },
-        { label: 'Seguimiento público en tiempo real', on: true },
-        { label: 'Catálogo de servicios y productos', on: true },
-        { label: 'Módulo de operaciones y trazabilidad', on: plan.has_operations },
-        { label: 'Certificados digitales personalizables', on: plan.has_certificates },
-        { label: 'Exportación de reportes y datos', on: plan.can_export },
-        { label: 'Widget embebible para tu sitio web', on: plan.has_widget },
+    // Solo lo que cambia respecto del plan anterior: sus topes y las funciones nuevas.
+    const features: string[] = [
+        `${plan.max_orders} órdenes al mes`,
+        `${plan.max_users} ${plan.max_users === 1 ? 'usuario' : 'usuarios'} de acceso`,
+        ...(plan.ai_monthly_credits ? [`${plan.ai_monthly_credits} créditos de homenaje IA al mes`] : []),
+        ...highlights
+            .filter((h) => plan.offers?.includes(h.key) && !(prev && prev.offers?.includes(h.key)))
+            .map((h) => h.label),
     ];
-
-    if (plan.name.toUpperCase() === 'ULTRA') {
-        features.push({ label: 'Sitio web institucional incluido', on: true });
-    }
 
     return (
         <div
@@ -277,7 +343,7 @@ function PlanCard({ plan, isAnnual, isLight }: { plan: PublicPlan; isAnnual: boo
 
                     {showAnnual && plan.annual_savings ? (
                         <div className={`text-[9px] font-bold uppercase tracking-wider mt-1 ${isLight ? 'text-[#0284C7]' : 'text-[#19B5FE]'}`}>
-                            Ahorras ${formatCLP(plan.annual_savings)} al año
+                            Ahorras ${formatCLP(plan.annual_savings)} al año{pct > 0 ? ` (${pct} %)` : ''}
                         </div>
                     ) : isAnnual && !hasAnnual ? (
                         <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">
@@ -285,7 +351,7 @@ function PlanCard({ plan, isAnnual, isLight }: { plan: PublicPlan; isAnnual: boo
                         </div>
                     ) : hasAnnual && !isAnnual ? (
                         <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">
-                            Anual: ${formatCLP(plan.annual_price!)} CLP
+                            Anual: ${formatCLP(plan.annual_price!)} CLP{pct > 0 ? ` · −${pct} %` : ''}
                         </div>
                     ) : (
                         <div className="text-[9px] mt-1 h-[13px]" aria-hidden="true" />
@@ -296,33 +362,37 @@ function PlanCard({ plan, isAnnual, isLight }: { plan: PublicPlan; isAnnual: boo
             <ul className={`space-y-2 border-t pt-4 text-[11px] flex-1 ${
                 isLight ? 'border-slate-100 text-slate-700' : 'border-white/5 text-[#C0C0C0]'
             }`}>
-                {features.map((f) => (
-                    <li key={f.label} className={`flex items-start gap-2 ${f.on ? '' : 'opacity-45'}`}>
-                        {f.on ? (
-                            <Check size={13} className={`shrink-0 mt-0.5 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />
-                        ) : (
-                            <X size={13} className="shrink-0 mt-0.5 text-slate-500" />
-                        )}
-                        <span className={f.on ? '' : 'line-through'}>{f.label}</span>
+                {prev && (
+                    <li className={`font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                        Todo lo del plan {prev.name}, más:
+                    </li>
+                )}
+                {features.map((label) => (
+                    <li key={label} className="flex items-start gap-2">
+                        <Check size={13} className={`shrink-0 mt-0.5 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />
+                        <span>{label}</span>
                     </li>
                 ))}
             </ul>
 
             <a
-                href={`${WHATSAPP_BASE}${encodeURIComponent(copy.whatsapp)}`}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={cta.href}
+                {...(cta.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                 className={`text-center min-h-[44px] py-3 px-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all border flex items-center justify-center ${
-                    isRecommended
+                    cta.kind === 'recommended'
                         ? isLight
                             ? 'bg-[#0284C7] border-[#0284C7] hover:bg-[#0369A1] text-white'
                             : 'bg-[#19B5FE] border-[#19B5FE] hover:brightness-110 text-[#020210]'
-                        : isLight
-                            ? 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-800'
-                            : 'bg-white/5 border-white/10 hover:bg-white/10 text-white'
+                        : cta.kind === 'sales'
+                            ? isLight
+                                ? 'bg-amber-50 border-amber-300 hover:bg-amber-100 text-amber-800'
+                                : 'bg-[#E0B84D]/10 border-[#E0B84D]/40 hover:bg-[#E0B84D]/20 text-[#E0B84D]'
+                            : isLight
+                                ? 'bg-slate-900 border-slate-900 hover:bg-slate-800 text-white'
+                                : 'bg-white border-white hover:bg-slate-200 text-[#020210]'
                 }`}
             >
-                Cotizar
+                {cta.label}
             </a>
         </div>
     );
@@ -337,6 +407,7 @@ function PlanCard({ plan, isAnnual, isLight }: { plan: PublicPlan; isAnnual: boo
  */
 function FreePlanBlock({ plan, isLight }: { plan: PublicPlan; isLight: boolean }) {
     const copy = PLAN_COPY.FREE;
+    const freeCta = planCta(plan.name, 0);
 
     const highlights = [
         `${plan.max_orders} órdenes al mes`,
@@ -398,15 +469,14 @@ function FreePlanBlock({ plan, isLight }: { plan: PublicPlan; isLight: boolean }
                 </div>
 
                 <a
-                    href={`${WHATSAPP_BASE}${encodeURIComponent(copy.whatsapp)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={freeCta.href}
+                    {...(freeCta.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                     className="inline-flex items-center justify-center gap-2.5 min-h-[48px] w-full lg:w-auto px-7 rounded-xl bg-[#25D366] hover:bg-[#20ba5a] text-[#020210] text-[11px] font-black uppercase tracking-wider transition-all shadow-lg shadow-[#25D366]/20 hover:scale-[1.02] active:scale-[0.98]"
                 >
                     <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 shrink-0" aria-hidden="true">
                         <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.71.306 1.263.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.247-.694.247-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
                     </svg>
-                    Solicitar por WhatsApp
+                    {freeCta.label}
                 </a>
 
                 <p className={`text-[10px] leading-relaxed max-w-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>

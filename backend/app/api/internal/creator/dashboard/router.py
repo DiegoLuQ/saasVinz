@@ -1324,6 +1324,35 @@ def update_annual_discount(
     return set_annual_discount(db, payload.pct, payload.launch)
 
 
+class LandingFeatureIn(BaseModel):
+    key: str = Field(..., min_length=1, max_length=80)
+    label: str = Field(..., min_length=1, max_length=70)
+    group: str = Field("Operación", max_length=40)
+    description: str = Field("", max_length=160)
+
+
+@router.get("/pricing/landing-features")
+def read_landing_features(
+    current_creator: User = Depends(get_current_creator),
+    db: Session = Depends(get_db)
+):
+    """Funciones que la web muestra al comparar planes (orden = el de la lista)."""
+    from app.services.landing_features import get_landing_features, GROUPS
+    return {"items": get_landing_features(db), "groups": list(GROUPS)}
+
+
+@router.put("/pricing/landing-features")
+def update_landing_features(
+    payload: List[LandingFeatureIn],
+    current_creator: User = Depends(get_current_creator),
+    db: Session = Depends(get_db)
+):
+    from app.services.landing_features import set_landing_features, GROUPS, MAX_ITEMS
+    if len(payload) > MAX_ITEMS:
+        raise HTTPException(status_code=400, detail=f"Máximo {MAX_ITEMS} funciones.")
+    return {"items": set_landing_features(db, [p.model_dump() for p in payload]), "groups": list(GROUPS)}
+
+
 @router.post("/plans", response_model=SubscriptionPlanResponse)
 async def create_plan(
     plan_data: SubscriptionPlanCreate,

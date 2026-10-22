@@ -250,6 +250,13 @@ class SaaSConfig(Base):
     pais = Column(String)
     whatsapp = Column(String)
     correo = Column(String)
+    # Correo(s) donde llegan los mensajes de los formularios públicos (separados
+    # por coma). Vacío = MAIL_FROM. Ver services/email.py notification_recipients().
+    notification_email = Column(String(500), nullable=True)
+    # Carrusel del banner del inicio de los crematorios (/dashboard): hasta 3
+    # [{image_url, title, message, button_label, whatsapp_text, show_button}].
+    # Ver services/dashboard_slides.py. NULL/vacío = banner fijo.
+    dashboard_slides = Column(JSON, nullable=True)
     redes_sociales = Column(JSON, default=list) # [{"name": "Facebook", "link": "..."}]
     imagenes = Column(JSON, default=list) # ["url1", "url2"]
     
@@ -275,5 +282,9 @@ class SaaSConfig(Base):
     # --- Descuento por pago anual (todos los planes; ver services/plan_pricing.py) ---
     annual_discount_pct = Column(Integer, nullable=False, default=25)
     annual_discount_launch = Column(Boolean, nullable=False, default=True)  # "precio de lanzamiento"
+
+    # --- Funciones que la web muestra al comparar planes (services/landing_features.py) ---
+    # [{key, label, group, description}] en orden; NULL = lista por defecto.
+    landing_features = Column(JSON, nullable=True)
 
     updated_at = Column(DateTime(timezone=True), default=tz.get_now, onupdate=tz.get_now)

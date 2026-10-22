@@ -90,7 +90,10 @@ def get_platform_info(db: Session = Depends(get_db)):
     Sin RUT ni dirección."""
     cfg = db.query(models.SaaSConfig).first()
     if not cfg:
-        return {"name": "Vinzer", "eslogan": None, "logo": None, "whatsapp": None, "correo": None, "redes_sociales": []}
+        return {"name": "Vinzer", "eslogan": None, "logo": None, "whatsapp": None, "correo": None, "redes_sociales": [],
+                "dashboard_default_slide": None, "dashboard_slides": []}
+    from app.services.dashboard_slides import parse
+    banner_default, banner_slides = parse(cfg.dashboard_slides)
     redes = cfg.redes_sociales if isinstance(cfg.redes_sociales, list) else []
     return {
         "name": cfg.name or "Vinzer",
@@ -102,4 +105,7 @@ def get_platform_info(db: Session = Depends(get_db)):
             {"name": r.get("name"), "link": r.get("link")}
             for r in redes if isinstance(r, dict) and r.get("link")
         ],
+        # Carrusel del banner del inicio de los crematorios (Configuración → Banner del panel).
+        "dashboard_default_slide": banner_default,
+        "dashboard_slides": banner_slides,
     }

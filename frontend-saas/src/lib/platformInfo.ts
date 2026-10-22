@@ -1,6 +1,25 @@
 import { useEffect, useState } from 'react';
 import { API_BASE_URL } from '@/lib/api';
 
+/** Diapositiva del banner del inicio de los crematorios (admin → Configuración → Banner del panel). */
+export type DashboardSlide = {
+    image_url: string;
+    title: string;
+    message: string;
+    button_label: string;
+    whatsapp_text: string;
+    show_button: boolean;
+    /** Encuadre de la imagen en % (background-position). */
+    pos_x?: number;
+    pos_y?: number;
+    /** Degradado automático: celeste en modo claro, azul noche en oscuro (ignora color/intensidad). */
+    overlay_auto?: boolean;
+    /** Degradado sobre la imagen (hex + intensidad 0–100) y color del texto. */
+    overlay_color?: string;
+    overlay_opacity?: number;
+    text_theme?: 'dark' | 'light';
+};
+
 /** Datos públicos de la plataforma (Configuración global del admin). */
 export type PlatformInfo = {
     name: string;
@@ -9,6 +28,9 @@ export type PlatformInfo = {
     whatsapp?: string | null;
     correo?: string | null;
     redes_sociales: { name?: string | null; link: string }[];
+    /** Diapositiva principal editada en el admin (null = la original). */
+    dashboard_default_slide?: DashboardSlide | null;
+    dashboard_slides?: DashboardSlide[];
 };
 
 const FALLBACK: PlatformInfo = { name: 'Vinzer', redes_sociales: [] };

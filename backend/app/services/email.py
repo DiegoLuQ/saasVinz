@@ -25,6 +25,27 @@ mail_config = ConnectionConfig(
 fm = FastMail(mail_config)
 
 
+def notification_recipients() -> list[str]:
+    """Destino de los mensajes de los formularios públicos: el «Correo para recibir
+    mensajes» de Configuración → Datos del SaaS (sys_saas_config.notification_email,
+    uno o varios separados por coma) o, si está vacío, MAIL_FROM."""
+    try:
+        from app.database import SessionLocal
+        from app import models
+        db = SessionLocal()
+        try:
+            cfg = db.query(models.SaaSConfig).first()
+            raw = (cfg.notification_email or '') if cfg else ''
+        finally:
+            db.close()
+        emails = [e.strip() for e in raw.split(',') if e.strip()]
+        if emails:
+            return emails
+    except Exception as e:  # sin base disponible se usa el correo del sistema
+        print(f"⚠️ No se pudo leer el correo de notificaciones: {e}")
+    return [os.getenv("MAIL_FROM", "")]
+
+
 class ContactFormData(BaseModel):
     nombre_cliente: str
     email: str
@@ -41,7 +62,7 @@ class ContactFormData(BaseModel):
 async def send_contact_email(data: ContactFormData):
     """
     Envía un email de notificación con los datos del formulario de contacto.
-    Destinatario: la dirección configurada en MAIL_FROM (admin).
+    Destinatario: notification_recipients() (Datos del SaaS o MAIL_FROM).
     """
     html_body = f"""
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fafafa; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0;">
@@ -100,7 +121,7 @@ async def send_contact_email(data: ContactFormData):
 
     message = MessageSchema(
         subject=f"🕊️ Solicitud Memorial Gratuito — {data.nombre_mascota} ({data.nombre_cliente})",
-        recipients=[os.getenv("MAIL_FROM", "")],
+        recipients=notification_recipients(),
         body=html_body,
         subtype=MessageType.html,
     )
@@ -123,7 +144,7 @@ class DemoLeadData(BaseModel):
 async def send_demo_lead_email(data: DemoLeadData):
     """
     Notifica un nuevo lead del formulario "Solicitar Demostración Guiada".
-    Destinatario: la dirección configurada en MAIL_FROM (admin).
+    Destinatario: notification_recipients() (Datos del SaaS o MAIL_FROM).
     """
     whatsapp_digits = "".join(ch for ch in (data.telefono or "") if ch.isdigit())
     whatsapp_link = f"https://wa.me/{whatsapp_digits}" if whatsapp_digits else ""
@@ -162,7 +183,7 @@ async def send_demo_lead_email(data: DemoLeadData):
 
     message = MessageSchema(
         subject=f"Demo Vinzer — {data.empresa} ({data.nombre})",
-        recipients=[os.getenv("MAIL_FROM", "")],
+        recipients=notification_recipients(),
         body=html_body,
         subtype=MessageType.html,
     )

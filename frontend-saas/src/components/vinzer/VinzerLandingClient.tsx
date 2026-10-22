@@ -36,7 +36,7 @@ import { VinzerMemorialBanner } from './VinzerMemorialBanner';
 import { VinzerNavbar } from './VinzerNavbar';
 import { VinzerFooter } from './VinzerFooter';
 import ReCaptchaProvider from '@/components/captcha/ReCaptchaProvider';
-import type { PublicPlan } from '@/lib/api/plans';
+import type { PlanHighlight, PublicPlan } from '@/lib/api/plans';
 
 interface HeroConfig {
     mediaType?: 'image' | 'video';
@@ -51,6 +51,7 @@ interface VinzerLandingClientProps {
         [key: string]: unknown;
     } | null;
     initialPlans?: PublicPlan[] | null;
+    initialHighlights?: PlanHighlight[] | null;
 }
 
 const resolveMediaUrl = (url?: string | null) => {
@@ -60,7 +61,7 @@ const resolveMediaUrl = (url?: string | null) => {
     return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
 };
 
-export default function VinzerLandingClient({ initialConfig = null, initialPlans = null }: VinzerLandingClientProps) {
+export default function VinzerLandingClient({ initialConfig = null, initialPlans = null, initialHighlights = null }: VinzerLandingClientProps) {
     const heroConfig = initialConfig?.hero || {};
     const heroBgUrl = heroConfig.backgroundImage || 'https://i.postimg.cc/mD9jZNX2/portada-1.webp';
     const isHeroVideo = heroConfig.mediaType === 'video' || /\.(mp4|webm|mov)(\?.*)?$/i.test(heroBgUrl);
@@ -283,7 +284,7 @@ export default function VinzerLandingClient({ initialConfig = null, initialPlans
                 cargado a la tarjeta ULTRA */}
             <VinzerWebService theme={theme} />
 
-            <VinzerPricing theme={theme} initialPlans={initialPlans} />
+            <VinzerPricing theme={theme} initialPlans={initialPlans} initialHighlights={initialHighlights} />
 
             <VinzerFaqs theme={theme} />
 

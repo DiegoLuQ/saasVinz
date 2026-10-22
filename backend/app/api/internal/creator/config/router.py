@@ -7,6 +7,41 @@ from app import schemas, models, auth
 
 router = APIRouter()
 
+
+@router.get("/dashboard-slides")
+def get_dashboard_slides(
+    db: Session = Depends(get_db),
+    current_creator: models.User = Depends(auth.get_current_creator)
+):
+    """Carrusel del banner del inicio de los crematorios: principal + extras."""
+    from app.services.dashboard_slides import parse, MAX_SLIDES
+    config = db.query(models.SaaSConfig).first()
+    default, slides = parse(config.dashboard_slides if config else None)
+    return {"default": default, "slides": slides, "max": MAX_SLIDES}
+
+
+@router.put("/dashboard-slides")
+def update_dashboard_slides(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_creator: models.User = Depends(auth.get_current_creator)
+):
+    from app.services.dashboard_slides import parse, serialize, MAX_SLIDES
+    raw = payload.get("slides")
+    if not isinstance(raw, list):
+        raise HTTPException(status_code=400, detail="Formato inválido: se espera la lista de diapositivas.")
+    if len(raw) > MAX_SLIDES:
+        raise HTTPException(status_code=400, detail=f"Máximo {MAX_SLIDES} diapositivas.")
+    config = db.query(models.SaaSConfig).first()
+    if not config:
+        config = models.SaaSConfig(name="SaaS Crematorio")
+        db.add(config)
+    # default = None vuelve a la diapositiva principal original.
+    config.dashboard_slides = serialize(payload.get("default"), raw)
+    db.commit()
+    default, slides = parse(config.dashboard_slides)
+    return {"default": default, "slides": slides, "max": MAX_SLIDES}
+
 @router.get("", response_model=schemas.SaaSConfigInDB)
 def get_saas_config(
     db: Session = Depends(get_db),

@@ -41,7 +41,7 @@ const addMonths = (months: number) => {
 };
 const fmtCLP = (n: number) => `$${Math.round(n).toLocaleString('es-CL')}`;
 
-interface PlanInfo { id: number; name: string; price: number; max_pets?: number; }
+interface PlanInfo { id: number; name: string; price: number; max_orders?: number; }
 
 const STEPS = [
     {
@@ -376,8 +376,8 @@ export default function TenantFacturacionPage() {
                                             {fmtCLP(plan.price)}
                                             <span className="text-xs font-normal text-white/30 ml-1">/mes</span>
                                         </div>
-                                        {plan.max_pets && (
-                                            <div className="text-[11px] text-white/40 font-medium">Hasta {plan.max_pets} mascotas/mes</div>
+                                        {plan.max_orders && (
+                                            <div className="text-[11px] text-white/40 font-medium">Hasta {plan.max_orders} órdenes/mes</div>
                                         )}
                                         {plan.name === tenant?.plan && (
                                             <div className="mt-2 text-[10px] font-black uppercase tracking-widest text-white/30">Plan actual</div>

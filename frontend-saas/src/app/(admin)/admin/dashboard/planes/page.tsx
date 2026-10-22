@@ -9,6 +9,7 @@ import DeleteConfirmationModal from '@/components/admin/DeleteConfirmationModal'
 import PlanCard, { type PlanData } from '@/components/admin/plans/PlanCard';
 import CreatePlanModal from '@/components/admin/plans/CreatePlanModal';
 import AnnualDiscountCard from '@/components/admin/plans/AnnualDiscountCard';
+import LandingFeaturesCard from '@/components/admin/plans/LandingFeaturesCard';
 import type { PlanModuleDef } from '@/components/admin/plans/PlanModuleToggle';
 
 const ALL_MODULES: PlanModuleDef[] = [
@@ -31,6 +32,13 @@ export default function PlansPage() {
     const { showToast } = useToast();
     const bootstrapPlans = useAdminPlans();
     const { refetch: refetchBootstrap, isLoading } = useAdminBootstrap();
+
+    // Tras cualquier cambio de planes, la landing (/) los muestra al instante: se
+    // purga su caché (planes públicos y comparación de funciones).
+    const afterChange = async () => {
+        await refetchBootstrap();
+        fetch('/api/revalidate-landing', { method: 'POST' }).catch(() => {});
+    };
 
     const [savingId, setSavingId] = useState<number | null>(null);
     const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -57,7 +65,7 @@ export default function PlansPage() {
                 body: plan
             });
             showToast(`Plan ${plan.name} actualizado`, 'success');
-            await refetchBootstrap();
+            await afterChange();
         } catch (err: any) {
             showToast(err.message || 'Error al actualizar plan', 'error');
         } finally {
@@ -77,7 +85,7 @@ export default function PlansPage() {
                 body: { ...target, features }
             });
             showToast('Características actualizadas', 'success');
-            await refetchBootstrap();
+            await afterChange();
         } catch (err: any) {
             showToast(err.message || 'Error al actualizar características', 'error');
         }
@@ -91,7 +99,7 @@ export default function PlansPage() {
             await apiRequest(`/api/internal/creator/plans/${target.id}`, { method: 'DELETE' });
             showToast(`Plan ${target.name} eliminado`, 'success');
             setDeleteModal({ open: false, plan: null });
-            await refetchBootstrap();
+            await afterChange();
         } catch (err: any) {
             showToast(err.message || 'Error al eliminar plan', 'error');
         } finally {
@@ -126,7 +134,7 @@ export default function PlansPage() {
             });
             showToast(`Plan ${name} creado`, 'success');
             setCreateModalOpen(false);
-            await refetchBootstrap();
+            await afterChange();
         } catch (err: any) {
             showToast(err.message || 'Error al crear plan', 'error');
         } finally {
@@ -152,7 +160,9 @@ export default function PlansPage() {
                 </button>
             </header>
 
-            <AnnualDiscountCard plans={plans} onSaved={refetchBootstrap} onToast={showToast} />
+            <AnnualDiscountCard plans={plans} onSaved={afterChange} onToast={showToast} />
+
+            <LandingFeaturesCard plans={plans} onSaved={afterChange} onToast={showToast} />
 
             {isLoading && plans.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 opacity-50">

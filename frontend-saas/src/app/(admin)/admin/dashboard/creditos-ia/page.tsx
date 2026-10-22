@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     Coins, BarChart3, Wallet, History, Settings2, Gift, Loader2, X, CheckCircle2, AlertCircle, Save, ChevronLeft, ChevronRight,
-    Inbox, Check,
+    Inbox, Check, RefreshCw, Server, AlertTriangle,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/admin/api';
 import GrantCreditsModal from '@/components/admin/aiCredits/GrantCreditsModal';
@@ -184,6 +184,120 @@ export default function CreditosIaPage() {
 }
 
 // ---------------------------------------------------------------------------
+// Saldo real en las plataformas IA (consultado en vivo)
+// ---------------------------------------------------------------------------
+
+interface ProviderBalance {
+    provider: string;
+    key_hint: string | null;
+    connections: string[];
+    models: string[];
+    supported: boolean;
+    account?: { total_usd: number; used_usd: number; remaining_usd: number };
+    key_limit?: { limit_usd: number; used_usd: number; remaining_usd: number };
+    avg_image_cost_usd: number | null;
+    recorded_cost_usd: number;
+    error?: string;
+}
+
+const PROVIDER_LABEL: Record<string, string> = { openrouter: 'OpenRouter', gemini: 'Google Gemini', anthropic: 'Claude', openai: 'ChatGPT', deepseek: 'DeepSeek' };
+
+function ProviderBalances() {
+    const { data, isLoading, isFetching, refetch, error } = useQuery<{ items: ProviderBalance[]; checked_at: string }>({
+        queryKey: ['admin', 'ai-credits', 'provider-balances'],
+        queryFn: () => apiRequest(`${BASE}/provider-balances`),
+        staleTime: 60_000,
+    });
+
+    return (
+        <div className={`${cardCls} p-5 space-y-4`}>
+            <div className="flex items-center justify-between gap-3">
+                <div>
+                    <h3 className="text-white font-bold flex items-center gap-2"><Server size={16} className="text-primary" /> Saldo en plataformas IA</h3>
+                    <p className="text-[11px] text-white/40">
+                        Consultado en vivo con la clave guardada en Plataformas IA
+                        {data ? ` · ${new Date(data.checked_at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}` : ''}.
+                    </p>
+                </div>
+                <button onClick={() => refetch()} disabled={isFetching} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 text-xs font-bold disabled:opacity-50">
+                    <RefreshCw size={13} className={isFetching ? 'animate-spin' : ''} /> Actualizar
+                </button>
+            </div>
+
+            {isLoading ? (
+                <div className="py-6 flex justify-center"><Loader2 className="animate-spin text-primary" size={22} /></div>
+            ) : error || !data ? (
+                <p className="text-red-300 text-sm">{(error as Error)?.message || 'No se pudo consultar el saldo'}</p>
+            ) : data.items.length === 0 ? (
+                <p className="text-white/40 text-sm">No hay plataformas IA activas.</p>
+            ) : (
+                <div className="grid gap-4 lg:grid-cols-2">
+                    {data.items.map((b) => {
+                        const acc = b.account;
+                        // Lo que de verdad se puede gastar: el menor entre la cuenta y el tope de la clave.
+                        const usable = acc ? Math.min(acc.remaining_usd, b.key_limit?.remaining_usd ?? Infinity) : null;
+                        const pctUsed = acc && acc.total_usd > 0 ? Math.min(100, (acc.used_usd / acc.total_usd) * 100) : 0;
+                        const images = usable != null && b.avg_image_cost_usd ? Math.floor(usable / b.avg_image_cost_usd) : null;
+                        const low = usable != null && usable < 1;
+                        return (
+                            <div key={`${b.provider}${b.key_hint}`} className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-bold text-white">{PROVIDER_LABEL[b.provider] || b.provider}</p>
+                                        <p className="text-[11px] text-white/40 truncate" title={b.models.join(', ')}>
+                                            {b.connections.length} {b.connections.length === 1 ? 'conexión' : 'conexiones'} · clave {b.key_hint || '—'} · {b.models.join(', ')}
+                                        </p>
+                                    </div>
+                                    {usable != null && (
+                                        <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black ${low ? 'bg-red-500/20 text-red-300' : 'bg-emerald-500/15 text-emerald-300'}`}>
+                                            {low ? 'Saldo bajo' : 'OK'}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {!b.supported ? (
+                                    <p className="text-xs text-white/50">Esta plataforma no informa su saldo por API: revísalo en su panel.</p>
+                                ) : b.error ? (
+                                    <p className="text-xs text-red-300">{b.error}</p>
+                                ) : acc && (
+                                    <>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <div><p className="text-[10px] uppercase font-bold text-white/40">Cargado</p><p className="text-lg font-black text-white">{usd(acc.total_usd)}</p></div>
+                                            <div><p className="text-[10px] uppercase font-bold text-white/40">Gastado</p><p className="text-lg font-black text-amber-300">{usd(acc.used_usd)}</p></div>
+                                            <div><p className="text-[10px] uppercase font-bold text-white/40">Disponible</p><p className={`text-lg font-black ${low ? 'text-red-400' : 'text-emerald-400'}`}>{usd(acc.remaining_usd)}</p></div>
+                                        </div>
+                                        <div className="h-2 rounded-full bg-white/10 overflow-hidden"><div className="h-full bg-amber-400" style={{ width: `${pctUsed}%` }} /></div>
+
+                                        {b.key_limit && b.key_limit.remaining_usd < acc.remaining_usd && (
+                                            <p className="flex items-start gap-2 text-[11px] text-amber-200 bg-amber-500/10 border border-amber-500/25 rounded-lg p-2.5">
+                                                <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                                                <span>
+                                                    Esta clave tiene un tope propio de {usd(b.key_limit.limit_usd)} y le quedan {usd(b.key_limit.remaining_usd)}.
+                                                    Al llegar al tope deja de funcionar aunque la cuenta tenga saldo: súbelo o quítalo en openrouter.ai, sección Keys.
+                                                </span>
+                                            </p>
+                                        )}
+                                        {images != null && (
+                                            <p className="text-xs text-white/60">
+                                                Alcanza para <b className="text-white">≈ {images.toLocaleString('es-CL')} imágenes</b> más
+                                                (costo promedio {usd(b.avg_image_cost_usd!, 4)} c/u, últimos 30 días).
+                                            </p>
+                                        )}
+                                        <p className="text-[11px] text-white/40">
+                                            Registrado en Vinzer: {usd(b.recorded_cost_usd, 4)}. La diferencia con lo gastado son pruebas del admin o uso de la clave fuera de Vinzer.
+                                        </p>
+                                    </>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Resumen: gasto real vs. valor de los créditos
 // ---------------------------------------------------------------------------
 
@@ -196,6 +310,8 @@ function ReportTab() {
 
     return (
         <div className="space-y-6">
+            <ProviderBalances />
+
             <div className="flex items-center gap-3">
                 <label className="text-sm text-white/60">Mes</label>
                 <input type="month" value={period} max={currentPeriod()} onChange={(e) => e.target.value && setPeriod(e.target.value)} className={inputCls} />

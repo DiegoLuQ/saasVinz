@@ -9,6 +9,7 @@ import {
     CheckCircle2,
     PawPrint,
     Camera,
+    FileText,
     AlertCircle,
     Building2,
     Heart,
@@ -1125,13 +1126,16 @@ export default function TrackingPage() {
                                                 transition={{ delay: 0.1 + (idx * 0.08) }}
                                                 className={`relative pb-10 sm:pb-12 last:pb-0 ${isCurrent ? 'opacity-100' : isCompleted ? 'opacity-100' : 'opacity-40'}`}
                                             >
+                                                {/* Tarjeta + indicador: el círculo se centra en la línea (mismo relleno pl-8/sm:pl-10
+                                                    + mitad del borde de 4px + mitad del círculo w-7) y en el alto de la tarjeta. */}
+                                                <div className="relative">
                                                 {/* Indicator */}
-                                                <div className={`absolute -left-[45px] sm:-left-[54px] top-[22px] sm:top-[26px] w-7 h-7 rounded-full border-4 transition-all duration-700 z-10 flex items-center justify-center shadow-sm
+                                                <div className={`absolute left-[calc(-2rem-2px-0.875rem)] sm:left-[calc(-2.5rem-2px-0.875rem)] top-1/2 -translate-y-1/2 w-7 h-7 rounded-full border-4 transition-all duration-700 z-10 flex items-center justify-center shadow-sm
                                                     ${isCompleted ? 'bg-emerald-500 border-emerald-500 text-white shadow-[0_0_12px_rgba(16,185,129,0.3)]' :
-                                                        isCurrent ? `border-sky-400 ${isDarkMode ? 'bg-sky-950/85 text-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.5)]' : 'bg-white text-sky-550 shadow-[0_0_12px_rgba(56,189,248,0.25)]'} scale-110` :
-                                                            isDarkMode ? 'border-neutral-700 bg-neutral-900/40 text-neutral-600' : 'border-gray-250 bg-gray-100 text-gray-400'}`}>
+                                                        isCurrent ? `border-sky-400 ${isDarkMode ? 'bg-sky-950/85 text-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.5)]' : 'bg-white text-sky-600 shadow-[0_0_12px_rgba(56,189,248,0.25)]'} scale-110` :
+                                                            isDarkMode ? 'border-neutral-700 bg-neutral-900/40 text-neutral-600' : 'border-gray-300 bg-gray-100 text-gray-400'}`}>
                                                     {isCompleted && <CheckCircle2 size={14} strokeWidth={4} className="text-white" />}
-                                                    {isCurrent && <Heart size={11} fill="currentColor" className={`${isDarkMode ? 'text-sky-450' : 'text-sky-500'} animate-pulse shrink-0`} />}
+                                                    {isCurrent && <Heart size={11} fill="currentColor" className={`${isDarkMode ? 'text-sky-400' : 'text-sky-500'} animate-pulse shrink-0`} />}
                                                 </div>
 
                                                 <div className={`px-6 py-4 sm:px-9 sm:py-5 rounded-[2rem] border transition-all duration-500 ${
@@ -1139,7 +1143,7 @@ export default function TrackingPage() {
                                                         ? (isDarkMode ? 'bg-sky-950/10 border-sky-500 shadow-[0_0_25px_rgba(56,189,248,0.25)]' : 'bg-sky-50/70 border-sky-200 shadow-[0_0_20px_rgba(56,189,248,0.15)]') + ' scale-[1.02] backdrop-blur-md'
                                                         : isCompleted
                                                             ? (isDarkMode ? 'bg-emerald-950/10 border-emerald-500/20' : 'bg-emerald-50/20 border-emerald-100') + ' shadow-sm'
-                                                            : isDarkMode ? 'bg-neutral-950/20 border-neutral-900/60' : 'bg-gray-50/60 border-gray-150 shadow-sm'
+                                                            : isDarkMode ? 'bg-neutral-950/20 border-neutral-900/60' : 'bg-gray-50/60 border-gray-200 shadow-sm'
                                                     }`}>
                                                     <div className="flex items-center gap-4 h-full">
                                                         {/* Circular Icon Container */}
@@ -1169,50 +1173,19 @@ export default function TrackingPage() {
                                                                 {/* Minimalist Angel Wing Evidence Icon */}
                                                                 {event.evidence && (event.evidence.photo_url || (Array.isArray(event.evidence.comments) && event.evidence.comments.some((c: string) => c.trim())) || (typeof event.evidence.comments === 'string' && event.evidence.comments.trim())) && (
                                                                     <motion.button
-                                                                        whileHover={{ scale: 1.2, backdropFilter: "blur(12px)" }}
-                                                                        whileTap={{ scale: 0.9 }}
-                                                                        animate={{
-                                                                            scale: [1, 1.15, 1],
-                                                                            backgroundColor: isDarkMode ? [
-                                                                                "rgba(249, 115, 22, 0.05)",
-                                                                                "rgba(249, 115, 22, 0.15)",
-                                                                                "rgba(249, 115, 22, 0.05)"
-                                                                            ] : [
-                                                                                "rgba(6, 78, 59, 0.05)",
-                                                                                "rgba(6, 78, 59, 0.15)",
-                                                                                "rgba(6, 78, 59, 0.05)"
-                                                                            ],
-                                                                            boxShadow: isDarkMode ? [
-                                                                                "0 0 0px rgba(249, 115, 22, 0)",
-                                                                                "0 0 20px rgba(249, 115, 22, 0.4)",
-                                                                                "0 0 0px rgba(249, 115, 22, 0)"
-                                                                            ] : [
-                                                                                "0 0 0px rgba(6, 78, 59, 0)",
-                                                                                "0 0 20px rgba(6, 78, 59, 0.4)",
-                                                                                "0 0 0px rgba(6, 78, 59, 0)"
-                                                                            ]
-                                                                        }}
-                                                                        transition={{
-                                                                            duration: 2.5,
-                                                                            repeat: Infinity,
-                                                                            ease: "easeInOut"
-                                                                        }}
+                                                                        whileHover={{ y: -1 }}
+                                                                        whileTap={{ scale: 0.95 }}
                                                                         onClick={() => setSelectedEvidence(event.evidence)}
-                                                                        className={`p-3 sm:p-2.5 rounded-full cursor-pointer transition-all group relative border shrink-0 ${
-                                                                            isDarkMode 
-                                                                                ? 'text-orange-500 border-orange-500/20' 
-                                                                                : 'text-emerald-900 border-emerald-900/25'
+                                                                        className={`inline-flex items-center gap-1.5 shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold transition-colors cursor-pointer ${
+                                                                            isDarkMode
+                                                                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
+                                                                                : 'bg-white border-emerald-200 text-emerald-700 shadow-sm hover:bg-emerald-50 hover:border-emerald-300'
                                                                         }`}
-                                                                        title="Ver registro visual"
+                                                                        title={event.evidence.photo_url ? 'Ver fotos y notas de esta etapa' : 'Ver la nota de esta etapa'}
+                                                                        aria-label={`${event.evidence.photo_url ? 'Ver fotos' : 'Ver nota'} de ${event.step_name}`}
                                                                     >
-                                                                        <Camera className={`w-5 h-5 sm:w-4 sm:h-4 transition-all ${
-                                                                            isDarkMode 
-                                                                                ? 'group-hover:drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]' 
-                                                                                : 'group-hover:drop-shadow-[0_0_8px_rgba(6,78,59,0.5)]'
-                                                                        }`} />
-                                                                        <div className={`absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 blur-md transition-opacity ${
-                                                                            isDarkMode ? 'bg-orange-500/10' : 'bg-emerald-950/10'
-                                                                        }`} />
+                                                                        {event.evidence.photo_url ? <Camera className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
+                                                                        <span>{event.evidence.photo_url ? 'Ver fotos' : 'Ver nota'}</span>
                                                                     </motion.button>
                                                                 )}
                                                             </div>
@@ -1236,11 +1209,12 @@ export default function TrackingPage() {
                                                                 ) : isCurrent ? (
                                                                     <span className="px-2.5 py-0.5 bg-sky-500/15 border border-sky-500/30 text-sky-600 dark:text-sky-400 rounded-full text-[9px] font-bold uppercase tracking-wider animate-pulse">En proceso</span>
                                                                 ) : (
-                                                                    <span className="px-2.5 py-0.5 bg-neutral-900 border border-neutral-800 text-neutral-500 dark:text-neutral-600 rounded-full text-[9px] font-bold uppercase tracking-wider">Pendiente</span>
+                                                                    <span className={`px-2.5 py-0.5 border rounded-full text-[9px] font-bold uppercase tracking-wider ${isDarkMode ? 'bg-neutral-900 border-neutral-800 text-neutral-500' : 'bg-gray-100 border-gray-200 text-gray-500'}`}>Pendiente</span>
                                                                 )}
                                                             </div>
                                                         </div>
                                                     </div>
+                                                </div>
                                                 </div>
                                             </motion.div>
                                         );

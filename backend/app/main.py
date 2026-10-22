@@ -55,13 +55,16 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     logger.error(f"422 Validation Error on {request.method} {request.url.path}: {exc.errors()}")
+    # jsonable_encoder: los errores de validadores propios traen la excepción en
+    # ctx (ValueError) y json.dumps fallaba con 500 en vez de responder 422.
     return JSONResponse(
         status_code=422,
-        content={"detail": exc.errors()},
+        content={"detail": jsonable_encoder(exc.errors())},
     )
 
 

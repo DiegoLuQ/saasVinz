@@ -10,6 +10,7 @@ import ImageCropper from '@/components/tenant/ImageCropper';
 import BackupSettings from './BackupSettings';
 import AiProvidersSettings from './AiProvidersSettings';
 import PaymentSettings from './PaymentSettings';
+import DashboardBannerSettings from './DashboardBannerSettings';
 import HeroAssetSelector from '@/components/admin/landing/HeroAssetSelector';
 import MediaSelector from '@/components/admin/media/MediaSelector';
 
@@ -326,6 +327,7 @@ export default function LandingConfigPage() {
                         { id: 'backups', label: 'Respaldos', icon: Database },
                         { id: 'ai', label: 'Plataformas IA', icon: Bot },
                         { id: 'pagos', label: 'Datos de pago', icon: Landmark },
+                        { id: 'panel', label: 'Banner del panel', icon: ImageIcon },
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -352,6 +354,10 @@ export default function LandingConfigPage() {
 
                     {activeTab === 'pagos' && (
                         <PaymentSettings />
+                    )}
+
+                    {activeTab === 'panel' && (
+                        <DashboardBannerSettings />
                     )}
 
                     {/* General & SEO */}
@@ -1031,6 +1037,20 @@ export default function LandingConfigPage() {
                                                 onChange={(e) => updateSaasField('correo', e.target.value)}
                                                 className="w-full bg-[#0a192f] border border-white/10 rounded-xl p-3 outline-none focus:border-primary"
                                             />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs uppercase font-bold text-white/40 mb-1 block">Correo para recibir mensajes</label>
+                                            <input
+                                                type="text"
+                                                inputMode="email"
+                                                value={saasConfig.notification_email || ''}
+                                                onChange={(e) => updateSaasField('notification_email', e.target.value)}
+                                                placeholder="ventas@vinzer.cl, otro@vinzer.cl"
+                                                className="w-full bg-[#0a192f] border border-white/10 rounded-xl p-3 outline-none focus:border-primary placeholder:text-white/20"
+                                            />
+                                            <p className="text-[11px] text-white/40 mt-1">
+                                                Aquí llegan las solicitudes de «Demostración guiada» y de memorial de la web. Puedes poner varios separados por coma (máx. 5). Vacío: se usa el correo del sistema (MAIL_FROM).
+                                            </p>
                                         </div>
                                         <div>
                                             <label className="text-xs uppercase font-bold text-white/40 mb-1 block">WhatsApp Corporativo</label>
