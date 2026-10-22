@@ -976,6 +976,15 @@ def _img_format_date(dt, fmt):
     return dt.strftime("%d/%m/%Y")
 
 
+def _ov_date(ov: dict):
+    """Fecha escrita al emitir (override "date", AAAA-MM-DD) cuando la ficha no la tiene."""
+    raw = str(ov.get("date") or "")[:10]
+    try:
+        return datetime.strptime(raw, "%Y-%m-%d") if raw else None
+    except ValueError:
+        return None
+
+
 def generate_image_certificate_html(
     background_url: str,
     aspect_ratio: str,
@@ -1179,9 +1188,9 @@ def generate_image_certificate_html(
         if ftype == "nombre_mascota":
             value = pet_name or ""
         elif ftype == "fecha_nacimiento":
-            value = _img_format_date(birth_date, ov.get("format") or field.get("format"))
+            value = _img_format_date(_ov_date(ov) or birth_date, ov.get("format") or field.get("format"))
         elif ftype == "fecha_fallecimiento":
-            value = _img_format_date(death_date, ov.get("format") or field.get("format"))
+            value = _img_format_date(_ov_date(ov) or death_date, ov.get("format") or field.get("format"))
         elif ftype == "fecha_actual":
             value = _img_format_date(current_date, ov.get("format") or field.get("format"))
         elif ftype == "texto_fijo":

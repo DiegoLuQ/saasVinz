@@ -119,8 +119,8 @@ export function VinzerTracking({ theme = 'dark' }: VinzerTrackingProps) {
                                 <TrackingSearch
                                     theme={theme}
                                     layout="inline"
-                                    label="Prueba el portal con un código de seguimiento:"
-                                    placeholder="Ej: SMROE2STJ4"
+                                    label="Prueba el portal con este código de ejemplo:"
+                                    fixedCode="SMROE2STJ4"
                                     buttonLabel="Consultar estado"
                                 />
                             </div>

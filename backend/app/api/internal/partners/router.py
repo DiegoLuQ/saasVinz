@@ -5,6 +5,7 @@ from typing import List, Optional
 from app.database import get_db
 from app.api.deps import get_tenant_id
 from app.api.internal.admin.rbac.router import check_permission
+from app.api.deps_features import check_feature
 from . import models, schemas
 from app.api.internal.partners.models import Veterinary, PartnerLinkV2 as PartnerLink, PartnerCommission, PartnerLinkStatus, PartnerCommissionStatus
 from app import auth
@@ -395,7 +396,8 @@ def list_commissions(
     search: Optional[str] = None,
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
-    _perm: bool = Depends(check_permission("veterinarios", "view"))
+    _perm: bool = Depends(check_permission("veterinarios", "view")),
+    _f: bool = Depends(check_feature("veterinarios:comisiones:ver", default=True))
 ):
     query = db.query(PartnerCommission).join(PartnerLink).join(Veterinary).filter(
         PartnerLink.tenant_id == tenant_id
@@ -469,7 +471,8 @@ def pay_commission(
     payload: Optional[schemas.PayCommissionPayload] = None,
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
-    _perm: bool = Depends(check_permission("veterinarios", "edit"))
+    _perm: bool = Depends(check_permission("veterinarios", "edit")),
+    _f: bool = Depends(check_feature("veterinarios:comisiones:liquidar", default=True))
 ):
     comm = db.query(PartnerCommission).options(
         joinedload(PartnerCommission.partner_link).joinedload(PartnerLink.veterinary),
@@ -497,7 +500,8 @@ def unpay_commission(
     commission_id: int,
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
-    _perm: bool = Depends(check_permission("veterinarios", "edit"))
+    _perm: bool = Depends(check_permission("veterinarios", "edit")),
+    _f: bool = Depends(check_feature("veterinarios:comisiones:liquidar", default=True))
 ):
     comm = db.query(PartnerCommission).options(
         joinedload(PartnerCommission.partner_link).joinedload(PartnerLink.veterinary),

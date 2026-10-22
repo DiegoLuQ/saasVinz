@@ -26,6 +26,32 @@ const ROUTE_MODULES: { prefix: string; module: string }[] = [
     { prefix: '/dashboard/recibo', module: 'configuracion' },
 ];
 
+/**
+ * Ruta → característica del plan (admin → Planes → "Configurar Características").
+ * Va dentro de un módulo ya permitido; el más específico primero. `exact` = solo
+ * esa ruta (no sus hijas). Mantener alineado con los `featureKey` del Sidebar.
+ */
+const ROUTE_FEATURES: { prefix: string; feature: string; exact?: boolean }[] = [
+    { prefix: '/dashboard/inventario/categorias', feature: 'inventario:categorias:gestionar' },
+    { prefix: '/dashboard/inventario/proveedores', feature: 'inventario:proveedores:gestionar' },
+    { prefix: '/dashboard/documentos/repositorio', feature: 'certificados:repositorio' },
+    { prefix: '/dashboard/documentos/disenos', feature: 'certificados:diseno' },
+    { prefix: '/dashboard/documentos/redes', feature: 'certificados:redes' },
+    { prefix: '/dashboard/documentos', feature: 'certificados:generar_pdf', exact: true },
+    { prefix: '/dashboard/operaciones/lista', feature: 'operaciones:panel' },
+    { prefix: '/dashboard/operaciones/crear-seguimiento', feature: 'operaciones:seguimiento:crear' },
+    { prefix: '/dashboard/ordenes-cremacion', feature: 'pagos:ver_historial' },
+    { prefix: '/dashboard/partners/comisiones', feature: 'veterinarios:comisiones:ver' },
+    { prefix: '/dashboard/partners', feature: 'veterinarios:gestionar' },
+    { prefix: '/dashboard/roles-modulos', feature: 'configuracion:roles' },
+];
+
+/** Característica del plan que exige una ruta, o null. */
+export function featureForPath(path: string): string | null {
+    const clean = path.length > 1 ? path.replace(/\/$/, '') : path;
+    return ROUTE_FEATURES.find(r => (r.exact ? clean === r.prefix : matches(clean, r.prefix)))?.feature ?? null;
+}
+
 /** Rutas sin módulo: accesibles para cualquier usuario autenticado del tenant. */
 const OPEN_PREFIXES = ['/dashboard/perfil', '/dashboard/ayuda'];
 

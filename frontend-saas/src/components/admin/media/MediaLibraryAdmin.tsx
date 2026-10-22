@@ -25,28 +25,13 @@ import { apiRequest, getImageUrl } from '@/lib/admin/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { authHeader } from '@/lib/auth/token';
 import MediaFilterSelect, { type FilterOption } from './MediaFilterSelect';
-import { Building2, FolderTree, Eye } from 'lucide-react';
+import { Building2, FolderTree, Eye, Info } from 'lucide-react';
 import MediaUsagePanel from './MediaUsagePanel';
+import MediaInfoModal, { type MediaInfoItem } from './MediaInfoModal';
 import MediaStorageSummary from './MediaStorageSummary';
 import { useQueryClient } from '@tanstack/react-query';
 
-interface MediaItem {
-    id: number;
-    tenant_id?: number | null;
-    tenant_name?: string | null;
-    url: string;
-    media_type: 'image' | 'video';
-    category: string;
-    ratio: string;
-    description: string;
-    alt_text: string;
-    file_size: number;
-    width: number;
-    height: number;
-    duration?: number;
-    thumbnail_url?: string;
-    created_at: string;
-}
+type MediaItem = MediaInfoItem;
 
 const PAGE_SIZE = 24;
 
@@ -97,6 +82,7 @@ export default function MediaLibraryAdmin() {
     const [editingItem, setEditingItem] = useState<MediaItem | null>(null);
     // Panel "¿Dónde se usa?" (ojo)
     const [usageItem, setUsageItem] = useState<MediaItem | null>(null);
+    const [infoItem, setInfoItem] = useState<MediaItem | null>(null);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<MediaItem | null>(null);
 
@@ -562,6 +548,17 @@ export default function MediaLibraryAdmin() {
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
+                                        setInfoItem(item);
+                                    }}
+                                    className="p-1.5 bg-black/60 hover:bg-primary text-white rounded-lg backdrop-blur-sm"
+                                    title="Información (quién lo subió, cuándo, peso, dimensiones)"
+                                    aria-label="Información del archivo"
+                                >
+                                    <Info size={14} />
+                                </button>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
                                         setUsageItem(item);
                                     }}
                                     className="p-1.5 bg-black/60 hover:bg-primary text-white rounded-lg backdrop-blur-sm"
@@ -1011,6 +1008,8 @@ export default function MediaLibraryAdmin() {
                 </div>
             )}
 
+            <MediaInfoModal item={infoItem} onClose={() => setInfoItem(null)}
+                onShowUsage={(it) => { setInfoItem(null); setUsageItem(it); }} />
             <MediaUsagePanel item={usageItem} onClose={() => setUsageItem(null)} />
         </div>
     );

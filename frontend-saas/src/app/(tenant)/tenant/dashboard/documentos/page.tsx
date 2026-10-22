@@ -446,7 +446,7 @@ export default function EmitirDocumentosPage() {
             </div>
 
             {/* Grid de diseños */}
-            <div className="bg-zinc-950/40 border border-white/5 rounded-[2.5rem] p-6 lg:p-8 min-h-[400px]">
+            <div className="bg-slate-50 dark:bg-zinc-950/40 border border-slate-200 dark:border-white/5 rounded-[2.5rem] p-6 lg:p-8 min-h-[400px]">
                 {loading ? (
                     <div className="h-64 flex flex-col items-center justify-center text-muted-foreground">
                         <Loader2 className="animate-spin text-primary mb-4" size={32} />
@@ -455,7 +455,7 @@ export default function EmitirDocumentosPage() {
                 ) : templates.length === 0 ? (
                     <div className="h-64 flex flex-col items-center justify-center text-center">
                         <FileImage size={48} className="text-muted-foreground/20 mb-4" />
-                        <h3 className="text-white font-bold mb-1">Aún no hay certificados con imagen</h3>
+                        <h3 className="text-slate-900 dark:text-white font-bold mb-1">Aún no hay certificados con imagen</h3>
                         <p className="text-muted-foreground text-sm max-w-sm">Cuando el administrador publique diseños de tipo "Certificado con Imagen", aparecerán aquí para que puedas emitirlos.</p>
                     </div>
                 ) : (
@@ -463,12 +463,12 @@ export default function EmitirDocumentosPage() {
                         {templates.map((tpl) => {
                             const isExclusive = !!(tpl.is_locked || (tpl.tenant_id && tpl.tenant_id > 0));
                             return (
-                                <div key={tpl.id} className="group rounded-[2rem] border border-white/5 bg-white/[0.02] overflow-hidden hover:border-primary/30 transition-all flex flex-col">
-                                    <div className="aspect-video bg-black/40 overflow-hidden relative">
+                                <div key={tpl.id} className="group rounded-[2rem] border border-slate-200 dark:border-white/5 bg-white dark:bg-white/[0.02] overflow-hidden hover:border-primary/30 transition-all flex flex-col">
+                                    <div className="aspect-video bg-slate-100 dark:bg-black/40 overflow-hidden relative">
                                         {tpl.background_logo_url ? (
                                             <img src={getImageUrl(tpl.background_logo_url)} alt={tpl.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center"><ImageIcon size={32} className="text-white/10" /></div>
+                                            <div className="w-full h-full flex items-center justify-center"><ImageIcon size={32} className="text-slate-300 dark:text-white/10" /></div>
                                         )}
                                         <div className="absolute top-3 left-3 flex items-center gap-1.5">
                                             {isExclusive ? (
@@ -483,13 +483,13 @@ export default function EmitirDocumentosPage() {
                                         </div>
                                     </div>
                                     <div className="p-5 flex flex-col flex-1">
-                                        <h4 className="font-bold text-lg text-white tracking-tight">{tpl.name}</h4>
+                                        <h4 className="font-bold text-lg text-slate-900 dark:text-white tracking-tight">{tpl.name}</h4>
                                         <div className="flex items-center gap-2 mt-2">
-                                            <span className="text-[10px] text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-md font-black uppercase tracking-wider w-fit">
+                                            <span className="text-[10px] text-purple-700 bg-purple-50 border border-purple-200 dark:text-purple-400 dark:bg-purple-500/10 dark:border-purple-500/20 px-2 py-0.5 rounded-md font-black uppercase tracking-wider w-fit">
                                                 {tpl.sections_config?.aspect_ratio || '16:9'}
                                             </span>
                                             {isExclusive && (
-                                                <span className="text-[10px] text-amber-400/80 font-bold">Solo para tu crematorio</span>
+                                                <span className="text-[10px] text-amber-700 dark:text-amber-400/80 font-bold">Solo para tu crematorio</span>
                                             )}
                                         </div>
                                         <button
@@ -510,20 +510,20 @@ export default function EmitirDocumentosPage() {
             {active && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4">
                     <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={closeEmit} />
-                    <div className="relative w-full max-w-6xl bg-[#0b1220] border border-white/10 rounded-[2rem] shadow-2xl flex flex-col h-[92dvh] overflow-hidden">
+                    <div className="relative w-full max-w-6xl bg-white dark:bg-[#0b1220] border border-slate-200 dark:border-white/10 rounded-[2rem] shadow-2xl flex flex-col h-[92dvh] overflow-hidden">
                         {/* Header modal */}
-                        <div className="p-5 border-b border-white/5 flex items-center justify-between shrink-0">
+                        <div className="p-5 border-b border-slate-200 dark:border-white/5 flex items-center justify-between shrink-0">
                             <div className="flex items-center gap-3 min-w-0">
                                 <div className="p-2.5 bg-primary/10 rounded-xl text-primary shrink-0"><Sparkles size={18} /></div>
                                 <div className="min-w-0">
                                     <div className="flex items-center gap-2">
-                                        <h3 className="text-lg font-bold text-white truncate">{active.name}</h3>
+                                        <h3 className="text-lg font-bold text-slate-900 dark:text-white truncate">{active.name}</h3>
                                         {(active.is_locked || (active.tenant_id && active.tenant_id > 0)) ? (
                                             <span className="text-[9px] text-amber-800 bg-amber-100 border border-amber-300 dark:text-amber-300 dark:bg-amber-500/20 dark:border-amber-500/30 px-1.5 py-0.5 rounded font-black uppercase flex items-center gap-1">
                                                 <Lock size={9} /> Exclusiva
                                             </span>
                                         ) : (
-                                            <span className="text-[9px] text-emerald-300 bg-emerald-500/20 border border-emerald-500/30 px-1.5 py-0.5 rounded font-black uppercase flex items-center gap-1">
+                                            <span className="text-[9px] text-emerald-800 bg-emerald-100 border border-emerald-300 dark:text-emerald-300 dark:bg-emerald-500/20 dark:border-emerald-500/30 px-1.5 py-0.5 rounded font-black uppercase flex items-center gap-1">
                                                 <Globe size={9} /> Global
                                             </span>
                                         )}
@@ -531,32 +531,32 @@ export default function EmitirDocumentosPage() {
                                     <p className="text-[11px] text-muted-foreground uppercase tracking-widest font-bold">Emisión de certificado</p>
                                 </div>
                             </div>
-                            <button onClick={closeEmit} className="p-2.5 bg-white/5 hover:bg-white/10 rounded-xl text-white/50 hover:text-white transition-all"><X size={18} /></button>
+                            <button onClick={closeEmit} className="p-2.5 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-xl text-slate-500 dark:text-white/50 hover:text-slate-900 dark:hover:text-white transition-all"><X size={18} /></button>
                         </div>
 
                         <div className="flex-1 flex flex-col lg:flex-row min-h-0">
                             {/* Form */}
-                            <div className="lg:w-[380px] shrink-0 border-r border-white/5 overflow-y-auto p-6 space-y-6">
+                            <div className="lg:w-[380px] shrink-0 border-r border-slate-200 dark:border-white/5 overflow-y-auto p-6 space-y-6">
                                 {/* Selección de mascota */}
                                 <div className="space-y-3">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-white/40 flex items-center gap-2"><PawPrint size={12} /> Mascota / Orden</label>
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-white/40 flex items-center gap-2"><PawPrint size={12} /> Mascota / Orden</label>
                                     <div className="relative">
-                                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" />
+                                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-white/20" />
                                         <input
                                             value={search}
                                             onChange={(e) => setSearch(e.target.value)}
                                             placeholder="Buscar por mascota o dueño..."
-                                            className="w-full bg-black/40 border border-white/5 rounded-xl py-2.5 pl-9 pr-3 text-xs font-bold text-white outline-none focus:border-primary/50"
+                                            className="w-full bg-white dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-xl py-2.5 pl-9 pr-3 text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-primary/50"
                                         />
                                     </div>
                                     {!search.trim() ? (
-                                        <p className="text-white/20 text-xs italic py-4 text-center">Escribe el nombre de la mascota o del dueño para buscar.</p>
+                                        <p className="text-slate-400 dark:text-white/20 text-xs italic py-4 text-center">Escribe el nombre de la mascota o del dueño para buscar.</p>
                                     ) : (
                                         <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
                                             {cremLoading ? (
-                                                <div className="flex items-center justify-center py-6 text-white/30"><Loader2 className="animate-spin" size={20} /></div>
+                                                <div className="flex items-center justify-center py-6 text-slate-400 dark:text-white/30"><Loader2 className="animate-spin" size={20} /></div>
                                             ) : filteredCremations.length === 0 ? (
-                                                <p className="text-white/20 text-xs italic py-4 text-center">Sin resultados</p>
+                                                <p className="text-slate-400 dark:text-white/20 text-xs italic py-4 text-center">Sin resultados</p>
                                             ) : (
                                                 filteredCremations.map((c) => (
                                                 <button
@@ -564,8 +564,8 @@ export default function EmitirDocumentosPage() {
                                                     onClick={() => { setSelectedCremId(c.id); setPhotoOverrides({}); }}
                                                     className={`w-full flex items-center gap-3 p-2.5 rounded-xl border text-left transition-all ${selectedCremId === c.id ? 'bg-emerald-50 border-emerald-300 dark:bg-primary/15 dark:border-primary/40' : 'bg-white border-slate-200 hover:bg-slate-50 dark:bg-white/[0.02] dark:border-white/5 dark:hover:bg-white/5'}`}
                                                 >
-                                                    <div className="w-9 h-9 rounded-lg bg-black/40 overflow-hidden shrink-0">
-                                                        {(c.pet?.image_url) ? <img src={getImageUrl(c.pet.image_url)} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><PawPrint size={14} className="text-white/20" /></div>}
+                                                    <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-black/40 overflow-hidden shrink-0">
+                                                        {(c.pet?.image_url) ? <img src={getImageUrl(c.pet.image_url)} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><PawPrint size={14} className="text-slate-400 dark:text-white/20" /></div>}
                                                     </div>
                                                     <div className="min-w-0">
                                                         <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{c.pet_name || c.pet?.name || 'Mascota'}</p>
@@ -581,17 +581,17 @@ export default function EmitirDocumentosPage() {
                                 {/* Visibilidad de campos */}
                                 {selectedCrem && fields.length > 0 && (
                                     <div className="space-y-3">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-white/40 flex items-center gap-2"><Type size={12} /> Campos del certificado</label>
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-white/40 flex items-center gap-2"><Type size={12} /> Campos del certificado</label>
                                         {fields.map((f) => {
                                             const on = isFieldVisible(f);
                                             return (
                                                 <div
                                                     key={f.id}
                                                     onClick={() => setFieldToggles((prev) => ({ ...prev, [f.id]: !on }))}
-                                                    className="flex items-center gap-3 p-2.5 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/5 cursor-pointer transition-all"
+                                                    className="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200 dark:border-white/5 bg-white dark:bg-white/[0.02] hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-all"
                                                 >
-                                                    <span className="flex-1 text-xs font-bold text-white/70">{fieldLabel(f, textOverrides[f.id])}</span>
-                                                    <div className={`w-10 h-5 rounded-full relative transition-all ${on ? 'bg-primary' : 'bg-white/10'}`}>
+                                                    <span className="flex-1 text-xs font-bold text-slate-700 dark:text-white/70">{fieldLabel(f, textOverrides[f.id])}</span>
+                                                    <div className={`w-10 h-5 rounded-full relative transition-all ${on ? 'bg-primary' : 'bg-slate-300 dark:bg-white/10'}`}>
                                                         <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-all ${on ? 'translate-x-5' : 'translate-x-0'}`} />
                                                     </div>
                                                 </div>
@@ -603,19 +603,19 @@ export default function EmitirDocumentosPage() {
                                 {/* Edición del texto libre */}
                                 {selectedCrem && textFields.length > 0 && (
                                     <div className="space-y-3">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-white/40 flex items-center gap-2"><Type size={12} /> Textos</label>
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-white/40 flex items-center gap-2"><Type size={12} /> Textos</label>
                                         {textFields.map((f, i) => (
                                             <div key={f.id} className="space-y-1.5">
                                                 <div className="flex items-center gap-2">
                                                     {f.code ? (
                                                         <span className="text-[10px] font-mono font-black text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">{f.code}</span>
                                                     ) : (
-                                                        <span className="text-[10px] text-white/40 font-bold uppercase">
+                                                        <span className="text-[10px] text-slate-500 dark:text-white/40 font-bold uppercase">
                                                             {textFields.length > 1 ? `Texto #${i + 1}` : 'Texto libre'}
                                                         </span>
                                                     )}
                                                     {f.code && f.code in savedTexts && (textOverrides[f.id] ?? '') === savedTexts[f.code] && (
-                                                        <span className="text-[10px] text-emerald-400 font-bold">Guardado</span>
+                                                        <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">Guardado</span>
                                                     )}
                                                 </div>
                                                 <textarea
@@ -623,7 +623,7 @@ export default function EmitirDocumentosPage() {
                                                     onChange={(e) => setTextOverrides((prev) => ({ ...prev, [f.id]: e.target.value }))}
                                                     rows={2}
                                                     placeholder="Escribe el texto para este certificado"
-                                                    className="w-full bg-black/40 border border-white/5 rounded-xl py-2 px-3 text-xs font-bold text-white outline-none focus:border-primary/50 resize-y"
+                                                    className="w-full bg-white dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-xl py-2 px-3 text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-primary/50 resize-y"
                                                 />
                                                 {(textOverrides[f.id] ?? '') !== (f.value ?? '') && (
                                                     <button
@@ -634,7 +634,7 @@ export default function EmitirDocumentosPage() {
                                                     </button>
                                                 )}
                                                 {f.code && (
-                                                    <label className="flex items-center gap-2 text-[11px] text-white/60 cursor-pointer select-none">
+                                                    <label className="flex items-center gap-2 text-[11px] text-slate-600 dark:text-white/60 cursor-pointer select-none">
                                                         <input
                                                             type="checkbox"
                                                             checked={!!saveTextToggles[f.id]}
@@ -646,7 +646,7 @@ export default function EmitirDocumentosPage() {
                                                 )}
                                             </div>
                                         ))}
-                                        <p className="text-[10px] text-white/20 font-medium">
+                                        <p className="text-[10px] text-slate-400 dark:text-white/20 font-medium">
                                             {textFields.some((f) => f.code)
                                                 ? 'Los textos con código marcados se guardan al generar el certificado. El diseño original no se modifica.'
                                                 : 'Solo cambia este certificado; el diseño original no se modifica.'}
@@ -657,16 +657,16 @@ export default function EmitirDocumentosPage() {
                                 {/* Overrides de fecha */}
                                 {selectedCrem && dateFields.length > 0 && (
                                     <div className="space-y-3">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-white/40 flex items-center gap-2"><Calendar size={12} /> Formato de fechas</label>
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-white/40 flex items-center gap-2"><Calendar size={12} /> Formato de fechas</label>
                                         {dateFields.map((f) => (
                                             <div key={f.id} className="space-y-1.5">
-                                                <span className="text-[10px] text-white/40 font-bold uppercase">
+                                                <span className="text-[10px] text-slate-500 dark:text-white/40 font-bold uppercase">
                                                     {f.type === 'fecha_nacimiento' ? 'Nacimiento' : f.type === 'fecha_fallecimiento' ? 'Fallecimiento' : 'Fecha actual'}
                                                 </span>
                                                 <select
                                                     value={dateOverrides[f.id] || f.format || 'short'}
                                                     onChange={(e) => setDateOverrides((prev) => ({ ...prev, [f.id]: e.target.value }))}
-                                                    className="w-full bg-black/40 border border-white/5 rounded-xl py-2 px-3 text-xs font-bold text-white outline-none focus:border-primary/50"
+                                                    className="w-full bg-white dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-xl py-2 px-3 text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-primary/50"
                                                 >
                                                     <option value="short">12/06/2026</option>
                                                     <option value="long">12 de junio de 2026</option>
@@ -681,16 +681,16 @@ export default function EmitirDocumentosPage() {
                                 {/* Overrides de fotos */}
                                 {selectedCrem && imageFields.length > 0 && (
                                     <div className="space-y-3">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-white/40 flex items-center gap-2"><ImageIcon size={12} /> Fotos</label>
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-white/40 flex items-center gap-2"><ImageIcon size={12} /> Fotos</label>
                                         {petPhotos.length === 0 ? (
-                                            <p className="text-[11px] text-amber-400/80 italic">Esta mascota no tiene fotos cargadas; los espacios de imagen quedarán vacíos.</p>
+                                            <p className="text-[11px] text-amber-700 dark:text-amber-400/80 italic">Esta mascota no tiene fotos cargadas; los espacios de imagen quedarán vacíos.</p>
                                         ) : (
                                             imageFields.map((f) => {
                                                 const fr: CertFrame = frameForField(f) || { color: 'gold' };
                                                 const setFrame = (patch: Partial<CertFrame>) => setFrameOverrides((prev) => ({ ...prev, [f.id]: { ...fr, ...patch } }));
                                                 return (
-                                                    <div key={f.id} className="space-y-2 pb-3 border-b border-white/5 last:border-0">
-                                                        <span className="text-[10px] text-white/40 font-bold uppercase">Foto #{(f.slot ?? 0) + 1}</span>
+                                                    <div key={f.id} className="space-y-2 pb-3 border-b border-slate-200 dark:border-white/5 last:border-0">
+                                                        <span className="text-[10px] text-slate-500 dark:text-white/40 font-bold uppercase">Foto #{(f.slot ?? 0) + 1}</span>
                                                         <div className="flex gap-2 flex-wrap">
                                                             {petPhotos.map((url) => {
                                                                 const isSel = photoForField(f) === url;
@@ -707,24 +707,24 @@ export default function EmitirDocumentosPage() {
                                                         </div>
                                                         {/* Marco de la foto */}
                                                         <div className="flex items-center gap-2 flex-wrap pt-1">
-                                                            <span className="text-[9px] text-white/30 font-bold uppercase mr-1">Marco:</span>
+                                                            <span className="text-[9px] text-slate-400 dark:text-white/30 font-bold uppercase mr-1">Marco:</span>
                                                             {FRAME_COLOR_LIST.map((c) => (
                                                                 <button
                                                                     key={c.key}
                                                                     onClick={() => setFrame({ color: c.key })}
                                                                     title={c.label}
-                                                                    className={`w-6 h-6 rounded-full border-2 transition-all ${fr.color === c.key ? 'border-white scale-110' : 'border-white/10'}`}
+                                                                    className={`w-6 h-6 rounded-full border-2 transition-all ${fr.color === c.key ? 'border-slate-900 dark:border-white scale-110' : 'border-slate-200 dark:border-white/10'}`}
                                                                     style={{ background: `linear-gradient(135deg, ${c.from}, ${c.to})` }}
                                                                 />
                                                             ))}
                                                         </div>
                                                         <div className="grid grid-cols-3 gap-2">
-                                                            <button onClick={() => setFrame({ border: !fr.border })} className={`py-1.5 text-[10px] font-black rounded-lg border transition-all ${fr.border ? 'bg-primary/20 text-primary border-primary/30' : 'bg-black/40 text-white/30 border-white/5'}`}>Borde</button>
-                                                            <button onClick={() => setFrame({ glow: !fr.glow })} className={`py-1.5 text-[10px] font-black rounded-lg border transition-all ${fr.glow ? 'bg-primary/20 text-primary border-primary/30' : 'bg-black/40 text-white/30 border-white/5'}`}>Halo</button>
-                                                            <button onClick={() => setFrame(fr.gradient ? { gradient: false } : { gradient: true, border: true })} className={`py-1.5 text-[10px] font-black rounded-lg border transition-all ${fr.gradient ? 'bg-primary/20 text-primary border-primary/30' : 'bg-black/40 text-white/30 border-white/5'}`}>Degrad.</button>
+                                                            <button onClick={() => setFrame({ border: !fr.border })} className={`py-1.5 text-[10px] font-black rounded-lg border transition-all ${fr.border ? 'bg-primary/20 text-primary border-primary/30' : 'bg-slate-100 dark:bg-black/40 text-slate-400 dark:text-white/30 border-slate-200 dark:border-white/5'}`}>Borde</button>
+                                                            <button onClick={() => setFrame({ glow: !fr.glow })} className={`py-1.5 text-[10px] font-black rounded-lg border transition-all ${fr.glow ? 'bg-primary/20 text-primary border-primary/30' : 'bg-slate-100 dark:bg-black/40 text-slate-400 dark:text-white/30 border-slate-200 dark:border-white/5'}`}>Halo</button>
+                                                            <button onClick={() => setFrame(fr.gradient ? { gradient: false } : { gradient: true, border: true })} className={`py-1.5 text-[10px] font-black rounded-lg border transition-all ${fr.gradient ? 'bg-primary/20 text-primary border-primary/30' : 'bg-slate-100 dark:bg-black/40 text-slate-400 dark:text-white/30 border-slate-200 dark:border-white/5'}`}>Degrad.</button>
                                                         </div>
                                                         {f.shape === 'circle' && (
-                                                            <button onClick={() => setFrame({ feather: !fr.feather })} className={`w-full py-1.5 text-[10px] font-black rounded-lg border transition-all ${fr.feather ? 'bg-primary/20 text-primary border-primary/30' : 'bg-black/40 text-white/30 border-white/5'}`}>Difuminar borde (feather)</button>
+                                                            <button onClick={() => setFrame({ feather: !fr.feather })} className={`w-full py-1.5 text-[10px] font-black rounded-lg border transition-all ${fr.feather ? 'bg-primary/20 text-primary border-primary/30' : 'bg-slate-100 dark:bg-black/40 text-slate-400 dark:text-white/30 border-slate-200 dark:border-white/5'}`}>Difuminar borde (feather)</button>
                                                         )}
                                                     </div>
                                                 );
@@ -736,20 +736,20 @@ export default function EmitirDocumentosPage() {
                                 {/* Elementos decorativos */}
                                 {selectedCrem && elements.length > 0 && (
                                     <div className="space-y-3">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-white/40 flex items-center gap-2"><Sticker size={12} /> Elementos decorativos</label>
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-white/40 flex items-center gap-2"><Sticker size={12} /> Elementos decorativos</label>
                                         {elements.map((el, idx) => {
                                             const on = isElementVisible(el);
                                             return (
                                                 <div
                                                     key={el.id}
                                                     onClick={() => setElementToggles((prev) => ({ ...prev, [el.id]: !on }))}
-                                                    className="flex items-center gap-3 p-2.5 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/5 cursor-pointer transition-all"
+                                                    className="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200 dark:border-white/5 bg-white dark:bg-white/[0.02] hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-all"
                                                 >
-                                                    <div className="w-9 h-9 rounded-lg bg-black/40 overflow-hidden shrink-0 flex items-center justify-center">
+                                                    <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-black/40 overflow-hidden shrink-0 flex items-center justify-center">
                                                         <img src={getImageUrl(el.url)} className="max-w-full max-h-full object-contain" />
                                                     </div>
-                                                    <span className="flex-1 text-xs font-bold text-white/70">Elemento #{idx + 1}</span>
-                                                    <div className={`w-10 h-5 rounded-full relative transition-all ${on ? 'bg-primary' : 'bg-white/10'}`}>
+                                                    <span className="flex-1 text-xs font-bold text-slate-700 dark:text-white/70">Elemento #{idx + 1}</span>
+                                                    <div className={`w-10 h-5 rounded-full relative transition-all ${on ? 'bg-primary' : 'bg-slate-300 dark:bg-white/10'}`}>
                                                         <div className={`absolute top-1 left-1 w-3 h-3 bg-white rounded-full transition-all ${on ? 'translate-x-5' : 'translate-x-0'}`} />
                                                     </div>
                                                 </div>
@@ -769,7 +769,7 @@ export default function EmitirDocumentosPage() {
                                         Generar Certificado
                                     </button>
                                     {resultHtml && (
-                                        <button onClick={handleDownloadPdf} disabled={downloading} className="w-full bg-white/5 hover:bg-white/10 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-xs uppercase tracking-widest border border-white/5 transition-all disabled:opacity-50">
+                                        <button onClick={handleDownloadPdf} disabled={downloading} className="w-full bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-900 dark:text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-xs uppercase tracking-widest border border-slate-200 dark:border-white/5 transition-all disabled:opacity-50">
                                             {downloading ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
                                             Descargar PDF
                                         </button>
@@ -778,9 +778,9 @@ export default function EmitirDocumentosPage() {
                             </div>
 
                             {/* Preview */}
-                            <div className="flex-1 bg-black/40 p-6 overflow-auto flex items-start justify-center">
+                            <div className="flex-1 bg-slate-100 dark:bg-black/40 p-6 overflow-auto flex items-start justify-center">
                                 {!selectedCrem ? (
-                                    <div className="h-full flex flex-col items-center justify-center text-center text-white/30">
+                                    <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 dark:text-white/30">
                                         <PawPrint size={40} className="mb-4 opacity-30" />
                                         <p className="text-sm">Selecciona una mascota para ver la vista previa.</p>
                                     </div>

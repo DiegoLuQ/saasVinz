@@ -9,7 +9,10 @@ from app.api.internal.auth.models import (
 from app.api.internal.admin.models import (
     Tenant, TenantStatus, TenantBillingInfo, SubscriptionPlan, AuditLog, TemporaryFormToken, TableConfiguration, SaaSConfig
 )
-from app.api.internal.admin.image_templates.models import ImageTemplate
+from app.api.internal.admin.image_templates.models import ImageTemplate, AiGeneration, TemplateExport
+from app.api.internal.creator.ai_providers.models import AiProvider
+from app.api.internal.common.ai_credits.models import AiCreditBalance, AiDesignSession, AiCreditLedger, AiCreditPurchase
+from app.api.internal.common.auto_documents.models import DocumentRun, DocumentJob
 from app.api.internal.creator.subscriptions.models import (
     TenantSubscription, BillingTransaction, Coupon, Receipt, ReceiptStatus
 )

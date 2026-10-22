@@ -40,15 +40,19 @@ def get_widget_info(
     db: Session = Depends(get_db),
 ):
     """Plan del tenant + si el plan habilita el widget (informativo para la UI)."""
+    from app.services.plan_features import plan_has
+
     tenant = _resolve_tenant(identifier, db)
     plan = tenant.effective_plan
+    # Planes que hoy tienen la casilla activa (admin → Configurar Características)
+    active_plans = db.query(models.SubscriptionPlan).filter(models.SubscriptionPlan.is_active == True).all()  # noqa: E712
     return {
         "tenant": {"id": tenant.id, "name": tenant.name, "slug": tenant.slug},
         "can_use": services.tenant_can_use_widget(tenant),
         "plan_name": plan.name if plan else None,
-        "allowed_plans": sorted(services.WIDGET_ALLOWED_PLANS),
+        "allowed_plans": sorted(p.name for p in active_plans if plan_has(p, "integraciones:widget")),
         "can_use_form_embed": services.tenant_can_use_form_embed(tenant),
-        "form_embed_allowed_plans": sorted(services.FORM_EMBED_ALLOWED_PLANS),
+        "form_embed_allowed_plans": sorted(p.name for p in active_plans if plan_has(p, "integraciones:formulario_incrustable")),
     }
 
 

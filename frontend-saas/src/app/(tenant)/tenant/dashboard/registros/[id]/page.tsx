@@ -28,10 +28,12 @@ import { apiRequest, getImageUrl } from '@/lib/tenant/api';
 import { copyToClipboard } from '@/lib/clipboard';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { useDashboardSummary, useCurrentTenant } from '@/hooks/useSessionBootstrap';
+import { useFeatures } from '@/hooks/useFeatures';
 import { useQueryClient } from '@tanstack/react-query';
 import { buildTrackingUrl } from '@/lib/publicUrls';
 import { PlanLimitModal } from '@/components/tenant/PlanLimitModal';
 import Modal from '@/components/tenant/Modal';
+import GenerateAllPanel, { type ProcessResult, type StepKey } from '@/components/tenant/registros/GenerateAllPanel';
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
     <svg
@@ -63,6 +65,9 @@ export default function SubmissionDetailPage() {
         cremation_id?: number
     }>({});
     const [userRole, setUserRole] = useState<string | null>(null);
+    // "Generar todo" es una característica del plan (sin flag = visible)
+    const { hasFeature } = useFeatures();
+    const canGenerateAll = hasFeature('certificados:generar_todo', true);
 
     const [showLimitModal, setShowLimitModal] = useState(false);
     const [modalResource, setModalResource] = useState('');
@@ -115,10 +120,11 @@ export default function SubmissionDetailPage() {
             const data = await apiRequest(`/api/internal/submissions/${submissionId}`);
             setSubmission(data);
 
-            if (data.customer_id || data.pet_id) {
+            if (data.customer_id || data.pet_id || data.order?.id) {
                 setWorkflowStep({
                     customer_id: data.customer_id,
-                    pet_id: data.pet_id
+                    pet_id: data.pet_id,
+                    cremation_id: data.order?.id,
                 });
             }
         } catch (err: any) {
@@ -149,70 +155,73 @@ export default function SubmissionDetailPage() {
         }
     };
 
-    const handleAddCustomer = async () => {
-        if (!submission) return;
-        if (isCustomerLimitReached) {
-            setModalResource('Clientes');
+    /**
+     * Procesa el registro: crea lo que falte de cliente → mascota → orden (cada
+     * paso se reutiliza si ya existe) e informa el avance. Lo usan el botón
+     * «Procesar registro» y «Generar todo».
+     */
+    const processRegistro = async (
+        onStep: (step: 'cliente' | 'mascota' | 'orden', s: { state: 'running' | 'done' | 'error'; detail?: string; href?: string }) => void,
+    ): Promise<ProcessResult> => {
+        if (!submission) throw new Error('Registro no cargado');
+        const ids = { ...workflowStep };
+        const limitHit = (resource: string, msg: string) => {
+            setModalResource(resource);
             setShowLimitModal(true);
-            return;
-        }
-        setProcessingAction('customer');
-        try {
-            const res = await apiRequest(`/api/internal/submissions/${submission.id}/create-customer`, { method: 'POST' });
-            setWorkflowStep(prev => ({ ...prev, customer_id: res.customer_id }));
-            showToast(res.message || 'Cliente procesado correctamente', 'success');
-        } catch (err: any) {
-            showToast(err.message, 'error');
-        } finally {
-            setProcessingAction(null);
-        }
-    };
+            throw new Error(msg);
+        };
+        if (!ids.customer_id && isCustomerLimitReached) limitHit('Clientes', 'Alcanzaste el límite de clientes de tu plan');
+        if (!ids.pet_id && isPetLimitReached) limitHit('Mascotas', 'Alcanzaste el límite de mascotas de tu plan');
+        if (!ids.cremation_id && isOrderLimitReached) limitHit('Recursos', 'Alcanzaste el límite de órdenes de tu plan');
 
-    const handleAddPet = async () => {
-        if (!submission || !workflowStep.customer_id) return;
-        if (isPetLimitReached) {
-            setModalResource('Mascotas');
-            setShowLimitModal(true);
-            return;
-        }
-        setProcessingAction('pet');
+        let current: 'cliente' | 'mascota' | 'orden' = 'cliente';
         try {
-            const res = await apiRequest(`/api/internal/submissions/${submission.id}/create-pet?customer_id=${workflowStep.customer_id}`, { method: 'POST' });
-            setWorkflowStep(prev => ({ ...prev, pet_id: res.pet_id }));
-            showToast('Mascota registrada y fotos migradas', 'success');
-        } catch (err: any) {
-            showToast(err.message, 'error');
-        } finally {
-            setProcessingAction(null);
-        }
-    };
-
-    const handleAddServices = async () => {
-        if (!submission || !workflowStep.pet_id) return;
-        if (isOrderLimitReached) {
-            setModalResource('Recursos');
-            setShowLimitModal(true);
-            return;
-        }
-        setProcessingAction('services');
-        try {
-            const res = await apiRequest(`/api/internal/submissions/${submission.id}/create-services?pet_id=${workflowStep.pet_id}`, { method: 'POST' });
-            setWorkflowStep(prev => ({ ...prev, cremation_id: res.cremation_id }));
-            showToast('OEC y servicios generados correctamente', 'success');
-
-            try {
-                await apiRequest(`/api/internal/notifications/archive-by-submission/${submission.id}`, { method: 'POST' });
-            } catch (err) {
-                console.error('Error archiving notification:', err);
+            if (!ids.customer_id) {
+                onStep('cliente', { state: 'running' });
+                const res = await apiRequest(`/api/internal/submissions/${submission.id}/create-customer`, { method: 'POST' });
+                ids.customer_id = res.customer_id;
+                setWorkflowStep(prev => ({ ...prev, customer_id: res.customer_id }));
             }
+            onStep('cliente', { state: 'done' });
 
-            queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
-            queryClient.invalidateQueries({ queryKey: ['cremations-simple'] });
-            queryClient.invalidateQueries({ queryKey: ['cremations'] });
-            // Directo al expediente de la orden recién creada (antes volvía al dashboard).
-            router.push(res.cremation_id ? `/dashboard/recepcion-pedidos?orden=${res.cremation_id}` : '/dashboard');
-        } catch (err: any) {
-            showToast(err.message, 'error');
+            current = 'mascota';
+            if (!ids.pet_id) {
+                onStep('mascota', { state: 'running' });
+                const res = await apiRequest(`/api/internal/submissions/${submission.id}/create-pet?customer_id=${ids.customer_id}`, { method: 'POST' });
+                ids.pet_id = res.pet_id;
+                setWorkflowStep(prev => ({ ...prev, pet_id: res.pet_id }));
+            }
+            onStep('mascota', { state: 'done', detail: 'Datos y fotos migrados' });
+
+            current = 'orden';
+            if (!ids.cremation_id) {
+                onStep('orden', { state: 'running' });
+                const res = await apiRequest(`/api/internal/submissions/${submission.id}/create-services?pet_id=${ids.pet_id}`, { method: 'POST' });
+                ids.cremation_id = res.cremation_id;
+                setWorkflowStep(prev => ({ ...prev, cremation_id: res.cremation_id }));
+                apiRequest(`/api/internal/notifications/archive-by-submission/${submission.id}`, { method: 'POST' })
+                    .catch(err => console.error('Error archiving notification:', err));
+                queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
+                queryClient.invalidateQueries({ queryKey: ['cremations-simple'] });
+                queryClient.invalidateQueries({ queryKey: ['cremations'] });
+            }
+            onStep('orden', { state: 'done', href: `/dashboard/recepcion-pedidos?orden=${ids.cremation_id}` });
+        } catch (err) {
+            onStep(current, { state: 'error', detail: (err as Error).message });
+            throw err;
+        }
+        return ids as ProcessResult;
+    };
+
+    const [processSteps, setProcessSteps] = useState<Partial<Record<StepKey, { state: string; detail?: string }>>>({});
+
+    const handleProcess = async () => {
+        setProcessingAction('process');
+        try {
+            await processRegistro((k, st) => setProcessSteps(prev => ({ ...prev, [k]: st })));
+            showToast('Registro procesado: cliente, mascota y orden listos', 'success');
+        } catch (err) {
+            showToast((err as Error).message || 'No se pudo procesar el registro', 'error');
         } finally {
             setProcessingAction(null);
         }
@@ -494,6 +503,23 @@ export default function SubmissionDetailPage() {
                         )}
                     </div>
 
+                    {/* Documentos: certificado, imagen digital e imagen para redes (Generar todo) */}
+                    {canGenerateAll && (
+                    <GenerateAllPanel
+                        submission={submission}
+                        existing={workflowStep}
+                        canRun={userRole === 'admin' || userRole === 'recepcion' || userRole === 'creator'}
+                        tenant={tenant}
+                        processRegistro={async (onStep) => {
+                            const res = await processRegistro((k, st) => {
+                                setProcessSteps(prev => ({ ...prev, [k]: st }));
+                                onStep(k, st);
+                            });
+                            return res;
+                        }}
+                    />
+                    )}
+
                     {/* Selected Services */}
                     <div className="bg-card border border-card-border rounded-3xl p-6 space-y-4 shadow-sm">
                         <h3 className="text-sm font-black uppercase tracking-widest text-amber-500 dark:text-orange-400/70 flex items-center gap-2">
@@ -558,6 +584,18 @@ export default function SubmissionDetailPage() {
                                             </td>
                                         </tr>
                                     )}
+                                    {/* Recargo por el tramo de peso elegido en el formulario (incluido en el total). */}
+                                    {submission.weight_charge && (
+                                        <tr className="hover:bg-muted/40 transition-colors">
+                                            <td className="px-5 py-3.5">
+                                                <p className="font-bold text-foreground">{submission.weight_charge.label}</p>
+                                                <p className="text-[9px] text-muted-foreground uppercase">Peso</p>
+                                            </td>
+                                            <td className="px-5 py-3.5 text-right font-black text-amber-600 dark:text-orange-400 text-sm">
+                                                ${(submission.weight_charge.price || 0).toLocaleString()}
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                                 {submission.total > 0 && (
                                     <tfoot>
@@ -577,146 +615,52 @@ export default function SubmissionDetailPage() {
                 {/* Right Column - Actions & Details */}
                 <div className="space-y-8">
                     {/* Workflow Actions Card */}
-                    <div className="bg-card border border-card-border rounded-3xl p-6 space-y-6 shadow-sm">
+                    <div className="bg-card border border-card-border rounded-3xl p-6 space-y-5 shadow-sm">
                         <h3 className="text-sm font-black uppercase tracking-widest text-foreground flex items-center gap-2">
                             <CheckCircle size={16} className="text-primary" /> Procesar Registro
                         </h3>
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                            Sigue el flujo de trabajo para migrar los datos a tu base de datos de Clientes, Mascotas y generar el Pedido Operativo correspondiente.
+                            Crea el cliente, la mascota y la orden operativa con los datos del formulario. Si alguno ya existe, se reutiliza.
                         </p>
 
+                        <ul className="space-y-2">
+                            {([
+                                ['cliente', 'Cliente', User, workflowStep.customer_id],
+                                ['mascota', 'Mascota', Dog, workflowStep.pet_id],
+                                ['orden', 'Orden operativa', Package, workflowStep.cremation_id],
+                            ] as const).map(([key, label, Icon, done]) => {
+                                const st = processSteps[key];
+                                return (
+                                    <li key={key} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-xs ${done ? 'bg-emerald-500/10 border-emerald-500/30' : st?.state === 'error' ? 'bg-red-500/10 border-red-500/30' : 'bg-muted/40 border-card-border'}`}>
+                                        <Icon size={14} className={done ? 'text-emerald-500' : 'text-muted-foreground'} />
+                                        <span className="font-bold text-foreground flex-1">{label}</span>
+                                        {st?.state === 'running' ? <Loader2 size={14} className="animate-spin text-primary" />
+                                            : done ? <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1"><CheckCircle size={11} /> Listo</span>
+                                                : st?.state === 'error' ? <span className="text-[10px] font-bold text-red-500 truncate max-w-[55%]" title={st.detail}>{st.detail || 'Error'}</span>
+                                                    : <span className="text-[10px] text-muted-foreground">Pendiente</span>}
+                                    </li>
+                                );
+                            })}
+                        </ul>
+
                         {(userRole === 'admin' || userRole === 'recepcion' || userRole === 'creator') ? (
-                            <div className="flex flex-col gap-4">
-                                {/* Step 1: Client */}
-                                <div className={`p-3.5 rounded-2xl border transition-all ${
-                                    workflowStep.customer_id 
-                                        ? 'bg-emerald-500/10 border-emerald-500/30 shadow-sm' 
-                                        : 'bg-primary/5 border-primary/30 ring-2 ring-primary/20 shadow-sm'
-                                }`}>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 ${
-                                            workflowStep.customer_id ? 'text-emerald-500 dark:text-emerald-400' : 'text-primary'
-                                        }`}>
-                                            <span className="w-5 h-5 rounded-full bg-foreground/10 flex items-center justify-center text-[10px]">1</span>
-                                            Paso 1: Tutor / Cliente
-                                        </span>
-                                        {workflowStep.customer_id && (
-                                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-md flex items-center gap-1">
-                                                <CheckCircle size={10} /> Registrado
-                                            </span>
-                                        )}
-                                    </div>
-                                    <button
-                                        onClick={handleAddCustomer}
-                                        disabled={!!workflowStep.customer_id || processingAction === 'customer' || isCustomerLimitReached}
-                                        className={`w-full py-3.5 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-sm ${
-                                            workflowStep.customer_id
-                                                ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 cursor-not-allowed'
-                                                : isCustomerLimitReached 
-                                                    ? 'bg-red-500/15 text-red-500 border border-red-500/30 cursor-not-allowed' 
-                                                    : 'bg-primary text-white hover:opacity-95 shadow-primary/30 hover:scale-[1.01] active:scale-[0.98]'
-                                        }`}
-                                    >
-                                        {processingAction === 'customer' ? (
-                                            <Loader2 className="animate-spin" size={15} />
-                                        ) : workflowStep.customer_id ? (
-                                            <CheckCircle size={15} />
-                                        ) : (
-                                            <User size={15} />
-                                        )}
-                                        {isCustomerLimitReached && !workflowStep.customer_id ? 'Límite Clientes Superado' : workflowStep.customer_id ? '✓ Cliente Creado' : '1. Registrar Cliente'}
-                                    </button>
-                                </div>
-
-                                {/* Step 2: Pet */}
-                                <div className={`p-3.5 rounded-2xl border transition-all ${
-                                    workflowStep.pet_id 
-                                        ? 'bg-emerald-500/10 border-emerald-500/30' 
-                                        : workflowStep.customer_id 
-                                            ? 'bg-cyan-500/10 border-cyan-500/40 ring-2 ring-cyan-500/20 shadow-sm' 
-                                            : 'bg-muted/40 border-card-border opacity-50'
-                                }`}>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 ${
-                                            workflowStep.pet_id ? 'text-emerald-500 dark:text-emerald-400' : workflowStep.customer_id ? 'text-cyan-600 dark:text-cyan-400' : 'text-muted-foreground'
-                                        }`}>
-                                            <span className="w-5 h-5 rounded-full bg-foreground/10 flex items-center justify-center text-[10px]">2</span>
-                                            Paso 2: Mascota
-                                        </span>
-                                        {workflowStep.pet_id && (
-                                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-md flex items-center gap-1">
-                                                <CheckCircle size={10} /> Registrada
-                                            </span>
-                                        )}
-                                    </div>
-                                    <button
-                                        onClick={handleAddPet}
-                                        disabled={!workflowStep.customer_id || !!workflowStep.pet_id || processingAction === 'pet' || isPetLimitReached}
-                                        className={`w-full py-3.5 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-sm ${
-                                            workflowStep.pet_id
-                                                ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 cursor-not-allowed'
-                                                : isPetLimitReached && workflowStep.customer_id 
-                                                    ? 'bg-red-500/15 text-red-500 border border-red-500/30 cursor-not-allowed' 
-                                                    : !workflowStep.customer_id 
-                                                        ? 'bg-muted text-muted-foreground border border-card-border cursor-not-allowed' 
-                                                        : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-cyan-500/30 hover:scale-[1.01] active:scale-[0.98]'
-                                        }`}
-                                    >
-                                        {processingAction === 'pet' ? (
-                                            <Loader2 className="animate-spin" size={15} />
-                                        ) : workflowStep.pet_id ? (
-                                            <CheckCircle size={15} />
-                                        ) : (
-                                            <Dog size={15} />
-                                        )}
-                                        {isPetLimitReached && workflowStep.customer_id && !workflowStep.pet_id 
-                                            ? 'Límite Mascotas Superado' 
-                                            : workflowStep.pet_id 
-                                                ? '✓ Mascota Creada' 
-                                                : workflowStep.customer_id 
-                                                    ? '2. Registrar Mascota' 
-                                                    : 'Esperando Paso 1'}
-                                    </button>
-                                </div>
-
-                                {/* Step 3: Services & Finalize */}
-                                <div className={`p-3.5 rounded-2xl border transition-all ${
-                                    workflowStep.pet_id 
-                                        ? 'bg-emerald-500/15 border-emerald-500/40 ring-2 ring-emerald-500/30 shadow-md' 
-                                        : 'bg-muted/40 border-card-border opacity-50'
-                                }`}>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 ${
-                                            workflowStep.pet_id ? 'text-emerald-500 dark:text-emerald-400' : 'text-muted-foreground'
-                                        }`}>
-                                            <span className="w-5 h-5 rounded-full bg-foreground/10 flex items-center justify-center text-[10px]">3</span>
-                                            Paso 3: Orden Operativa
-                                        </span>
-                                    </div>
-                                    <button
-                                        onClick={handleAddServices}
-                                        disabled={!workflowStep.pet_id || processingAction === 'services' || (isOrderLimitReached && !workflowStep.pet_id)}
-                                        className={`w-full py-4 px-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2.5 ${
-                                            !workflowStep.pet_id
-                                                ? 'bg-muted text-muted-foreground cursor-not-allowed border border-card-border'
-                                                : isOrderLimitReached 
-                                                    ? 'bg-red-500/20 text-red-500 border border-red-500/30 cursor-not-allowed' 
-                                                    : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:brightness-110 active:scale-[0.98] shadow-emerald-500/30 animate-pulse'
-                                        }`}
-                                    >
-                                        {processingAction === 'services' ? (
-                                            <Loader2 className="animate-spin" size={16} />
-                                        ) : (
-                                            <Package size={16} />
-                                        )}
-                                        {isOrderLimitReached && workflowStep.pet_id 
-                                            ? 'Límite Órdenes Superado' 
-                                            : workflowStep.pet_id 
-                                                ? '3. Generar Orden y Finalizar' 
-                                                : 'Esperando Pasos 1 y 2'}
-                                    </button>
-                                </div>
-                            </div>
+                            workflowStep.cremation_id ? (
+                                <button
+                                    onClick={() => router.push(`/dashboard/recepcion-pedidos?orden=${workflowStep.cremation_id}`)}
+                                    className="w-full py-3.5 px-4 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm"
+                                >
+                                    <ExternalLink size={15} /> Ver orden
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleProcess}
+                                    disabled={processingAction === 'process'}
+                                    className="w-full py-3.5 px-4 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:brightness-110 active:scale-[0.98] shadow-md shadow-emerald-500/30 disabled:opacity-60"
+                                >
+                                    {processingAction === 'process' ? <Loader2 className="animate-spin" size={16} /> : <Package size={16} />}
+                                    Procesar registro
+                                </button>
+                            )
                         ) : (
                             <div className="py-4 px-6 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-center">
                                 <p className="text-xs font-bold text-amber-500 uppercase tracking-widest flex items-center justify-center gap-2">

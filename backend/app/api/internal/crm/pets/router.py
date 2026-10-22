@@ -28,6 +28,18 @@ def get_pets(
         .all()
     )
 
+@router.get("/{pet_id}", response_model=schemas.PetInDB)
+def get_pet(
+    pet_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    _: bool = Depends(check_permission("mascotas", "view"))
+):
+    pet = db.query(models.Pet).filter(models.Pet.id == pet_id, models.Pet.tenant_id == tenant_id).first()
+    if not pet:
+        raise HTTPException(status_code=404, detail="Mascota no encontrada")
+    return pet
+
 @router.post("", response_model=schemas.PetInDB)
 def create_pet(
     pet_in: schemas.PetCreate,

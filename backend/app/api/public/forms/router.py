@@ -14,7 +14,7 @@ import uuid
 from app.api.internal.common.media_service import MediaService
 from app.core.rate_limiter import limiter
 from app.services.recaptcha import verify_recaptcha
-from app.services.public_form_config import apply_form_config_to_submission
+from app.services.public_form_config import apply_form_config_to_submission, normalize_form_config
 from app.core.tenant_context import apply_tenant_rls, apply_bypass_rls
 from app.utils.upload_validation import read_and_validate_image, enforce_max_files, MAX_PUBLIC_FORM_PHOTOS
 from app.api.internal.integrations.models import TenantApiKey
@@ -103,6 +103,7 @@ async def submit_public_form(
     token: str | None = Form(None),
     partner_id: int | None = Form(None),  # NEW: Optional partner ID
     widget_key: str | None = Form(None),  # Formulario incrustable (iframe, plan ULTRA)
+    form_preset_id: str | None = Form(None),  # NEW: Optional custom form preset
     recaptcha_token: str = Form(default=""),
     files: list[UploadFile] = File(default=[]),
     db: Session = Depends(get_db)
@@ -262,7 +263,16 @@ async def submit_public_form(
         raise HTTPException(status_code=400, detail="Datos inválidos (JSON)")
 
     # 2.1 Campos obligatorios configurados por el crematorio + tramo de peso
-    apply_form_config_to_submission(db, tenant, owner_dict, pet_dict)
+    apply_form_config_to_submission(db, tenant, owner_dict, pet_dict, form_preset_id=form_preset_id)
+
+    # 2.2 Si el formulario personalizado tiene un servicio/plan asociado predeterminado, asegurarlo en la orden
+    if form_preset_id and tenant.form_config:
+        cfg = normalize_form_config(tenant.form_config)
+        preset = next((p for p in cfg.get("custom_forms", []) if p.get("id") == form_preset_id), None)
+        if preset and preset.get("associated_service_id"):
+            assoc_id = str(preset["associated_service_id"]).strip()
+            if assoc_id and assoc_id not in services_list_ids:
+                services_list_ids.append(assoc_id)
 
     # 3. Enrich Services Data (Snapshot Prices)
     enriched_services = []

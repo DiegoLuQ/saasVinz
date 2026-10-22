@@ -45,6 +45,7 @@ import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useCurrentUser, useCurrentTenant } from '@/hooks/useSessionBootstrap';
 import { useTenantUsers, useToggleUserStatus, useUpdateUser } from '@/hooks/useUsers';
 import { useRoleConfig, useUserPermissions, useSaveUserPermissions } from '@/hooks/useRoles';
+import { useFeatures } from '@/hooks/useFeatures';
 import { useSessionBootstrap } from '@/hooks/useSessionBootstrap';
 
 const MODULE_ICONS: Record<string, any> = {
@@ -119,6 +120,9 @@ export default function RolesModulosPage() {
     const [togglingUser, setTogglingUser] = useState<number | null>(null);
 
     const { showToast } = useToast();
+    // Editar / activar usuarios: característica del plan "Gestionar Usuarios" (sin flag = permitido)
+    const { hasFeature } = useFeatures();
+    const canManageUsers = hasFeature('configuracion:usuarios', true);
 
     // TanStack Query Hooks
     const { data: users = [], isLoading: loadingUsers } = useTenantUsers(!!bootstrapUser && (bootstrapUser.role === 'admin' || bootstrapUser.role === 'creator'));
@@ -477,7 +481,7 @@ export default function RolesModulosPage() {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex items-center justify-end gap-2">
-                                                {bootstrapUser?.id !== user.id && (
+                                                {canManageUsers && bootstrapUser?.id !== user.id && (
                                                     <button
                                                         onClick={() => setEditingUser(user)}
                                                         className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-all"
@@ -496,7 +500,7 @@ export default function RolesModulosPage() {
                                                 >
                                                     <Shield size={18} />
                                                 </button>
-                                                {bootstrapUser?.id !== user.id && (
+                                                {canManageUsers && bootstrapUser?.id !== user.id && (
                                                     <button
                                                         onClick={() => handleToggleUser(user.id, user.is_active)}
                                                         disabled={togglingUser === user.id}
@@ -613,53 +617,54 @@ export default function RolesModulosPage() {
                             initial={{ scale: 0.9, opacity: 0, y: 20 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
                             exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                            className="bg-slate-900 border border-white/10 w-full max-w-4xl rounded-3xl shadow-2xl relative overflow-hidden h-[85vh] flex flex-col"
+                            className="bg-white text-slate-900 border border-slate-200 dark:bg-slate-900 dark:text-white dark:border-white/10 w-full max-w-4xl rounded-3xl shadow-2xl relative overflow-hidden h-[85vh] flex flex-col"
                         >
-                            <div className="p-8 border-b border-white/10 flex items-center justify-between bg-primary/5">
+                            <div className="p-5 sm:p-8 border-b border-slate-200 dark:border-white/10 flex items-center justify-between gap-4 bg-slate-50 dark:bg-white/[0.03]">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-14 h-14 rounded-2xl bg-primary/20 border border-primary/30 flex items-center justify-center text-primary">
+                                    <div className="w-12 h-12 sm:w-14 sm:h-14 shrink-0 rounded-2xl bg-primary/10 border border-primary/30 flex items-center justify-center text-primary">
                                         <Shield size={28} />
                                     </div>
                                     <div>
-                                        <h3 className="text-2xl font-bold">Permisos Granulares</h3>
-                                        <p className="text-muted-foreground text-sm">Configurando accesos para <strong>{permissionsUser.name}</strong></p>
+                                        <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Permisos Granulares</h3>
+                                        <p className="text-slate-600 dark:text-slate-300 text-sm">Configurando accesos para <strong className="text-slate-900 dark:text-white">{permissionsUser.name}</strong></p>
                                     </div>
                                 </div>
-                                <button onClick={() => setPermissionsUser(null)} className="p-3 hover:bg-white/10 rounded-2xl transition-all">
+                                <button onClick={() => setPermissionsUser(null)} aria-label="Cerrar" className="p-3 text-slate-500 hover:text-slate-900 hover:bg-slate-200 dark:text-slate-400 dark:hover:text-white dark:hover:bg-white/10 rounded-2xl transition-all">
                                     <X size={24} />
                                 </button>
                             </div>
 
-                            <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                            <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-6 bg-white dark:bg-slate-900">
                                 {loadingPerms ? (
-                                    <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+                                    <div className="h-full flex flex-col items-center justify-center text-slate-500 dark:text-slate-400">
                                         <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
                                         <p className="font-bold animate-pulse">Obteniendo matriz de permisos...</p>
                                     </div>
                                 ) : (
-                                    <div className="grid grid-cols-1 gap-4">
+                                    <div className="grid grid-cols-1 gap-3">
                                         {userPermissions.map((perm) => (
-                                            <div key={perm.module_key} className="p-5 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-between group hover:border-primary/30 transition-all">
+                                            <div key={perm.module_key} className={`p-4 sm:p-5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:border-primary/40 ${perm.is_active ? 'bg-white border-slate-200 dark:bg-white/[0.04] dark:border-white/10' : 'bg-slate-50 border-slate-200 dark:bg-white/[0.02] dark:border-white/5'}`}>
                                                 <div className="flex items-center gap-4">
-                                                    <div className={`p-3 rounded-xl ${perm.is_active ? 'bg-primary/10 text-primary' : 'bg-white/5 text-muted-foreground'}`}>
+                                                    <div className={`p-3 rounded-xl ${perm.is_active ? 'bg-primary/10 text-primary' : 'bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-slate-400'}`}>
                                                         {React.createElement(MODULE_ICONS[perm.module_key] || Activity, { size: 20 })}
                                                     </div>
                                                     <div>
-                                                        <p className="font-bold text-lg">{perm.module_key.charAt(0).toUpperCase() + perm.module_key.slice(1)}</p>
-                                                        <p className="text-xs text-muted-foreground">Personaliza las acciones del usuario.</p>
+                                                        <p className={`font-bold text-lg ${perm.is_active ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>{perm.module_key.charAt(0).toUpperCase() + perm.module_key.slice(1)}</p>
+                                                        <p className="text-xs text-slate-500 dark:text-slate-400">{perm.is_active ? 'Personaliza las acciones del usuario.' : 'Módulo desactivado para este usuario.'}</p>
                                                     </div>
                                                 </div>
 
-                                                <div className="flex items-center gap-8">
+                                                <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-8">
                                                     {/* Acciones CRUD */}
-                                                    <div className="flex items-center gap-4 bg-black/20 p-1 rounded-xl border border-white/5">
+                                                    <div className={`flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-black/30 p-1 rounded-xl border border-slate-200 dark:border-white/10 ${perm.is_active ? '' : 'opacity-50'}`}>
                                                         {['view', 'create', 'edit', 'delete'].map((action) => (
                                                             <button
                                                                 key={action}
                                                                 onClick={() => togglePermissionAction(perm.module_key, action)}
-                                                                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${perm.actions[action]
-                                                                    ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
-                                                                    : 'text-muted-foreground hover:bg-white/5'
+                                                                aria-pressed={!!perm.actions[action]}
+                                                                className={`px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-all ${perm.actions[action]
+                                                                    ? 'bg-primary text-primary-foreground shadow-sm'
+                                                                    : 'text-slate-600 hover:bg-white hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'
                                                                     }`}
                                                             >
                                                                 {action === 'view' ? 'Ver' : action === 'create' ? 'Crear' : action === 'edit' ? 'Edit' : 'Elim'}
@@ -673,9 +678,12 @@ export default function RolesModulosPage() {
                                                                 p.module_key === perm.module_key ? { ...p, is_active: !p.is_active } : p
                                                             ));
                                                         }}
-                                                        className={`relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 ${perm.is_active ? 'bg-primary' : 'bg-white/20'}`}
+                                                        role="switch"
+                                                        aria-checked={perm.is_active}
+                                                        aria-label={`Módulo ${perm.module_key}`}
+                                                        className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-all duration-300 ${perm.is_active ? 'bg-primary' : 'bg-slate-300 dark:bg-white/20'}`}
                                                     >
-                                                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform duration-300 ${perm.is_active ? 'translate-x-6' : 'translate-x-1'}`} />
+                                                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-300 ${perm.is_active ? 'translate-x-6' : 'translate-x-1'}`} />
                                                     </button>
                                                 </div>
                                             </div>
@@ -684,8 +692,8 @@ export default function RolesModulosPage() {
                                 )}
                             </div>
 
-                            <div className="p-8 bg-white/5 border-t border-white/10 flex justify-end gap-4">
-                                <button onClick={() => setPermissionsUser(null)} className="px-6 py-3 rounded-2xl border border-white/10 font-bold hover:bg-white/10 transition-all">
+                            <div className="p-4 sm:p-6 bg-slate-50 border-t border-slate-200 dark:bg-white/[0.03] dark:border-white/10 flex justify-end gap-3">
+                                <button onClick={() => setPermissionsUser(null)} className="px-6 py-3 rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-white/15 dark:bg-transparent dark:text-slate-200 dark:hover:bg-white/10 font-bold transition-all">
                                     Descartar
                                 </button>
                                 <button

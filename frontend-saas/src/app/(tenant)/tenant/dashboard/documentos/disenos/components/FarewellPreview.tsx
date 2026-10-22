@@ -80,6 +80,8 @@ function FarewellPetImage({
             return;
         }
 
+        // data-photo-state: las capturas fuera de pantalla esperan a que la foto esté dibujada.
+        canvas.dataset.photoState = 'loading';
         const isLocal = src.startsWith('blob:') || src.startsWith('data:');
         console.log("[FarewellPetImage] Starting image load:", src, "isLocal:", isLocal);
         const img = new Image();
@@ -90,10 +92,12 @@ function FarewellPetImage({
             console.log("[FarewellPetImage] Image loaded successfully:", src, "Dimensions:", img.naturalWidth, "x", img.naturalHeight);
             imgRef.current = img;
             drawFeathered(canvas, img, width, height, shape, glow!);
+            canvas.dataset.photoState = 'ready';
         };
         img.onerror = (err) => {
             if (isLocal) {
                 console.error("[FarewellPetImage] Local blob/data image failed to load:", src, err);
+                canvas.dataset.photoState = 'error';
                 return;
             }
             console.warn("[FarewellPetImage] CORS loading failed for pet image with crossOrigin='anonymous', retrying without it:", src, err);
@@ -102,9 +106,11 @@ function FarewellPetImage({
                 console.log("[FarewellPetImage] Fallback image loaded successfully:", fallbackImg.src);
                 imgRef.current = fallbackImg;
                 drawFeathered(canvas, fallbackImg, width, height, shape, glow!);
+                canvas.dataset.photoState = 'ready';
             };
             fallbackImg.onerror = (err2) => {
                 console.error("[FarewellPetImage] Fallback image also failed to load:", fallbackImg.src, err2);
+                canvas.dataset.photoState = 'error';
             };
             // Append a cache-buster query parameter to bypass poisoned browser cache for this URL
             const fallbackSrc = src + (src.includes('?') ? '&' : '?') + 'cors-fallback=1';
@@ -156,6 +162,7 @@ function FarewellPetImage({
         >
             <canvas
                 ref={canvasRef}
+                data-photo-state="loading"
                 width={width}
                 height={height}
                 style={{

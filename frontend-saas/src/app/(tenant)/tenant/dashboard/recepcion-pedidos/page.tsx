@@ -4,7 +4,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     Star,
     Plus,
-    AlertCircle,
     Loader2,
     Activity,
     Search,
@@ -30,18 +29,19 @@ import Link from 'next/link';
 import { copyToClipboard } from '@/lib/clipboard';
 import { buildTrackingUrl } from '@/lib/publicUrls';
 import { motion, AnimatePresence } from 'framer-motion';
-import Modal from '@/components/tenant/Modal';
+import DeleteOrderModal from '@/components/tenant/orders/DeleteOrderModal';
 import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
 import { normalizeOrderStatus } from '@/lib/tenant/orders/types';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import CancellationModal from '@/components/tenant/CancellationModal';
-import { useCremations, useUpdateCremationStatus, useDeleteCremation, type Cremation } from '@/hooks/useCremations';
+import { useCremations, useUpdateCremationStatus, type Cremation } from '@/hooks/useCremations';
 import OperationsStatsCards, { type OpsFilter } from '@/components/tenant/operations/OperationsStatsCards';
 import OperationsToolbar, { type StatusPillFilter } from '@/components/tenant/operations/OperationsToolbar';
 import OperationRow from '@/components/tenant/operations/OperationRow';
 import OrderSlideOver from '@/components/tenant/operations/OrderSlideOver';
 import { getImageUrl } from '@/lib/tenant/api';
 import { PlanLimitModal } from '@/components/tenant/PlanLimitModal';
+import { usePermissions } from '@/app/(tenant)/tenant/context/PermissionContext';
 
 // ==========================================
 // Status normalization
@@ -71,13 +71,16 @@ export default function CremationsPage() {
     // Enlace de reseñas de Google del crematorio (Perfil de Empresa)
     const reviewUrl: string | undefined = (tenantData as { social_media?: { google_review?: string } } | null)?.social_media?.google_review || undefined;
     const router = useRouter();
+    // Permiso del rol + característica del plan (ver PermissionContext)
+    const { canCreate, canDelete } = usePermissions();
+    const canCreateOrder = canCreate('ordenes');
+    const canDeleteOrder = canDelete('ordenes');
 
     // ==========================================
     // Data
     // ==========================================
     const { data: cremations = [], isLoading: loadingCremations } = useCremations();
     const updateStatusMutation = useUpdateCremationStatus();
-    const deleteCremationMutation = useDeleteCremation();
 
     // ==========================================
     // Local state
@@ -116,7 +119,6 @@ export default function CremationsPage() {
     // Deletion + cancellation modals
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<number | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
     const [cancelModalOpen, setCancelModalOpen] = useState(false);
     const [idToCancel, setIdToCancel] = useState<number | null>(null);
     const [showLimitModal, setShowLimitModal] = useState(false);
@@ -233,19 +235,6 @@ export default function CremationsPage() {
     };
     const handleOpen = (id: number) => router.push(`/dashboard/recepcion-pedidos/registro?id=${id}`);
 
-    const handleDeleteCremation = async () => {
-        if (!itemToDelete) return;
-        setIsDeleting(true);
-        try {
-            await deleteCremationMutation.mutateAsync(itemToDelete);
-            setIsDeleteModalOpen(false);
-            setItemToDelete(null);
-        } catch {
-        } finally {
-            setIsDeleting(false);
-        }
-    };
-
     const handleUpdateStatus = async (cremationId: number, newStatus: string) => {
         if (newStatus === 'cancelado') {
             setIdToCancel(cremationId);
@@ -329,7 +318,7 @@ export default function CremationsPage() {
                     </div>
                 )}
 
-                {(normalizeStatus(item.status) === 'en_proceso' || item.status.trim().toLowerCase() === 'processing' || normalizeStatus(item.status) === 'pendiente' || isCancelled) && (
+                {canDeleteOrder && (normalizeStatus(item.status) === 'en_proceso' || item.status.trim().toLowerCase() === 'processing' || normalizeStatus(item.status) === 'pendiente' || isCancelled) && (
                     <button
                         type="button"
                         onClick={(e) => {
@@ -557,6 +546,7 @@ export default function CremationsPage() {
                         </button>
                     </div>
 
+                    {canCreateOrder && (
                     <button
                         onClick={handleNewService}
                         className={`min-h-[44px] font-black py-3 px-6 rounded-xl flex items-center justify-center shadow-xl transition-all text-xs uppercase tracking-[0.18em] ${
@@ -568,6 +558,7 @@ export default function CremationsPage() {
                         {isRegistrarBloqueado ? <Lock className="mr-2" size={15} /> : <Plus className="mr-2" size={16} />}
                         Registrar Servicio
                     </button>
+                    )}
                 </div>
             </header>
 
@@ -785,6 +776,7 @@ export default function CremationsPage() {
                                 setItemToDelete(id);
                                 setIsDeleteModalOpen(true);
                             }}
+                            allowDelete={canDeleteOrder}
                         />
                     ))}
                 </div>
@@ -800,38 +792,19 @@ export default function CremationsPage() {
             />
 
             {/* Modals */}
-            <Modal
-                isOpen={isDeleteModalOpen}
-                onClose={() => !isDeleting && setIsDeleteModalOpen(false)}
-                title="Eliminar Registro"
-                maxWidth="max-w-md"
-            >
-                <div className="p-4 text-center">
-                    <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <AlertCircle className="text-red-400" size={32} />
-                    </div>
-                    <h3 className="text-xl font-bold mb-2">¿Confirmar eliminación permanente?</h3>
-                    <p className="text-muted-foreground text-sm mb-6">
-                        Esta acción no se puede deshacer.
-                    </p>
-                    <div className="flex gap-3">
-                        <button
-                            disabled={isDeleting}
-                            onClick={() => setIsDeleteModalOpen(false)}
-                            className="flex-1 py-3 px-4 rounded-xl border border-white/10 hover:bg-white/5 transition-all font-semibold text-sm"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            disabled={isDeleting}
-                            onClick={handleDeleteCremation}
-                            className="flex-1 py-3 px-4 rounded-xl bg-red-500 text-white font-bold hover:bg-red-600 transition-all text-sm flex justify-center"
-                        >
-                            {isDeleting ? <Loader2 size={18} className="animate-spin" /> : 'Eliminar'}
-                        </button>
-                    </div>
-                </div>
-            </Modal>
+            {/* Eliminar: elegir si solo la orden, también la mascota o todo (con el cliente) */}
+            {isDeleteModalOpen && itemToDelete && (
+                <DeleteOrderModal
+                    isOpen={isDeleteModalOpen}
+                    orderId={itemToDelete}
+                    onClose={() => setIsDeleteModalOpen(false)}
+                    onDeleted={() => {
+                        setIsDeleteModalOpen(false);
+                        setItemToDelete(null);
+                        if (slideOverCremation?.id === itemToDelete) setIsSlideOverOpen(false);
+                    }}
+                />
+            )}
 
             <CancellationModal
                 isOpen={cancelModalOpen}

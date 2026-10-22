@@ -23,6 +23,7 @@ import {
     Sparkles,
     Download,
     Stethoscope,
+    Play,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -30,6 +31,7 @@ import html2canvas from 'html2canvas';
 
 // Hook
 import { useTenantForm } from '@/hooks/useTenantForm';
+import { formatCLP } from '@/lib/publicFormConfig';
 import { useEmbedAutoHeight, postToEmbedParent } from '@/hooks/useEmbedAutoHeight';
 
 // Components
@@ -40,6 +42,7 @@ import ServiceSelectionStep from '@/components/public/ServiceSelectionStep';
 import MemoryStep from '@/components/public/MemoryStep';
 import SummaryStep from '@/components/public/SummaryStep';
 import CondolenceModal from '@/components/public/CondolenceModal';
+import FormVideoPlayer from '@/components/public/FormVideoPlayer';
 import SkyBackground from '@/components/public/SkyBackground';
 import FarewellPreview from '@/app/(tenant)/tenant/dashboard/documentos/disenos/components/FarewellPreview';
 
@@ -78,6 +81,7 @@ export default function TenantFormPage() {
 
     const [copiedTrackLink, setCopiedTrackLink] = React.useState(false);
     const [isDownloadingCard, setIsDownloadingCard] = React.useState(false);
+    const [watchingEndVideo, setWatchingEndVideo] = React.useState(false);
     const cardExportRef = React.useRef<HTMLDivElement>(null);
 
     const handleDownloadCard = async () => {
@@ -121,6 +125,10 @@ export default function TenantFormPage() {
         setTheme,
         currentStep,
         maxVisitedStep,
+        activeSteps,
+        currentStepDef,
+        currentStepKey,
+        totalSteps,
         ownerData,
         setOwnerData,
         petData,
@@ -139,7 +147,12 @@ export default function TenantFormPage() {
         handleExtend,
         handleSubmit,
         farewellTemplate,
+        customFormPreset,
     } = useTenantForm(slug, token, partnerSlug, widgetKey);
+    // Servicio fijado por el formulario específico (ej: Eutanasia), visible desde el encabezado.
+    const fixedService = customFormPreset?.associated_service_id
+        ? services.find(s => s.id === customFormPreset.associated_service_id)
+        : undefined;
 
     // Embed: tema claro por defecto (el sitio del tenant suele serlo), salvo ?theme=dark.
     React.useEffect(() => {
@@ -240,6 +253,8 @@ export default function TenantFormPage() {
             ...(ownerData.comments?.trim() ? ['', '📝 *COMENTARIOS*', ownerData.comments.trim()] : []),
             ...(trackUrl ? ['', '🔗 *Seguimiento:*', trackUrl] : []),
         ].filter((l): l is string => l !== null).join('\n');
+        const wm = formConfig.welcome_modal;
+        const endVideo = wm?.show_video_button && wm.video && wm.video_position === 'end' ? wm.video : null;
         const tenantWaUrl = tenantWa.length >= 8 ? `https://wa.me/${tenantWa}?text=${encodeURIComponent(tenantWaText)}` : '';
 
         const primaryImageBlobUrl = images && images.length > 0 && typeof window !== 'undefined'
@@ -294,6 +309,28 @@ export default function TenantFormPage() {
                         Hemos recibido tu información y la guardaremos con todo el respeto que tu compañero merece.
                         El equipo de <span className="text-emerald-500 dark:text-emerald-400 font-black">{tenant.name}</span> se pondrá en contacto contigo a la brevedad.
                     </p>
+
+                    {/* Video del crematorio configurado para el final (welcome_modal.video_position = 'end') */}
+                    {endVideo && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.1 }}
+                            className="mb-6"
+                        >
+                            {watchingEndVideo ? (
+                                <FormVideoPlayer video={endVideo} />
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => setWatchingEndVideo(true)}
+                                    className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-slate-900 dark:bg-slate-950 dark:border dark:border-slate-800 text-white text-xs font-bold uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+                                >
+                                    <Play size={14} className="fill-current" /> {formConfig.welcome_modal?.video_button_text?.trim() || 'Ver video'}
+                                </button>
+                            )}
+                        </motion.div>
+                    )}
 
                     {/* 1. Enlace de Seguimiento en Vivo */}
                     {submissionCode && (
@@ -368,6 +405,23 @@ export default function TenantFormPage() {
                             </p>
                             <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
                                 Guárdalo. Te servirá para identificar tu solicitud al hablar con {tenant.name}.
+                            </p>
+                        </motion.div>
+                    )}
+
+                    {/* Plazo / Aviso de entrega si está configurado */}
+                    {formConfig.delivery_notice && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.22 }}
+                            className="mb-8 rounded-3xl p-5 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-slate-800/40 border border-amber-200/80 dark:border-amber-900/40 text-center"
+                        >
+                            <p className="text-[10px] uppercase font-black tracking-[0.2em] text-amber-800 dark:text-amber-300 mb-1">
+                                Plazo de Entrega de Cenizas
+                            </p>
+                            <p className="text-xs text-amber-900/90 dark:text-amber-200/90 font-medium leading-relaxed">
+                                {formConfig.delivery_notice}
                             </p>
                         </motion.div>
                     )}
@@ -557,6 +611,7 @@ export default function TenantFormPage() {
                         isOpen={showWelcomeModal}
                         onClose={() => setShowWelcomeModal(false)}
                         tenant={tenant}
+                        config={formConfig.welcome_modal}
                     />
                 )}
 
@@ -588,6 +643,26 @@ export default function TenantFormPage() {
                     <h1 className="text-3xl font-extrabold text-slate-800 dark:text-slate-100 uppercase tracking-tight">
                         {tenant.name}
                     </h1>
+                    {customFormPreset && (
+                        <div className="mt-3 text-center max-w-md mx-auto">
+                            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-200 dark:border-sky-800/40">
+                                {customFormPreset.name}
+                            </span>
+                            {fixedService && (
+                                <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
+                                    Incluye: <span className="font-bold">{fixedService.name}</span>
+                                    {formConfig.show_service_prices && fixedService.price != null && fixedService.price > 0 && (
+                                        <span className="font-bold text-emerald-700 dark:text-emerald-400"> · {formatCLP(fixedService.price)}</span>
+                                    )}
+                                </p>
+                            )}
+                            {customFormPreset.description && (
+                                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1.5 font-medium leading-relaxed">
+                                    {customFormPreset.description}
+                                </p>
+                            )}
+                        </div>
+                    )}
                     <div className="h-1 w-12 bg-sky-400 mx-auto mt-4 rounded-full" />
                 </motion.div>
                 )}
@@ -606,7 +681,7 @@ export default function TenantFormPage() {
                 <div className="mb-4">
                     <StepIndicator 
                         currentStep={currentStep} 
-                        steps={STEP_NAMES} 
+                        steps={activeSteps.map((s: any) => s.name)} 
                         isDark={theme === 'dark'} 
                         maxVisitedStep={maxVisitedStep}
                         onStepClick={goToStep}
@@ -621,10 +696,10 @@ export default function TenantFormPage() {
                     className="text-center mb-10 space-y-1.5"
                 >
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                        Paso {currentStep} de {STEP_NAMES.length} · {STEP_NAMES[currentStep - 1]}
+                        Paso {currentStep} de {totalSteps} · {currentStepDef?.name}
                     </p>
                     <p className="text-xs text-slate-500 dark:text-slate-400 font-normal italic leading-relaxed">
-                        {STEP_PHRASES[currentStep]}
+                        {currentStepDef?.phrase}
                     </p>
                 </motion.div>
 
@@ -638,13 +713,13 @@ export default function TenantFormPage() {
                     <div className="p-8 sm:p-14">
                         <AnimatePresence mode="wait">
                             <motion.div
-                                key={currentStep}
+                                key={currentStepKey}
                                 initial={{ opacity: 0, x: 20 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: -20 }}
                                 transition={{ duration: 0.3 }}
                             >
-                                {currentStep === 1 && (
+                                {currentStepKey === 'familia' && (
                                     <OwnerInfoStep
                                         data={ownerData}
                                         updateData={(d) => setOwnerData(prev => ({ ...prev, ...d }))}
@@ -656,7 +731,7 @@ export default function TenantFormPage() {
                                         formConfig={formConfig}
                                     />
                                 )}
-                                {currentStep === 2 && (
+                                {currentStepKey === 'angel' && (
                                     <PetInfoStep
                                         data={petData}
                                         updateData={(d) => setPetData(prev => ({ ...prev, ...d }))}
@@ -665,7 +740,7 @@ export default function TenantFormPage() {
                                         weightTiers={weightTiers}
                                     />
                                 )}
-                                {currentStep === 3 && (
+                                {currentStepKey === 'camino' && (
                                     <ServiceSelectionStep
                                         services={services}
                                         selectedServices={selectedServices}
@@ -673,7 +748,7 @@ export default function TenantFormPage() {
                                         showPrices={formConfig.show_service_prices}
                                     />
                                 )}
-                                {currentStep === 4 && (
+                                {currentStepKey === 'recuerdos' && (
                                     <MemoryStep
                                         images={images}
                                         setImages={setImages}
@@ -683,7 +758,7 @@ export default function TenantFormPage() {
                                         onDedicationChange={(text) => setPetData(prev => ({ ...prev, dedication: text }))}
                                     />
                                 )}
-                                {currentStep === 5 && (
+                                {currentStepKey === 'resumen' && (
                                     <SummaryStep
                                         ownerData={ownerData}
                                         petData={petData}
@@ -713,12 +788,12 @@ export default function TenantFormPage() {
                             Atrás
                         </button>
 
-                        {currentStep < 5 ? (
+                        {currentStep < totalSteps ? (
                             <button
                                 onClick={handleNext}
                                 className="bg-slate-800 dark:bg-slate-950 text-white dark:text-slate-200 dark:border dark:border-slate-800/80 font-bold py-3.5 px-9 rounded-2xl text-xs uppercase tracking-wider shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center hover:bg-slate-900 dark:hover:bg-slate-900 cursor-pointer"
                             >
-                                {currentStep === 4 ? 'Revisar Resumen' : 'Siguiente'}
+                                {currentStep === totalSteps - 1 ? 'Revisar Resumen' : 'Siguiente'}
                                 <ChevronRight size={16} className="ml-2" />
                             </button>
                         ) : (

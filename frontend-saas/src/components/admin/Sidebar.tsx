@@ -24,7 +24,8 @@ import {
     Heart,
     ImageIcon,
     Receipt,
-    Code2
+    Code2,
+    Coins,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAdminMetadata, useAdminSaasConfig } from '@/hooks/useAdminBootstrap';
@@ -101,6 +102,7 @@ export default function Sidebar({ onLogout, isCollapsed: isCollapsedProp, setIsC
                     ]
                 },
                 { href: '/dashboard/planes', icon: Plus, label: 'Configuración de Planes' },
+                { href: '/dashboard/creditos-ia', icon: Coins, label: 'Créditos IA' },
             ]
         },
         {

@@ -196,6 +196,12 @@ def get_submission_detail(
         except Exception as e:
             print(f"Error resolving service {item}: {e}")
             
+    # Recargo por peso (tramo elegido por la familia): se muestra como línea y suma al total.
+    from app.services.public_form_config import submission_weight_charge
+    weight_charge = submission_weight_charge(db, tenant_id, submission.pet_data)
+    if weight_charge:
+        total += weight_charge["price"]
+
     # Add resolved data to response
     data = json.loads(json.dumps(submission, default=str, sort_keys=True))
     # Note: Pydantic models need to be converted to dict or use an adapter if we want to add fields
@@ -242,6 +248,7 @@ def get_submission_detail(
         "created_at": format_tenant_datetime(submission.created_at, db, tenant_id),
         "resolved_services": resolved_services,
         "total": total,
+        "weight_charge": weight_charge,
         "customer_id": submission.customer_id,
         "pet_id": submission.pet_id,
         "partner": partner_info,
@@ -305,7 +312,8 @@ def delete_submission(
 def create_customer_from_submission(
     submission_id: int,
     db: Session = Depends(get_db),
-    tenant_id: int = Depends(deps.get_tenant_id)
+    tenant_id: int = Depends(deps.get_tenant_id),
+    _: bool = Depends(check_permission("clientes", "create"))
 ):
     submission = db.query(models.FormSubmission).filter(
         models.FormSubmission.id == submission_id,
@@ -361,7 +369,8 @@ def create_pet_from_submission(
     submission_id: int,
     customer_id: int,
     db: Session = Depends(get_db),
-    tenant_id: int = Depends(deps.get_tenant_id)
+    tenant_id: int = Depends(deps.get_tenant_id),
+    _: bool = Depends(check_permission("mascotas", "create"))
 ):
     try:
         submission = db.query(models.FormSubmission).filter(
@@ -443,6 +452,8 @@ def create_pet_from_submission(
         db.commit()
         
         return {"status": "created", "pet_id": db_pet.id}
+    except HTTPException:
+        raise  # 404 / límite del plan: se responden tal cual, no como 500
     except Exception as e:
         print(f"🚨 EXCEPTION in create_pet: {str(e)}")
         import traceback
@@ -454,7 +465,8 @@ def create_services_from_submission(
     submission_id: int,
     pet_id: int,
     db: Session = Depends(get_db),
-    tenant_id: int = Depends(deps.get_tenant_id)
+    tenant_id: int = Depends(deps.get_tenant_id),
+    _: bool = Depends(check_permission("ordenes", "create"))
 ):
     try:
         submission = db.query(models.FormSubmission).filter(
@@ -573,6 +585,14 @@ def create_services_from_submission(
             except Exception as e:
                 print(f"Error resolving item {item}: {e}")
 
+        # Recargo por el tramo de peso elegido en el formulario: se guarda como
+        # weight_price y suma al total. Es editable en la orden; si el crematorio
+        # registra el peso real (kg), se recalcula con los tramos vigentes.
+        from app.services.public_form_config import submission_weight_charge
+        weight_charge = submission_weight_charge(db, tenant_id, submission.pet_data)
+        weight_price = weight_charge["price"] if weight_charge else 0.0
+        total_price += weight_price
+
         # Create Cremation record with full details
         owner = submission.owner_data
         # Map city/commune with fallback
@@ -621,7 +641,8 @@ def create_services_from_submission(
             tenant_id=tenant_id,
             total_price=total_price,
             total_cost=total_cost,
-            discount=0.0
+            discount=0.0,
+            weight_price=weight_price,
         ))
         
         # 4. Partitioned: Details
@@ -736,6 +757,8 @@ def create_services_from_submission(
         db.commit()
         
         return {"status": "created", "cremation_id": db_cremation.id}
+    except HTTPException:
+        raise  # 404 / límite del plan: se responden tal cual, no como 500
     except Exception as e:
         print(f"🚨 EXCEPTION in create_services: {str(e)}")
         import traceback

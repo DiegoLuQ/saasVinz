@@ -14,7 +14,10 @@ from app.auth import get_current_creator, get_password_hash
 from app.api.internal.common.media_service import MediaService
 from app.api.internal.creator.subscriptions.models import BillingTransaction
 from typing import List, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from app.services.plan_pricing import (
+    MAX_ANNUAL_DISCOUNT, apply_annual_price, get_annual_discount, set_annual_discount,
+)
 
 router = APIRouter()
 
@@ -1296,6 +1299,31 @@ async def get_plans(
 ):
     return db.query(models.SubscriptionPlan).all()
 
+class AnnualDiscount(BaseModel):
+    pct: int = Field(..., ge=0, le=MAX_ANNUAL_DISCOUNT)
+    launch: bool = True
+
+
+@router.get("/pricing/annual-discount")
+def read_annual_discount(
+    current_creator: User = Depends(get_current_creator),
+    db: Session = Depends(get_db)
+):
+    """Descuento por pago anual (uno para todos los planes)."""
+    return get_annual_discount(db)
+
+
+@router.put("/pricing/annual-discount")
+def update_annual_discount(
+    payload: AnnualDiscount,
+    current_creator: User = Depends(get_current_creator),
+    db: Session = Depends(get_db)
+):
+    """Cambia el descuento y recalcula el precio anual de los planes. Lo que paga
+    cada crematorio que ya contrató (sys_tenants.contracted_price) no cambia."""
+    return set_annual_discount(db, payload.pct, payload.launch)
+
+
 @router.post("/plans", response_model=SubscriptionPlanResponse)
 async def create_plan(
     plan_data: SubscriptionPlanCreate,
@@ -1303,6 +1331,7 @@ async def create_plan(
     db: Session = Depends(get_db)
 ):
     new_plan = models.SubscriptionPlan(**plan_data.dict())
+    apply_annual_price(db, new_plan)
     db.add(new_plan)
     db.commit()
     db.refresh(new_plan)
@@ -1334,6 +1363,9 @@ async def update_plan(
 
     if features_val is not None:
         plan.features = features_val
+
+    # El anual sigue al mensual con el descuento global (no cambia lo ya contratado).
+    apply_annual_price(db, plan)
 
     db.commit()
     db.refresh(plan)

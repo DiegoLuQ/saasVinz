@@ -23,8 +23,12 @@ import {
     Store,
     ShieldCheck,
     Sun,
-    Moon
+    Moon,
+    Coins,
+    FileText,
+    ExternalLink,
 } from 'lucide-react';
+import type { CustomFormPreset } from '@/lib/publicFormConfig';
 import Modal from '@/components/tenant/Modal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
@@ -38,7 +42,8 @@ import NotificationDetailModal from '@/components/tenant/modals/NotificationDeta
 import GlobalSearchModal from '@/components/tenant/GlobalSearchModal';
 import { copyToClipboard } from '@/lib/clipboard';
 import { useInitialNotifications } from '@/hooks/useSessionBootstrap';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { getAiUsage } from '@/lib/tenant/imageTemplates';
 
 const themes = [
     { id: 'esmeralda', name: 'Esmeralda', color: '#10b981' },
@@ -59,6 +64,15 @@ export default function Navbar() {
     const router = useRouter();
     const [showPalette, setShowPalette] = useState(false);
     const [showUserMenu, setShowUserMenu] = useState(false);
+    // Créditos IA del crematorio: se consultan al abrir el menú de usuario
+    // (misma query que Diseños para Redes, así se mantienen sincronizados).
+    const { data: aiUsage } = useQuery({
+        queryKey: ['tenant', 'image-templates', 'ai-usage'],
+        queryFn: getAiUsage,
+        enabled: showUserMenu,
+        staleTime: 30_000,
+    });
+    const aiCredits = aiUsage?.credits;
     const [showNotifications, setShowNotifications] = useState(false);
     const [selectedNotification, setSelectedNotification] = useState<any>(null);
     const [showNotifModal, setShowNotifModal] = useState(false);
@@ -85,7 +99,7 @@ export default function Navbar() {
     const { tenantData } = useTenant();
     const isRegistrarBloqueado = false;
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-    const [shareMode, setShareMode] = useState<'permanent' | 'temporary'>('permanent');
+    const [shareMode, setShareMode] = useState<'permanent' | 'temporary' | 'custom'>('permanent');
 
     const [tempToken, setTempToken] = useState<string | null>(null);
     const [tokenExpiry, setTokenExpiry] = useState<Date | null>(null);
@@ -178,22 +192,29 @@ export default function Navbar() {
         }
     };
 
-    const getFormUrl = (mode: 'permanent' | 'temporary') => {
+    const getFormUrl = (mode: 'permanent' | 'temporary' | 'custom', formPresetId?: string) => {
         if (!tenantData?.slug) return '';
         const baseUrl = process.env.NEXT_PUBLIC_PUBLIC_FORM_URL ||
             (typeof window !== 'undefined'
-                ? `${window.location.protocol}//${process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000'}`
+                ? `${window.location.protocol}//${process.env.NEXT_PUBLIC_ROOT_DOMAIN || (window.location.host.includes('lvh.me') ? 'lvh.me:3000' : window.location.host)}`
                 : 'http://localhost:3000');
         
+        const permToken = tenantData.public_token;
         if (mode === 'permanent') {
-            const permToken = tenantData.public_token;
             return permToken 
                 ? `${baseUrl}/${tenantData.slug}/form?token=${permToken}` 
                 : `${baseUrl}/${tenantData.slug}/form`;
-        } else {
+        } else if (mode === 'temporary') {
             return tempToken 
                 ? `${baseUrl}/${tenantData.slug}/form?token=${tempToken}` 
                 : '';
+        } else {
+            const base = `${baseUrl}/${tenantData.slug}/form`;
+            const params = new URLSearchParams();
+            if (permToken) params.set('token', permToken);
+            if (formPresetId) params.set('form', formPresetId);
+            const qs = params.toString();
+            return qs ? `${base}?${qs}` : base;
         }
     };
 
@@ -497,6 +518,42 @@ export default function Navbar() {
                                     <div className="p-3 border-b border-slate-100 mb-1 dark:border-slate-800">
                                         <p className="text-xs font-bold truncate text-[#020210] dark:text-white">{userData?.email}</p>
                                         <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Socio Premium</p>
+                                        {(() => {
+                                            // Disponibles / total del periodo (plan del mes + extra que tenga).
+                                            const total = aiCredits ? aiCredits.monthly_granted + aiCredits.extra_remaining : 0;
+                                            const available = aiCredits?.available ?? 0;
+                                            const pct = total > 0 ? Math.round((available / total) * 100) : 0;
+                                            const canBuy = userData?.role === 'admin' || userData?.role === 'creator';
+                                            return (
+                                                <div className="mt-2.5 rounded-xl bg-violet-50 px-2.5 py-2 dark:bg-violet-500/10">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="flex items-center gap-1.5 text-[11px] font-bold text-violet-700 dark:text-violet-300">
+                                                            <Coins size={13} /> Créditos IA
+                                                        </span>
+                                                        <span className="text-sm font-black tabular-nums text-violet-700 dark:text-violet-200">
+                                                            {aiCredits ? `${available}/${total}` : '…'}
+                                                        </span>
+                                                    </div>
+                                                    {aiCredits && total > 0 && (
+                                                        <div className="mt-1.5 h-1 rounded-full bg-violet-200/70 dark:bg-violet-500/20 overflow-hidden">
+                                                            <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${pct}%` }} />
+                                                        </div>
+                                                    )}
+                                                    {aiCredits && canBuy && available < total + (total === 0 ? 1 : 0) && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                router.push('/dashboard/configuracion?tab=creditos');
+                                                                setShowUserMenu(false);
+                                                            }}
+                                                            className="mt-2 w-full rounded-lg bg-violet-600 py-1.5 text-[11px] font-bold text-white hover:bg-violet-700"
+                                                        >
+                                                            Comprar más créditos
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                     <div className="space-y-0.5">
                                         <Link
@@ -543,121 +600,238 @@ export default function Navbar() {
             >
                 <div className="space-y-6">
                     {/* Selector de tipo de enlace */}
-                    <div className="grid grid-cols-2 p-1.5 bg-foreground/5 rounded-2xl border border-foreground/10 gap-1.5">
-                        <button
-                            onClick={() => setShareMode('permanent')}
-                            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
-                                shareMode === 'permanent'
-                                    ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
-                                    : 'text-muted-foreground hover:text-foreground hover:bg-foreground/5'
-                            }`}
-                        >
-                            <Globe size={15} />
-                            Enlace Permanente
-                        </button>
-                        <button
-                            onClick={() => setShareMode('temporary')}
-                            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
-                                shareMode === 'temporary'
-                                    ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
-                                    : 'text-muted-foreground hover:text-foreground hover:bg-foreground/5'
-                            }`}
-                        >
-                            <Clock size={15} />
-                            Enlace Temporal (3 Días)
-                        </button>
-                    </div>
-
-                    {/* Contenido según pestaña activa */}
-                    {shareMode === 'permanent' ? (
-                        <div className="space-y-4">
-                            <div className="p-3.5 bg-primary/10 border border-primary/20 rounded-2xl flex items-start gap-3">
-                                <ShieldCheck size={20} className="text-primary shrink-0 mt-0.5" />
-                                <div className="space-y-1 text-xs">
-                                    <p className="font-bold text-foreground">Enlace Fijo para Redes y Sitio Web</p>
-                                    <p className="text-muted-foreground">
-                                        Este enlace nunca expira. Es ideal para vincular en tu sitio web, perfil de Instagram, WhatsApp Business o folletos.
-                                    </p>
+                    {(() => {
+                        const customFormsList: CustomFormPreset[] = (tenantData?.form_config as any)?.custom_forms || [];
+                        return (
+                            <>
+                                <div className="grid grid-cols-3 p-1.5 bg-foreground/5 rounded-2xl border border-foreground/10 gap-1.5">
+                                    <button
+                                        onClick={() => setShareMode('permanent')}
+                                        className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-bold transition-all ${
+                                            shareMode === 'permanent'
+                                                ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
+                                                : 'text-muted-foreground hover:text-foreground hover:bg-foreground/5'
+                                        }`}
+                                    >
+                                        <Globe size={14} />
+                                        <span>Permanente</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setShareMode('temporary')}
+                                        className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-bold transition-all ${
+                                            shareMode === 'temporary'
+                                                ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
+                                                : 'text-muted-foreground hover:text-foreground hover:bg-foreground/5'
+                                        }`}
+                                    >
+                                        <Clock size={14} />
+                                        <span>Temporal (3d)</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setShareMode('custom')}
+                                        className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-bold transition-all ${
+                                            shareMode === 'custom'
+                                                ? 'bg-violet-600 text-white shadow-sm shadow-violet-600/20'
+                                                : 'text-violet-400 hover:text-foreground hover:bg-foreground/5'
+                                        }`}
+                                    >
+                                        <FileText size={14} />
+                                        <span>Específicos</span>
+                                        {customFormsList.length > 0 && (
+                                            <span className="ml-1 px-1.5 py-0.2 bg-violet-500/30 text-[10px] rounded-full font-mono">
+                                                {customFormsList.length}
+                                            </span>
+                                        )}
+                                    </button>
                                 </div>
-                            </div>
 
-                            <div className="relative group">
-                                <input
-                                    readOnly
-                                    value={getFormUrl('permanent') || 'Cargando enlace...'}
-                                    className="w-full bg-foreground/5 border border-foreground/10 rounded-2xl py-3.5 pl-4 pr-12 outline-none text-xs sm:text-sm font-mono text-primary truncate selection:bg-primary/20"
-                                />
-                                <button
-                                    onClick={() => copyToClipboardHandler(getFormUrl('permanent'))}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-primary/20 text-primary rounded-xl transition-all"
-                                    title="Copiar enlace permanente"
-                                >
-                                    <Copy size={17} />
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <p className="text-muted-foreground text-xs sm:text-sm">
-                                    Enlace con vigencia de 3 días diseñado para enviar a clientes particulares en atenciones puntuales.
-                                </p>
-                                {tokenExpiry && (
-                                    <div className="flex items-center gap-2 text-xs bg-foreground/5 px-3 py-1.5 rounded-xl w-fit border border-foreground/5">
-                                        <span className="text-muted-foreground">Tiempo restante:</span>
-                                        <span className={`font-mono font-bold ${
-                                            timeRemaining === 'Expirado' ? 'text-red-500' :
-                                            timeRemaining.startsWith('0:') && parseInt(timeRemaining.split(':')[1]) < 10 ? 'text-orange-500' :
-                                            'text-primary'
-                                        }`}>
-                                            {timeRemaining}
-                                        </span>
+                                {/* Contenido según pestaña activa */}
+                                {shareMode === 'permanent' ? (
+                                    <div className="space-y-4">
+                                        <div className="p-3.5 bg-primary/10 border border-primary/20 rounded-2xl flex items-start gap-3">
+                                            <ShieldCheck size={20} className="text-primary shrink-0 mt-0.5" />
+                                            <div className="space-y-1 text-xs">
+                                                <p className="font-bold text-foreground">Enlace Fijo para Redes y Sitio Web</p>
+                                                <p className="text-muted-foreground">
+                                                    Este enlace nunca expira. Es ideal para vincular en tu sitio web, perfil de Instagram, WhatsApp Business o folletos.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="relative group">
+                                            <input
+                                                readOnly
+                                                value={getFormUrl('permanent') || 'Cargando enlace...'}
+                                                className="w-full bg-foreground/5 border border-foreground/10 rounded-2xl py-3.5 pl-4 pr-12 outline-none text-xs sm:text-sm font-mono text-primary truncate selection:bg-primary/20"
+                                            />
+                                            <button
+                                                onClick={() => copyToClipboardHandler(getFormUrl('permanent'))}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-primary/20 text-primary rounded-xl transition-all"
+                                                title="Copiar enlace permanente"
+                                            >
+                                                <Copy size={17} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : shareMode === 'temporary' ? (
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            <p className="text-muted-foreground text-xs sm:text-sm">
+                                                Enlace con vigencia de 3 días diseñado para enviar a clientes particulares en atenciones puntuales.
+                                            </p>
+                                            {tokenExpiry && (
+                                                <div className="flex items-center gap-2 text-xs bg-foreground/5 px-3 py-1.5 rounded-xl w-fit border border-foreground/5">
+                                                    <span className="text-muted-foreground">Tiempo restante:</span>
+                                                    <span className={`font-mono font-bold ${
+                                                        timeRemaining === 'Expirado' ? 'text-red-500' :
+                                                        timeRemaining.startsWith('0:') && parseInt(timeRemaining.split(':')[1]) < 10 ? 'text-orange-500' :
+                                                        'text-primary'
+                                                    }`}>
+                                                        {timeRemaining}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="relative group">
+                                            <input
+                                                readOnly
+                                                value={getFormUrl('temporary') || (isGeneratingToken ? 'Generando enlace temporal...' : 'Genera un nuevo enlace')}
+                                                className="w-full bg-foreground/5 border border-foreground/10 rounded-2xl py-3.5 pl-4 pr-12 outline-none text-xs sm:text-sm font-mono text-primary truncate selection:bg-primary/20"
+                                            />
+                                            <button
+                                                onClick={() => copyToClipboardHandler(getFormUrl('temporary'))}
+                                                disabled={!tempToken}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-primary/20 text-primary rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                                title="Copiar enlace temporal"
+                                            >
+                                                <Copy size={17} />
+                                            </button>
+                                        </div>
+
+                                        <button
+                                            onClick={generateTemporaryToken}
+                                            disabled={isGeneratingToken}
+                                            className="w-full py-2.5 text-xs bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 rounded-xl font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                        >
+                                            {isGeneratingToken ? 'Generando nuevo token...' : '🔄 Generar Nuevo Enlace Temporal'}
+                                        </button>
+                                    </div>
+                                ) : (
+                                    /* Modo Formularios Específicos */
+                                    <div className="space-y-3">
+                                        <div className="p-3 bg-violet-500/10 border border-violet-500/20 rounded-2xl flex items-start gap-2.5">
+                                            <FileText size={18} className="text-violet-400 shrink-0 mt-0.5" />
+                                            <div className="space-y-0.5 text-xs">
+                                                <p className="font-bold text-foreground">Formularios Dedicados</p>
+                                                <p className="text-muted-foreground">
+                                                    Enlaces para servicios específicos con nombre y descripción propia (ej. Eutanasia, Extras).
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {customFormsList.length === 0 ? (
+                                            <div className="p-6 text-center border border-dashed border-foreground/15 rounded-2xl space-y-2">
+                                                <p className="text-xs text-muted-foreground">
+                                                    Aún no has creado formularios específicos.
+                                                </p>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsShareModalOpen(false);
+                                                        router.push('/dashboard/configuracion');
+                                                    }}
+                                                    className="inline-flex items-center gap-1.5 text-xs font-bold text-violet-700 dark:text-violet-400 hover:text-violet-800 dark:hover:text-violet-300 underline"
+                                                >
+                                                    Ir a Configuración para crearlos →
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                                                {customFormsList.map((preset) => {
+                                                    const url = getFormUrl('custom', preset.id);
+                                                    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(`Hola, te comparto el formulario de ${preset.name}:\n\n${url}`)}`;
+                                                    return (
+                                                        <div
+                                                            key={preset.id}
+                                                            className="p-3 bg-slate-50 dark:bg-foreground/5 border border-slate-200 dark:border-foreground/10 rounded-2xl space-y-2"
+                                                        >
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="font-black text-xs text-slate-900 dark:text-foreground truncate">
+                                                                    {preset.name}
+                                                                </span>
+                                                                {preset.include_health_status && (
+                                                                    <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-400 border border-sky-300 dark:border-sky-500/20">
+                                                                        🩺 Diagnóstico
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {preset.description && (
+                                                                <p className="text-[11px] text-slate-600 dark:text-muted-foreground line-clamp-1 font-medium">
+                                                                    {preset.description}
+                                                                </p>
+                                                            )}
+                                                            <div className="flex items-center gap-2 pt-1">
+                                                                <input
+                                                                    readOnly
+                                                                    value={url}
+                                                                    className="flex-1 min-w-0 bg-white dark:bg-background/50 border border-slate-300 dark:border-foreground/10 rounded-xl py-1.5 px-2.5 text-[11px] font-mono text-violet-700 dark:text-violet-300 font-semibold truncate"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => copyToClipboardHandler(url)}
+                                                                    className="p-2 bg-violet-100 hover:bg-violet-200 dark:bg-violet-600/15 dark:hover:bg-violet-600/25 text-violet-700 dark:text-violet-300 rounded-xl transition-all border border-violet-200 dark:border-transparent"
+                                                                    title="Copiar enlace"
+                                                                >
+                                                                    <Copy size={13} />
+                                                                </button>
+                                                                <a
+                                                                    href={waUrl}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="p-2 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-xl transition-all shadow-xs"
+                                                                    title="Compartir por WhatsApp"
+                                                                >
+                                                                    <Share2 size={13} />
+                                                                </a>
+                                                                <a
+                                                                    href={url}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="p-2 text-slate-500 hover:text-slate-900 dark:text-muted-foreground dark:hover:text-foreground hover:bg-slate-200/50 dark:hover:bg-foreground/10 rounded-xl transition-all"
+                                                                    title="Abrir formulario"
+                                                                >
+                                                                    <ExternalLink size={13} />
+                                                                </a>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
-                            </div>
 
-                            <div className="relative group">
-                                <input
-                                    readOnly
-                                    value={getFormUrl('temporary') || (isGeneratingToken ? 'Generando enlace temporal...' : 'Genera un nuevo enlace')}
-                                    className="w-full bg-foreground/5 border border-foreground/10 rounded-2xl py-3.5 pl-4 pr-12 outline-none text-xs sm:text-sm font-mono text-primary truncate selection:bg-primary/20"
-                                />
-                                <button
-                                    onClick={() => copyToClipboardHandler(getFormUrl('temporary'))}
-                                    disabled={!tempToken}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-primary/20 text-primary rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                                    title="Copiar enlace temporal"
-                                >
-                                    <Copy size={17} />
-                                </button>
-                            </div>
-
-                            <button
-                                onClick={generateTemporaryToken}
-                                disabled={isGeneratingToken}
-                                className="w-full py-2.5 text-xs bg-foreground/5 hover:bg-foreground/10 border border-foreground/10 rounded-xl font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                            >
-                                {isGeneratingToken ? 'Generando nuevo token...' : '🔄 Generar Nuevo Enlace Temporal'}
-                            </button>
-                        </div>
-                    )}
-
-                    <div className="flex justify-end gap-3 pt-4 border-t border-foreground/5">
-                        <button
-                            onClick={() => setIsShareModalOpen(false)}
-                            className="px-5 py-2.5 rounded-xl hover:bg-foreground/5 font-bold transition-all text-muted-foreground hover:text-foreground text-xs sm:text-sm"
-                        >
-                            Cerrar
-                        </button>
-                        <button
-                            onClick={() => copyToClipboardHandler()}
-                            disabled={shareMode === 'temporary' && !tempToken}
-                            className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-primary/20 hover:opacity-90 transition-all flex items-center gap-2 text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <Copy size={16} />
-                            Copiar {shareMode === 'permanent' ? 'Enlace Permanente' : 'Enlace Temporal'}
-                        </button>
-                    </div>
+                                <div className="flex justify-end gap-3 pt-4 border-t border-foreground/5">
+                                    <button
+                                        onClick={() => setIsShareModalOpen(false)}
+                                        className="px-5 py-2.5 rounded-xl hover:bg-foreground/5 font-bold transition-all text-muted-foreground hover:text-foreground text-xs sm:text-sm"
+                                    >
+                                        Cerrar
+                                    </button>
+                                    {shareMode !== 'custom' && (
+                                        <button
+                                            onClick={() => copyToClipboardHandler()}
+                                            disabled={shareMode === 'temporary' && !tempToken}
+                                            className="bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-primary/20 hover:opacity-90 transition-all flex items-center gap-2 text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <Copy size={16} />
+                                            Copiar {shareMode === 'permanent' ? 'Enlace Permanente' : 'Enlace Temporal'}
+                                        </button>
+                                    )}
+                                </div>
+                            </>
+                        );
+                    })()}
                 </div>
             </Modal>
             {/* Notification Detail Modal Rediseñado */}

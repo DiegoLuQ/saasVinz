@@ -24,6 +24,7 @@ import {
     FileText,
     BarChart3,
     Stamp,
+    Lock,
 } from 'lucide-react';
 import { getImageUrl } from '@/lib/tenant/api';
 import { useRouter } from 'next/navigation';
@@ -34,6 +35,7 @@ import { useDashboardSummary, type DashboardOrder, type DashboardSummary } from 
 import { useCurrentUser, useInitialSubmissions, type BootstrapSubmissionData } from '@/hooks/useSessionBootstrap';
 import QuickRegistrationModal from '@/components/tenant/dashboard/QuickRegistrationModal';
 import QuickTrackingModal from '@/components/tenant/dashboard/QuickTrackingModal';
+import { useFeatures } from '@/hooks/useFeatures';
 
 const OWNER_ROLES = ['admin', 'contabilidad', 'creator'];
 const OPERATOR_ROLES = ['operador_cremacion', 'operator', 'driver'];
@@ -97,6 +99,9 @@ export default function DashboardPage() {
 
     const role = currentUser?.role ?? '';
     const isOwner = OWNER_ROLES.includes(role);
+    // Indicadores y gráfico: característica del plan "Métricas y Analíticas" (sin flag = visible)
+    const { hasFeature } = useFeatures();
+    const showMetrics = hasFeature('dashboard:metricas', true);
 
     const rawSubmissions = useInitialSubmissions();
     const pendingSubmissions = rawSubmissions
@@ -250,6 +255,7 @@ export default function DashboardPage() {
             )}
 
             {/* 2. KPIs del crematorio (datos reales; comparación mes a la fecha) */}
+            {showMetrics && (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <KpiCard
                     icon={<Dog size={22} />}
@@ -285,6 +291,7 @@ export default function DashboardPage() {
                     }}
                 />
             </div>
+            )}
 
             {/* 3. SECCIÓN CENTRAL: GRÁFICO (60%) + ÚLTIMOS PROCESOS (40%) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
@@ -299,7 +306,13 @@ export default function DashboardPage() {
                         </span>
                     </div>
                     <div className="pt-2 flex-1">
-                        <DashboardTrendChart />
+                        {showMetrics ? <DashboardTrendChart /> : (
+                            <div className="h-full min-h-[180px] flex flex-col items-center justify-center text-center gap-2 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 p-6">
+                                <Lock size={20} className="text-slate-400" />
+                                <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Métricas no incluidas en tu plan</p>
+                                <Link href="/dashboard/configuracion?tab=facturacion" className="text-xs font-bold text-primary hover:underline">Ver planes</Link>
+                            </div>
+                        )}
                     </div>
                 </div>
 

@@ -38,7 +38,7 @@ export const FEATURES_REGISTRY: Record<string, ModuleDef> = {
             {
                 label: 'General',
                 features: [
-                    { key: 'dashboard:metricas', label: 'Métricas y Analíticas', description: 'Gráficos de cremaciones, ingresos y tendencias' },
+                    { key: 'dashboard:metricas', label: 'Métricas y Analíticas', description: 'Indicadores (mascotas, clientes, cremaciones) y gráfico mensual del inicio' },
                 ],
             },
         ],
@@ -131,9 +131,23 @@ export const FEATURES_REGISTRY: Record<string, ModuleDef> = {
         label: 'Documentos',
         sections: [
             {
-                label: 'Repositorio',
+                label: 'Certificados',
                 features: [
-                    { key: 'certificados:repositorio', label: 'Repositorio de Documentos', description: 'Almacenamiento y gestión de actas y contratos' },
+                    { key: 'certificados:generar_pdf', label: 'Emitir Certificado', description: 'Página «Emitir Certificado» y el botón de certificado en las órdenes' },
+                    { key: 'certificados:repositorio', label: 'Repositorio de Documentos', description: 'Página «Repositorio» y eliminar certificados / archivos' },
+                ],
+            },
+            {
+                label: 'Diseños',
+                features: [
+                    { key: 'certificados:diseno', label: 'Tarjetas de Homenaje', description: 'Página «Tarjetas de Homenaje» y el botón de diseño de despedida en las órdenes' },
+                    { key: 'certificados:redes', label: 'Diseños para Redes (IA)', description: 'Página «Diseños para Redes»: generar textos e ilustraciones con IA y guardar diseños' },
+                ],
+            },
+            {
+                label: 'Automatización',
+                features: [
+                    { key: 'certificados:generar_todo', label: 'Generar todo', description: 'Botón «Generar todo» del registro y la pestaña «Documentos automáticos»' },
                 ],
             },
         ],
@@ -150,8 +164,7 @@ export const FEATURES_REGISTRY: Record<string, ModuleDef> = {
             {
                 label: 'Seguimiento',
                 features: [
-                    { key: 'operaciones:seguimiento:crear', label: 'Crear Seguimientos', description: 'Crear bitácoras digitales de transporte' },
-                    { key: 'operaciones:seguimiento:qr_publico', label: 'QR Público de Mascotas', description: 'Código QR para tracking público del memorial' },
+                    { key: 'operaciones:seguimiento:crear', label: 'Crear Seguimientos', description: 'Página «Iniciar nuevo tracking» para registrar órdenes desde Operaciones' },
                 ],
             },
         ],
@@ -162,15 +175,7 @@ export const FEATURES_REGISTRY: Record<string, ModuleDef> = {
             {
                 label: 'General',
                 features: [
-                    { key: 'pagos:ver_historial', label: 'Ver Historial de Pagos', description: 'Muestra el menú "Órdenes Cremación" y el listado de órdenes/pagos' },
-                    { key: 'pagos:registrar', label: 'Registrar Pagos Manuales', description: 'Permite registrar pagos físicos (transferencia, efectivo) sobre una orden' },
-                ],
-            },
-            {
-                label: 'Acciones en Órdenes Cremación',
-                features: [
-                    { key: 'certificados:generar_pdf', label: 'Aplicar Certificado', description: 'Habilita el botón para generar el acta/certificado desde la tabla de Órdenes Cremación' },
-                    { key: 'certificados:diseno', label: 'Aplicar Diseño', description: 'Habilita el botón de diseño de despedida desde la tabla de Órdenes Cremación' },
+                    { key: 'pagos:ver_historial', label: 'Ver Historial y Cobros', description: 'Menú y página «Historial y Cobros» (listado de órdenes y pagos)' },
                 ],
             },
         ],
@@ -188,13 +193,7 @@ export const FEATURES_REGISTRY: Record<string, ModuleDef> = {
                 label: 'Comisiones',
                 features: [
                     { key: 'veterinarios:comisiones:ver', label: 'Ver Comisiones', description: 'Consultar comisiones acumuladas por partner' },
-                    { key: 'veterinarios:comisiones:liquidar', label: 'Liquidar Comisiones', description: 'Generación y aprobación de reportes de pago' },
-                ],
-            },
-            {
-                label: 'Solicitudes',
-                features: [
-                    { key: 'veterinarios:solicitudes', label: 'Recibir Solicitudes Web', description: 'Formulario público de solicitud de convenio' },
+                    { key: 'veterinarios:comisiones:liquidar', label: 'Liquidar Comisiones', description: 'Marcar comisiones como pagadas (o deshacer el pago)' },
                 ],
             },
         ],
@@ -206,8 +205,23 @@ export const FEATURES_REGISTRY: Record<string, ModuleDef> = {
                 label: 'General',
                 features: [
                     { key: 'configuracion:roles', label: 'Gestionar Roles y Módulos', description: 'RBAC: control de acceso por rol de usuario' },
-                    { key: 'configuracion:usuarios', label: 'Gestionar Usuarios', description: 'CRUD de usuarios del tenant' },
-                    { key: 'configuracion:avanzada', label: 'Configuración Avanzada', description: 'Ajustes avanzados de la empresa' },
+                    { key: 'configuracion:usuarios', label: 'Gestionar Usuarios', description: 'Editar datos y activar/desactivar usuarios (en Roles y Módulos)' },
+                ],
+            },
+            {
+                label: 'Pestañas de Configuración',
+                features: [
+                    { key: 'configuracion:formulario', label: 'Formulario y Pesos', description: 'Formulario para la familia, rangos de peso, bienvenida y enlaces' },
+                    { key: 'configuracion:flujo', label: 'Flujo Operativo', description: 'Crear y editar las etapas del servicio' },
+                    { key: 'configuracion:creditos_ia', label: 'Compra de créditos IA', description: 'Pestaña «Compra de créditos» para pedir créditos extra' },
+                ],
+            },
+            {
+                label: 'Integraciones',
+                features: [
+                    { key: 'integraciones:widget', label: 'Widget web', description: 'Catálogo y seguimiento incrustables en el sitio del crematorio (API key pública)' },
+                    { key: 'integraciones:formulario_incrustable', label: 'Formulario incrustable', description: 'Formulario de ingreso dentro del sitio web del crematorio' },
+                    { key: 'integraciones:video_bienvenida', label: 'Video de bienvenida', description: 'Botón «Ver video» en el mensaje de bienvenida del formulario' },
                 ],
             },
         ],

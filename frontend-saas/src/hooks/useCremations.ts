@@ -79,14 +79,22 @@ export const useDeleteCremation = () => {
     const { showToast } = useToast();
 
     return useMutation({
-        mutationFn: (id: number) => apiRequest(`/api/internal/cremations/${id}`, { method: 'DELETE' }),
-        onSuccess: () => {
+        /** scope: 'order' (solo la orden) · 'pet' (+ mascota y todo lo suyo) · 'all' (+ cliente). */
+        mutationFn: (arg: number | { id: number; scope: 'order' | 'pet' | 'all' }) => {
+            const { id, scope } = typeof arg === 'number' ? { id: arg, scope: 'order' } : arg;
+            return apiRequest(`/api/internal/cremations/${id}?scope=${scope}`, { method: 'DELETE' });
+        },
+        onSuccess: (res: { message?: string } | undefined, arg) => {
+            if (typeof arg !== 'number' && arg.scope !== 'order') {
+                // También se borraron mascota/cliente, registro web, memorial y diseños.
+                ['pets', 'customers', 'submissions', 'tenant', 'ops-documents'].forEach(k => queryClient.invalidateQueries({ queryKey: [k] }));
+            }
             queryClient.invalidateQueries({ queryKey: ['cremations-simple'] });
             // La tabla de Órdenes de Cremación usa la clave ['cremations', ...filtros];
             // sin esto seguía mostrando la lista cacheada tras crear/editar/borrar.
             queryClient.invalidateQueries({ queryKey: ['cremations'] });
             queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
-            showToast('Orden eliminada correctamente', 'success');
+            showToast(res?.message || 'Orden eliminada correctamente', 'success');
         },
         onError: (err: any) => {
             showToast(err.message || 'Error al eliminar la orden', 'error');

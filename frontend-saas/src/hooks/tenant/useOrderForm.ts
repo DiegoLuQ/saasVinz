@@ -984,12 +984,15 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
         }));
     }, [weightPricingRules]);
 
-    // El recargo por peso se deriva siempre de las reglas vigentes. Las órdenes
+    // Con peso en kg, el recargo se deriva de las reglas vigentes. Las órdenes
     // creadas por otros flujos (p. ej. el Registro Rápido) guardan weight_price = 0
     // aunque tengan peso, y al editarlas el valor no aparecía junto al campo.
+    // Sin kg se respeta el recargo guardado (p. ej. el tramo elegido por la familia
+    // en el formulario público): recalcularlo daría 0 y lo borraría.
     useEffect(() => {
         if (weightPricingRules.length === 0) return;
         setCurrentCremation(prev => {
+            if (!prev.weight) return prev;
             const expected = calculateWeightPrice(prev.weight, weightPricingRules);
             if (expected === (prev.weight_price || 0)) return prev;
             return { ...prev, weight_price: expected };

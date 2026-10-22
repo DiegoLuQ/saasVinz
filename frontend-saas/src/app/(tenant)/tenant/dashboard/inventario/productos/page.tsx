@@ -82,6 +82,10 @@ export default function ProductsPage() {
 
     const canViewCatalog = hasFeature('inventario:productos:catalogo');
     const canCreateProductFeature = hasFeature('inventario:productos:crear');
+    // Editar / eliminar: permiso del rol + característica del plan (sin flag = permitido)
+    const canEditProduct = (canEdit('inventario') || userData?.role === 'admin' || userData?.role === 'creator')
+        && hasFeature('inventario:productos:editar', true);
+    const canDeleteProductPlan = canDeleteProduct && hasFeature('inventario:productos:eliminar', true);
 
     // TanStack Query Hooks
     const { data: products = [], isLoading: loadingProducts } = useProducts();
@@ -493,6 +497,7 @@ export default function ProductsPage() {
 
                                 {/* Acciones Móvil */}
                                 <div className="flex items-center gap-2 pt-1">
+                                    {canEditProduct && (
                                     <button
                                         onClick={() => handleOpenModal(product)}
                                         className="flex-1 bg-white/5 hover:bg-primary/20 border border-white/10 hover:border-primary/30 text-white hover:text-primary min-h-[42px] py-2 px-4 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center gap-2 shadow-sm"
@@ -500,7 +505,8 @@ export default function ProductsPage() {
                                         <Edit2 size={15} />
                                         <span>Editar Producto</span>
                                     </button>
-                                    {canDeleteProduct && (
+                                    )}
+                                    {canDeleteProductPlan && (
                                         <button
                                             onClick={() => setProductToDelete(product)}
                                             className="min-h-[42px] min-w-[42px] px-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center shadow-sm"
@@ -590,6 +596,7 @@ export default function ProductsPage() {
                                         </td>
                                         <td className="px-6 py-4 align-middle text-right">
                                             <div className="flex items-center justify-end gap-2">
+                                                {canEditProduct && (
                                                 <button
                                                     onClick={() => handleOpenModal(product)}
                                                     className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-primary/20 hover:border-primary/30 text-white hover:text-primary transition-all shadow-sm active:scale-95"
@@ -597,7 +604,8 @@ export default function ProductsPage() {
                                                 >
                                                     <Edit2 size={16} />
                                                 </button>
-                                                {canDeleteProduct && (
+                                                )}
+                                                {canDeleteProductPlan && (
                                                     <button
                                                         onClick={() => setProductToDelete(product)}
                                                         className="p-2 rounded-xl bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-400 transition-all shadow-sm active:scale-95"

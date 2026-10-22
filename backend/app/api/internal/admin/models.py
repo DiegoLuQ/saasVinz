@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Float, Enum, JSON, Text
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Float, Enum, JSON, Text, Numeric
 from sqlalchemy.orm import relationship
 from app.database import Base
 from datetime import datetime
@@ -41,6 +41,10 @@ class SubscriptionPlan(Base):
     stripe_price_id = Column(String, nullable=True)  # Stripe Price ID for future integration
     polar_product_id = Column(String, nullable=True) # Polar.sh Product ID
     polar_price_id = Column(String, nullable=True)   # Polar.sh Price ID
+    # Créditos IA que el plan entrega cada mes (1 crédito = 1 diseño con N intentos).
+    ai_monthly_credits = Column(Integer, nullable=False, default=0)
+    # Precio de 1 crédito IA extra para los tenants de este plan (NULL = precio de referencia global).
+    ai_extra_credit_price_usd = Column(Numeric(10, 2), nullable=True)
     
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
     updated_at = Column(DateTime(timezone=True), default=tz.get_now, onupdate=tz.get_now)
@@ -99,6 +103,8 @@ class Tenant(Base):
     cert_text_values = Column(JSON, nullable=True)
     # Tarjeta de homenaje del formulario público (NULL = global predeterminada)
     form_farewell_template_id = Column(Integer, ForeignKey("ops_farewell_templates.id", ondelete="SET NULL"), nullable=True)
+    # "Generar todo" del registro: documentos y plantillas a usar (ver common/auto_documents).
+    auto_documents = Column(JSON, nullable=True)
     
     # --- Facturación ---
     billing_cycle = Column(String, default="monthly") 
@@ -109,7 +115,10 @@ class Tenant(Base):
     billing_notify_days = Column(Integer, default=30)
     billing_notify_channels = Column(String, default="email")
     billing_discount = Column(Integer, default=0)
-    
+    # Monto por ciclo congelado al contratar (no cambia si después cambia el precio
+    # o el descuento anual de los planes). NULL = se usa el precio de lista.
+    contracted_price = Column(Float, nullable=True)
+
     # --- Polar.sh Integration ---
     polar_customer_id = Column(String, nullable=True)
     polar_subscription_id = Column(String, nullable=True)
@@ -250,5 +259,21 @@ class SaaSConfig(Base):
     backup_time = Column(String, default="03:00") # HH:MM
     last_backup_at = Column(DateTime(timezone=True), nullable=True)
     last_backup_status = Column(String, nullable=True) # success, error
-    
+
+    # --- Créditos IA (plantillas para redes) ---
+    ai_credit_price_usd = Column(Numeric(10, 2), nullable=False, default=1)  # puede subir con el tiempo
+    ai_attempts_per_credit = Column(Integer, nullable=False, default=3)
+    ai_session_days = Column(Integer, nullable=False, default=7)
+    # Tipo de cambio fijo (CLP por 1 USD) para mostrar y cobrar los créditos en CLP.
+    usd_clp_rate = Column(Integer, nullable=True, default=950)
+
+    # --- Datos de pago de Vinzer (compra de créditos) ---
+    # {holder_name, rut, bank, account_type, account_number, email}
+    payment_bank_info = Column(JSON, nullable=True)
+    payment_other_instructions = Column(Text, nullable=True)
+
+    # --- Descuento por pago anual (todos los planes; ver services/plan_pricing.py) ---
+    annual_discount_pct = Column(Integer, nullable=False, default=25)
+    annual_discount_launch = Column(Boolean, nullable=False, default=True)  # "precio de lanzamiento"
+
     updated_at = Column(DateTime(timezone=True), default=tz.get_now, onupdate=tz.get_now)

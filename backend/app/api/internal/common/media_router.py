@@ -93,6 +93,7 @@ async def list_media(
     media_type: str = None,
     tenant_id: int = None,
     global_only: bool = False,
+    q: str = None,
     page: int = 1,
     page_size: int = 24,
     creator=Depends(_optional_creator),
@@ -123,6 +124,15 @@ async def list_media(
         query = query.filter(MediaLibrary.tenant_id.is_(None))
     elif tenant_id is not None:
         query = query.filter(MediaLibrary.tenant_id == tenant_id)
+    if q and q.strip():
+        # Búsqueda simple por descripción / texto alternativo / nombre de archivo.
+        from sqlalchemy import or_
+        like = f"%{q.strip()[:80]}%"
+        query = query.filter(or_(
+            MediaLibrary.description.ilike(like),
+            MediaLibrary.alt_text.ilike(like),
+            MediaLibrary.url.ilike(like),
+        ))
 
     total = query.count()
     items = (
@@ -141,6 +151,16 @@ async def list_media(
         ).all()
         names = {tid: name for tid, name in rows}
 
+    # Quién subió cada archivo: solo para el SuperAdmin (la lista pública no expone usuarios).
+    authors = {}
+    author_ids = {it.created_by for it in items if it.created_by} if creator is not None else set()
+    if author_ids:
+        rows = db.query(app_models.User.id, app_models.User.name, app_models.User.email, app_models.User.role).filter(
+            app_models.User.id.in_(author_ids)
+        ).all()
+        authors = {uid: {"id": uid, "name": name or email, "email": email, "role": getattr(role, "value", role)}
+                   for uid, name, email, role in rows}
+
     result_items = [{
         "id": it.id,
         "tenant_id": it.tenant_id,
@@ -157,6 +177,7 @@ async def list_media(
         "duration": it.duration,
         "thumbnail_url": it.thumbnail_url,
         "theme_config": it.theme_config,
+        "created_by": authors.get(it.created_by),
         "created_at": it.created_at,
     } for it in items]
 

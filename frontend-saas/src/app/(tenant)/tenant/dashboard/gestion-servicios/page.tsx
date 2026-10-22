@@ -80,7 +80,7 @@ const cardAnimate = { opacity: 1, y: 0 };
 export default function ServicesPage() {
     const { showToast } = useToast();
     const router = useRouter();
-    const { canDelete, canCreate } = usePermissions();
+    const { canDelete, canCreate, canEdit } = usePermissions();
     const { tenantData, formatLimit } = useTenant();
 
     const { data: services = [], isLoading: loadingServices } = useCatalogServices();
@@ -409,6 +409,7 @@ export default function ServicesPage() {
                                                 )}
                                             </div>
                                             <div className="flex gap-1.5">
+                                                {canEdit('servicios') && (
                                                 <button
                                                     onClick={() => handleOpenServiceModal(service)}
                                                     className="p-2.5 rounded-xl border border-white/[0.06] hover:bg-white/[0.06] hover:border-amber-500/25 text-muted-foreground hover:text-amber-400 transition-all"
@@ -416,6 +417,7 @@ export default function ServicesPage() {
                                                 >
                                                     <Edit2 size={15} />
                                                 </button>
+                                                )}
                                                 {canDelete('servicios') && (
                                                     <button
                                                         onClick={() => handleDelete('service', service.id, service.name)}
@@ -466,6 +468,7 @@ export default function ServicesPage() {
 
                                     {/* Acciones: siempre visibles arriba a la derecha (sobre imagen o encabezado) */}
                                     <div className="absolute top-3 right-3 z-20 flex gap-1.5">
+                                        {canEdit('servicios') && (
                                         <button
                                             onClick={() => router.push(`/dashboard/gestion-servicios/plan/${plan.id}`)}
                                             className="w-9 h-9 flex items-center justify-center rounded-xl bg-black/30 backdrop-blur-md border border-white/10 text-white/80 hover:bg-amber-500/20 hover:border-amber-500/40 hover:text-amber-300 transition-all"
@@ -473,6 +476,7 @@ export default function ServicesPage() {
                                         >
                                             <Edit2 size={15} />
                                         </button>
+                                        )}
                                         {canDelete('servicios') && (
                                             <button
                                                 onClick={() => handleDelete('plan', plan.id, plan.name)}

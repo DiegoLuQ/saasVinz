@@ -19,6 +19,52 @@ import { useDocuments, useDeleteDocument, fetchDocumentContent, DocumentItem } f
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { downloadHtmlAsPdf, pdfFileName } from '@/lib/certPdf';
 
+type FilterKey = 'certificados' | 'recibos' | 'autorizaciones' | 'otros';
+type Tone = 'blue' | 'emerald' | 'purple' | 'orange';
+
+// Colores por tipo de documento, legibles en modo claro y oscuro.
+const TONES: Record<Tone, { icon: string; iconActive: string; active: string; count: string; dot: string; badge: string }> = {
+    blue: {
+        icon: 'bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300',
+        iconActive: 'bg-blue-600 text-white',
+        active: 'bg-blue-50 border-blue-300 ring-2 ring-blue-200 dark:bg-blue-500/10 dark:border-blue-500/40 dark:ring-blue-500/20',
+        count: 'text-blue-700 dark:text-blue-300',
+        dot: 'bg-blue-500',
+        badge: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/25',
+    },
+    emerald: {
+        icon: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300',
+        iconActive: 'bg-emerald-600 text-white',
+        active: 'bg-emerald-50 border-emerald-300 ring-2 ring-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/40 dark:ring-emerald-500/20',
+        count: 'text-emerald-700 dark:text-emerald-300',
+        dot: 'bg-emerald-500',
+        badge: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/25',
+    },
+    purple: {
+        icon: 'bg-purple-100 text-purple-600 dark:bg-purple-500/15 dark:text-purple-300',
+        iconActive: 'bg-purple-600 text-white',
+        active: 'bg-purple-50 border-purple-300 ring-2 ring-purple-200 dark:bg-purple-500/10 dark:border-purple-500/40 dark:ring-purple-500/20',
+        count: 'text-purple-700 dark:text-purple-300',
+        dot: 'bg-purple-500',
+        badge: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/25',
+    },
+    orange: {
+        icon: 'bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300',
+        iconActive: 'bg-orange-600 text-white',
+        active: 'bg-orange-50 border-orange-300 ring-2 ring-orange-200 dark:bg-orange-500/10 dark:border-orange-500/40 dark:ring-orange-500/20',
+        count: 'text-orange-700 dark:text-orange-300',
+        dot: 'bg-orange-500',
+        badge: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-500/10 dark:text-orange-300 dark:border-orange-500/25',
+    },
+};
+
+const FILTERS: { key: FilterKey; label: string; icon: typeof FileText; tone: Tone }[] = [
+    { key: 'certificados', label: 'Certificados', icon: FileText, tone: 'blue' },
+    { key: 'recibos', label: 'Recibos', icon: FileBadge, tone: 'emerald' },
+    { key: 'autorizaciones', label: 'Autorizaciones', icon: FileCheck, tone: 'purple' },
+    { key: 'otros', label: 'Otros', icon: Filter, tone: 'orange' },
+];
+
 export default function DocumentsPage() {
     // Queries & Mutations
     const { data, isLoading } = useDocuments();
@@ -31,7 +77,7 @@ export default function DocumentsPage() {
 
     // States
     const [searchTerm, setSearchTerm] = useState('');
-    const [activeFilter, setActiveFilter] = useState<'certificados' | 'recibos' | 'autorizaciones' | 'otros' | null>(null);
+    const [activeFilter, setActiveFilter] = useState<FilterKey | null>(null);
     
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [docToDelete, setDocToDelete] = useState<{ id: number; isGenerated: boolean } | null>(null);
@@ -66,7 +112,7 @@ export default function DocumentsPage() {
     }, [documents, activeFilter, searchTerm]);
 
     // Handlers
-    const toggleFilter = (filter: 'certificados' | 'recibos' | 'autorizaciones' | 'otros') => {
+    const toggleFilter = (filter: FilterKey) => {
         setActiveFilter(prev => prev === filter ? null : filter);
     };
 
@@ -101,21 +147,21 @@ export default function DocumentsPage() {
                 return;
             }
             await downloadHtmlAsPdf(html, pdfFileName(doc.number || doc.pet_name || 'documento'));
-        } catch (error: any) {
+        } catch (error) {
             console.error('Error al generar PDF:', error);
-            showToast('Error al generar el PDF: ' + (error?.message || ''), 'error');
+            showToast('Error al generar el PDF: ' + ((error as Error)?.message || ''), 'error');
         } finally {
             setDownloadingId(null);
         }
     };
 
-    // UI Helpers
+    // UI Helpers: clases completas (no armadas con `${color}`) para que Tailwind las genere.
     const getBadgeStyle = (type: string, isGenerated: boolean) => {
         const t = type.toLowerCase();
-        if (t.includes('certificad') || isGenerated) return { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20' };
-        if (t.includes('recibo')) return { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20' };
-        if (t.includes('autoriza')) return { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/20' };
-        return { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/20' };
+        if (t.includes('certificad') || isGenerated) return TONES.blue.badge;
+        if (t.includes('recibo')) return TONES.emerald.badge;
+        if (t.includes('autoriza')) return TONES.purple.badge;
+        return TONES.orange.badge;
     };
 
     return (
@@ -123,180 +169,160 @@ export default function DocumentsPage() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Repositorio de Documentos</h1>
-                    <p className="text-muted-foreground mt-1">Gestor documental enterprise para certificados, recibos y autorizaciones.</p>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Repositorio de Documentos</h1>
+                    <p className="text-slate-500 dark:text-slate-400 mt-1">Certificados, recibos y autorizaciones emitidos por tu crematorio.</p>
                 </div>
-                {/* Opcional: Podríamos poner aquí un botón "Nuevo Documento" o "Exportar" en el futuro */}
             </div>
 
             {/* Interactive Filters (Stats) */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 lg:gap-6">
-                {[
-                    { key: 'certificados', label: 'Certificados', count: stats.certificados, icon: FileText, color: 'blue' },
-                    { key: 'recibos', label: 'Recibos', count: stats.recibos, icon: FileBadge, color: 'emerald' },
-                    { key: 'autorizaciones', label: 'Autorizaciones', count: stats.autorizaciones, icon: FileCheck, color: 'purple' },
-                    { key: 'otros', label: 'Otros', count: stats.otros, icon: Filter, color: 'orange' },
-                ].map((item) => {
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 lg:gap-5">
+                {FILTERS.map((item) => {
                     const isActive = activeFilter === item.key;
                     const Icon = item.icon;
+                    const tone = TONES[item.tone];
                     return (
                         <button
                             key={item.key}
-                            onClick={() => toggleFilter(item.key as any)}
-                            className={`
-                                relative p-4 rounded-3xl flex items-center justify-between text-left transition-all duration-300
-                                ${isActive 
-                                    ? `bg-${item.color}-500/10 border border-${item.color}-500/30 ring-1 ring-${item.color}-500/20 shadow-lg shadow-${item.color}-500/10` 
-                                    : 'bg-white/[0.02] border border-white/5 hover:border-white/10 hover:bg-white/[0.04]'
-                                }
-                            `}
+                            onClick={() => toggleFilter(item.key)}
+                            aria-pressed={isActive}
+                            className={`relative p-4 rounded-3xl flex items-center justify-between text-left border transition-all duration-200 ${isActive
+                                ? tone.active
+                                : 'bg-white border-slate-200 shadow-sm hover:border-slate-300 hover:shadow-md dark:bg-slate-900/40 dark:border-white/10 dark:hover:border-white/20'
+                                }`}
                         >
-                            <div className="flex items-center gap-4">
-                                <div className={`p-3 rounded-2xl transition-all ${isActive ? `bg-${item.color}-500 text-white` : `bg-${item.color}-500/10 text-${item.color}-400`}`}>
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className={`p-3 rounded-2xl shrink-0 transition-colors ${isActive ? tone.iconActive : tone.icon}`}>
                                     <Icon size={20} />
                                 </div>
-                                <div>
-                                    <p className={`font-bold text-sm ${isActive ? 'text-white' : 'text-foreground'}`}>{item.label}</p>
-                                    <p className={`text-[10px] uppercase font-bold tracking-wider ${isActive ? `text-${item.color}-400/80` : 'text-muted-foreground'}`}>
-                                        {item.count} archivos
+                                <div className="min-w-0">
+                                    <p className="font-bold text-sm text-slate-900 dark:text-white truncate">{item.label}</p>
+                                    <p className={`text-xs font-semibold ${isActive ? tone.count : 'text-slate-500 dark:text-slate-400'}`}>
+                                        {stats[item.key]} {stats[item.key] === 1 ? 'archivo' : 'archivos'}
                                     </p>
                                 </div>
                             </div>
-                            {/* Active dot indicator */}
-                            {isActive && (
-                                <div className={`w-2 h-2 rounded-full bg-${item.color}-400 shadow-[0_0_8px_rgba(var(--${item.color}-500),0.8)]`} />
-                            )}
+                            {isActive && <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${tone.dot}`} />}
                         </button>
                     );
                 })}
             </div>
 
             {/* List Control & Repository */}
-            <div className="bg-zinc-950/50 border border-white/5 rounded-[2.5rem] p-6 lg:p-8 relative overflow-hidden">
-                {/* Ambient glow */}
-                <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 blur-[120px] rounded-full pointer-events-none" />
-
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 relative z-10">
-                    <div className="flex items-center gap-3">
-                        <h2 className="text-xl font-bold">Documentos Generados</h2>
+            <div className="bg-slate-50 border border-slate-200 rounded-[2rem] p-5 lg:p-8 dark:bg-slate-950/40 dark:border-white/10">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <h2 className="text-xl font-bold text-slate-900 dark:text-white">Documentos Generados</h2>
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{filteredDocuments.length} de {documents.length}</span>
                         {activeFilter && (
-                            <span className="text-[10px] uppercase font-bold px-2.5 py-1 rounded-md bg-primary/20 text-primary flex items-center gap-1.5">
-                                Filtrando: {activeFilter}
-                                <button onClick={() => setActiveFilter(null)} className="hover:text-white transition-colors"><X size={12}/></button>
+                            <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 flex items-center gap-1.5">
+                                {FILTERS.find(f => f.key === activeFilter)?.label}
+                                <button onClick={() => setActiveFilter(null)} aria-label="Quitar filtro" className="hover:opacity-70"><X size={12} /></button>
                             </span>
                         )}
                     </div>
                     <div className="relative flex-1 max-w-sm">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/60" size={18} />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input
                             type="text"
                             placeholder="Buscar mascota, ID o folio..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full bg-black/40 border border-white/10 rounded-2xl py-3 pl-12 pr-4 text-sm outline-none focus:border-primary/50 transition-all font-medium text-white"
+                            className="w-full bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 rounded-2xl py-3 pl-12 pr-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all font-medium dark:bg-black/30 dark:border-white/10 dark:text-white dark:placeholder:text-slate-500"
                         />
                     </div>
                 </div>
 
                 {isLoading ? (
-                    <div className="h-64 flex flex-col items-center justify-center relative z-10">
+                    <div className="h-64 flex flex-col items-center justify-center">
                         <Loader2 className="animate-spin text-primary" size={32} />
-                        <p className="text-muted-foreground text-xs mt-4 uppercase tracking-widest font-bold">Accediendo al repositorio...</p>
+                        <p className="text-slate-500 dark:text-slate-400 text-xs mt-4 uppercase tracking-widest font-bold">Cargando documentos...</p>
                     </div>
                 ) : (
-                    <div className="relative z-10">
-                        <AnimatePresence mode="popLayout">
-                            {filteredDocuments.length > 0 ? (
-                                <motion.div 
-                                    layout
-                                    className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
-                                >
-                                    {filteredDocuments.map((doc) => {
-                                        const badge = getBadgeStyle(doc.type, doc.is_generated);
-                                        return (
-                                            <motion.div
-                                                layout
-                                                initial={{ opacity: 0, scale: 0.95 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                exit={{ opacity: 0, scale: 0.95 }}
-                                                key={doc.id}
-                                                className="group relative p-6 bg-white/[0.02] rounded-[2rem] border border-white/10 hover:border-primary/40 hover:bg-white/[0.04] transition-all flex flex-col justify-between h-full overflow-hidden"
-                                            >
-                                                {/* Top edge highlight */}
-                                                <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-
-                                                <div>
-                                                    <div className="flex items-start justify-between mb-4">
-                                                        <div className={`px-2.5 py-1 rounded-md text-[9px] uppercase font-black tracking-widest border ${badge.bg} ${badge.text} ${badge.border}`}>
-                                                            {doc.type}
-                                                        </div>
-                                                        <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0">
-                                                            <button
-                                                                onClick={() => handleDownloadPdf(doc)}
-                                                                disabled={downloadingId === doc.id}
-                                                                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white transition-all shadow-sm disabled:opacity-50"
-                                                                title="Descargar PDF"
-                                                            >
-                                                                {downloadingId === doc.id ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDeleteClick(doc.id, doc.is_generated)}
-                                                                className="p-2 rounded-xl bg-white/5 hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-all shadow-sm"
-                                                                title="Eliminar del repositorio"
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                    
-                                                    <div>
-                                                        <h4 className="font-bold text-white text-lg tracking-tight mb-1">{doc.pet_name}</h4>
-                                                        <p className="text-[11px] text-muted-foreground uppercase font-bold tracking-widest flex items-center gap-1.5">
-                                                            {doc.service_type} 
-                                                            <span className="w-1 h-1 rounded-full bg-white/20" /> 
-                                                            {doc.number}
-                                                        </p>
-                                                    </div>
-                                                </div>
-
-                                                <div className="mt-6 pt-5 border-t border-white/[0.06] flex items-center justify-between text-[10px] text-muted-foreground font-black uppercase tracking-wider">
-                                                    <span className="flex items-center gap-1.5 px-2 py-1 bg-black/30 rounded-md">
-                                                        <FileBadge size={12} className="text-primary/70" />
-                                                        Orden #{doc.cremation_id}
-                                                    </span>
-                                                    <span>{new Date(doc.issue_date || doc.created_at).toLocaleDateString()}</span>
-                                                </div>
-                                            </motion.div>
-                                        );
-                                    })}
-                                </motion.div>
-                            ) : (
-                                <motion.div 
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    className="col-span-full py-20 flex flex-col items-center justify-center text-center px-4"
-                                >
-                                    <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6 border border-white/5 shadow-2xl">
-                                        <Search size={32} className="text-muted-foreground/40" />
-                                    </div>
-                                    <h3 className="text-xl font-bold text-white mb-2">No se encontraron documentos</h3>
-                                    <p className="text-muted-foreground text-sm max-w-md">
-                                        {activeFilter || searchTerm 
-                                            ? 'Intenta ajustar los filtros o el término de búsqueda para encontrar lo que necesitas.'
-                                            : 'El repositorio está vacío. Los documentos aparecerán aquí una vez que se completen los servicios.'}
-                                    </p>
-                                    {(activeFilter || searchTerm) && (
-                                        <button 
-                                            onClick={() => { setActiveFilter(null); setSearchTerm(''); }}
-                                            className="mt-6 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-xs font-bold uppercase tracking-widest"
+                    <AnimatePresence mode="popLayout">
+                        {filteredDocuments.length > 0 ? (
+                            <motion.div layout className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                {filteredDocuments.map((doc) => {
+                                    const badge = getBadgeStyle(doc.type, doc.is_generated);
+                                    return (
+                                        <motion.div
+                                            layout
+                                            initial={{ opacity: 0, scale: 0.97 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0, scale: 0.97 }}
+                                            key={doc.id}
+                                            className="group p-5 bg-white rounded-3xl border border-slate-200 shadow-sm hover:border-primary/40 hover:shadow-md transition-all flex flex-col justify-between h-full dark:bg-slate-900/50 dark:border-white/10 dark:shadow-none"
                                         >
-                                            Limpiar Filtros
-                                        </button>
-                                    )}
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
+                                            <div>
+                                                <div className="flex items-start justify-between gap-2 mb-4">
+                                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] uppercase font-black tracking-wider border ${badge}`}>
+                                                        {doc.type}
+                                                    </span>
+                                                    <div className="flex gap-1.5 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
+                                                        <button
+                                                            onClick={() => handleDownloadPdf(doc)}
+                                                            disabled={downloadingId === doc.id}
+                                                            className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-primary/10 hover:text-primary transition-colors disabled:opacity-50 dark:bg-white/5 dark:text-slate-300"
+                                                            title="Descargar PDF"
+                                                            aria-label="Descargar PDF"
+                                                        >
+                                                            {downloadingId === doc.id ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteClick(doc.id, doc.is_generated)}
+                                                            className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors dark:bg-white/5 dark:text-slate-300 dark:hover:bg-red-500/15 dark:hover:text-red-400"
+                                                            title="Eliminar del repositorio"
+                                                            aria-label="Eliminar del repositorio"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <h4 className="font-bold text-slate-900 dark:text-white text-lg tracking-tight mb-1 truncate">{doc.pet_name}</h4>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold flex items-center gap-1.5 flex-wrap">
+                                                    {doc.service_type}
+                                                    {doc.number && <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-white/20" />}
+                                                    <span className="font-mono">{doc.number}</span>
+                                                </p>
+                                            </div>
+
+                                            <div className="mt-5 pt-4 border-t border-slate-100 dark:border-white/[0.06] flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                                                <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 rounded-lg dark:bg-white/5">
+                                                    <FileBadge size={12} className="text-primary" />
+                                                    Orden #{doc.cremation_id}
+                                                </span>
+                                                <span>{new Date(doc.issue_date || doc.created_at).toLocaleDateString('es-CL')}</span>
+                                            </div>
+                                        </motion.div>
+                                    );
+                                })}
+                            </motion.div>
+                        ) : (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                className="py-16 flex flex-col items-center justify-center text-center px-4"
+                            >
+                                <div className="w-20 h-20 rounded-full bg-white border border-slate-200 flex items-center justify-center mb-5 shadow-sm dark:bg-white/5 dark:border-white/10">
+                                    <Search size={30} className="text-slate-400" />
+                                </div>
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">No se encontraron documentos</h3>
+                                <p className="text-slate-500 dark:text-slate-400 text-sm max-w-md">
+                                    {activeFilter || searchTerm
+                                        ? 'Intenta ajustar los filtros o el término de búsqueda.'
+                                        : 'El repositorio está vacío. Los documentos aparecerán aquí cuando se emitan.'}
+                                </p>
+                                {(activeFilter || searchTerm) && (
+                                    <button
+                                        onClick={() => { setActiveFilter(null); setSearchTerm(''); }}
+                                        className="mt-5 px-4 py-2 rounded-xl bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors text-xs font-bold uppercase tracking-wider dark:bg-white/5 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10"
+                                    >
+                                        Limpiar filtros
+                                    </button>
+                                )}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 )}
             </div>
 
@@ -311,15 +337,15 @@ export default function DocumentsPage() {
                     <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6 text-red-500 shadow-[0_0_20px_rgba(239,68,68,0.2)]">
                         <Trash2 size={28} />
                     </div>
-                    <h3 className="text-xl font-bold text-white mb-3 tracking-tight">¿Eliminar permanentemente?</h3>
-                    <p className="text-muted-foreground text-sm mb-8 leading-relaxed">
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3 tracking-tight">¿Eliminar permanentemente?</h3>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 leading-relaxed">
                         Esta acción borrará el documento del servidor. Perderás el acceso al archivo y no podrás recuperarlo.
                     </p>
                     <div className="flex gap-3">
                         <button
                             disabled={deleteMutation.isPending}
                             onClick={() => setIsDeleteModalOpen(false)}
-                            className="flex-1 py-3.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors font-bold text-xs uppercase tracking-widest disabled:opacity-50"
+                            className="flex-1 py-3.5 px-4 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors font-bold text-xs uppercase tracking-widest disabled:opacity-50 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
                         >
                             Cancelar
                         </button>

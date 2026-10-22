@@ -207,6 +207,10 @@ app.include_router(creator_plans_router, prefix="/api/internal/creator/subscript
 app.include_router(creator_subscriptions_router, prefix="/api/internal/creator", tags=["Creator - Subscriptions"])
 app.include_router(creator_notifications_router, prefix="/api/internal/creator/notifications", tags=["Creator - Notificaciones"])
 app.include_router(creator_config_router, prefix="/api/internal/creator/config", tags=["Creator - Configuración Global"])
+from app.api.internal.creator.ai_providers.router import router as creator_ai_providers_router
+app.include_router(creator_ai_providers_router, prefix="/api/internal/creator/ai-providers", tags=["Creator - Plataformas IA"])
+from app.api.internal.creator.ai_credits.router import router as creator_ai_credits_router
+app.include_router(creator_ai_credits_router, prefix="/api/internal/creator/ai-credits", tags=["Creator - Créditos IA"])
 app.include_router(creator_templates_router, prefix="/api/internal/creator/document-templates", tags=["Creator - Plantillas de Documentos"])
 app.include_router(creator_receipts_router, prefix="/api/internal/creator", tags=["Creator - Recibos"])
 app.include_router(creator_farewell_router, prefix="/api/internal/creator/farewell-templates", tags=["Creator - Plantillas de Despedida"])
@@ -243,6 +247,12 @@ app.include_router(onboarding_router, prefix="/api/internal/onboarding", tags=["
 
 app.include_router(landing_router, prefix="/api/internal/landing", tags=["Landing Config"])
 app.include_router(farewell_router, prefix="/api/internal/farewell-templates", tags=["Plantillas Despedida"])
+from app.api.internal.common.image_templates.router import router as image_templates_router
+app.include_router(image_templates_router, prefix="/api/internal/image-templates", tags=["Plantillas de Imagen (Redes)"])
+from app.api.internal.common.ai_credits.router import router as ai_credits_router
+app.include_router(ai_credits_router, prefix="/api/internal/ai-credits", tags=["Créditos IA"])
+from app.api.internal.common.auto_documents.router import router as auto_documents_router
+app.include_router(auto_documents_router, prefix="/api/internal/auto-documents", tags=["Documentos automáticos"])
 app.include_router(form_tokens_router, prefix="/api/internal/form-tokens", tags=["Form Tokens"])
 app.include_router(health_router, prefix="/api/internal", tags=["Health"])
 app.include_router(media_router, prefix="/api/internal", tags=["Biblioteca de Medios"])

@@ -13,6 +13,7 @@ import os
 import uuid
 from app.api.internal.common.media_service import MediaService
 from app.api.internal.creator.subscriptions.models import SubscriptionStatus, BillingCycle, SubscriptionStatus as SubStatus, BillingTransaction
+from app.services.plan_pricing import cycle_price, get_annual_discount, lock_contracted_price
 
 router = APIRouter()
 
@@ -26,6 +27,20 @@ def get_available_plans(
     Accessible to Tenant Admins.
     """
     return db.query(models.SubscriptionPlan).filter(models.SubscriptionPlan.is_active == True).all()
+
+
+@router.get("/pricing")
+def get_billing_pricing(
+    db: Session = Depends(get_db),
+    tenant: models.Tenant = Depends(get_tenant),
+):
+    """Descuento anual vigente (lo define el SuperAdmin) y el precio congelado del
+    crematorio: lo que paga por ciclo, que no cambia con el descuento."""
+    return {
+        "annual_discount": get_annual_discount(db),
+        "contracted_price": tenant.contracted_price,
+        "billing_cycle": tenant.billing_cycle or "monthly",
+    }
 
 @router.get("/history", response_model=List[schemas.BillingTransactionResponse])
 def get_billing_history(
@@ -67,7 +82,7 @@ def request_plan_change(
     # 3. Create Pending Transaction
     new_tx = BillingTransaction(
         tenant_id=tenant.id,
-        amount=plan.price if request.billing_cycle == "monthly" else (plan.annual_price or plan.price * 10), # Simple logic
+        amount=cycle_price(plan, request.billing_cycle),  # precio de lista vigente; se congela al aprobar
         payment_status="pending",
         payment_method="transfer",
         target_plan_id=request.plan_id,
@@ -309,7 +324,10 @@ def approve_payment(
     if transaction.target_plan_id:
         tenant.subscription_plan_id = transaction.target_plan_id
         tenant.billing_cycle = transaction.target_billing_cycle
-    
+        # Lo pactado en esta contratación queda congelado para sus renovaciones.
+        cycle = getattr(transaction.target_billing_cycle, "value", transaction.target_billing_cycle)
+        lock_contracted_price(tenant, transaction.amount, cycle)
+
     # 5. Sync Billing Dates to Tenant
     tenant.status = "active"
     tenant.billing_end_date = approval_data.end_date

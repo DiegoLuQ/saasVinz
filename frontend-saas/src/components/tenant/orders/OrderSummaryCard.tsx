@@ -151,12 +151,13 @@ export default function OrderSummaryCard({
                             ))}
 
                             {/* Weight Surcharge */}
-                            {currentCremation?.weight && (currentCremation?.weight_price ?? 0) >= 0 && (
+                            {/* Con kg o con recargo guardado (tramo elegido en el formulario público, sin kg) */}
+                            {(currentCremation?.weight || (currentCremation?.weight_price ?? 0) > 0) && (
                                 <div className="flex justify-between items-center py-3 border-y border-white/[0.05] group">
                                     <div className="flex items-center gap-2.5 min-w-0">
                                         <div className="w-1.5 h-1.5 rounded-full bg-[#00C985] shrink-0" aria-hidden="true" />
                                         <span className="text-xs font-black text-[#00C985] uppercase tracking-tight truncate">
-                                            Cargo por Peso ({currentCremation.weight}kg)
+                                            Cargo por Peso {currentCremation.weight ? `(${currentCremation.weight}kg)` : '(según tramo)'}
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-3 shrink-0">

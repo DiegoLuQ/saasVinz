@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     Activity, User, Dog, Copy, Check, FileText, ExternalLink, Loader2, Edit, Building2,
     MessageCircle, Compass, ArrowRight, CircleDot,
-    BookHeart, Receipt, AlertCircle, Lock, Download, Undo2,
+    BookHeart, Receipt, AlertCircle, Lock, Download, Undo2, Calendar,
 } from 'lucide-react';
 import SlideOver from '@/components/tenant/SlideOver';
 import type { Cremation } from '@/hooks/useCremations';
@@ -16,10 +16,11 @@ import { buildTrackingUrl } from '@/lib/publicUrls';
 import { downloadHtmlAsPdf, pdfFileName } from '@/lib/certPdf';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import FarewellCardSection from './expediente/FarewellCardSection';
+import GeneratedImagesSection from './expediente/GeneratedImagesSection';
 import DedicationSection from './expediente/DedicationSection';
 import StageTimeline, { type Stage } from './expediente/StageTimeline';
 import RevertOrderModal, { canRevertStatus } from './RevertOrderModal';
-import CertificateTextsModal, { ISSUE_TEMPLATE_QUERY_KEY, issueTextFields, loadIssueTemplate } from './CertificateTextsModal';
+import CertificateTextsModal, { DATE_LABELS, ISSUE_TEMPLATE_QUERY_KEY, issueDateFields, issueTextFields, loadIssueTemplate, missingPetDates, usePetDates, type CertOverrides } from './CertificateTextsModal';
 import { useIsOwner } from '@/hooks/useSessionBootstrap';
 import { usePermissions } from '@/app/(tenant)/tenant/context/PermissionContext';
 
@@ -105,10 +106,13 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
     const certEnabled = !!exp?.deliverables.certificate.enabled;
     const { data: issueTpl, isLoading: issueTplLoading } = useQuery({
         queryKey: ISSUE_TEMPLATE_QUERY_KEY,
-        queryFn: loadIssueTemplate,
+        queryFn: () => loadIssueTemplate(),
         enabled: isOpen && certEnabled,
         staleTime: 60_000,
     });
+    // Fechas de la ficha que el diseño muestra: si faltan, se avisa y se completan al emitir.
+    const { data: petDates } = usePetDates(exp?.pet.id, isOpen && issueDateFields(issueTpl).length > 0);
+    const missingDates = missingPetDates(issueTpl, petDates);
 
     if (!cremation) return null;
 
@@ -182,7 +186,7 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
         }
     };
 
-    const issueCertificate = async (templateId?: number, overrides?: Record<string, { value: string }>): Promise<boolean> => {
+    const issueCertificate = async (templateId?: number, overrides?: CertOverrides): Promise<boolean> => {
         setActing(true);
         try {
             await openCertificateHtml(async () => {
@@ -203,10 +207,10 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
         }
     };
 
-    // Con textos libres en el diseño (o aún sin saberlo) se abre el modal para
-    // editarlos; si no hay, se emite directo como siempre.
+    // Con textos libres o fechas de la mascota en el diseño (o aún sin saberlo) se
+    // abre el modal para editarlos; si no hay, se emite directo como siempre.
     const startIssueCertificate = () => {
-        if (!issueTpl || issueTextFields(issueTpl).length > 0) {
+        if (!issueTpl || issueTextFields(issueTpl).length > 0 || issueDateFields(issueTpl).length > 0) {
             setShowCertTexts(true);
             return;
         }
@@ -462,7 +466,23 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                 </div>
                                 {!exp.deliverables.certificate.enabled ? (
                                     <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Lock size={12} /> Disponible desde el plan NORMAL.</p>
-                                ) : (
+                                ) : (<>
+                                    {missingDates.length > 0 && (
+                                        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25">
+                                            <p className="text-[11px] text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                                                <Calendar size={12} className="shrink-0" />
+                                                Falta en la ficha: {missingDates.map((k) => DATE_LABELS[k].toLowerCase()).join(' y ')}. En el certificado quedará vacío.
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowCertTexts(true)}
+                                                disabled={busy}
+                                                className="text-[11px] font-bold text-amber-900 dark:text-amber-200 underline-offset-2 hover:underline disabled:opacity-50"
+                                            >
+                                                Completar fecha
+                                            </button>
+                                        </div>
+                                    )}
                                     <div className="flex flex-wrap items-center gap-2">
                                         {exp.deliverables.certificate.issued.map((c) => (
                                             <div key={c.id} className="flex items-stretch rounded-xl border border-emerald-500/20 overflow-hidden">
@@ -496,8 +516,11 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                             {exp.deliverables.certificate.issued.length ? 'Volver a emitir' : 'Emitir certificado'}
                                         </button>
                                     </div>
-                                )}
+                                </>)}
                             </div>
+
+                            {/* Imágenes generadas (tarjeta digital y diseño para redes en segundo plano) */}
+                            <GeneratedImagesSection orderId={exp.order.id} petId={exp.pet.id} petName={petName} />
 
                             {/* Memorial */}
                             {/* Memorial online: en desarrollo. Se muestra deshabilitado con "Próximamente"
@@ -529,6 +552,7 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                     isOpen={showCertTexts}
                     onClose={() => setShowCertTexts(false)}
                     cremationId={cremation.id}
+                    petId={exp?.pet.id}
                     hasIssued={!!exp?.deliverables.certificate.issued.length}
                     data={issueTpl}
                     isLoading={issueTplLoading}

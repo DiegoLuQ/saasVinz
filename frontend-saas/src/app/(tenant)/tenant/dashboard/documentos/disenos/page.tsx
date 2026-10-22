@@ -403,7 +403,7 @@ export default function FarewellPickerPage() {
                 });
                 
                 // Increment template usage count asynchronously
-                apiRequest(`/api/internal/farewell-templates/image-templates/${selected.id}/use`, {
+                apiRequest(`/api/internal/image-templates/${selected.id}/use`, {
                     method: 'POST'
                 }).catch(err => console.warn('Increment usage count failed:', err));
 
@@ -623,14 +623,14 @@ export default function FarewellPickerPage() {
 
                                         <div className="p-6 flex-1 flex flex-col justify-between">
                                             <div>
-                                                <h3 className="text-lg font-black text-white tracking-tight truncate group-hover:text-primary transition-colors duration-300 mb-1.5">
+                                                <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight truncate group-hover:text-primary transition-colors duration-300 mb-1.5">
                                                     {template.name}
                                                 </h3>
-                                                <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
                                                     {template.description || 'Sin descripción'}
                                                 </p>
                                             </div>
-                                            <div className="mt-5 pt-4 border-t border-white/[0.04] flex items-center justify-between">
+                                            <div className="mt-5 pt-4 border-t border-slate-100 dark:border-white/[0.04] flex items-center justify-between">
                                                 <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
                                                     {template.type === 'canvas' ? 'Multi-Formato' : 'Formato Fijo'}
                                                 </span>
@@ -652,7 +652,7 @@ export default function FarewellPickerPage() {
                         <div>
                             <button
                                 onClick={handleBackToGallery}
-                                className="group inline-flex items-center text-slate-400 hover:text-white transition-colors mb-4 text-xs font-bold uppercase tracking-widest bg-white/[0.03] border border-white/5 hover:border-white/20 px-4 py-2.5 rounded-xl backdrop-blur-md"
+                                className="group inline-flex items-center text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors mb-4 text-xs font-bold uppercase tracking-widest bg-white border border-slate-200 hover:border-slate-300 dark:bg-white/[0.03] dark:border-white/5 dark:hover:border-white/20 px-4 py-2.5 rounded-xl backdrop-blur-md"
                             >
                                 <ArrowLeft size={14} className="mr-2 group-hover:-translate-x-1 transition-transform duration-300" />
                                 Volver al Catálogo
@@ -661,11 +661,11 @@ export default function FarewellPickerPage() {
                                 <Sparkles className="text-primary animate-pulse" size={13} aria-hidden="true" />
                                 <span className="text-[10px] font-black text-primary uppercase tracking-[0.25em]">{selected.name}</span>
                             </div>
-                            <h1 className="text-3xl lg:text-4xl font-black tracking-tight text-white leading-none">
+                            <h1 className="text-3xl lg:text-4xl font-black tracking-tight text-slate-900 dark:text-white leading-none">
                                 Personaliza tu despedida
                                 <span className="text-primary">.</span>
                             </h1>
-                            <p className="text-slate-400 mt-3 text-sm max-w-xl font-medium leading-relaxed">
+                            <p className="text-slate-500 dark:text-slate-400 mt-3 text-sm max-w-xl font-medium leading-relaxed">
                                 Ingresa la información y la foto de la mascota. El diseño final se previsualizará de forma interactiva y en tiempo real.
                             </p>
                         </div>
@@ -682,11 +682,11 @@ export default function FarewellPickerPage() {
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 relative z-10">
                         {/* Form column */}
                         <aside className="lg:col-span-4 space-y-6">
-                            <div className="bg-slate-900/40 backdrop-blur-xl rounded-[2rem] border border-white/[0.08] p-7 shadow-2xl relative overflow-hidden space-y-6">
+                            <div className="bg-white border border-slate-200 shadow-sm dark:bg-slate-900/40 dark:backdrop-blur-xl dark:border-white/[0.08] dark:shadow-2xl rounded-[2rem] p-7 relative overflow-hidden space-y-6">
                                 <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
 
                                 <div>
-                                    <label htmlFor="pet-name" className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2.5">
+                                    <label htmlFor="pet-name" className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] mb-2.5">
                                         Nombre de la Mascota {!prefilledName && <span className="text-red-400">*</span>}
                                         {prefilledName && (
                                             <span className="ml-2 text-primary normal-case tracking-normal text-[10px] font-medium bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20">
@@ -704,18 +704,18 @@ export default function FarewellPickerPage() {
                                         maxLength={60}
                                         className={`w-full h-13 border rounded-2xl px-4 text-sm font-medium outline-none transition-all duration-300 ${
                                             prefilledName
-                                                ? 'bg-slate-950/50 border-white/5 text-slate-400/80 cursor-not-allowed shadow-inner'
-                                                : 'bg-slate-950/30 border-white/10 text-white placeholder:text-slate-600 focus:border-primary/50 focus:ring-4 focus:ring-primary/10 shadow-lg shadow-black/10'
+                                                ? 'bg-slate-100 border-slate-200 text-slate-500 dark:bg-slate-950/50 dark:border-white/5 dark:text-slate-400/80 cursor-not-allowed shadow-inner'
+                                                : 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 dark:bg-slate-950/30 dark:border-white/10 dark:text-white dark:placeholder:text-slate-600 focus:border-primary/50 focus:ring-4 focus:ring-primary/10 dark:shadow-lg dark:shadow-black/10'
                                         }`}
                                     />
                                 </div>
 
                                 {/* Subtitle selector: eslogan | fecha | rango | nada | default de la plantilla */}
                                 <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">
+                                    <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] mb-3">
                                         Eslogan o Fecha
                                     </label>
-                                    <div className="grid grid-cols-2 gap-2 mb-4 bg-slate-950/40 p-1.5 rounded-2xl border border-white/5">
+                                    <div className="grid grid-cols-2 gap-2 mb-4 bg-slate-100 dark:bg-slate-950/40 p-1.5 rounded-2xl border border-slate-200 dark:border-white/5">
                                         {([
                                             { value: 'template', label: 'Por defecto' },
                                             { value: 'eslogan', label: 'Mi eslogan' },
@@ -734,8 +734,8 @@ export default function FarewellPickerPage() {
                                                         subtitleMode === opt.value
                                                             ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20 border border-primary/20'
                                                             : disabled
-                                                                ? 'bg-transparent text-slate-600/40 cursor-not-allowed'
-                                                                : 'bg-transparent text-slate-400 hover:text-white hover:bg-white/[0.02]'
+                                                                ? 'bg-transparent text-slate-400/60 dark:text-slate-600/40 cursor-not-allowed'
+                                                                : 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-white dark:text-slate-400 dark:hover:text-white dark:hover:bg-white/[0.02]'
                                                     } ${opt.value === 'none' ? 'col-span-2' : ''}`}
                                                     title={disabled ? 'Datos de fecha no registrados' : undefined}
                                                 >
@@ -751,11 +751,11 @@ export default function FarewellPickerPage() {
                                             onChange={(e) => setSubtitleCustom(e.target.value)}
                                             placeholder='Ej. "Por siempre en nuestro corazón"'
                                             maxLength={80}
-                                            className="w-full h-11 bg-slate-950/30 border border-white/10 rounded-xl px-4 text-white text-sm outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all placeholder:text-slate-600 shadow-lg shadow-black/10"
+                                            className="w-full h-11 bg-white border border-slate-200 dark:bg-slate-950/30 dark:border-white/10 rounded-xl px-4 text-slate-900 dark:text-white text-sm outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600 dark:shadow-lg dark:shadow-black/10"
                                         />
                                     )}
                                     {(subtitleMode === 'fecha' || subtitleMode === 'rango') && (
-                                        <div className="px-4 py-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs font-semibold flex items-center gap-2.5 shadow-sm">
+                                        <div className="px-4 py-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-700 dark:text-emerald-400 text-xs font-semibold flex items-center gap-2.5 shadow-sm">
                                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
                                             <span>{subtitleMode === 'fecha' ? deathDateFormatted : lifeRangeFormatted}</span>
                                         </div>
@@ -767,10 +767,10 @@ export default function FarewellPickerPage() {
 
                                 <div>
                                     <div className="flex items-center justify-between mb-2.5">
-                                        <label htmlFor="farewell-text" className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                                        <label htmlFor="farewell-text" className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em]">
                                             Mensaje de Despedida
                                         </label>
-                                        <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-950/30 px-2 py-0.5 rounded-full border border-white/5">
+                                        <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 dark:bg-slate-950/30 px-2 py-0.5 rounded-full border border-slate-200 dark:border-white/5">
                                             {farewellText.length}/{MAX_FAREWELL_LENGTH}
                                         </span>
                                     </div>
@@ -781,7 +781,7 @@ export default function FarewellPickerPage() {
                                         maxLength={MAX_FAREWELL_LENGTH}
                                         placeholder="Escribe unas palabras en su honor…"
                                         rows={4}
-                                        className="w-full bg-slate-950/30 border border-white/10 rounded-2xl px-4 py-3.5 text-white text-sm font-medium placeholder:text-slate-600 outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all resize-none min-h-[110px] shadow-lg shadow-black/10"
+                                        className="w-full bg-white border border-slate-200 dark:bg-slate-950/30 dark:border-white/10 rounded-2xl px-4 py-3.5 text-slate-900 dark:text-white text-sm font-medium placeholder:text-slate-400 dark:placeholder:text-slate-600 outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/10 transition-all resize-none min-h-[110px] dark:shadow-lg dark:shadow-black/10"
                                     />
                                     <p className="text-[10px] text-slate-500 mt-2 italic leading-relaxed">
                                         Si lo dejas vacío, se usará el mensaje por defecto del diseño.
@@ -789,11 +789,11 @@ export default function FarewellPickerPage() {
                                 </div>
 
                                 <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2.5">
+                                    <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] mb-2.5">
                                         Foto de la Mascota
                                     </label>
                                     {petPhotoUrl ? (
-                                        <div className="relative w-full aspect-square rounded-2xl overflow-hidden border border-white/10 bg-slate-950 shadow-2xl group/photo">
+                                        <div className="relative w-full aspect-square rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-slate-950 shadow-2xl group/photo">
                                             <img
                                                 src={petPhotoUrl}
                                                 alt="Foto de la mascota"
@@ -809,13 +809,13 @@ export default function FarewellPickerPage() {
                                             </button>
                                         </div>
                                     ) : (
-                                        <label className="block w-full aspect-square rounded-2xl border-2 border-dashed border-white/10 hover:border-primary/40 bg-slate-950/20 hover:bg-primary/[0.02] cursor-pointer transition-all duration-300 group/upload relative overflow-hidden">
+                                        <label className="block w-full aspect-square rounded-2xl border-2 border-dashed border-slate-300 dark:border-white/10 hover:border-primary/40 bg-slate-50 dark:bg-slate-950/20 hover:bg-primary/[0.02] cursor-pointer transition-all duration-300 group/upload relative overflow-hidden">
                                             <div className="absolute inset-0 bg-gradient-to-br from-primary/0 to-primary/0 group-hover/upload:from-primary/[0.02] group-hover/upload:to-transparent transition-all duration-500" />
                                             <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 hover:text-primary transition-colors duration-300 p-6 text-center relative z-10">
-                                                <div className="w-12 h-12 rounded-full bg-slate-900/60 border border-white/5 flex items-center justify-center mb-3 group-hover/upload:border-primary/20 group-hover/upload:bg-primary/5 transition-all duration-300">
+                                                <div className="w-12 h-12 rounded-full bg-white border border-slate-200 dark:bg-slate-900/60 dark:border-white/5 flex items-center justify-center mb-3 group-hover/upload:border-primary/20 group-hover/upload:bg-primary/5 transition-all duration-300">
                                                     <Upload size={20} className="group-hover/upload:translate-y-[-2px] transition-transform duration-300" />
                                                 </div>
-                                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-300 group-hover/upload:text-primary transition-colors duration-300">Subir foto</span>
+                                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-600 dark:text-slate-300 group-hover/upload:text-primary transition-colors duration-300">Subir foto</span>
                                                 <span className="text-[9px] text-slate-500 mt-1.5 leading-relaxed">PNG, JPG o JPEG<br />Recomendado cuadrado · Máx 5MB</span>
                                             </div>
                                             <input
@@ -832,7 +832,7 @@ export default function FarewellPickerPage() {
                             <div className="bg-primary/5 border border-primary/10 rounded-2xl p-5 flex items-start gap-3.5 relative overflow-hidden shadow-md">
                                 <div className="absolute top-[-20%] right-[-10%] w-16 h-16 bg-primary/10 rounded-full blur-2xl pointer-events-none" />
                                 <Heart size={16} className="text-primary mt-0.5 shrink-0 animate-pulse" />
-                                <p className="text-xs text-slate-400 leading-relaxed">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                                     Las fuentes, colores de fondo y elementos florales están pre-diseñados. Tú aportas el alma del recuerdo: el nombre, la foto y tus palabras.
                                 </p>
                             </div>
@@ -840,7 +840,7 @@ export default function FarewellPickerPage() {
 
                         {/* Preview column */}
                         <section className="lg:col-span-8">
-                            <div className="sticky top-6 bg-slate-950 rounded-[2.5rem] border border-white/[0.08] p-6 lg:p-10 flex flex-col items-center justify-center overflow-hidden relative min-h-[640px] shadow-[inset_0_0_80px_rgba(0,0,0,0.8)]">
+                            <div className="sticky top-6 bg-slate-100 border border-slate-200 dark:bg-slate-950 dark:border-white/[0.08] rounded-[2.5rem] p-6 lg:p-10 flex flex-col items-center justify-center overflow-hidden relative min-h-[640px] shadow-inner dark:shadow-[inset_0_0_80px_rgba(0,0,0,0.8)]">
                                 {/* Ambient spotlight glowing background */}
                                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[75%] h-[75%] bg-primary/5 rounded-full blur-[100px] pointer-events-none z-0" />
                                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[50%] h-[50%] bg-emerald-500/5 rounded-full blur-[80px] pointer-events-none z-0" />
@@ -848,7 +848,7 @@ export default function FarewellPickerPage() {
 
                                 {selected?.type === 'canvas' && selected.raw.supported_ratios?.length > 1 && (
                                     /* Ratio switcher */
-                                    <div className="relative z-10 mb-8 flex gap-1.5 bg-slate-900/60 p-1.5 rounded-2xl border border-white/5 backdrop-blur-md shadow-2xl">
+                                    <div className="relative z-10 mb-8 flex gap-1.5 bg-white dark:bg-slate-900/60 p-1.5 rounded-2xl border border-slate-200 dark:border-white/5 backdrop-blur-md shadow-sm dark:shadow-2xl">
                                         {selected.raw.supported_ratios.map((r: AspectRatio) => (
                                             <button
                                                 key={r}
@@ -856,7 +856,7 @@ export default function FarewellPickerPage() {
                                                 className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 cursor-pointer ${
                                                     canvasRatio === r
                                                         ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 border border-primary/20'
-                                                        : 'text-slate-400 hover:text-white hover:bg-white/[0.03]'
+                                                        : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-white/[0.03]'
                                                 }`}
                                             >
                                                 {r === '1:1' ? '1:1 Cuadrado' : r === '9:16' ? '9:16 Vertical' : r === '4:3' ? '4:3 Horizontal' : r === '3:4' ? '3:4 Vertical' : r}
@@ -866,7 +866,7 @@ export default function FarewellPickerPage() {
                                 )}
 
                                 {selected?.type === 'canvas' ? (
-                                    <div className="relative z-10 bg-slate-900/80 p-4 rounded-[2rem] border border-white/10 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] ring-1 ring-white/5 transition-all duration-500 hover:shadow-[0_30px_70px_-10px_rgba(16,185,129,0.1)] hover:border-primary/20">
+                                    <div className="relative z-10 bg-white dark:bg-slate-900/80 p-4 rounded-[2rem] border border-slate-200 dark:border-white/10 shadow-[0_25px_60px_-15px_rgba(15,23,42,0.25)] dark:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] ring-1 ring-slate-900/5 dark:ring-white/5 transition-all duration-500 hover:shadow-[0_30px_70px_-10px_rgba(16,185,129,0.1)] hover:border-primary/20">
                                         <TemplateCanvas
                                             ref={stageRef}
                                             width={stageSize.width}
@@ -877,7 +877,7 @@ export default function FarewellPickerPage() {
                                         />
                                     </div>
                                 ) : previewConfig ? (
-                                    <div className="relative z-10 bg-slate-900/80 p-4 rounded-[2rem] border border-white/10 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] ring-1 ring-white/5 transition-all duration-500 hover:shadow-[0_30px_70px_-10px_rgba(16,185,129,0.1)] hover:border-primary/20">
+                                    <div className="relative z-10 bg-white dark:bg-slate-900/80 p-4 rounded-[2rem] border border-slate-200 dark:border-white/10 shadow-[0_25px_60px_-15px_rgba(15,23,42,0.25)] dark:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] ring-1 ring-slate-900/5 dark:ring-white/5 transition-all duration-500 hover:shadow-[0_30px_70px_-10px_rgba(16,185,129,0.1)] hover:border-primary/20">
                                         <FarewellPreview ref={exportRef} config={previewConfig} />
                                     </div>
                                 ) : (
@@ -906,20 +906,20 @@ export default function FarewellPickerPage() {
                                 animate={{ scale: 1, y: 0 }}
                                 exit={{ scale: 0.95, y: 20 }}
                                 transition={{ type: 'spring', duration: 0.5 }}
-                                className="relative w-full max-w-2xl bg-slate-900/90 border border-white/10 rounded-[2.5rem] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col max-h-[85vh] backdrop-blur-2xl"
+                                className="relative w-full max-w-2xl bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-white/10 rounded-[2.5rem] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5)] dark:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col max-h-[85vh] backdrop-blur-2xl"
                             >
                                 {/* Decorative glowing gradient circle */}
                                 <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/20 rounded-full blur-3xl pointer-events-none" />
                                 <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
 
                                 {/* Header */}
-                                <div className="p-6 md:p-8 border-b border-white/[0.08] flex items-start justify-between relative z-10">
+                                <div className="p-6 md:p-8 border-b border-slate-200 dark:border-white/[0.08] flex items-start justify-between relative z-10">
                                     <div>
-                                        <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
+                                        <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
                                             Selecciona una Mascota
                                             <span className="text-primary font-bold">.</span>
                                         </h2>
-                                        <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
                                             Elige la mascota de la cual deseas generar el diseño de despedida. Cargaremos sus datos automáticamente.
                                         </p>
                                     </div>
@@ -928,14 +928,14 @@ export default function FarewellPickerPage() {
                                             setIsPetModalOpen(false);
                                             setPendingTemplate(null);
                                         }}
-                                        className="p-2 rounded-xl bg-white/[0.03] border border-white/5 hover:border-white/20 text-slate-400 hover:text-white transition-all cursor-pointer"
+                                        className="p-2 rounded-xl bg-white border border-slate-200 hover:border-slate-300 dark:bg-white/[0.03] dark:border-white/5 dark:hover:border-white/20 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-all cursor-pointer"
                                     >
                                         <X size={18} />
                                     </button>
                                 </div>
 
                                 {/* Search Bar */}
-                                <div className="px-6 md:px-8 py-4 border-b border-white/[0.05] relative z-10">
+                                <div className="px-6 md:px-8 py-4 border-b border-slate-100 dark:border-white/[0.05] relative z-10">
                                     <div className="relative">
                                         <Search className="absolute left-4 top-3 text-slate-500" size={16} />
                                         <input
@@ -943,12 +943,12 @@ export default function FarewellPickerPage() {
                                             placeholder="Buscar mascota por nombre o especie..."
                                             value={petSearchQuery}
                                             onChange={(e) => setPetSearchQuery(e.target.value)}
-                                            className="w-full h-11 bg-slate-950/40 border border-white/10 rounded-xl pl-11 pr-4 text-white text-sm placeholder:text-slate-600 outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all"
+                                            className="w-full h-11 bg-slate-50 border border-slate-200 dark:bg-slate-950/40 dark:border-white/10 rounded-xl pl-11 pr-4 text-slate-900 dark:text-white text-sm placeholder:text-slate-400 dark:placeholder:text-slate-600 outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all"
                                         />
                                         {petSearchQuery && (
                                             <button
                                                 onClick={() => setPetSearchQuery('')}
-                                                className="absolute right-3.5 top-3 text-xs text-slate-500 hover:text-white font-bold"
+                                                className="absolute right-3.5 top-3 text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white font-bold"
                                             >
                                                 Limpiar
                                             </button>
@@ -999,9 +999,9 @@ export default function FarewellPickerPage() {
                                                             <div
                                                                 key={pet.id}
                                                                 onClick={() => handleSelectPet(pet)}
-                                                                className="group flex items-center gap-4 p-4 rounded-2xl bg-slate-950/20 border border-white/[0.04] hover:border-primary/40 hover:bg-primary/[0.02] cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-primary/5"
+                                                                className="group flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200 dark:bg-slate-950/20 dark:border-white/[0.04] hover:border-primary/40 hover:bg-primary/[0.02] cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-primary/5"
                                                             >
-                                                                <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-900 border border-white/5 flex items-center justify-center shrink-0">
+                                                                <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 dark:bg-slate-900 dark:border-white/5 flex items-center justify-center shrink-0">
                                                                     {photo ? (
                                                                         <img
                                                                             src={getImageUrl(photo)}
@@ -1014,20 +1014,20 @@ export default function FarewellPickerPage() {
                                                                 </div>
                                                                 <div className="flex-1 min-w-0">
                                                                     <div className="flex items-center justify-between gap-2">
-                                                                        <h4 className="text-sm font-bold text-white truncate group-hover:text-primary transition-colors">
+                                                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate group-hover:text-primary transition-colors">
                                                                             {pet.name}
                                                                         </h4>
                                                                         {pet.latest_order ? (
-                                                                            <span className="shrink-0 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                                                            <span className="shrink-0 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                                                                                 Orden #{pet.latest_order.oc_number || pet.latest_order.id}
                                                                             </span>
                                                                         ) : (
-                                                                            <span className="shrink-0 text-[10px] font-medium text-slate-400 bg-white/[0.04] px-2 py-0.5 rounded-full border border-white/5">
+                                                                            <span className="shrink-0 text-[10px] font-medium text-slate-500 bg-slate-100 dark:text-slate-400 dark:bg-white/[0.04] px-2 py-0.5 rounded-full border border-slate-200 dark:border-white/5">
                                                                                 Ingreso
                                                                             </span>
                                                                         )}
                                                                     </div>
-                                                                    <p className="text-xs text-slate-400 truncate mt-0.5">
+                                                                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
                                                                         {pet.species} {pet.breed ? `· ${pet.breed}` : ''}
                                                                     </p>
                                                                     {years && (
@@ -1046,10 +1046,10 @@ export default function FarewellPickerPage() {
                                 </div>
 
                                 {/* Footer actions */}
-                                <div className="p-6 md:p-8 border-t border-white/[0.08] flex items-center justify-between bg-slate-950/20 relative z-10">
+                                <div className="p-6 md:p-8 border-t border-slate-200 dark:border-white/[0.08] flex items-center justify-between bg-slate-50 dark:bg-slate-950/20 relative z-10">
                                     <button
                                         onClick={() => handleSelectPet(null)}
-                                        className="text-xs font-bold text-slate-400 hover:text-white hover:underline transition-all cursor-pointer"
+                                        className="text-xs font-bold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:underline transition-all cursor-pointer"
                                     >
                                         Continuar sin mascota (Diseño en blanco)
                                     </button>
@@ -1058,7 +1058,7 @@ export default function FarewellPickerPage() {
                                             setIsPetModalOpen(false);
                                             setPendingTemplate(null);
                                         }}
-                                        className="px-5 py-2.5 rounded-xl border border-white/10 bg-transparent text-xs font-bold text-slate-300 hover:text-white hover:bg-white/[0.02] transition-all cursor-pointer"
+                                        className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-transparent text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-white/[0.02] transition-all cursor-pointer"
                                     >
                                         Cancelar
                                     </button>

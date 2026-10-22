@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ShieldCheck, Cpu, Globe, Smartphone, ArrowRight, ChevronRight, BookOpen } from 'lucide-react';
+import { ShieldCheck, Cpu, Globe, Smartphone, Heart, ArrowRight, ChevronRight, BookOpen } from 'lucide-react';
 
 import { VinzerNavbar } from './VinzerNavbar';
 import { VinzerFooter } from './VinzerFooter';
-import { GUIAS, guiaPath, type GuiaAccent } from '@/lib/vinzer/guias';
+import { GUIAS, guiaPath, type Guia, type GuiaAccent } from '@/lib/vinzer/guias';
 
 const ACCENT = {
     sky: {
@@ -37,7 +37,17 @@ const ACCENT = {
         hoverDark: 'hover:border-violet-400/40',
         hoverLight: 'hover:border-violet-300',
     },
+    rose: {
+        icon: Heart,
+        dark: 'bg-rose-500/10 border-rose-500/25 text-rose-400',
+        light: 'bg-rose-50 border-rose-200 text-rose-700',
+        hoverDark: 'hover:border-rose-400/40',
+        hoverLight: 'hover:border-rose-300',
+    },
 } satisfies Record<GuiaAccent, unknown>;
+
+const GUIAS_CREMATORIOS = GUIAS.filter((g) => g.audience === 'crematorios');
+const GUIAS_FAMILIAS = GUIAS.filter((g) => g.audience === 'familias');
 
 export function GuiasIndexClient() {
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -108,67 +118,37 @@ export function GuiasIndexClient() {
                 </h1>
                 <p className={`mt-5 text-base sm:text-lg leading-relaxed max-w-2xl ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
                     Protocolos y buenas prácticas para operar con trazabilidad, orden y transparencia hacia las familias
-                    y las clínicas veterinarias.
+                    y las clínicas veterinarias, escritos por el equipo de <strong className={isLight ? 'text-slate-900' : 'text-white'}>Vinzer,
+                    el software de gestión para crematorios de mascotas</strong>.
                 </p>
             </header>
 
             <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pb-20">
                 <ul className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
-                    {GUIAS.map((g) => {
-                        const a = ACCENT[g.accent];
-                        const Icon = a.icon;
-                        return (
-                            <li key={g.slug}>
-                                <Link
-                                    href={guiaPath(g.slug)}
-                                    className={`group h-full flex flex-col rounded-3xl border p-6 sm:p-7 transition-all ${
-                                        isLight
-                                            ? `bg-white border-slate-200 shadow-sm hover:shadow-md ${a.hoverLight}`
-                                            : `bg-gradient-to-b from-[#071120] to-[#020210] border-white/10 ${a.hoverDark}`
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between gap-3 mb-5">
-                                        <span className={`w-11 h-11 rounded-2xl border flex items-center justify-center ${isLight ? a.light : a.dark}`}>
-                                            <Icon size={20} />
-                                        </span>
-                                        <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${isLight ? a.light : a.dark}`}>
-                                            {g.badge}
-                                        </span>
-                                    </div>
-
-                                    <h2 className={`text-xl sm:text-2xl font-black tracking-tight leading-snug ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                                        {g.title}
-                                    </h2>
-                                    <p className={`mt-3 text-sm leading-relaxed flex-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                                        {g.summary}
-                                    </p>
-
-                                    <div className="mt-5 flex flex-wrap gap-1.5">
-                                        {g.topics.map((t) => (
-                                            <span
-                                                key={t}
-                                                className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${
-                                                    isLight ? 'bg-slate-100 text-slate-600' : 'bg-white/5 text-slate-400'
-                                                }`}
-                                            >
-                                                {t}
-                                            </span>
-                                        ))}
-                                    </div>
-
-                                    <span
-                                        className={`mt-6 inline-flex items-center gap-1.5 text-sm font-bold ${
-                                            isLight ? 'text-[#0284C7]' : 'text-[#19B5FE]'
-                                        }`}
-                                    >
-                                        Leer guía
-                                        <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
-                                    </span>
-                                </Link>
-                            </li>
-                        );
-                    })}
+                    {GUIAS_CREMATORIOS.map((g) => <GuiaCard key={g.slug} g={g} isLight={isLight} />)}
                 </ul>
+
+                {GUIAS_FAMILIAS.length > 0 && (
+                    <section aria-labelledby="guias-familias" className="mt-16">
+                        <div
+                            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border mb-4 ${
+                                isLight ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-rose-500/10 border-rose-500/25 text-rose-400'
+                            }`}
+                        >
+                            <Heart size={14} /> Para familias
+                        </div>
+                        <h2 id="guias-familias" className={`text-2xl sm:text-3xl font-black tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                            Guías para tutores de mascotas
+                        </h2>
+                        <p className={`mt-3 mb-7 text-sm sm:text-base leading-relaxed max-w-2xl ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+                            Información clara para despedir a tu compañero. Vinzer no realiza cremaciones: desarrollamos el
+                            software con el que los crematorios gestionan y comunican cada servicio.
+                        </p>
+                        <ul className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+                            {GUIAS_FAMILIAS.map((g) => <GuiaCard key={g.slug} g={g} isLight={isLight} />)}
+                        </ul>
+                    </section>
+                )}
 
                 {/* CTA */}
                 <div
@@ -199,5 +179,60 @@ export function GuiasIndexClient() {
 
             <VinzerFooter theme={theme} />
         </div>
+    );
+}
+
+function GuiaCard({ g, isLight }: { g: Guia; isLight: boolean }) {
+    const a = ACCENT[g.accent];
+    const Icon = a.icon;
+    return (
+        <li>
+            <Link
+                href={guiaPath(g.slug)}
+                className={`group h-full flex flex-col rounded-3xl border p-6 sm:p-7 transition-all ${
+                    isLight
+                        ? `bg-white border-slate-200 shadow-sm hover:shadow-md ${a.hoverLight}`
+                        : `bg-gradient-to-b from-[#071120] to-[#020210] border-white/10 ${a.hoverDark}`
+                }`}
+            >
+                <div className="flex items-center justify-between gap-3 mb-5">
+                    <span className={`w-11 h-11 rounded-2xl border flex items-center justify-center ${isLight ? a.light : a.dark}`}>
+                        <Icon size={20} />
+                    </span>
+                    <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${isLight ? a.light : a.dark}`}>
+                        {g.badge}
+                    </span>
+                </div>
+
+                <h2 className={`text-xl sm:text-2xl font-black tracking-tight leading-snug ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                    {g.title}
+                </h2>
+                <p className={`mt-3 text-sm leading-relaxed flex-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                    {g.summary}
+                </p>
+
+                <div className="mt-5 flex flex-wrap gap-1.5">
+                    {g.topics.map((t) => (
+                        <span
+                            key={t}
+                            className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${
+                                isLight ? 'bg-slate-100 text-slate-600' : 'bg-white/5 text-slate-400'
+                            }`}
+                        >
+                            {t}
+                        </span>
+                    ))}
+                </div>
+
+                <span
+                    className={`mt-6 inline-flex items-center gap-1.5 text-sm font-bold ${
+                        isLight ? 'text-[#0284C7]' : 'text-[#19B5FE]'
+                    }`}
+                >
+                    Leer guía
+                    <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+                </span>
+            </Link>
+        </li>
     );
 }

@@ -12,6 +12,8 @@ interface OperationRowProps {
     onChangeStatus: (id: number, status: string) => void;
     onOpen: (id: number) => void;
     onDelete: (id: number) => void;
+    /** Permiso del rol + característica del plan para eliminar órdenes. */
+    allowDelete?: boolean;
 }
 
 const CLP = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' });
@@ -65,6 +67,7 @@ export default function OperationRow({
     onChangeStatus,
     onOpen,
     onDelete,
+    allowDelete = true,
 }: OperationRowProps) {
     const urgency = getUrgency(item.scheduled_at, item.status);
     const u = URGENCY_STYLES[urgency];
@@ -74,7 +77,7 @@ export default function OperationRow({
     const petImg = item.pet?.image_url;
 
     const normalizedStatus = item.status ? item.status.trim().toLowerCase() : '';
-    const canDelete = ['processing', 'en_proceso', 'pendiente', 'pending', 'received', 'cancelado', 'canceled'].includes(normalizedStatus);
+    const canDelete = allowDelete && ['processing', 'en_proceso', 'pendiente', 'pending', 'received', 'cancelado', 'canceled'].includes(normalizedStatus);
 
     return (
         <article

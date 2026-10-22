@@ -1,263 +1,231 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
-import {
-    HelpCircle,
-    BookOpen,
-    Users,
-    Dog,
-    Flame,
-    Compass,
-    FileText,
-    CheckCircle2,
-    ChevronDown,
-    ArrowRight,
-    Search,
-    Shield,
-    Sparkles,
-    PhoneCall,
-    ExternalLink,
-    LifeBuoy,
-    PlayCircle
-} from 'lucide-react';
-import OnboardingWidget from '@/components/tenant/help/OnboardingWidget';
+import { ArrowRight, BookOpen, ChevronDown, HelpCircle, LifeBuoy, Mail, MessageCircle, Search, X } from 'lucide-react';
+import { useSessionBootstrap } from '@/hooks/useSessionBootstrap';
+import { useFeatures } from '@/hooks/useFeatures';
+import { featureForPath, moduleForPath } from '@/lib/tenant/moduleRoutes';
+import { usePlatformInfo, whatsappLink } from '@/lib/platformInfo';
+import { FAQ_CATEGORIES, FAQS, GUIDES, type Faq, type FaqCategory, type HelpLink } from '@/lib/tenant/helpContent';
 
-const FAQS = [
-    {
-        category: 'Ingreso & Registros',
-        question: '¿Puedo registrar una mascota si el cliente aún no existe?',
-        answer: 'Sí. Al abrir el formulario de Mascota, encontrarás la opción "+ Nuevo Cliente" justo al lado del selector de cliente. Esto te permite registrar al tutor en un modal emergente de forma inmediata sin perder los datos de la mascota.'
-    },
-    {
-        category: 'Ingreso & Registros',
-        question: '¿Por qué es obligatorio ingresar el peso/tamaño de la mascota?',
-        answer: 'El peso determina el tramo tarifario (Regla de Precios por Peso) configurado en tu plan y define si la cremación requiere un proceso o urna especial.'
-    },
-    {
-        category: 'Planes & Tarifas',
-        question: '¿Cuál es la diferencia entre Plan Individual y Plan Comunitario?',
-        answer: 'El Plan Individual garantiza que la mascota sea cremada de forma exclusiva con devolución de sus cenizas en una urna elegida. El Plan Comunitario realiza la cremación de forma colectiva y las cenizas no se devuelven al tutor.'
-    },
-    {
-        category: 'Seguimiento (Tracking)',
-        question: '¿Cómo funciona el código de seguimiento (Tracking)?',
-        answer: 'Al crear una orden o seguimiento, el sistema genera un código único (ej: TRK-84920). Con este código o mediante el enlace público, el tutor puede consultar el estado del proceso en tiempo real desde la web de tracking sin necesidad de iniciar sesión.'
-    },
-    {
-        category: 'Certificados & Documentos',
-        question: '¿Cuándo se habilita la emisión del Certificado de Cremación?',
-        answer: 'El certificado se habilita automáticamente una vez que el estado de la orden cambia a "Finalizado" (o "Delivered"). Puedes descargarlo en formato PDF de alta calidad con el diseño corporativo de tu crematorio.'
-    },
-];
+const cardCls = 'rounded-3xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]';
 
-const GUIDE_STEPS = [
-    {
-        number: '01',
-        title: 'Registrar Tutor / Cliente',
-        desc: 'Busca al cliente por su RUT. Si es la primera vez que atiende con ustedes, créalo ingresando su Nombre, Teléfono y Correo Electrónico.',
-        icon: Users,
-        link: '/dashboard/clientes',
-        linkText: 'Ir a Clientes'
-    },
-    {
-        number: '02',
-        title: 'Registrar Ficha de Mascota',
-        desc: 'Ingresa el Nombre, Especie (Perro, Gato, etc.), Raza, Edad y el Peso/Tamaño aproximado. Asígnala a su respectivo tutor.',
-        icon: Dog,
-        link: '/dashboard/mascotas',
-        linkText: 'Ir a Mascotas'
-    },
-    {
-        number: '03',
-        title: 'Recepción y Pedido del Servicio',
-        desc: 'Define el plan de cremación (Individual / Comunitario) y agrega productos o servicios adicionales (Urna especial, molde de huella, traslado).',
-        icon: Flame,
-        link: '/dashboard/recepcion-pedidos',
-        linkText: 'Ir a Recepción y Pedidos'
-    },
-    {
-        number: '04',
-        title: 'Crear Seguimiento & Comprobante',
-        desc: 'Inicia la orden de trabajo. Se generará un código de seguimiento público que podrás compartir con la familia por WhatsApp o Email.',
-        icon: Compass,
-        link: '/dashboard/operaciones/crear-seguimiento',
-        linkText: 'Crear Seguimiento'
-    },
-    {
-        number: '05',
-        title: 'Emisión de Certificado & Memorial',
-        desc: 'Una vez finalizada la cremación, emite el Certificado Oficial en PDF y opcionalmente configura la página de Memorial público.',
-        icon: FileText,
-        link: '/dashboard/documentos',
-        linkText: 'Emitir Documento'
-    },
-];
+/** Normaliza para buscar sin tildes ni mayúsculas. */
+const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
-export default function AyudaPage() {
-    const [searchQuery, setSearchQuery] = useState('');
-    const [openFaq, setOpenFaq] = useState<number | null>(0);
-    const [activeSection, setActiveSection] = useState<'tutorial' | 'faq' | 'contacto'>('tutorial');
-
-    const filteredFaqs = FAQS.filter(
-        f => f.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            f.answer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            f.category.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
+function GoLink({ item }: { item: HelpLink }) {
+    if (!item.href || !item.linkText) return null;
     return (
-        <div className="space-y-8 pb-12">
-            {/* Header Banner */}
-            <div className="glass-card rounded-3xl p-6 sm:p-10 border border-white/10 relative overflow-hidden bg-gradient-to-r from-primary/10 via-background to-background">
-                <div className="max-w-3xl space-y-4">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-full text-xs font-bold text-primary uppercase tracking-wider">
-                        <LifeBuoy size={14} />
-                        Centro de Ayuda & Capacitación
-                    </div>
-                    <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight">
-                        ¿Cómo usar Vinzer? Guía y Preguntas Frecuentes
-                    </h1>
-                    <p className="text-muted-foreground text-sm sm:text-base leading-relaxed">
-                        Aprende el flujo estándar de trabajo para recepcionar tutores, inscribir mascotas y gestionar el seguimiento hasta la entrega de certificados.
-                    </p>
-                </div>
-            </div>
+        <Link href={item.href} className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline">
+            {item.linkText} <ArrowRight size={13} />
+        </Link>
+    );
+}
 
-            {/* Interactive Stepper Widget */}
-            <OnboardingWidget />
-
-            {/* Navigation Tabs */}
-            <div className="flex border-b border-white/10 gap-6 text-sm font-bold">
-                <button
-                    type="button"
-                    onClick={() => setActiveSection('tutorial')}
-                    className={`pb-4 transition border-b-2 flex items-center gap-2 ${activeSection === 'tutorial'
-                            ? 'border-primary text-primary'
-                            : 'border-transparent text-muted-foreground hover:text-foreground'
-                        }`}
-                >
-                    <BookOpen size={16} />
-                    Guía de Registro Completa
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setActiveSection('faq')}
-                    className={`pb-4 transition border-b-2 flex items-center gap-2 ${activeSection === 'faq'
-                            ? 'border-primary text-primary'
-                            : 'border-transparent text-muted-foreground hover:text-foreground'
-                        }`}
-                >
-                    <HelpCircle size={16} />
-                    Preguntas Frecuentes ({FAQS.length})
-                </button>
-            </div>
-
-            {/* Section 1: Detailed Step-by-Step Guide */}
-            {activeSection === 'tutorial' && (
-                <div className="space-y-6">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-bold tracking-tight">Pasos Recomendados de Operación</h2>
-                        <span className="text-xs text-muted-foreground">Flujo operativo estandarizado</span>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {GUIDE_STEPS.map((step) => {
-                            const Icon = step.icon;
-                            return (
-                                <div
-                                    key={step.number}
-                                    className="glass-card rounded-3xl p-6 space-y-4 border border-white/10 flex flex-col justify-between hover:border-primary/30 transition group"
-                                >
-                                    <div className="space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-2xl font-black text-primary/40 font-mono">
-                                                {step.number}
-                                            </span>
-                                            <div className="p-3 bg-white/5 rounded-2xl border border-white/10 text-primary group-hover:bg-primary/10 transition">
-                                                <Icon size={20} />
-                                            </div>
-                                        </div>
-                                        <h3 className="text-lg font-bold text-foreground group-hover:text-primary transition">
-                                            {step.title}
-                                        </h3>
-                                        <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                                            {step.desc}
-                                        </p>
-                                    </div>
-
-                                    <div className="pt-3 border-t border-white/5">
-                                        <Link
-                                            href={step.link}
-                                            className="inline-flex items-center gap-2 text-xs font-bold text-primary hover:underline"
-                                        >
-                                            {step.linkText}
-                                            <ArrowRight size={14} />
-                                        </Link>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+function FaqItem({ faq, open, onToggle, showCategory }: { faq: Faq; open: boolean; onToggle: () => void; showCategory?: boolean }) {
+    return (
+        <div className={`${cardCls} overflow-hidden`}>
+            <button type="button" onClick={onToggle} aria-expanded={open}
+                className="w-full p-4 sm:p-5 text-left flex items-start justify-between gap-4 hover:bg-slate-50 dark:hover:bg-white/[0.03] transition">
+                <span className="min-w-0">
+                    {showCategory && (
+                        <span className="block text-[10px] font-black uppercase tracking-wider text-primary mb-1">{faq.category}</span>
+                    )}
+                    <span className="font-bold text-sm text-slate-900 dark:text-white">{faq.q}</span>
+                </span>
+                <ChevronDown size={18} className={`shrink-0 mt-0.5 text-slate-400 transition-transform ${open ? 'rotate-180 text-primary' : ''}`} />
+            </button>
+            {open && (
+                <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-3 border-t border-slate-100 dark:border-white/5 pt-3">
+                    <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">{faq.a}</p>
+                    <GoLink item={faq} />
                 </div>
             )}
+        </div>
+    );
+}
 
-            {/* Section 2: FAQ Accordion */}
-            {activeSection === 'faq' && (
-                <div className="space-y-6">
-                    {/* Search bar */}
-                    <div className="relative max-w-xl">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+export default function AyudaPage() {
+    const { data } = useSessionBootstrap();
+    const { hasFeature } = useFeatures();
+    // Canales de soporte: Configuración Global → Datos del SaaS (WhatsApp y correo).
+    const platform = usePlatformInfo();
+    const [query, setQuery] = useState('');
+    const [guideId, setGuideId] = useState(GUIDES[0].id);
+    const [category, setCategory] = useState<FaqCategory | 'all'>('all');
+    const [openFaq, setOpenFaq] = useState<string | null>(null);
+
+    const activeModules = useMemo(
+        () => data?.rbac.modules.filter(m => m.is_active).map(m => m.module_key) ?? [],
+        [data],
+    );
+
+    // Solo lo que este usuario puede abrir: módulo de su rol + características del plan.
+    const applies = (item: HelpLink) => {
+        if (!data) return true;
+        const path = (item.href || item.checkPath || '').split('?')[0];
+        if (path) {
+            const mod = moduleForPath(path);
+            if (mod && !activeModules.includes(mod)) return false;
+            const feat = featureForPath(path);
+            if (feat && !hasFeature(feat, true)) return false;
+        }
+        return !item.feature || hasFeature(item.feature, true);
+    };
+
+    const guides = GUIDES.map(g => ({ ...g, steps: g.steps.filter(applies) })).filter(g => g.steps.length > 0);
+    const guide = guides.find(g => g.id === guideId) ?? guides[0];
+    const faqs = FAQS.filter(applies);
+    const categories = FAQ_CATEGORIES.filter(c => faqs.some(f => f.category === c));
+
+    const q = norm(query.trim());
+    const searching = q.length > 0;
+    const faqResults = searching ? faqs.filter(f => norm(`${f.q} ${f.a} ${f.category}`).includes(q)) : [];
+    const stepResults = searching
+        ? guides.flatMap(g => g.steps.filter(s => norm(`${s.title} ${s.desc}`).includes(q)).map(s => ({ guide: g.title, step: s })))
+        : [];
+    const shownFaqs = category === 'all' ? faqs : faqs.filter(f => f.category === category);
+
+    const tenantName = data?.tenant?.name;
+    const supportWa = whatsappLink(platform.whatsapp, `Hola, necesito ayuda con ${platform.name}${tenantName ? ` (crematorio ${tenantName})` : ''}.`);
+    const supportEmail = platform.correo?.trim() || null;
+
+    return (
+        <div className="space-y-8 pb-12 max-w-6xl mx-auto">
+            {/* Encabezado + búsqueda */}
+            <div className={`${cardCls} p-6 sm:p-10 bg-gradient-to-br from-primary/10 via-white to-white dark:from-primary/15 dark:via-transparent dark:to-transparent`}>
+                <div className="max-w-3xl space-y-4">
+                    <span className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-full text-xs font-bold text-primary uppercase tracking-wider">
+                        <LifeBuoy size={14} /> Centro de Ayuda
+                    </span>
+                    <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">¿Cómo usar Vinzer?</h1>
+                    <p className="text-sm sm:text-base leading-relaxed text-slate-600 dark:text-slate-300">
+                        El flujo de trabajo paso a paso, respuestas a las dudas frecuentes y contacto con soporte.
+                        Solo ves lo que corresponde a tu plan y a tus permisos.
+                    </p>
+                    <div className="relative">
+                        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input
-                            type="text"
-                            placeholder="Buscar en preguntas frecuentes..."
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                            className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-12 pr-4 outline-none focus:border-primary/50 text-sm transition"
+                            type="text" role="searchbox" value={query} onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Busca un tema: créditos, certificado, formulario, seguimiento…"
+                            className="w-full rounded-2xl border border-slate-300 bg-white py-3 pl-12 pr-10 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-primary dark:border-white/10 dark:bg-black/20 dark:text-white"
                         />
-                    </div>
-
-                    <div className="space-y-3 max-w-4xl">
-                        {filteredFaqs.map((faq, index) => {
-                            const isOpen = openFaq === index;
-                            return (
-                                <div
-                                    key={index}
-                                    className="glass-card rounded-2xl border border-white/10 overflow-hidden transition"
-                                >
-                                    <button
-                                        type="button"
-                                        onClick={() => setOpenFaq(isOpen ? null : index)}
-                                        className="w-full p-5 text-left flex items-center justify-between gap-4 font-bold text-sm hover:bg-white/[0.02] transition"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <span className="px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold bg-primary/10 text-primary border border-primary/20">
-                                                {faq.category}
-                                            </span>
-                                            <span>{faq.question}</span>
-                                        </div>
-                                        <ChevronDown
-                                            size={18}
-                                            className={`text-muted-foreground transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180 text-primary' : ''
-                                                }`}
-                                        />
-                                    </button>
-
-                                    {isOpen && (
-                                        <div className="px-5 pb-5 pt-1 text-xs sm:text-sm text-muted-foreground border-t border-white/5 leading-relaxed bg-white/[0.01]">
-                                            {faq.answer}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-
-                        {filteredFaqs.length === 0 && (
-                            <div className="p-8 text-center glass-card rounded-3xl text-muted-foreground text-sm">
-                                No se encontraron preguntas frecuentes para "{searchQuery}".
-                            </div>
+                        {query && (
+                            <button type="button" onClick={() => setQuery('')} aria-label="Limpiar búsqueda"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white">
+                                <X size={16} />
+                            </button>
                         )}
                     </div>
                 </div>
+            </div>
+
+            {searching ? (
+                /* Resultados de búsqueda (guía + preguntas) */
+                <section className="space-y-4">
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                        {faqResults.length + stepResults.length} resultado{faqResults.length + stepResults.length === 1 ? '' : 's'} para «{query.trim()}»
+                    </h2>
+                    {stepResults.map(({ guide: g, step }) => (
+                        <div key={`${g}-${step.title}`} className={`${cardCls} p-4 sm:p-5 space-y-2`}>
+                            <p className="text-[10px] font-black uppercase tracking-wider text-primary">Guía · {g}</p>
+                            <p className="font-bold text-sm text-slate-900 dark:text-white">{step.title}</p>
+                            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{step.desc}</p>
+                            <GoLink item={step} />
+                        </div>
+                    ))}
+                    {faqResults.map(f => (
+                        <FaqItem key={f.q} faq={f} showCategory open={openFaq === f.q} onToggle={() => setOpenFaq(openFaq === f.q ? null : f.q)} />
+                    ))}
+                    {faqResults.length + stepResults.length === 0 && (
+                        <div className={`${cardCls} p-8 text-center text-sm text-slate-500 dark:text-slate-400`}>
+                            No encontramos nada sobre «{query.trim()}». Prueba con otra palabra o escríbenos a soporte (abajo).
+                        </div>
+                    )}
+                </section>
+            ) : (
+                <>
+                    {/* Guía paso a paso */}
+                    {guide && (
+                        <section className="space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+                                <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                                    <BookOpen size={20} className="text-primary" /> Paso a paso
+                                </h2>
+                                {guides.length > 1 && (
+                                    <div className="flex gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-white/5 w-full sm:w-auto">
+                                        {guides.map(g => (
+                                            <button key={g.id} type="button" onClick={() => setGuideId(g.id)}
+                                                className={`flex-1 sm:flex-none px-3 py-2 rounded-xl text-xs font-bold transition ${guide.id === g.id ? 'bg-white text-slate-900 shadow-sm dark:bg-white/10 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}>
+                                                {g.title}
+                                                {g.badge && <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-primary/15 text-primary text-[9px] uppercase">{g.badge}</span>}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <p className="text-sm text-slate-600 dark:text-slate-300">{guide.intro}</p>
+                            <ol className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {guide.steps.map((step, i) => (
+                                    <li key={step.title} className={`${cardCls} p-5 flex flex-col gap-3`}>
+                                        <div className="flex items-center gap-3">
+                                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-white text-sm font-black">{i + 1}</span>
+                                            <h3 className="font-bold text-slate-900 dark:text-white leading-snug">{step.title}</h3>
+                                        </div>
+                                        <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300 flex-1">{step.desc}</p>
+                                        {step.href && <div className="pt-3 border-t border-slate-100 dark:border-white/5"><GoLink item={step} /></div>}
+                                    </li>
+                                ))}
+                            </ol>
+                        </section>
+                    )}
+
+                    {/* Preguntas frecuentes */}
+                    <section className="space-y-4">
+                        <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                            <HelpCircle size={20} className="text-primary" /> Preguntas frecuentes
+                        </h2>
+                        <div className="flex flex-wrap gap-2">
+                            {(['all', ...categories] as const).map(c => (
+                                <button key={c} type="button" onClick={() => { setCategory(c); setOpenFaq(null); }}
+                                    className={`px-3 py-1.5 rounded-full text-xs font-bold border transition ${category === c ? 'bg-primary text-white border-primary' : 'border-slate-300 text-slate-600 hover:border-primary hover:text-primary dark:border-white/10 dark:text-slate-300'}`}>
+                                    {c === 'all' ? `Todas (${faqs.length})` : c}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="space-y-2.5">
+                            {shownFaqs.map(f => (
+                                <FaqItem key={f.q} faq={f} showCategory={category === 'all'}
+                                    open={openFaq === f.q} onToggle={() => setOpenFaq(openFaq === f.q ? null : f.q)} />
+                            ))}
+                        </div>
+                    </section>
+                </>
+            )}
+
+            {/* Soporte */}
+            {(supportWa || supportEmail) && (
+            <section className={`${cardCls} p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6`}>
+                <div className="space-y-1">
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-white">¿No encontraste lo que buscabas?</h2>
+                    <p className="text-sm text-slate-600 dark:text-slate-300">Escríbele al equipo de {platform.name} y te ayudamos.</p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                    {supportWa && (
+                        <a href={supportWa} target="_blank" rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-[#25D366] hover:bg-[#1ebe5b] text-white text-sm font-bold">
+                            <MessageCircle size={17} /> WhatsApp
+                        </a>
+                    )}
+                    {supportEmail && (
+                        <a href={`mailto:${supportEmail}?subject=${encodeURIComponent(`Ayuda ${platform.name}${tenantName ? ` · ${tenantName}` : ''}`)}`}
+                            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl border border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/10 text-sm font-bold">
+                            <Mail size={17} /> {supportEmail}
+                        </a>
+                    )}
+                </div>
+            </section>
             )}
         </div>
     );

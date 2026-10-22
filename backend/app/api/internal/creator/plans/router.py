@@ -5,6 +5,7 @@ from app import models
 from app import schemas
 from app import auth
 from typing import List
+from app.services.plan_pricing import apply_annual_price
 
 router = APIRouter()
 
@@ -32,6 +33,7 @@ def create_subscription_plan(
 ):
     """Create a new subscription plan."""
     db_plan = models.SubscriptionPlan(**plan.dict())
+    apply_annual_price(db, db_plan)
     db.add(db_plan)
     db.commit()
     db.refresh(db_plan)
@@ -74,7 +76,9 @@ def update_subscription_plan(
     update_data = plan_update.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(plan, field, value)
-    
+    # El anual sigue al mensual con el descuento global (services/plan_pricing.py).
+    apply_annual_price(db, plan)
+
     db.commit()
     db.refresh(plan)
     

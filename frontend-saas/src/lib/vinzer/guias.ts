@@ -1,9 +1,15 @@
 /**
- * Fuente única de las guías B2B del sitio Vinzer. La usan el índice /guias,
+ * Fuente única de las guías del sitio Vinzer. La usan el índice /guias,
  * el Navbar, el Footer y el sitemap: para publicar una guía nueva basta con
  * crear su página y agregarla aquí.
  */
-export type GuiaAccent = 'sky' | 'gold' | 'emerald' | 'violet';
+export type GuiaAccent = 'sky' | 'gold' | 'emerald' | 'violet' | 'rose';
+
+/**
+ * 'crematorios' = guías B2B (menú "Soluciones" del Navbar).
+ * 'familias' = guías informativas para tutores; solo índice, footer y sitemap.
+ */
+export type GuiaAudience = 'crematorios' | 'familias';
 
 export interface Guia {
     slug: string;
@@ -20,6 +26,7 @@ export interface Guia {
     summary: string;
     topics: string[];
     accent: GuiaAccent;
+    audience: GuiaAudience;
 }
 
 export const GUIAS: Guia[] = [
@@ -33,6 +40,7 @@ export const GUIAS: Guia[] = [
         summary: 'Protocolo de cadena de custodia en 5 etapas: código único por servicio, fotografías en cada traspaso, avance por etapas, certificado y seguimiento en vivo para la familia.',
         topics: ['Código único', 'Evidencia fotográfica', 'Checklist', 'Seguimiento familiar'],
         accent: 'sky',
+        audience: 'crematorios',
     },
     {
         slug: 'sistema-gestion-operativa-automatizacion-crematorio-mascotas',
@@ -44,6 +52,7 @@ export const GUIAS: Guia[] = [
         summary: 'Cómo ordenar la operación: recepción en 4 pestañas, solicitudes online de familias y veterinarias, etapas con evidencia fotográfica, seguimiento en vivo e inventario de urnas.',
         topics: ['Recepción', 'Formulario online', 'Etapas y evidencia', 'Inventario'],
         accent: 'gold',
+        audience: 'crematorios',
     },
     {
         slug: 'formulario-cremacion-mascotas-online',
@@ -55,6 +64,7 @@ export const GUIAS: Guia[] = [
         summary: 'Cómo funciona un formulario online para familias: los 5 pasos, qué recibe la familia al enviar, cómo llega al crematorio y 4 formas de compartirlo, incluido tu sitio web.',
         topics: ['WhatsApp', 'Enlace permanente', 'Sitio web', 'Veterinarias'],
         accent: 'emerald',
+        audience: 'crematorios',
     },
     {
         slug: 'seguimiento-cremacion-mascotas-en-linea',
@@ -66,6 +76,19 @@ export const GUIAS: Guia[] = [
         summary: 'Qué ve la familia en su enlace de seguimiento, cómo le llega (formulario, WhatsApp o código), qué registrar en cada etapa y cómo reduce las llamadas al crematorio.',
         topics: ['Enlace privado', 'Etapas con fotos', 'WhatsApp', 'Código de seguimiento'],
         accent: 'violet',
+        audience: 'crematorios',
+    },
+    {
+        slug: 'crematorio-de-mascotas-chile',
+        title: 'Crematorio de mascotas en Chile: guía completa para despedir a tu compañero',
+        shortTitle: 'Crematorio de Mascotas en Chile',
+        footerLabel: 'Guía: Crematorio de Mascotas en Chile',
+        badge: 'Para familias',
+        description: 'Tipos de cremación, precios, retiro y cómo elegir un servicio confiable.',
+        summary: 'Guía para tutores: cremación individual vs. colectiva, cómo funciona el proceso, qué influye en el precio, qué preguntar antes de contratar y qué dice la normativa chilena.',
+        topics: ['Individual vs. colectiva', 'Precios', 'Cómo elegir', 'Normativa'],
+        accent: 'rose',
+        audience: 'familias',
     },
 ];
 

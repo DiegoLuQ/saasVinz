@@ -159,14 +159,20 @@ def obtener_expediente(
     for pr in (oc.productos or []):
         items.append({"tipo": "producto", "nombre": getattr(pr.product, "name", "Producto"), "cantidad": pr.cantidad or 1, "precio": pr.precio_venta or 0})
 
-    # Recargo por peso: igual que el formulario de registro, se deriva de los
-    # tramos vigentes (las órdenes del formulario público / Registro Rápido o con
-    # peso editado en Operaciones guardan weight_price = 0). Sin tramos, el guardado.
+    # Recargo por peso: con peso en kg se deriva de los tramos vigentes (las
+    # órdenes con peso editado en Operaciones o del Registro Rápido guardan
+    # weight_price = 0). Sin kg (p. ej. orden del formulario público con el tramo
+    # elegido por la familia) o sin tramos, se usa el monto guardado en la orden.
     tiers = get_weight_tiers(db, tenant_id)
-    weight_price = weight_surcharge(tiers, oc.weight) if tiers else ((oc.financial.weight_price or 0) if oc.financial else 0)
+    saved_weight_price = (oc.financial.weight_price or 0) if oc.financial else 0
+    weight_price = weight_surcharge(tiers, oc.weight) if (tiers and oc.weight) else saved_weight_price
     if weight_price:
-        items.append({"tipo": "peso", "nombre": f"Recargo por peso ({oc.weight:g} kg)".replace(".", ","),
-                      "cantidad": 1, "precio": weight_price})
+        if oc.weight:
+            label = f"Recargo por peso ({oc.weight:g} kg)".replace(".", ",")
+        else:
+            size = getattr(oc.pet, "size", None) if getattr(oc, "pet", None) else None
+            label = f"Recargo por peso ({size})" if size else "Recargo por peso"
+        items.append({"tipo": "peso", "nombre": label, "cantidad": 1, "precio": weight_price})
 
     # Etapas del crematorio con su evidencia (misma lógica que el seguimiento público).
     steps = db.query(models.WorkflowStep).filter(
@@ -344,12 +350,51 @@ def actualizar_cremacion(
 @router.delete("/{cremation_id}")
 def eliminar_cremacion(
     cremation_id: int,
+    scope: str = Query("order", pattern="^(order|pet|all)$"),
+    db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
+    current_user=Depends(get_current_user),
     service: CremationService = Depends(get_cremation_service),
     _: bool = Depends(check_permission("ordenes", "delete"))
 ):
-    """Elimina una OC y sus registros asociados (con restauración de stock y limpieza de archivos)."""
-    return service.delete(tenant_id, cremation_id)
+    """Elimina una OC. Alcance (`scope`):
+    - order: solo la orden y sus archivos (restaura stock).
+    - pet: además la mascota con todo lo suyo (memorial, registro web, diseños e
+      ilustraciones IA, fotos). Solo si la mascota no tiene otras órdenes.
+    - all: además el cliente. Solo si no tiene otras mascotas."""
+    if scope == "order":
+        return service.delete(tenant_id, cremation_id)
+
+    from app import models
+    from app.api.internal.crm.pets import purge
+
+    oc = db.query(models.Cremation).filter(models.Cremation.id == cremation_id, models.Cremation.tenant_id == tenant_id).first()
+    if not oc:
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
+    pet = oc.pet
+    if not pet:
+        raise HTTPException(status_code=400, detail="La orden no tiene mascota asociada; elimina solo la orden.")
+    if db.query(models.Cremation.id).filter(models.Cremation.pet_id == pet.id, models.Cremation.id != oc.id).first():
+        raise HTTPException(status_code=400, detail="La mascota tiene otras órdenes: elimina solo esta orden.")
+    check_permission("mascotas", "delete")(db=db, current_user=current_user)
+
+    customer = None
+    if scope == "all":
+        customer = pet.customer
+        if customer is None:
+            raise HTTPException(status_code=400, detail="La mascota no tiene cliente asociado.")
+        if db.query(models.Pet.id).filter(models.Pet.customer_id == customer.id, models.Pet.id != pet.id).first():
+            raise HTTPException(status_code=400, detail="El cliente tiene otras mascotas: no se puede eliminar.")
+        check_permission("clientes", "delete")(db=db, current_user=current_user)
+
+    pet_name = pet.name
+    try:
+        summary = purge.purge(db, tenant_id, pet, customer=customer)
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    what = "la orden, la mascota y el cliente" if scope == "all" else "la orden y la mascota"
+    return {"status": "success", "message": f"Se eliminó {what} ({pet_name}) con todos sus datos e imágenes", **summary}
 
 @router.get("/{cremation_id}/delete-preview")
 def vista_previa_eliminacion(
@@ -370,9 +415,6 @@ def vista_previa_eliminacion(
 
     other_orders = db.query(C).filter(C.pet_id == oc.pet_id, C.id != oc.id).count() if oc.pet_id else 0
     pet = oc.pet
-    pet_photos = 0
-    if pet and other_orders == 0:
-        pet_photos = (1 if pet.image_url else 0) + len([u for u in (pet.images or []) if u and u != pet.image_url])
     evidence_photos = len([e for e in (oc.evidence or []) if e.photo_url])
     order_photos = len((oc.details.images if oc.details else None) or [])
     comm = oc.commission
@@ -395,9 +437,36 @@ def vista_previa_eliminacion(
             "amount": comm.amount,
             "status": str(getattr(comm.status, "value", comm.status)),
         } if comm else None,
-        # Si es la única orden de la mascota, el servicio borra también sus fotos
-        "fotos_mascota": pet_photos,
+        # Alcances opcionales: borrar también la mascota (y el cliente) con todo lo suyo.
+        "scopes": _scopes_preview(db, tenant_id, oc, other_orders),
     }
+
+
+def _scopes_preview(db: Session, tenant_id: int, oc, other_orders: int) -> dict:
+    from app import models
+    from app.api.internal.crm.pets import purge
+
+    pet = oc.pet
+    if not pet:
+        return {"pet": {"available": False, "reason": "La orden no tiene mascota asociada."},
+                "all": {"available": False, "reason": "La orden no tiene mascota asociada."}}
+    if other_orders:
+        reason = f"{pet.name} tiene {other_orders} orden(es) más."
+        return {"pet": {"available": False, "reason": reason}, "all": {"available": False, "reason": reason}}
+
+    p = purge.preview(db, tenant_id, pet)
+    pet_scope = {
+        "available": True, "pet_name": pet.name,
+        "memorials": p["memorials"], "submissions": p["submissions"], "designs": p["designs"],
+        "illustrations": p["illustrations"], "digital_cards": p["digital_cards"], "images": p["images"],
+    }
+    customer = pet.customer
+    if not customer:
+        return {"pet": pet_scope, "all": {"available": False, "reason": "La mascota no tiene cliente asociado."}}
+    other_pets = db.query(models.Pet.id).filter(models.Pet.customer_id == customer.id, models.Pet.id != pet.id).count()
+    all_scope = ({"available": True, "customer_name": customer.name} if other_pets == 0 else
+                 {"available": False, "reason": f"{customer.name} tiene {other_pets} mascota(s) más."})
+    return {"pet": pet_scope, "all": all_scope}
 
 @router.post("/upload-image")
 async def upload_image(

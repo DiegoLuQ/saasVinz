@@ -256,7 +256,8 @@ def obtener_todos_los_documentos(
 
 
 @router.delete("/certificates/{cert_id}")
-def eliminar_certificado(cert_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id), _perm: bool = Depends(check_permission("certificados", "delete"))):
+def eliminar_certificado(cert_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id), _perm: bool = Depends(check_permission("certificados", "delete")),
+                         _f: bool = Depends(check_feature("certificados:repositorio", default=True))):
     cert = db.query(models.Certificate).filter(
         models.Certificate.id == cert_id,
         models.Certificate.tenant_id == tenant_id
@@ -280,7 +281,8 @@ def obtener_contenido_certificado(cert_id: int, db: Session = Depends(get_db), t
     return {"html_content": cert.html_content}
 
 @router.delete("/files/{doc_id}")
-def eliminar_documento_subido(doc_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id), _perm: bool = Depends(check_permission("certificados", "delete"))):
+def eliminar_documento_subido(doc_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id), _perm: bool = Depends(check_permission("certificados", "delete")),
+                              _f: bool = Depends(check_feature("certificados:repositorio", default=True))):
     doc = db.query(models.Document).filter(
         models.Document.id == doc_id,
         models.Document.tenant_id == tenant_id

@@ -15,7 +15,8 @@ import {
     Cpu,
     BookOpen,
     Globe,
-    Smartphone
+    Smartphone,
+    Heart
 } from 'lucide-react';
 import { VinzerLogo } from './VinzerLogo';
 import { GUIAS, guiaPath } from '@/lib/vinzer/guias';
@@ -27,14 +28,21 @@ export interface VinzerNavbarProps {
     onNavigateSection?: (e: React.MouseEvent<any>, sectionId: string) => void;
 }
 
+/** true en el primer enlace de familias: ahí se pinta el subtítulo "Para familias". */
+const startsFamilias = (i: number) =>
+    SOLUTIONS_LINKS[i].audience === 'familias' && (i === 0 || SOLUTIONS_LINKS[i - 1].audience !== 'familias');
+
 const ACCENT_STYLES = {
     sky: { icon: ShieldCheck, iconColor: 'text-[#19B5FE]', bgIcon: 'bg-[#19B5FE]/10 border-[#19B5FE]/20' },
     gold: { icon: Cpu, iconColor: 'text-[#E7C15A]', bgIcon: 'bg-[#E7C15A]/10 border-[#E7C15A]/20' },
     emerald: { icon: Globe, iconColor: 'text-emerald-400', bgIcon: 'bg-emerald-500/10 border-emerald-500/20' },
     violet: { icon: Smartphone, iconColor: 'text-violet-400', bgIcon: 'bg-violet-500/10 border-violet-500/20' },
+    rose: { icon: Heart, iconColor: 'text-rose-400', bgIcon: 'bg-rose-500/10 border-rose-500/20' },
 } as const;
 
-export const SOLUTIONS_LINKS = GUIAS.map((g) => ({
+// Guías B2B primero; las de familias van al final, bajo su propio subtítulo.
+export const SOLUTIONS_LINKS = [...GUIAS].sort((a, b) => Number(a.audience === 'familias') - Number(b.audience === 'familias')).map((g) => ({
+    audience: g.audience,
     title: g.shortTitle,
     href: guiaPath(g.slug),
     badge: g.badge,
@@ -268,12 +276,19 @@ export function VinzerNavbar({
                                         </div>
 
                                         <div className="flex flex-col gap-1.5">
-                                            {SOLUTIONS_LINKS.map((item) => {
+                                            {SOLUTIONS_LINKS.map((item, i) => {
                                                 const Icon = item.icon;
                                                 const isCurrent = pathname === item.href;
                                                 return (
+                                                    <React.Fragment key={item.href}>
+                                                    {startsFamilias(i) && (
+                                                        <div className={`px-3 pt-2 pb-1 mt-1 border-t ${isLight ? 'border-slate-200' : 'border-white/5'}`}>
+                                                            <span className={`text-[10px] font-black uppercase tracking-wider ${isLight ? 'text-rose-600' : 'text-rose-400'}`}>
+                                                                Para familias
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                     <Link
-                                                        key={item.href}
                                                         href={item.href}
                                                         onClick={() => setIsSolutionsOpen(false)}
                                                         className={`group p-3 rounded-xl transition-all duration-200 flex items-start gap-3 border ${
@@ -310,6 +325,7 @@ export function VinzerNavbar({
                                                             </p>
                                                         </div>
                                                     </Link>
+                                                    </React.Fragment>
                                                 );
                                             })}
                                         </div>
@@ -448,11 +464,14 @@ export function VinzerNavbar({
                                         <span className="text-xl font-bold text-[#19B5FE]">Guías</span>
                                     </div>
                                     <div className="mt-3 flex flex-col gap-2 pl-2">
-                                        {SOLUTIONS_LINKS.map((item) => {
+                                        {SOLUTIONS_LINKS.map((item, i) => {
                                             const Icon = item.icon;
                                             return (
+                                                <React.Fragment key={item.href}>
+                                                {startsFamilias(i) && (
+                                                    <span className="mt-2 text-[11px] font-black uppercase tracking-wider text-rose-400">Para familias</span>
+                                                )}
                                                 <Link
-                                                    key={item.href}
                                                     href={item.href}
                                                     onClick={() => setIsMobileMenuOpen(false)}
                                                     className="p-3 rounded-xl bg-white/5 border border-white/10 flex items-start gap-3 active:scale-[0.98] transition-all"
@@ -463,6 +482,7 @@ export function VinzerNavbar({
                                                         <div className="text-xs text-slate-400 mt-1 line-clamp-1">{item.description}</div>
                                                     </div>
                                                 </Link>
+                                                </React.Fragment>
                                             );
                                         })}
                                     </div>

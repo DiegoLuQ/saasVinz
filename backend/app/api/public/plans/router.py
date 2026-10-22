@@ -33,9 +33,9 @@ _FEATURE_MODULES = {
     "pagos": "payments",
 }
 
-# El widget embebible se habilita por nombre de plan, no por módulo.
-# Debe seguir igual que WIDGET_ALLOWED_PLANS en integrations/services.py.
-_WIDGET_PLANS = {"PRO", "ULTRA"}
+# El widget embebible es una característica del plan (admin → Configurar Características),
+# con la regla anterior por nombre si el plan no la tiene guardada.
+from app.services.plan_features import plan_has
 
 
 class PublicPlan(BaseModel):
@@ -102,7 +102,7 @@ def _serialize(plan: SubscriptionPlan) -> PublicPlan:
         has_veterinaries="veterinarios" in modules,
         has_memorials="memoriales" in modules,
         has_payments="pagos" in modules,
-        has_widget=(plan.name or "").upper() in _WIDGET_PLANS,
+        has_widget=plan_has(plan, "integraciones:widget"),
     )
 
 

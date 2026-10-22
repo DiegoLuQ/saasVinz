@@ -9,36 +9,32 @@ from app.utils import tz
 from .models import TenantApiKey
 from . import schemas
 
-# Planes que pueden usar el widget embebible / API keys públicas.
-WIDGET_ALLOWED_PLANS = {"PRO", "ULTRA"}
+from app.services.plan_features import NAME_FALLBACK, tenant_has
 
-# Formulario de ingreso incrustable (iframe en el sitio del tenant): solo ULTRA.
-FORM_EMBED_ALLOWED_PLANS = {"ULTRA"}
+# Se controlan desde admin → Planes → "Configurar Características" (Configuración →
+# Integraciones). Estos conjuntos son solo la regla anterior por nombre, usada si
+# el plan no tiene la casilla guardada (ver app/services/plan_features.py).
+WIDGET_ALLOWED_PLANS = NAME_FALLBACK["integraciones:widget"]
+FORM_EMBED_ALLOWED_PLANS = NAME_FALLBACK["integraciones:formulario_incrustable"]
 
 KEY_PREFIX = "pk_vinzer_live_"
 
 
 def tenant_can_use_widget(tenant: models.Tenant) -> bool:
-    """Gating por plan: solo PRO y ULTRA (considera plan demo vía effective_plan)."""
-    plan = tenant.effective_plan if tenant else None
-    if not plan or not plan.name:
-        return False
-    return plan.name.strip().upper() in WIDGET_ALLOWED_PLANS
+    """Widget / API keys públicas (considera plan demo vía effective_plan)."""
+    return tenant_has(tenant, "integraciones:widget")
 
 
 def tenant_can_use_form_embed(tenant: models.Tenant) -> bool:
-    """Gating del formulario incrustable: solo ULTRA (considera plan demo)."""
-    plan = tenant.effective_plan if tenant else None
-    if not plan or not plan.name:
-        return False
-    return plan.name.strip().upper() in FORM_EMBED_ALLOWED_PLANS
+    """Formulario incrustable en el sitio del tenant (considera plan demo)."""
+    return tenant_has(tenant, "integraciones:formulario_incrustable")
 
 
 def require_widget_plan(tenant: models.Tenant) -> None:
     if not tenant_can_use_widget(tenant):
         raise HTTPException(
             status_code=403,
-            detail="El widget embebible está disponible solo en los planes PRO y ULTRA.",
+            detail="El widget embebible no está incluido en tu plan.",
         )
 
 

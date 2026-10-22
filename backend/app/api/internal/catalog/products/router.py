@@ -6,6 +6,13 @@ from app import schemas
 from app.api.deps import get_tenant_id
 from app.api.internal.admin.rbac.router import check_permission
 from app.api.deps_limits import check_resource_limit
+from app.api.deps_features import check_feature
+
+# Gestionar categorías / proveedores es una característica del plan (admin →
+# Planes → "Configurar Características"); listarlos no, porque el formulario de
+# productos los necesita. Sin el flag configurado se permite (igual que el menú).
+_CATEGORIES_FEATURE = check_feature("inventario:categorias:gestionar", default=True)
+_PROVIDERS_FEATURE = check_feature("inventario:proveedores:gestionar", default=True)
 from app.api.internal.catalog.services import CategoryService, ProviderService, ProductService
 
 router = APIRouter()
@@ -34,7 +41,8 @@ def create_category(
     category: schemas.CategoryCreate, 
     tenant_id: int = Depends(get_tenant_id),
     service: CategoryService = Depends(get_category_service),
-    _: bool = Depends(check_permission("inventario", "create"))
+    _: bool = Depends(check_permission("inventario", "create")),
+    _f: bool = Depends(_CATEGORIES_FEATURE)
 ):
     return service.create(tenant_id, category)
 
@@ -44,7 +52,8 @@ def update_category(
     category_update: schemas.CategoryUpdate, 
     tenant_id: int = Depends(get_tenant_id),
     service: CategoryService = Depends(get_category_service),
-    _: bool = Depends(check_permission("inventario", "edit"))
+    _: bool = Depends(check_permission("inventario", "edit")),
+    _f: bool = Depends(_CATEGORIES_FEATURE)
 ):
     return service.update(tenant_id, category_id, category_update)
 
@@ -53,7 +62,8 @@ def delete_category(
     category_id: int, 
     tenant_id: int = Depends(get_tenant_id),
     service: CategoryService = Depends(get_category_service),
-    _: bool = Depends(check_permission("inventario", "delete"))
+    _: bool = Depends(check_permission("inventario", "delete")),
+    _f: bool = Depends(_CATEGORIES_FEATURE)
 ):
     return service.delete(tenant_id, category_id)
 
@@ -72,7 +82,8 @@ def create_provider(
     provider: schemas.ProviderCreate, 
     tenant_id: int = Depends(get_tenant_id),
     service: ProviderService = Depends(get_provider_service),
-    _: bool = Depends(check_permission("inventario", "create"))
+    _: bool = Depends(check_permission("inventario", "create")),
+    _f: bool = Depends(_PROVIDERS_FEATURE)
 ):
     return service.create(tenant_id, provider)
 
@@ -82,7 +93,8 @@ def update_provider(
     provider_update: schemas.ProviderUpdate, 
     tenant_id: int = Depends(get_tenant_id),
     service: ProviderService = Depends(get_provider_service),
-    _: bool = Depends(check_permission("inventario", "edit"))
+    _: bool = Depends(check_permission("inventario", "edit")),
+    _f: bool = Depends(_PROVIDERS_FEATURE)
 ):
     return service.update(tenant_id, provider_id, provider_update)
 
@@ -91,7 +103,8 @@ def delete_provider(
     provider_id: int, 
     tenant_id: int = Depends(get_tenant_id),
     service: ProviderService = Depends(get_provider_service),
-    _: bool = Depends(check_permission("inventario", "delete"))
+    _: bool = Depends(check_permission("inventario", "delete")),
+    _f: bool = Depends(_PROVIDERS_FEATURE)
 ):
     return service.delete(tenant_id, provider_id)
 
@@ -111,7 +124,8 @@ def create_product(
     tenant_id: int = Depends(get_tenant_id),
     service: ProductService = Depends(get_product_service),
     _: bool = Depends(check_permission("inventario", "create")),
-    __: bool = Depends(check_resource_limit("products"))
+    __: bool = Depends(check_resource_limit("products")),
+    _f: bool = Depends(check_feature("inventario:productos:crear", default=True))
 ):
     return service.create(tenant_id, product)
 
@@ -121,7 +135,8 @@ def update_product(
     product_update: schemas.ProductUpdate, 
     tenant_id: int = Depends(get_tenant_id),
     service: ProductService = Depends(get_product_service),
-    _: bool = Depends(check_permission("inventario", "edit"))
+    _: bool = Depends(check_permission("inventario", "edit")),
+    _f: bool = Depends(check_feature("inventario:productos:editar", default=True))
 ):
     return service.update(tenant_id, product_id, product_update)
 
@@ -130,7 +145,8 @@ def delete_product(
     product_id: int, 
     tenant_id: int = Depends(get_tenant_id),
     service: ProductService = Depends(get_product_service),
-    _: bool = Depends(check_permission("inventario", "delete"))
+    _: bool = Depends(check_permission("inventario", "delete")),
+    _f: bool = Depends(check_feature("inventario:productos:eliminar", default=True))
 ):
     return service.delete(tenant_id, product_id)
 

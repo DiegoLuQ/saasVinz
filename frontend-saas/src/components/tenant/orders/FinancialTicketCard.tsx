@@ -349,12 +349,13 @@ export default function FinancialTicketCard({
                             </AnimatePresence>
 
                             {/* Weight Surcharge */}
-                            {currentCremation?.weight && (currentCremation?.weight_price ?? 0) >= 0 && (
+                            {/* Con kg o con recargo guardado (tramo elegido en el formulario público, sin kg) */}
+                            {(currentCremation?.weight || (currentCremation?.weight_price ?? 0) > 0) && (
                                 <div className="flex justify-between items-center pt-3 border-t border-dashed border-white/[0.05] group gap-3">
                                     <div className="flex items-center gap-2 min-w-0">
                                         <span className="w-1.5 h-1.5 rounded-full bg-[#00C985] shrink-0" aria-hidden="true" />
                                         <span className="text-[10px] font-black text-[#00C985] uppercase tracking-tight truncate">
-                                            Cargo por peso ({currentCremation.weight}kg)
+                                            Cargo por peso {currentCremation.weight ? `(${currentCremation.weight}kg)` : '(según tramo)'}
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-1.5 shrink-0">

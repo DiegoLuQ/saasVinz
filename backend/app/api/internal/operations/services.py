@@ -582,19 +582,10 @@ class CremationService:
                 if doc.file_url:
                     MediaService.delete_media_by_url(self.db, doc.file_url)
 
-        other_orders = self.db.query(models.CremationOC).filter(
-            models.CremationOC.pet_id == db_cremation.pet_id,
-            models.CremationOC.id != cremation_id
-        ).count()
+        # Las fotos de la mascota NO se tocan: la mascota sigue existiendo (y su
+        # registro web, tarjeta y diseños las usan). Para borrar también la mascota
+        # está el alcance "pet"/"all" del endpoint (pets/purge.py).
 
-        if other_orders == 0 and db_cremation.pet:
-            pet = db_cremation.pet
-            if pet.image_url:
-                MediaService.delete_media_by_url(self.db, pet.image_url)
-            if pet.images:
-                for pet_img in pet.images or []:
-                    MediaService.delete_media_by_url(self.db, pet_img)
-        
         # Restore Stock
         for p_assoc in db_cremation.productos:
             prod = self.db.query(models.Product).filter(models.Product.id == p_assoc.product_id).first()

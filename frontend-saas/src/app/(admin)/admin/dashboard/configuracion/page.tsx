@@ -5,9 +5,11 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { apiRequest, getImageUrl } from '@/lib/admin/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Save, Plus, Trash2, Layout, Type, Search, CreditCard, Palette, ArrowUp, ArrowDown, HelpCircle, Building2, Globe, Mail, Phone, MapPin, Instagram, Facebook, Twitter, Youtube, Upload, ImageIcon, Database, ExternalLink } from 'lucide-react';
+import { Save, Plus, Trash2, Layout, Type, Search, CreditCard, Palette, ArrowUp, ArrowDown, HelpCircle, Building2, Globe, Mail, Phone, MapPin, Instagram, Facebook, Twitter, Youtube, Upload, ImageIcon, Database, ExternalLink, Bot, Landmark } from 'lucide-react';
 import ImageCropper from '@/components/tenant/ImageCropper';
 import BackupSettings from './BackupSettings';
+import AiProvidersSettings from './AiProvidersSettings';
+import PaymentSettings from './PaymentSettings';
 import HeroAssetSelector from '@/components/admin/landing/HeroAssetSelector';
 import MediaSelector from '@/components/admin/media/MediaSelector';
 
@@ -322,6 +324,8 @@ export default function LandingConfigPage() {
                         { id: 'whatsapp', label: 'WhatsApp / Contacto', icon: Phone },
                         { id: 'institucional', label: 'Datos del SaaS', icon: Building2 },
                         { id: 'backups', label: 'Respaldos', icon: Database },
+                        { id: 'ai', label: 'Plataformas IA', icon: Bot },
+                        { id: 'pagos', label: 'Datos de pago', icon: Landmark },
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -340,6 +344,14 @@ export default function LandingConfigPage() {
                     {/* Backups Section */}
                     {activeTab === 'backups' && (
                         <BackupSettings />
+                    )}
+
+                    {activeTab === 'ai' && (
+                        <AiProvidersSettings />
+                    )}
+
+                    {activeTab === 'pagos' && (
+                        <PaymentSettings />
                     )}
 
                     {/* General & SEO */}

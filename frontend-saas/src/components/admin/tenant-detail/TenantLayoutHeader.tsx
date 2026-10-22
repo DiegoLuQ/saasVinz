@@ -4,6 +4,7 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Box, Key } from 'lucide-react';
 import TenantStorageChip from './TenantStorageChip';
+import TenantCreditsButton from './TenantCreditsButton';
 
 interface TenantLayoutHeaderProps {
     tenantName?: string;
@@ -56,6 +57,7 @@ export default function TenantLayoutHeader({
                 </div>
 
                 <div className="flex flex-wrap gap-3">
+                    <TenantCreditsButton tenantId={tenantId} />
                     <button
                         onClick={onOpenModules}
                         className="flex items-center gap-2 px-6 py-3 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-bold transition-all border border-white/10"

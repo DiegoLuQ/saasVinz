@@ -4,8 +4,13 @@ from app.database import get_db
 from app import models, auth, schemas
 from typing import List, Literal
 from pydantic import BaseModel
+from app.api.deps_features import check_feature
 
 router = APIRouter()
+
+# "Gestionar Roles y Módulos" es una característica del plan (admin → Planes →
+# "Configurar Características"). Sin el flag configurado se permite (igual que el menú).
+ROLES_FEATURE = check_feature("configuracion:roles", default=True)
 
 # Módulo estructural: siempre activo para todos los roles, no editable desde el
 # blueprint (cada usuario necesita su perfil). 'dashboard' SÍ es controlable por rol.
@@ -106,7 +111,8 @@ def update_blueprint(
 def get_tenant_config(
     role: str,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.get_current_user),
+    _f: bool = Depends(ROLES_FEATURE)
 ):
     """Retorna la configuración de todos los módulos del sistema para un rol específico."""
     # 1. Obtener todos los módulos del sistema
@@ -182,7 +188,8 @@ def get_tenant_config(
 def toggle_module(
     data: ModuleToggle,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.get_current_user),
+    _f: bool = Depends(ROLES_FEATURE)
 ):
     """Permite al Admin del tenant (o al Creator) activar/desactivar módulos opcionales."""
     if current_user.role not in (models.UserRole.admin, models.UserRole.creator):
@@ -337,6 +344,24 @@ def get_my_granular_permissions(
         
     return result
 
+# Acciones que además dependen de una característica del plan (admin → Planes →
+# "Configurar Características"). Va antes de los permisos por usuario: el plan es
+# el techo. Sin el flag configurado se permite (mismo criterio que el menú).
+PLAN_ACTION_FEATURES: dict[tuple[str, str], str] = {
+    ("clientes", "create"): "clientes:crear",
+    ("clientes", "edit"): "clientes:editar",
+    ("clientes", "delete"): "clientes:eliminar",
+    ("mascotas", "create"): "mascotas:crear",
+    ("mascotas", "edit"): "mascotas:editar",
+    ("mascotas", "delete"): "mascotas:eliminar",
+    ("servicios", "create"): "servicios:crear",
+    ("servicios", "edit"): "servicios:editar",
+    ("ordenes", "create"): "ordenes:crear",
+    ("ordenes", "edit"): "ordenes:editar",
+    ("ordenes", "delete"): "ordenes:eliminar",
+}
+
+
 def check_permission(module_key: str, action: str):
     """
     Dependencia reutilizable para verificar permisos granulares.
@@ -362,6 +387,22 @@ def check_permission(module_key: str, action: str):
                         "code": "subscription_locked",
                         "module": module_key,
                         "message": "Tu suscripción venció y el período de gracia finalizó. Regulariza tu pago en Configuración → Facturación para reactivar este módulo.",
+                    },
+                )
+
+        # 0.6 Característica del plan para esta acción (crear/editar/eliminar).
+        feature_key = PLAN_ACTION_FEATURES.get((module_key, action))
+        if feature_key:
+            _tenant = db.query(models.Tenant).filter(models.Tenant.id == current_user.tenant_id).first()
+            _plan = _tenant.effective_plan if _tenant else None
+            _features = _plan.features if _plan and isinstance(_plan.features, dict) else {}
+            if _features.get(feature_key, True) is False:
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "error": "Característica no incluida en tu plan",
+                        "feature": feature_key,
+                        "message": "Tu plan actual no incluye esta acción. Revisa los planes en Configuración → Facturación.",
                     },
                 )
 

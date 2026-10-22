@@ -19,9 +19,52 @@ import {
     Database,
     MessageCircle,
     Store,
-    Globe
+    Globe,
+    ArrowRight,
+    Sparkles,
+    Loader2
 } from 'lucide-react';
+import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { formatChileDate, formatChileTime } from '@/lib/dates';
+import { listTemplateExports } from '@/lib/tenant/imageTemplates';
+import { getImageUrl } from '@/lib/tenant/api';
+import { RecipeDesignView, isRecipeDesign } from '@/components/tenant/redes/RecipeDesign';
+
+/** Acción principal del aviso: su action_url (rutas internas) o una derivada de sus datos. */
+type NotificationLike = { type?: string; action_url?: string | null; data?: Record<string, unknown> | null };
+
+function notificationAction(notif: NotificationLike): { href: string; label: string } | null {
+    const url = notif?.action_url || undefined;
+    const data = notif?.data || {};
+    if (data.cremation_id) {
+        return { href: url && url.startsWith('/') ? url : `/dashboard/recepcion-pedidos?orden=${data.cremation_id}`, label: 'Ver orden' };
+    }
+    if (notif?.type === 'new_submission' && data.submission_id) {
+        return { href: `/dashboard/registros/${data.submission_id}`, label: 'Ver solicitud' };
+    }
+    if (url && url.startsWith('/')) return { href: url, label: 'Ir' };
+    return null;
+}
+
+/** Vista previa del diseño que generó la tarea en segundo plano (aviso document_ready). */
+function GeneratedDesignPreview({ petId, exportId }: { petId: number | null; exportId: number }) {
+    const { data, isLoading } = useQuery({
+        queryKey: ['tenant', 'template-exports', 'notification', petId, exportId],
+        queryFn: () => listTemplateExports({ pet_id: petId ?? undefined, kind: 'design', page: 1, page_size: 60 }),
+    });
+    const item = data?.items.find(it => it.id === exportId);
+    if (isLoading) return <div className="h-64 flex items-center justify-center"><Loader2 className="animate-spin text-primary" size={22} /></div>;
+    if (!item) return <p className="text-sm text-white/40">La imagen ya no está disponible (pudo haberse eliminado).</p>;
+    return (
+        <div className="rounded-3xl bg-black/30 border border-white/10 h-80 flex items-center justify-center overflow-hidden">
+            {isRecipeDesign(item) ? <RecipeDesignView item={item} className="w-full h-full p-3" /> : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={getImageUrl(item.url || '')} alt={item.title} className="max-h-full max-w-full object-contain" />
+            )}
+        </div>
+    );
+}
 
 interface NotificationDetailModalProps {
     isOpen: boolean;
@@ -95,6 +138,11 @@ export default function NotificationDetailModal({
     };
 
     const config = getTypeConfig(notification);
+    const action = notificationAction(notification);
+    const visibleData = Object.entries(notification.data || {}).filter(([key]) =>
+        key !== 'notes' && key !== 'receipt_url' && !key.toLowerCase().endsWith('_id') && key.toLowerCase() !== 'id'
+    );
+    const designExportId = notification.type === 'document_ready' ? notification.data?.export_id : null;
 
     // Format data keys for display
     const formatKey = (key: string) => {
@@ -176,8 +224,19 @@ export default function NotificationDetailModal({
                                 </p>
                             </div>
 
+                            {/* Imagen generada (tarea en segundo plano) */}
+                            {designExportId && (
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-1 h-4 bg-violet-500 rounded-full" />
+                                        <h4 className="text-[10px] uppercase font-black text-white/30 tracking-[0.2em] flex items-center gap-1.5"><Sparkles size={12} /> Imagen generada</h4>
+                                    </div>
+                                    <GeneratedDesignPreview petId={notification.data?.pet_id ?? null} exportId={designExportId} />
+                                </div>
+                            )}
+
                             {/* Dynamic Data Grid */}
-                            {notification.data && Object.keys(notification.data).filter(k => k !== 'notes' && k !== 'receipt_url').length > 0 && (
+                            {visibleData.length > 0 && (
                                 <div className="space-y-6">
                                     <div className="flex items-center gap-2">
                                         <div className="w-1 h-4 bg-primary rounded-full" />
@@ -185,13 +244,7 @@ export default function NotificationDetailModal({
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {Object.entries(notification.data)
-                                            .filter(([key]) =>
-                                                key !== 'notes' &&
-                                                key !== 'receipt_url' &&
-                                                !key.toLowerCase().endsWith('_id') &&
-                                                key.toLowerCase() !== 'id'
-                                            )
+                                        {visibleData
                                             .map(([key, value]: [string, any]) => {
                                                 // Handle special keys with better icons
                                                 let Icon = Database;
@@ -244,6 +297,19 @@ export default function NotificationDetailModal({
 
                         {/* Footer Section */}
                         <div className="p-8 lg:p-10 bg-white/2 border-t border-white/5 flex flex-col sm:flex-row justify-end gap-3">
+                            {action && (
+                                <Link
+                                    href={action.href}
+                                    onClick={() => {
+                                        if (!notification.is_read) onMarkAsRead?.(notification.id);
+                                        onClose();
+                                    }}
+                                    className="flex-1 sm:flex-none sm:mr-auto px-8 py-4 bg-primary text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
+                                >
+                                    {action.label}
+                                    <ArrowRight size={18} />
+                                </Link>
+                            )}
                             {!notification.is_read && onMarkAsRead && (
                                 <button
                                     onClick={() => {

@@ -5,7 +5,7 @@ import { compressImages } from '@/lib/clientImageCompressor';
 import { Service } from '@/components/public/ServiceSelectionStep';
 import { saveDraftImages, loadDraftImages, clearDraftImages } from '@/lib/formDraftImages';
 import { MAX_MEMORIAL_PHOTOS } from '@/components/public/ImageUploadStep';
-import { resolveFormConfig, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
+import { mergeWelcomeModal, resolveFormConfig, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
 
 export interface Tenant {
     id: number;
@@ -55,6 +55,7 @@ export interface PetData {
     weightTierId: string;
     weightKg: string;
     dedication: string;
+    healthStatus: string;
 }
 
 export const INITIAL_OWNER_DATA: OwnerData = {
@@ -86,6 +87,7 @@ export const INITIAL_PET_DATA: PetData = {
     weightTierId: '',
     weightKg: '',
     dedication: '',
+    healthStatus: '',
 };
 
 export function useTenantForm(
@@ -308,8 +310,52 @@ export function useTenantForm(
         }
     }, [partnerSlug, tenant]);
 
-    // Campos visibles/obligatorios y tramos de peso definidos por el crematorio
-    const formConfig = useMemo(() => resolveFormConfig(tenant?.form_config), [tenant]);
+    // Custom form preset (ej. /form/[slug]?form=eutanasia o ?form=custom_id)
+    const customFormParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('form') : null;
+
+    const { formConfig, customFormPreset } = useMemo(() => {
+        const base = resolveFormConfig(tenant?.form_config);
+        if (!customFormParam) {
+            return { formConfig: base, customFormPreset: null };
+        }
+        const matched = base.custom_forms?.find(
+            cf => cf.id === customFormParam || cf.name.toLowerCase() === customFormParam.toLowerCase()
+        );
+        if (!matched) {
+            return { formConfig: base, customFormPreset: null };
+        }
+        const merged = {
+            ...base,
+            phases: {
+                ...base.phases,
+                ...(matched.phases || {}),
+            },
+            fields: {
+                ...base.fields,
+                ...(matched.fields || {}),
+                healthStatus: matched.include_health_status ? { visible: true, required: true } : (matched.fields?.healthStatus || base.fields.healthStatus),
+            },
+            delivery_notice: matched.delivery_notice || base.delivery_notice,
+            welcome_modal: mergeWelcomeModal(base.welcome_modal, matched.welcome_modal),
+        };
+        return { formConfig: merged, customFormPreset: matched };
+    }, [tenant, customFormParam]);
+
+    // Auto-seleccionar servicio o plan asociado al formulario personalizado
+    useEffect(() => {
+        if (customFormPreset?.associated_service_id) {
+            const assocId = customFormPreset.associated_service_id;
+            setSelectedServices(prev => {
+                if (prev.includes(assocId)) return prev;
+                if (assocId.startsWith('plan_')) {
+                    const withoutPlans = prev.filter(id => !id.startsWith('plan_'));
+                    return [...withoutPlans, assocId];
+                }
+                return [...prev, assocId];
+            });
+        }
+    }, [customFormPreset]);
+
     const weightTiers = useMemo(() => tenant?.weight_tiers ?? [], [tenant]);
 
     // 6. Validaciones
@@ -347,6 +393,7 @@ export function useTenantForm(
         if (f.breed.required && !(petData.breed || '').trim()) errors.breed = 'Requerido';
         if (f.birthDate.required && !petData.birthDate) errors.birthDate = 'Requerido';
         if (f.deathDate.required && !petData.deathDate) errors.deathDate = 'Requerido';
+        if (f.healthStatus?.required && !(petData.healthStatus || '').trim()) errors.healthStatus = 'Requerido';
 
         // Con tramos del crematorio vale el tramo elegido; si no tiene, los rangos fijos previos
         const hasRange = weightTiers.length > 0
@@ -382,49 +429,108 @@ export function useTenantForm(
         return Object.keys(errors).length === 0;
     }, [petData, formConfig, weightTiers]);
 
-    // 7. Navegación entre pasos
-    const handleNext = useCallback(() => {
-        if (currentStep === 1) {
-            if (validateOwner()) {
-                setCurrentStep(2);
-                setMaxVisitedStep(prev => Math.max(prev, 2));
-            }
-        } else if (currentStep === 2) {
-            if (validatePet()) {
-                setCurrentStep(3);
-                setMaxVisitedStep(prev => Math.max(prev, 3));
-            }
-        } else if (currentStep === 3) {
-            setCurrentStep(4);
-            setMaxVisitedStep(prev => Math.max(prev, 4));
-        } else if (currentStep === 4) {
-            setCurrentStep(5);
-            setMaxVisitedStep(prev => Math.max(prev, 5));
+    // 6.1 Fases activas dinámicas
+    const activeSteps = useMemo(() => {
+        const steps: { id: 'familia' | 'angel' | 'camino' | 'recuerdos' | 'resumen'; name: string; phrase: string }[] = [];
+        if (formConfig.phases.familia !== false) {
+            steps.push({
+                id: 'familia',
+                name: 'Familia',
+                phrase: 'Necesitamos conocerte para poder acompañarte de la mejor forma.',
+            });
         }
-    }, [currentStep, validateOwner, validatePet]);
+        if (formConfig.phases.angel !== false) {
+            steps.push({
+                id: 'angel',
+                name: 'Ángel',
+                phrase: 'Cuéntanos sobre tu compañero de vida.',
+            });
+        }
+        if (formConfig.phases.camino !== false) {
+            steps.push({
+                id: 'camino',
+                name: 'Camino',
+                phrase: 'Elige cómo quieres honrar su memoria.',
+            });
+        }
+        if (formConfig.phases.recuerdos !== false) {
+            steps.push({
+                id: 'recuerdos',
+                name: 'Recuerdos',
+                phrase: 'Un último recuerdo para guardar para siempre.',
+            });
+        }
+        steps.push({
+            id: 'resumen',
+            name: 'Resumen',
+            phrase: 'Confirma que todo esté correcto antes de enviar.',
+        });
+        return steps;
+    }, [formConfig.phases]);
+
+    const currentStepDef = activeSteps[currentStep - 1] || activeSteps[0];
+    const currentStepKey = currentStepDef?.id || 'familia';
+    const totalSteps = activeSteps.length;
+
+    // 7. Navegación entre pasos dinámicos
+    const handleNext = useCallback(() => {
+        const currentDef = activeSteps[currentStep - 1];
+        if (!currentDef) return;
+
+        if (currentDef.id === 'familia') {
+            if (!validateOwner()) return;
+        } else if (currentDef.id === 'angel') {
+            if (!validatePet()) return;
+        } else if (currentDef.id === 'recuerdos') {
+            const mem = formConfig.memories;
+            if (mem?.require_photos && images.length === 0) {
+                alert('Por favor sube al menos una fotografía para continuar');
+                return;
+            }
+            if (mem?.require_dedication && !petData.dedication?.trim()) {
+                alert('Por favor escribe unas palabras de dedicatoria para continuar');
+                return;
+            }
+        }
+
+        if (currentStep < totalSteps) {
+            setCurrentStep(prev => prev + 1);
+            setMaxVisitedStep(prev => Math.max(prev, currentStep + 1));
+        }
+    }, [currentStep, totalSteps, activeSteps, validateOwner, validatePet, formConfig.memories, images, petData.dedication]);
 
     const handleBack = useCallback(() => {
         setCurrentStep(prev => Math.max(1, prev - 1));
     }, []);
 
-    const handleEditFromSummary = useCallback((step: number) => {
-        setCurrentStep(step);
-        setMaxVisitedStep(prev => Math.max(prev, 5));
+    const handleEditFromSummary = useCallback((targetStep: number | string) => {
+        if (typeof targetStep === 'string') {
+            const idx = activeSteps.findIndex(s => s.id === targetStep);
+            if (idx >= 0) {
+                setCurrentStep(idx + 1);
+            }
+        } else {
+            setCurrentStep(Math.min(targetStep, totalSteps));
+        }
+        setMaxVisitedStep(prev => Math.max(prev, totalSteps));
         window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, []);
+    }, [activeSteps, totalSteps]);
 
     const goToStep = useCallback((targetStep: number) => {
-        if (targetStep < 1 || targetStep > 5) return;
+        if (targetStep < 1 || targetStep > totalSteps) return;
         if (targetStep === currentStep) return;
 
         // Validaciones previas si se salta hacia adelante
-        if (currentStep === 1 && targetStep > 1 && !validateOwner()) return;
-        if (currentStep <= 2 && targetStep > 2 && !validatePet()) return;
+        for (let s = 1; s < targetStep; s++) {
+            const stepId = activeSteps[s - 1]?.id;
+            if (stepId === 'familia' && !validateOwner()) return;
+            if (stepId === 'angel' && !validatePet()) return;
+        }
 
         setCurrentStep(targetStep);
         setMaxVisitedStep(prev => Math.max(prev, targetStep));
         window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, [currentStep, validateOwner, validatePet]);
+    }, [currentStep, totalSteps, activeSteps, validateOwner, validatePet]);
 
     const toggleService = useCallback((id: string, singleSelect: boolean = false) => {
         setSelectedServices(prev => {
@@ -485,6 +591,7 @@ export function useTenantForm(
             if (!f.birthDate.visible) pet.birthDate = '';
             if (!f.deathDate.visible) pet.deathDate = '';
             if (!f.weight.visible) { pet.weightKg = ''; pet.weightRange = ''; pet.weightTierId = ''; }
+            if (!f.healthStatus?.visible) pet.healthStatus = '';
             if (weightTiers.length > 0) pet.weightRange = '';
             else pet.weightTierId = '';
             formData.append('owner_data', JSON.stringify(owner));
@@ -492,6 +599,7 @@ export function useTenantForm(
             formData.append('selected_services', JSON.stringify(selectedServices));
             if (token) formData.append('token', token);
             if (widgetKey) formData.append('widget_key', widgetKey);
+            if (customFormParam) formData.append('form_preset_id', customFormParam);
 
             if (executeRecaptcha) {
                 try {
@@ -590,8 +698,13 @@ export function useTenantForm(
         handleEditFromSummary,
         goToStep,
         toggleService,
+        activeSteps,
+        currentStepDef,
+        currentStepKey,
+        totalSteps,
         handleExtend,
         handleSubmit,
         farewellTemplate,
+        customFormPreset,
     };
 }

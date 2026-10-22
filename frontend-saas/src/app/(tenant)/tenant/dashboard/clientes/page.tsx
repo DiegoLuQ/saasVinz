@@ -73,7 +73,7 @@ interface Customer {
 
 export default function CustomersPage() {
     const { showToast } = useToast();
-    const { canDelete, canCreate } = usePermissions();
+    const { canDelete, canCreate, canEdit } = usePermissions();
     const { tenantData, formatLimit } = useTenant();
 
     // TanStack Query Hooks
@@ -249,6 +249,7 @@ export default function CustomersPage() {
                     <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Gestión de Clientes (Tutores)</h1>
                     <p className="text-muted-foreground mt-1 text-sm sm:text-base">Inscribe al cliente para iniciar la atención o consulta el historial más abajo.</p>
                 </div>
+                {canCreate('clientes') && (
                 <button
                     type="button"
                     onClick={() => setShowNewForm(v => !v)}
@@ -257,9 +258,12 @@ export default function CustomersPage() {
                     {showNewForm ? <X size={18} /> : <Plus size={18} />}
                     {showNewForm ? 'Cerrar formulario' : 'Nuevo cliente'}
                 </button>
+                )}
             </div>
 
-            {/* TOP SECTION: Formulario de Inscripción Directa (en móvil, plegado tras "Nuevo cliente") */}
+            {/* TOP SECTION: Formulario de Inscripción Directa (en móvil, plegado tras "Nuevo cliente").
+                Sirve para crear y para editar: se muestra si el rol/plan permite esa acción. */}
+            {(currentCustomer?.id ? canEdit('clientes') : canCreate('clientes')) && (
             <div className={`${showNewForm ? 'block' : 'hidden'} lg:block glass-card rounded-3xl p-5 sm:p-8 border border-white/10 space-y-6`}>
                 <div className="flex items-center justify-between border-b border-white/5 pb-4">
                     <div className="flex items-center gap-3">
@@ -405,6 +409,7 @@ export default function CustomersPage() {
                     </div>
                 </form>
             </div>
+            )}
 
             {/* BOTTOM SECTION: Buscador & Tabla de Historial */}
             <div className="space-y-4 pt-4">
@@ -494,6 +499,7 @@ export default function CustomersPage() {
                                                         <Dog size={11} className="text-primary" />
                                                         {customerPets.length}
                                                     </span>
+                                                    {canCreate('mascotas') && (
                                                     <button
                                                         type="button"
                                                         onClick={() => {
@@ -506,10 +512,12 @@ export default function CustomersPage() {
                                                         <Plus size={11} />
                                                         Mascota
                                                     </button>
+                                                    )}
                                                 </div>
                                             </td>
                                             <td className="px-4 py-4 text-center">
                                                 <div className="flex items-center justify-center gap-1.5">
+                                                    {canEdit('clientes') && (
                                                     <button
                                                         onClick={() => handleOpenModal(customer)}
                                                         className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-primary/20 hover:border-primary/30 text-white transition-all shadow-sm"
@@ -517,6 +525,7 @@ export default function CustomersPage() {
                                                     >
                                                         <Edit2 size={15} />
                                                     </button>
+                                                    )}
                                                     {canDelete('clientes') && (
                                                         <button
                                                             onClick={() => handleDelete(customer)}
@@ -563,12 +572,14 @@ export default function CustomersPage() {
                                 </div>
 
                                 <div className="flex gap-2 pt-2">
+                                    {canEdit('clientes') && (
                                     <button
                                         onClick={() => handleOpenModal(customer)}
                                         className="flex-1 bg-primary text-primary-foreground min-h-[44px] py-3 rounded-2xl text-xs font-bold shadow-lg shadow-primary/20 transition-all active:scale-95"
                                     >
                                         Editar
                                     </button>
+                                    )}
                                     {canDelete('clientes') && (
                                         <button
                                             onClick={() => handleDelete(customer)}

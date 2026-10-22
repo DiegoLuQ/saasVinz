@@ -13,6 +13,7 @@ export interface PetData {
     weightRange?: 'small' | 'medium' | 'large' | 'giant' | '';
     weightTierId?: string;
     weightKg?: string;
+    healthStatus?: string;
 }
 
 interface Props {
@@ -253,6 +254,21 @@ export default function PetInfoStep({ data, updateData, errors, formConfig = DEF
                                 {errors.deathDate && <p className={ERROR}>! {errors.deathDate}</p>}
                             </div>
                         )}
+                    </div>
+                )}
+
+                {f.healthStatus?.visible && (
+                    <div>
+                        <label className={LABEL}>Estado de salud / Diagnóstico clínico{fieldSuffix(f.healthStatus)}</label>
+                        <textarea
+                            value={data.healthStatus || ''}
+                            onChange={(e) => updateData({ healthStatus: e.target.value.slice(0, 500) })}
+                            rows={3}
+                            className={`input-emotional resize-none ${errClass(errors.healthStatus)}`}
+                            placeholder="Describe el estado de salud, patología diagnosticada o motivo médico relevante..."
+                            maxLength={500}
+                        />
+                        {errors.healthStatus && <p className={ERROR}>! {errors.healthStatus}</p>}
                     </div>
                 )}
             </div>

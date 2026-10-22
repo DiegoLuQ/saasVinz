@@ -531,6 +531,13 @@ async def update_billing_transaction(
                     elif current_sub:
                         tenant.billing_info.monthly_price = current_sub.monthly_price
 
+                # Contratación / cambio de plan: lo pagado queda congelado para sus
+                # renovaciones (también fija el MRR de billing_info con ese monto).
+                if transaction.target_plan_id:
+                    from app.services.plan_pricing import lock_contracted_price
+                    cycle = transaction.target_billing_cycle or tenant.billing_cycle or "monthly"
+                    lock_contracted_price(tenant, transaction.amount, getattr(cycle, "value", cycle))
+
     db.commit()
     db.refresh(transaction)
 

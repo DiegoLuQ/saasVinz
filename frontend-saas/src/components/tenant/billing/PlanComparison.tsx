@@ -1,11 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Check, X } from "lucide-react";
+import { Check, Minus, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface Plan {
@@ -13,8 +9,8 @@ export interface Plan {
     name: string;
     description?: string;
     monthly_price: number;
-    annual_price: number;
-    features: { name: string; included: boolean }[] | any;
+    annual_price: number; // puede venir null (plan sin pago anual, ej. Track)
+    features?: unknown;
     is_active: boolean;
     recommended?: boolean;
     max_pets?: number;
@@ -24,6 +20,8 @@ export interface Plan {
     max_products?: number;
     max_customers?: number;
     max_partners?: number;
+    can_export?: boolean;
+    ai_monthly_credits?: number;
     allowed_modules?: string[];
 }
 
@@ -31,306 +29,355 @@ interface PlanComparisonProps {
     plans: Plan[];
     currentPlanId: number;
     onSelectPlan: (planId: number, interval: 'monthly' | 'annual') => void;
+    /** El SuperAdmin marca el descuento anual como precio de lanzamiento. */
+    launchPromo?: boolean;
 }
 
-export function PlanComparison({ plans, currentPlanId, onSelectPlan }: PlanComparisonProps) {
+// Integraciones: casilla del plan ("Configurar Características"); si el plan no la tiene
+// guardada, la regla anterior por nombre. Espejo de backend/app/services/plan_features.py.
+const NAME_FALLBACK: Record<string, string[]> = {
+    'integraciones:widget': ['PRO', 'ULTRA'],
+    'integraciones:formulario_incrustable': ['ULTRA'],
+    'integraciones:video_bienvenida': ['PRO', 'ULTRA'],
+};
+const planHas = (p: { name: string; features?: unknown }, key: string) => {
+    const v = (p.features as Record<string, unknown> | undefined)?.[key];
+    return typeof v === 'boolean' ? v : (NAME_FALLBACK[key] ?? []).includes(p.name.trim().toUpperCase());
+};
+
+const formatPrice = (amount: number) =>
+    new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(amount);
+
+const planKey = (p: Plan) => p.name.trim().toUpperCase();
+const isFreePlan = (p: Plan) => planKey(p) === 'FREE' || p.monthly_price <= 0;
+const hasAnnual = (p: Plan) => !!p.annual_price && p.annual_price > 0 && p.monthly_price > 0;
+/** Ahorro del pago anual frente a 12 meses (redondeado), o 0. */
+const annualSaving = (p: Plan) =>
+    hasAnnual(p) ? Math.max(0, Math.round((1 - p.annual_price! / (p.monthly_price * 12)) * 100)) : 0;
+const hasModule = (p: Plan, m: string) => !!p.allowed_modules?.includes(m);
+const num = (v: number | undefined) => (v && v >= 999999 ? 'Ilimitado' : (v ?? 0).toLocaleString('es-CL'));
+
+type Row =
+    | { label: string; value: (p: Plan) => string | null }
+    | { label: string; check: (p: Plan) => boolean };
+
+const LIMIT_ROWS: Row[] = [
+    { label: 'Cremaciones al mes', value: p => num(p.max_orders) },
+    { label: 'Mascotas al mes', value: p => num(p.max_pets) },
+    { label: 'Clientes', value: p => num(p.max_customers) },
+    { label: 'Usuarios', value: p => num(p.max_users) },
+    { label: 'Convenios veterinarios', value: p => (p.max_partners ? num(p.max_partners) : null) },
+    { label: 'Productos', value: p => num(p.max_products) },
+    { label: 'Servicios', value: p => num(p.max_services) },
+    { label: 'Créditos IA al mes', value: p => (p.ai_monthly_credits ? String(p.ai_monthly_credits) : null) },
+];
+
+const FEATURE_ROWS: Row[] = [
+    { label: 'Órdenes y seguimiento público', check: p => hasModule(p, 'operaciones') },
+    { label: 'Pagos y caja', check: p => hasModule(p, 'pagos') },
+    { label: 'Inventario', check: p => hasModule(p, 'inventario') },
+    { label: 'Certificados digitales', check: p => hasModule(p, 'certificados') },
+    { label: 'Configuración avanzada', check: p => hasModule(p, 'configuracion') },
+    { label: 'Veterinarias y comisiones', check: p => hasModule(p, 'veterinarios') && !!p.max_partners },
+    { label: 'Exportar datos', check: p => !!p.can_export },
+    { label: 'Widget para tu sitio web', check: p => planHas(p, 'integraciones:widget') },
+    { label: 'Video de bienvenida', check: p => planHas(p, 'integraciones:video_bienvenida') },
+    { label: 'Formulario incrustable', check: p => planHas(p, 'integraciones:formulario_incrustable') },
+];
+
+/** Lo que se destaca en la tarjeta: topes principales + funciones incluidas. */
+function cardHighlights(p: Plan): string[] {
+    const out = [
+        `${num(p.max_orders)} cremaciones al mes`,
+        `${num(p.max_customers)} clientes · ${num(p.max_users)} usuarios`,
+    ];
+    if (p.max_partners) out.push(`${num(p.max_partners)} convenios veterinarios`);
+    if (p.ai_monthly_credits) out.push(`${p.ai_monthly_credits} créditos IA al mes`);
+    for (const row of FEATURE_ROWS) {
+        if ('check' in row && row.check(p)) out.push(row.label);
+    }
+    return out;
+}
+
+export function PlanComparison({ plans, currentPlanId, onSelectPlan, launchPromo = false }: PlanComparisonProps) {
     const [isAnnual, setIsAnnual] = useState(false);
 
-    const formatPrice = (amount: number) => {
-        return new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(amount);
-    }
-
-    // Check if the user's current plan is the FREE plan
     const currentPlan = plans.find(p => p.id === currentPlanId);
-    const isCurrentPlanFree = currentPlan ? currentPlan.name.toLowerCase().includes('free') : true;
-
-    // Filter plans: hide "FREE" plan if the current plan is not FREE
-    const filteredPlans = plans.filter(plan => {
-        const planNameLower = plan.name.toLowerCase();
-        if (!isCurrentPlanFree && planNameLower.includes('free')) {
-            return false;
-        }
-        return true;
-    });
-
-    // Sort plans by price (approx)
-    const sortedPlans = [...filteredPlans].sort((a, b) => a.monthly_price - b.monthly_price);
+    const onFree = currentPlan ? isFreePlan(currentPlan) : true;
+    // FREE solo se muestra a quien todavía está en FREE.
+    const sortedPlans = plans
+        .filter(p => onFree || !isFreePlan(p) || p.id === currentPlanId)
+        .sort((a, b) => a.monthly_price - b.monthly_price);
+    const savings = sortedPlans.filter(hasAnnual).map(annualSaving);
+    const maxSaving = Math.max(0, ...savings);
+    // Mismo descuento en todos los planes = precio de lanzamiento (no "hasta").
+    const sameSaving = savings.length > 0 && savings.every(v => v === maxSaving);
+    const recommendedId = sortedPlans.find(p => planKey(p) === 'PRO')?.id;
 
     return (
-        <div className="w-full space-y-8 py-6">
-
-            {/* Toggle Annual/Monthly */}
-            <div className="flex items-center justify-center space-x-4">
-                <span className={cn("text-sm font-medium", !isAnnual && "text-primary")}>Mensual</span>
-                <Switch
-                    checked={isAnnual}
-                    onCheckedChange={setIsAnnual}
-                />
-                <span className={cn("text-sm font-medium", isAnnual && "text-primary")}>
-                    Anual <span className="text-xs text-emerald-700 dark:text-green-500 font-bold ml-1">(20% de descuento)</span>
-                </span>
-            </div>
-
-            {/* Plans Grid */}
-            <div className={cn(
-                "grid grid-cols-1 gap-6",
-                sortedPlans.length === 3 ? "md:grid-cols-3 max-w-5xl mx-auto" : "md:grid-cols-2 xl:grid-cols-4"
-            )}>
-                {sortedPlans.map((plan) => {
-                    const planNameLower = plan.name.toLowerCase();
-                    const isFree = planNameLower.includes('free');
-                    const isPro = planNameLower.includes('pro');
-                    const isUltra = planNameLower.includes('ultra');
-
-                    const discount = 0.8;
-                    // Definir los precios anuales totales aplicando un 20% de descuento exacto sobre el valor mensual base (mensual * 12 * 0.8)
-                    const displayAnnualPrice = Math.round(plan.monthly_price * 12 * discount);
-
-                    // El precio mensual mostrado bajo modalidad anual es el precio anual total dividido por 12
-                    const price = isAnnual && plan.monthly_price > 0 ? (displayAnnualPrice / 12) : plan.monthly_price;
-                    const isCurrent = plan.id === currentPlanId;
-                    // Determine if the user is currently on the PRO plan
-                    const currentPlanName = plans.find(p => p.id === currentPlanId)?.name.toLowerCase() || '';
-                    const isUserOnPro = currentPlanName.includes('pro');
-                    const isUserOnUltra = currentPlanName.includes('ultra');
-
-                    // Special condition: User is on PRO, highlight ULTRA (upsell)
-                    const isUltraUpsell = isUserOnPro && isUltra;
-
-                    // Condition: User is on ULTRA (current), make it golden
-                    const isUltraCurrent = isCurrent && isUltra;
-
-                    // Parse features
-                    let featuresList = [];
-                    if (Array.isArray(plan.features)) {
-                        featuresList = plan.features;
-                    }
-
-                    return (
-                        <Card
-                            key={plan.id}
+        <div className="@container w-full space-y-10">
+            {/* Mensual / Anual */}
+            <div className="flex justify-center">
+                <div className="inline-flex p-1 rounded-2xl bg-slate-100 border border-slate-200 dark:bg-white/5 dark:border-white/10" role="tablist" aria-label="Ciclo de pago">
+                    {([[false, 'Mensual'], [true, 'Anual']] as const).map(([annual, label]) => (
+                        <button
+                            key={label}
+                            type="button"
+                            role="tab"
+                            aria-selected={isAnnual === annual}
+                            onClick={() => setIsAnnual(annual)}
                             className={cn(
-                                "flex flex-col relative transition-all duration-300 border-2 bg-white text-slate-900 shadow-sm dark:bg-[#0a192f]/40 dark:text-white dark:shadow-none backdrop-blur-xl",
-                                isCurrent ?
-                                    (isUltraCurrent ? "border-amber-400 bg-amber-50 dark:bg-amber-400/5 shadow-lg shadow-amber-400/10" : "border-primary bg-primary/5 shadow-lg shadow-primary/10")
-                                    : "border-slate-200 dark:border-white/5",
-
-                                // PRO Highlight (Specially styled to stand out premiumly)
-                                isPro ? "border-blue-500/80 bg-gradient-to-b from-blue-50 to-white dark:from-blue-950/20 dark:to-[#0a192f]/60 shadow-[0_0_35px_-5px_rgba(59,130,246,0.3)] md:scale-[1.03] hover:md:scale-[1.06] z-10" : "hover:md:scale-[1.02]",
-
-                                // Ultra Upsell Highlight (User is on Pro)
-                                isUltraUpsell ? "border-amber-400 shadow-[0_0_25px_-5px_rgba(251,191,36,0.5)] scale-102 z-20 overflow-visible ring-1 ring-amber-400/50" : "",
-
-                                isFree ? "opacity-80 grayscale-[0.5]" : ""
+                                'px-5 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer flex items-center gap-2',
+                                isAnnual === annual
+                                    ? 'bg-white text-slate-900 shadow-sm dark:bg-white/15 dark:text-white'
+                                    : 'text-slate-500 hover:text-slate-800 dark:text-white/50 dark:hover:text-white'
                             )}
                         >
-                            {/* Badges */}
-                            {isCurrent && (
-                                <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20">
-                                    <Badge className={cn(
-                                        "text-[10px] text-white border-none px-3 py-0.5 shadow-lg whitespace-nowrap font-black uppercase",
-                                        isUltraCurrent ? "bg-amber-500 text-black" : "bg-emerald-500"
-                                    )}>Plan Actual</Badge>
-                                </div>
+                            {label}
+                            {annual && maxSaving > 0 && (
+                                <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
+                                    {sameSaving ? '' : 'hasta '}−{maxSaving}%
+                                </span>
                             )}
-                            {/* Prominent Popular Badge for PRO */}
-                            {isPro && !isCurrent && (
-                                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-20">
-                                    <Badge className="bg-gradient-to-r from-blue-600 to-indigo-600 text-[10px] text-white border-none px-4 py-1 shadow-lg shadow-blue-500/40 whitespace-nowrap font-black uppercase tracking-widest animate-pulse">
-                                        ★ RECOMENDADO ★
-                                    </Badge>
-                                </div>
-                            )}
+                        </button>
+                    ))}
+                </div>
+            </div>
 
-                            {/* Golden Badge for Ultra Upsell */}
-                            {isUltraUpsell && (
-                                <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 w-full text-center px-4">
-                                    <Badge className="bg-gradient-to-r from-amber-300 via-yellow-500 to-amber-300 text-black border-none px-3 py-0.5 shadow-lg shadow-amber-500/40 whitespace-nowrap font-black uppercase tracking-wider animate-shimmer bg-[length:200%_100%] text-[10px]">
-                                        ★ Recomendado Para Ti ★
-                                    </Badge>
-                                </div>
-                            )}
+            {launchPromo && maxSaving > 0 && <LaunchNotice saving={maxSaving} same={sameSaving} />}
 
-                            <CardHeader className="text-center pb-2 pt-8">
-                                <CardTitle className={cn(
-                                    "text-2xl font-black tracking-tight uppercase",
-                                    isPro ? "text-blue-700 dark:text-blue-400" : (isUltraUpsell || isUltraCurrent) ? "text-amber-700 dark:text-amber-400 dark:drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]" : "text-slate-900 dark:text-white"
+            {/* Tarjetas */}
+            <div className={cn('grid grid-cols-1 gap-5 @xl:grid-cols-2', sortedPlans.length >= 4 ? '@6xl:grid-cols-4' : '@4xl:grid-cols-3')}>
+                {sortedPlans.map(plan => {
+                    const isCurrent = plan.id === currentPlanId;
+                    const isRecommended = plan.id === recommendedId && !isCurrent;
+                    const free = isFreePlan(plan);
+                    const annualAvailable = hasAnnual(plan);
+                    const showAnnual = isAnnual && annualAvailable;
+                    const saving = annualSaving(plan);
+                    const perMonth = showAnnual ? plan.annual_price! / 12 : plan.monthly_price;
+
+                    return (
+                        <div
+                            key={plan.id}
+                            className={cn(
+                                'relative flex flex-col rounded-3xl border-2 p-6 transition-shadow',
+                                isCurrent
+                                    ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-500/[0.06]'
+                                    : isRecommended
+                                        ? 'border-primary bg-white shadow-lg shadow-primary/10 dark:bg-white/[0.04]'
+                                        : 'border-slate-200 bg-white hover:shadow-md dark:border-white/10 dark:bg-white/[0.02]'
+                            )}
+                        >
+                            {(isCurrent || isRecommended) && (
+                                <span className={cn(
+                                    'absolute -top-3 left-6 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm',
+                                    isCurrent ? 'bg-emerald-500 text-white' : 'bg-primary text-primary-foreground'
                                 )}>
-                                    {plan.name}
-                                </CardTitle>
-                                <CardDescription className="text-[10px] h-10 line-clamp-2 mt-2 text-slate-600 dark:text-white/40 font-medium">
-                                    {plan.description || "Potencia tu negocio con nuestras herramientas avanzadas."}
-                                </CardDescription>
-                            </CardHeader>
+                                    {isCurrent ? 'Tu plan actual' : 'Recomendado'}
+                                </span>
+                            )}
 
-                            <CardContent className="flex-grow pt-4">
-                                <div className="text-center mb-6">
-                                    <div className="flex items-baseline justify-center gap-1 transition-all duration-300 transform">
-                                        <span className={cn(
-                                            "text-4xl font-black transition-colors duration-300",
-                                            isAnnual ? "text-emerald-700 dark:text-green-400 dark:drop-shadow-[0_0_8px_rgba(74,222,128,0.3)]" :
-                                                (isUltraUpsell || isUltraCurrent) ? "text-amber-800 dark:text-amber-100" : "text-slate-900 dark:text-white"
-                                        )}>
-                                            {formatPrice(price)}
+                            <div className="min-h-[4.5rem]">
+                                <h4 className="text-lg font-black uppercase tracking-tight text-slate-900 dark:text-white">{plan.name}</h4>
+                                {plan.description && (
+                                    <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-white/50">{plan.description}</p>
+                                )}
+                            </div>
+
+                            <div className="mt-4 pb-5 border-b border-slate-200 dark:border-white/10">
+                                <div className="flex items-baseline gap-1 flex-wrap">
+                                    <span className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">
+                                        {free ? 'Gratis' : formatPrice(perMonth)}
+                                    </span>
+                                    {!free && <span className="text-sm font-semibold text-slate-500 dark:text-white/40">/mes</span>}
+                                </div>
+                                <p className="mt-1 min-h-[1.25rem] text-xs text-slate-600 dark:text-white/50">
+                                    {free ? 'Para empezar' : showAnnual ? (
+                                        <>
+                                            {formatPrice(plan.annual_price!)} al año
+                                            {saving > 0 && <span className="ml-1.5 font-bold text-emerald-700 dark:text-emerald-400">Ahorras {saving}%{launchPromo ? ' · precio de lanzamiento' : ''}</span>}
+                                        </>
+                                    ) : isAnnual && !annualAvailable ? 'Solo pago mensual' : 'Pago mensual'}
+                                </p>
+                            </div>
+
+                            <ul className="mt-5 space-y-2.5 flex-1">
+                                {cardHighlights(plan).map(item => (
+                                    <li key={item} className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-white/80">
+                                        <span className="mt-0.5 w-4 h-4 rounded-full bg-emerald-100 dark:bg-emerald-500/15 flex items-center justify-center shrink-0">
+                                            <Check className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" strokeWidth={3} />
                                         </span>
-                                        <span className="text-slate-500 dark:text-white/40 text-xs font-bold">/mes</span>
-                                    </div>
-                                    {isAnnual && plan.monthly_price > 0 && (
-                                        <p className="text-[9px] font-black text-primary dark:text-primary/60 mt-2 uppercase tracking-[0.15em] animate-fade-in bg-primary/5 py-1 px-2 rounded-lg border border-primary/10 inline-block">
-                                            FACTURADO {formatPrice(displayAnnualPrice)} ANUALMENTE
-                                        </p>
-                                    )}
+                                        <span className="leading-snug">{item}</span>
+                                    </li>
+                                ))}
+                            </ul>
 
-                                    {/* +100 Cremaciones Highlight (Show on Upsell OR Current Ultra) */}
-                                    {(isUltraUpsell || isUltraCurrent) && (
-                                        <div className="mt-2 bg-amber-500/10 border border-amber-500/20 rounded-md py-1 px-2.5 inline-block">
-                                            <span className="text-[10px] font-black text-amber-800 dark:text-amber-400 animate-pulse">+100 Cremaciones</span>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="space-y-4 mb-6 pt-4 border-t border-slate-200 dark:border-white/5">
-                                    <p className="text-[9px] font-black text-primary uppercase tracking-[0.2em] mb-4 text-center">Ventajas Disponibles</p>
-                                    <ul className="space-y-2.5">
-                                        {/* Standard Limits */}
-                                        {plan.max_pets && plan.max_pets !== -1 && (
-                                            <li className="flex items-center gap-2.5 text-slate-800 dark:text-white/80">
-                                                <div className={cn("w-4 h-4 rounded-full flex items-center justify-center shrink-0", (isUltraUpsell || isUltraCurrent) ? "bg-amber-500/20" : "bg-emerald-500/20")}>
-                                                    <Check className={cn("h-2.5 w-2.5", (isUltraUpsell || isUltraCurrent) ? "text-amber-500" : "text-emerald-500")} />
-                                                </div>
-                                                <span className={cn("text-[11px] font-bold", (isUltraUpsell || isUltraCurrent) ? "text-slate-900 dark:text-white" : "")}>Mascotas & Clientes Ilimitados</span>
-                                            </li>
-                                        )}
-                                        {/* Dynamic Features or fallback advantages */}
-                                        {(featuresList.length > 0 ? featuresList : [
-                                            { name: "Soporte Técnico", included: true },
-                                            { name: "Panel de Gestión", included: true },
-                                            { name: "Reportes Básicos", included: true },
-                                            { name: "Acceso Multi-usuario", included: planNameLower !== 'free' }
-                                        ]).map((feature: any, idx: number) => (
-                                            <li key={idx} className="flex items-center gap-2.5">
-                                                {feature.included ? (
-                                                    <>
-                                                        <div className={cn("w-4 h-4 rounded-full flex items-center justify-center shrink-0", (isUltraUpsell || isUltraCurrent) ? "bg-amber-500/20" : "bg-emerald-500/20")}>
-                                                            <Check className={cn("h-2.5 w-2.5", (isUltraUpsell || isUltraCurrent) ? "text-amber-500" : "text-emerald-500")} />
-                                                        </div>
-                                                        <span className="text-[11px] font-bold text-slate-800 dark:text-white/80">{feature.name}</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <div className="w-4 h-4 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center shrink-0">
-                                                            <X className="h-2.5 w-2.5 text-slate-400 dark:text-white/20" />
-                                                        </div>
-                                                        <span className="text-[11px] font-medium text-slate-400 dark:text-white/20 line-through decoration-slate-300 dark:decoration-white/10">{feature.name}</span>
-                                                    </>
-                                                )}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            </CardContent>
-
-                            <CardFooter className="pb-8">
-                                <Button
-                                    className={cn(
-                                        "w-full py-6 rounded-2xl font-black transition-all active:scale-95",
-                                        isCurrent ? "bg-slate-100 text-slate-500 border border-slate-200 dark:bg-white/5 dark:text-white/40 dark:border-white/10 cursor-not-allowed" :
-                                            isUltraUpsell ? "bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black shadow-lg shadow-amber-500/30 border-none" :
-                                                isPro ? "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/30" :
-                                                    "bg-slate-900 hover:bg-slate-800 text-white dark:bg-white/10 dark:hover:bg-white/20"
-                                    )}
-                                    disabled={isCurrent || isFree}
-                                    onClick={() => onSelectPlan(plan.id, isAnnual ? 'annual' : 'monthly')}
-                                >
-                                    {isCurrent ? "PLAN ACTUAL" : isFree ? "BLOQUEADO" : isUltraUpsell ? "ACTUALIZAR A ULTRA" : "ELEGIR PLAN"}
-                                </Button>
-                            </CardFooter>
-                        </Card>
+                            <button
+                                type="button"
+                                disabled={isCurrent || free}
+                                onClick={() => onSelectPlan(plan.id, showAnnual ? 'annual' : 'monthly')}
+                                className={cn(
+                                    'mt-6 w-full py-3 rounded-xl text-sm font-bold transition-all cursor-pointer disabled:cursor-not-allowed',
+                                    isCurrent || free
+                                        ? 'bg-slate-100 text-slate-500 dark:bg-white/5 dark:text-white/40'
+                                        : isRecommended
+                                            ? 'bg-primary text-primary-foreground hover:opacity-90 shadow-md shadow-primary/20'
+                                            : 'bg-slate-900 text-white hover:bg-slate-800 dark:bg-white/10 dark:hover:bg-white/20'
+                                )}
+                            >
+                                {isCurrent ? 'Plan actual' : free ? 'No disponible' : `Elegir ${plan.name}${showAnnual ? ' anual' : ''}`}
+                            </button>
+                        </div>
                     );
                 })}
             </div>
 
-            {/* Comparison Table */}
-            <div className="mt-20 pt-10 border-t border-slate-200 dark:border-white/5">
-                <div className="text-center mb-10">
-                    <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-widest mb-2">Comparativa Detallada</h3>
-                    <p className="text-slate-600 dark:text-white/40 text-sm">Analiza a fondo las capacidades de cada nivel de suscripción.</p>
+            {/* Comparativa */}
+            <div>
+                <div className="mb-4">
+                    <h4 className="text-lg font-black text-slate-900 dark:text-white">Comparativa detallada</h4>
+                    <p className="text-sm text-slate-600 dark:text-white/50">Topes y funciones de cada plan.</p>
                 </div>
 
-                <div className="overflow-x-auto rounded-[2rem] border border-slate-200 bg-white dark:border-white/5 dark:bg-[#0a192f]/20 backdrop-blur-md">
-                    <table className="w-full text-left border-collapse">
+                <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.02]">
+                    <table className="w-full min-w-[560px] text-sm border-collapse">
                         <thead>
-                            <tr className="border-b border-slate-200 dark:border-white/5">
-                                <th className="p-6 text-[10px] font-black text-slate-500 dark:text-white/30 uppercase tracking-[0.2em] w-1/4">Característica</th>
+                            <tr className="border-b border-slate-200 dark:border-white/10">
+                                <th className="sticky left-0 z-10 bg-white dark:bg-[#121826] p-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-white/40">
+                                    Plan
+                                </th>
                                 {sortedPlans.map(plan => (
-                                    <th key={plan.id} className="p-6 text-center">
-                                        <div className="flex flex-col items-center gap-1">
-                                            <span className={cn(
-                                                "text-sm font-black uppercase tracking-tight",
-                                                plan.id === currentPlanId ? "text-emerald-700 dark:text-emerald-400" :
-                                                    plan.name.toLowerCase().includes('pro') ? "text-blue-700 dark:text-blue-400" : "text-slate-900 dark:text-white"
-                                            )}>
-                                                {plan.name}
-                                            </span>
-                                            {plan.id === currentPlanId && <span className="text-[8px] font-black bg-emerald-500/10 text-emerald-700 dark:text-emerald-500 px-2 py-0.5 rounded-full">ACTUAL</span>}
-                                        </div>
+                                    <th
+                                        key={plan.id}
+                                        className={cn(
+                                            'p-4 text-center min-w-[110px]',
+                                            plan.id === currentPlanId && 'bg-emerald-50 dark:bg-emerald-500/[0.08]'
+                                        )}
+                                    >
+                                        <span className="block font-black uppercase text-slate-900 dark:text-white">{plan.name}</span>
+                                        {plan.id === currentPlanId && (
+                                            <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">Actual</span>
+                                        )}
                                     </th>
                                 ))}
                             </tr>
                         </thead>
-                        <tbody className="text-sm">
-                            {[
-                                { label: "Inversión Mensual", key: "monthly_price", format: (v: any) => formatPrice(v) },
-                                { label: "Mascotas", key: "max_pets", format: () => "Ilimitadas" },
-                                { label: "Usuarios", key: "max_users", format: (v: any) => v >= 999999 ? "Ilimitados" : v },
-                                { label: "Órdenes / Ventas", key: "max_orders", format: (v: any) => v >= 999999 ? "Ilimitadas" : v },
-                                { label: "Clientes", key: "max_customers", format: () => "Ilimitados" },
-                                { label: "Productos", key: "max_products", format: (v: any) => v >= 999999 ? "Ilimitados" : v },
-                                { label: "Módulo Clientes", module: "clientes" },
-                                { label: "Módulo Mascotas", module: "mascotas" },
-                                { label: "Gestión de Servicios", module: "servicios" },
-                                { label: "Ventas y Recaudación", module: "ordenes" },
-                                { label: "Catálogo de Productos", module: "productos" },
-                                { label: "Gestión de Inventario", module: "inventario" },
-                                { label: "Certificados Digitales", module: "certificados" },
-                                { label: "Control de Pagos / Caja", module: "pagos" },
-                                { label: "Veterinarias y Convenios", module: "veterinarios" },
-                                { label: "Logística y Operaciones", module: "operaciones" },
-                                { label: "Soporte Prioritario", custom: true, values: sortedPlans.map(p => p.name.toLowerCase().includes('pro') || p.name.toLowerCase().includes('ultra')) },
-                            ].map((row, idx) => (
-                                <tr key={idx} className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
-                                    <td className="p-6 font-bold text-slate-700 dark:text-white/60 text-xs">{row.label}</td>
-                                    {sortedPlans.map(plan => (
-                                        <td key={plan.id} className="p-6 text-center">
-                                            {row.module ? (
-                                                <div className="flex justify-center">
-                                                    {plan.allowed_modules?.includes(row.module) ? (
-                                                        <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-500" />
-                                                    ) : (
-                                                        <X className="h-4 w-4 text-slate-300 dark:text-white/10" />
-                                                    )}
-                                                </div>
-                                            ) : row.custom ? (
-                                                <div className="flex justify-center">
-                                                    {(row.values as any)[sortedPlans.indexOf(plan)] ? (
-                                                        <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-500" />
-                                                    ) : (
-                                                        <X className="h-4 w-4 text-slate-300 dark:text-white/10" />
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <span className="font-black text-slate-800 dark:text-white/80">
-                                                    {(row.format ? row.format((plan as any)[row.key!]) : (plan as any)[row.key!])}
-                                                </span>
-                                            )}
-                                        </td>
+                        <tbody>
+                            <SectionRow label="Precio" span={sortedPlans.length} />
+                            <tr className="border-b border-slate-100 dark:border-white/5">
+                                <RowLabel>Mensual</RowLabel>
+                                {sortedPlans.map(p => (
+                                    <Cell key={p.id} current={p.id === currentPlanId}>
+                                        <span className="font-bold text-slate-900 dark:text-white">{isFreePlan(p) ? 'Gratis' : formatPrice(p.monthly_price)}</span>
+                                    </Cell>
+                                ))}
+                            </tr>
+                            <tr className="border-b border-slate-100 dark:border-white/5">
+                                <RowLabel>
+                                    Anual
+                                    {maxSaving > 0 && (
+                                        <span className="block text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                                            {sameSaving ? `${maxSaving}% dcto.` : 'Con descuento'}{launchPromo ? ' · lanzamiento' : ''}
+                                        </span>
+                                    )}
+                                </RowLabel>
+                                {sortedPlans.map(p => (
+                                    <Cell key={p.id} current={p.id === currentPlanId}>
+                                        {hasAnnual(p) ? (
+                                            <span className="font-bold text-slate-900 dark:text-white">
+                                                {formatPrice(p.annual_price!)}
+                                                {annualSaving(p) > 0 && <span className="block text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">−{annualSaving(p)}%</span>}
+                                            </span>
+                                        ) : <Dash />}
+                                    </Cell>
+                                ))}
+                            </tr>
+
+                            <SectionRow label="Límites" span={sortedPlans.length} />
+                            {LIMIT_ROWS.map(row => (
+                                <tr key={row.label} className="border-b border-slate-100 dark:border-white/5">
+                                    <RowLabel>{row.label}</RowLabel>
+                                    {sortedPlans.map(p => {
+                                        const v = 'value' in row ? row.value(p) : null;
+                                        return (
+                                            <Cell key={p.id} current={p.id === currentPlanId}>
+                                                {v ? <span className="font-semibold text-slate-800 dark:text-white/90">{v}</span> : <Dash />}
+                                            </Cell>
+                                        );
+                                    })}
+                                </tr>
+                            ))}
+
+                            <SectionRow label="Funciones" span={sortedPlans.length} />
+                            {FEATURE_ROWS.map(row => (
+                                <tr key={row.label} className="border-b border-slate-100 last:border-0 dark:border-white/5">
+                                    <RowLabel>{row.label}</RowLabel>
+                                    {sortedPlans.map(p => (
+                                        <Cell key={p.id} current={p.id === currentPlanId}>
+                                            {'check' in row && row.check(p)
+                                                ? <Check className="inline h-4 w-4 text-emerald-600 dark:text-emerald-400" strokeWidth={3} />
+                                                : <Dash />}
+                                        </Cell>
                                     ))}
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
+                <p className="mt-3 flex items-center gap-1.5 text-xs text-slate-500 dark:text-white/40">
+                    <Sparkles size={12} /> Los créditos IA mensuales no se acumulan; puedes comprar créditos extra en «Compra de créditos».
+                </p>
             </div>
         </div>
     );
+}
+
+/** Precio anual de lanzamiento, válido para los primeros crematorios que se suscriban. */
+function LaunchNotice({ saving, same }: { saving: number; same: boolean }) {
+    return (
+        <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-500/25 dark:bg-emerald-500/[0.07]">
+            <span className="shrink-0 w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center">
+                <Sparkles size={16} />
+            </span>
+            <div>
+                <p className="text-sm font-bold text-emerald-900 dark:text-emerald-200">
+                    Precio de lanzamiento: {same ? '' : 'hasta '}{saving}% de descuento pagando anual{same ? ' en todos los planes' : ''}
+                </p>
+                <p className="text-xs text-emerald-800/80 dark:text-emerald-300/70 mt-0.5">
+                    Beneficio exclusivo para los primeros crematorios que se suscriban. Al contratar el plan anual, mantienes este precio durante todo el año.
+                </p>
+            </div>
+        </div>
+    );
+}
+
+function SectionRow({ label, span }: { label: string; span: number }) {
+    return (
+        <tr className="bg-slate-50 dark:bg-white/[0.03]">
+            <td colSpan={span + 1} className="px-4 py-2 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-white/40">
+                {label}
+            </td>
+        </tr>
+    );
+}
+
+function RowLabel({ children }: { children: React.ReactNode }) {
+    return (
+        <td className="sticky left-0 z-10 bg-white dark:bg-[#121826] px-4 py-3 text-left text-[13px] font-medium text-slate-700 dark:text-white/70">
+            {children}
+        </td>
+    );
+}
+
+function Cell({ current, children }: { current: boolean; children: React.ReactNode }) {
+    return (
+        <td className={cn('px-4 py-3 text-center', current && 'bg-emerald-50/70 dark:bg-emerald-500/[0.06]')}>
+            {children}
+        </td>
+    );
+}
+
+function Dash() {
+    return <Minus className="inline h-4 w-4 text-slate-300 dark:text-white/15" aria-label="No incluido" />;
 }

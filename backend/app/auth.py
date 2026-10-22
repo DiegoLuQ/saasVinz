@@ -260,6 +260,9 @@ def get_current_user(db: Session = Depends(get_db), token: Optional[str] = Depen
     # ocurre antes de poder fijar el contexto de tenant — el tenant sale del
     # propio usuario. No añadir RLS a esa tabla sin rediseñar este flujo.
     user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user is not None:
+        # Autor de lo que se registre en esta petición (p. ej. MediaService.upload_media).
+        db.info["current_user_id"] = user.id
 
     if user is None:
         raise HTTPException(

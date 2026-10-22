@@ -97,6 +97,7 @@ const navItems: NavItem[] = [
             { name: 'Emitir Certificado', href: '/dashboard/documentos', icon: Stamp, featureKey: 'certificados:generar_pdf' },
             { name: 'Repositorio', href: '/dashboard/documentos/repositorio', icon: FileText, featureKey: 'certificados:repositorio' },
             { name: 'Tarjetas de Homenaje', href: '/dashboard/documentos/disenos', icon: Palette, featureKey: 'certificados:diseno' },
+            { name: 'Diseños para Redes', href: '/dashboard/documentos/redes', icon: Sparkles, featureKey: 'certificados:redes' },
         ]
     },
     {

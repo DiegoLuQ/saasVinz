@@ -11,6 +11,7 @@ from typing import Optional, List
 from app.utils import tz
 from app.api.internal.common.dashboard import services as dashboard_services
 from app.api.internal.common.notifications import audience as notif_audience
+from app.api.deps_features import check_feature
 
 router = APIRouter()
 
@@ -488,6 +489,8 @@ def get_bootstrap(
 
     # Prepare tenant data with renewal date and cycle
     tenant_resp = schemas.BootstrapTenantData.model_validate(user.tenant)
+    from app.services.public_form_config import normalize_form_config
+    tenant_resp.form_config = {"custom_forms": normalize_form_config(user.tenant.form_config).get("custom_forms", [])}
 
     # Use consolidated fields from Tenant model
     tenant_resp.next_billing_date = user.tenant.billing_end_date
@@ -629,7 +632,8 @@ def toggle_user_status(
     user_id: int,
     status_data: UserStatusToggle,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.get_current_user),
+    _f: bool = Depends(check_feature("configuracion:usuarios", default=True))
 ):
     """Activa o desactiva un usuario del tenant (solo para admins)."""
     if current_user.role not in (models.UserRole.admin, models.UserRole.creator):
@@ -656,7 +660,8 @@ def update_user_info(
     user_id: int,
     user_in: schemas.UserUpdateMe, # Reusing this schema for basic info
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.get_current_user),
+    _f: bool = Depends(check_feature("configuracion:usuarios", default=True))
 ):
     """Actualiza la información básica de un usuario (solo admin)."""
     if current_user.role not in (models.UserRole.admin, models.UserRole.creator):
@@ -688,7 +693,8 @@ def update_user_info(
 def get_user_permissions(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.get_current_user),
+    _f: bool = Depends(check_feature("configuracion:roles", default=True))
 ):
     """Obtiene los permisos granulares de un usuario."""
     if current_user.role not in (models.UserRole.admin, models.UserRole.creator):
@@ -748,7 +754,8 @@ def update_user_permissions(
     user_id: int,
     permissions_in: List[schemas.UserPermissionBase],
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_user)
+    current_user: models.User = Depends(auth.get_current_user),
+    _f: bool = Depends(check_feature("configuracion:roles", default=True))
 ):
     """Actualiza todos los permisos granulares de un usuario."""
     if current_user.role not in (models.UserRole.admin, models.UserRole.creator):

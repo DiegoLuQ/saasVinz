@@ -22,6 +22,8 @@ interface TrackingSearchProps {
     buttonLabel?: string;
     autoFocus?: boolean;
     className?: string;
+    /** Código de ejemplo fijo (demo de la landing): el campo no se edita y el botón queda activo. */
+    fixedCode?: string;
 }
 
 /**
@@ -37,11 +39,13 @@ export default function TrackingSearch({
     buttonLabel = 'Ver seguimiento',
     autoFocus = false,
     className = '',
+    fixedCode,
 }: TrackingSearchProps) {
     const router = useRouter();
     const fieldId = useId();
     const errorId = `${fieldId}-error`;
-    const [code, setCode] = useState('');
+    const [typed, setCode] = useState('');
+    const code = fixedCode ?? typed;
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -106,9 +110,12 @@ export default function TrackingSearch({
                         autoCapitalize="characters"
                         autoFocus={autoFocus}
                         value={code}
-                        onChange={(e) => { setCode(e.target.value.toUpperCase()); if (error) setError(''); }}
+                        readOnly={!!fixedCode}
+                        aria-readonly={!!fixedCode || undefined}
+                        title={fixedCode ? 'Código de ejemplo' : undefined}
+                        onChange={(e) => { if (fixedCode) return; setCode(e.target.value.toUpperCase()); if (error) setError(''); }}
                         placeholder={placeholder}
-                        className={`w-full h-14 pl-11 pr-4 rounded-2xl border text-center text-lg font-mono font-bold tracking-[0.25em] placeholder:tracking-normal placeholder:font-sans focus:outline-none focus:ring-4 transition-all ${inputCls}`}
+                        className={`w-full h-14 pl-11 pr-4 rounded-2xl border text-center text-lg font-mono font-bold tracking-[0.25em] placeholder:tracking-normal placeholder:font-sans focus:outline-none focus:ring-4 transition-all ${fixedCode ? 'cursor-default select-all' : ''} ${inputCls}`}
                         aria-invalid={!!error}
                         aria-describedby={error ? errorId : undefined}
                     />

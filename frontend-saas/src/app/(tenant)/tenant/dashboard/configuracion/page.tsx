@@ -11,7 +11,9 @@ import {
     RefreshCcw,
     MessageCircle,
     Award,
-    ClipboardList
+    ClipboardList,
+    Coins,
+    Wand2
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -20,6 +22,7 @@ import { useSessionBootstrap } from '@/hooks/useSessionBootstrap';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { useTheme } from '@/app/(tenant)/tenant/context/ThemeContext';
 import { usePolar } from '@/hooks/usePolar';
+import { useFeatures } from '@/hooks/useFeatures';
 import { apiRequest } from '@/lib/tenant/api';
 import DeactivateTenantModal from '@/components/tenant/modals/DeactivateTenantModal';
 
@@ -29,6 +32,8 @@ import { PublicFormTab } from '@/components/tenant/settings/PublicFormTab';
 import { WorkflowTab } from '@/components/tenant/settings/WorkflowTab';
 import { BillingTab } from '@/components/tenant/settings/BillingTab';
 import { CertificatesTab } from '@/components/tenant/settings/CertificatesTab';
+import { AiCreditsTab } from '@/components/tenant/settings/AiCreditsTab';
+import { AutoDocumentsTab } from '@/components/tenant/settings/AutoDocumentsTab';
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState('general');
@@ -57,14 +62,62 @@ export default function SettingsPage() {
         }
     }, [bootstrapUser, bootstrapLoading, router, showToast]);
 
-    const tabs = [
-        { id: 'general', name: 'General', icon: Building2 },
-        { id: 'notificaciones', name: 'Notificaciones', icon: Bell },
-        { id: 'certificados', name: 'Certificados', icon: Award },
-        { id: 'facturacion', name: 'Facturación', icon: CreditCard },
-        { id: 'flujo', name: 'Flujo Operativo', icon: Activity },
-        { id: 'formulario', name: 'Formulario y Pesos', icon: ClipboardList },
+    // Abre la pestaña indicada en la URL (?tab=…, p. ej. desde una notificación).
+    // Se sincroniza durante el render cuando cambia el parámetro.
+    const urlTab = searchParams.get('tab');
+    const [syncedUrlTab, setSyncedUrlTab] = useState<string | null>(null);
+    if (urlTab !== syncedUrlTab) {
+        setSyncedUrlTab(urlTab);
+        if (urlTab) setActiveTab(urlTab);
+    }
+
+    // Pestañas que son características del plan (admin → "Configurar Características").
+    // Sin el flag configurado se muestran (mismo criterio que el menú).
+    const { hasFeature } = useFeatures();
+    const TAB_FEATURES: Record<string, string> = {
+        flujo: 'configuracion:flujo',
+        formulario: 'configuracion:formulario',
+        'documentos-auto': 'certificados:generar_todo',
+        creditos: 'configuracion:creditos_ia',
+    };
+    const tabAllowed = (id: string) => !TAB_FEATURES[id] || hasFeature(TAB_FEATURES[id], true);
+    const currentTab = tabAllowed(activeTab) ? activeTab : 'general';
+
+    // Agrupadas por tema: menú lateral en pantallas grandes, chips en móvil.
+    const allTabGroups = [
+        {
+            label: 'Empresa',
+            tabs: [
+                { id: 'general', name: 'General', hint: 'Datos, logo y contacto', icon: Building2 },
+                { id: 'facturacion', name: 'Facturación', hint: 'Plan y pagos', icon: CreditCard },
+                { id: 'notificaciones', name: 'Notificaciones', hint: 'Historial de avisos', icon: Bell },
+            ],
+        },
+        {
+            label: 'Operación',
+            tabs: [
+                { id: 'flujo', name: 'Flujo Operativo', hint: 'Etapas del servicio', icon: Activity },
+                { id: 'formulario', name: 'Formulario y Pesos', hint: 'Formulario público y tramos', icon: ClipboardList },
+            ],
+        },
+        {
+            label: 'Documentos',
+            tabs: [
+                { id: 'certificados', name: 'Certificados', hint: 'Plantilla y textos', icon: Award },
+                { id: 'documentos-auto', name: 'Documentos automáticos', hint: 'Plantillas de «Generar todo»', icon: Wand2 },
+            ],
+        },
+        {
+            label: 'Inteligencia artificial',
+            tabs: [
+                { id: 'creditos', name: 'Compra de créditos', hint: 'Saldo y compras', icon: Coins },
+            ],
+        },
     ];
+    const tabGroups = allTabGroups
+        .map(g => ({ ...g, tabs: g.tabs.filter(t => tabAllowed(t.id)) }))
+        .filter(g => g.tabs.length > 0);
+    const tabs = tabGroups.flatMap(g => g.tabs);
 
     const handleDeactivateTenant = async () => {
         try {
@@ -100,7 +153,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-3">
-                    {activeTab === 'facturacion' && (
+                    {currentTab === 'facturacion' && (
                         <a
                             href="https://wa.me/56912345678?text=Hola,%20necesito%20ayuda%20con%20mi%20plan%20de%20facturaci%C3%B3n"
                             target="_blank"
@@ -114,27 +167,58 @@ export default function SettingsPage() {
                 </div>
             </div>
 
-            <div className="flex flex-col space-y-6 sm:space-y-8">
-                {/* Tabs scroller with fade edges to indicate horizontal scroll */}
-                <div className="relative -mx-3 sm:mx-0">
-                    <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-background to-transparent z-10 sm:hidden" />
-                    <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-background to-transparent z-10 sm:hidden" />
-                    <div className="flex items-center gap-1.5 p-1 bg-black/20 rounded-[2rem] border border-white/5 w-max overflow-x-auto max-w-full mx-3 sm:mx-0 no-scrollbar scroll-fade-x">
+            <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[250px_minmax(0,1fr)] lg:gap-8 lg:items-start">
+                {/* Menú de secciones: chips en móvil/tablet, menú lateral agrupado en escritorio */}
+                <nav aria-label="Secciones de configuración" className="lg:sticky lg:top-24">
+                    <div className="flex flex-wrap gap-2 lg:hidden">
                         {tabs.map((tab) => (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center px-4 sm:px-5 py-2.5 min-h-[44px] rounded-[1.5rem] transition-all duration-300 whitespace-nowrap ${activeTab === tab.id
-                                    ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                                    : 'text-white/40 hover:text-white hover:bg-white/5'
+                                aria-current={currentTab === tab.id ? 'page' : undefined}
+                                className={`flex items-center gap-1.5 px-3.5 py-2 min-h-[40px] rounded-xl border text-xs font-bold transition-colors ${currentTab === tab.id
+                                    ? 'bg-primary text-white border-primary shadow-sm shadow-primary/20'
+                                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:text-slate-900 dark:bg-white/5 dark:text-white/60 dark:border-white/10 dark:hover:text-white'
                                     }`}
                             >
-                                <tab.icon size={16} className="mr-2" />
-                                <span className="font-extrabold text-[11px] uppercase tracking-wider">{tab.name}</span>
+                                <tab.icon size={14} />
+                                {tab.name}
                             </button>
                         ))}
                     </div>
-                </div>
+
+                    <div className="hidden lg:block rounded-3xl border border-slate-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-white/[0.03] dark:shadow-none">
+                        {tabGroups.map((group, gi) => (
+                            <div key={group.label} className={gi > 0 ? 'mt-3 pt-3 border-t border-slate-100 dark:border-white/5' : ''}>
+                                <p className="px-3 pb-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-slate-400 dark:text-white/30">{group.label}</p>
+                                <div className="space-y-0.5">
+                                    {group.tabs.map((tab) => {
+                                        const active = currentTab === tab.id;
+                                        return (
+                                            <button
+                                                key={tab.id}
+                                                onClick={() => setActiveTab(tab.id)}
+                                                aria-current={active ? 'page' : undefined}
+                                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left transition-colors ${active
+                                                    ? 'bg-primary text-white shadow-md shadow-primary/20'
+                                                    : 'text-slate-700 hover:bg-slate-100 dark:text-white/70 dark:hover:bg-white/5'
+                                                    }`}
+                                            >
+                                                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${active ? 'bg-white/20' : 'bg-slate-100 text-slate-500 dark:bg-white/5 dark:text-white/50'}`}>
+                                                    <tab.icon size={16} />
+                                                </span>
+                                                <span className="min-w-0">
+                                                    <span className="block text-sm font-bold leading-tight truncate">{tab.name}</span>
+                                                    <span className={`block text-[11px] leading-tight truncate ${active ? 'text-white/75' : 'text-slate-400 dark:text-white/35'}`}>{tab.hint}</span>
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </nav>
 
                 <div className="w-full space-y-10">
                     <motion.div
@@ -142,7 +226,7 @@ export default function SettingsPage() {
                         animate={{ opacity: 1, x: 0 }}
                         className="glass-card rounded-3xl sm:rounded-[2.5rem] p-4 sm:p-6 md:p-10 space-y-8 md:space-y-10"
                     >
-                        {activeTab === 'general' && (
+                        {currentTab === 'general' && (
                             <GeneralTab 
                                 bootstrapTenant={bootstrapTenant}
                                 billingInfo={bootstrapData?.tenant}
@@ -151,19 +235,19 @@ export default function SettingsPage() {
                             />
                         )}
 
-                        {activeTab === 'notificaciones' && (
+                        {currentTab === 'notificaciones' && (
                             <NotificationsTab />
                         )}
 
-                        {activeTab === 'flujo' && (
+                        {currentTab === 'flujo' && (
                             <WorkflowTab />
                         )}
 
-                        {activeTab === 'formulario' && (
+                        {currentTab === 'formulario' && (
                             <PublicFormTab />
                         )}
 
-                        {activeTab === 'facturacion' && (
+                        {currentTab === 'facturacion' && (
                             <BillingTab 
                                 bootstrapTenant={bootstrapTenant} 
                                 bootstrapData={bootstrapData} 
@@ -171,9 +255,13 @@ export default function SettingsPage() {
                             />
                         )}
 
-                        {activeTab === 'certificados' && (
+                        {currentTab === 'certificados' && (
                             <CertificatesTab bootstrapTenant={bootstrapTenant} />
                         )}
+
+                        {currentTab === 'documentos-auto' && <AutoDocumentsTab />}
+
+                        {currentTab === 'creditos' && <AiCreditsTab />}
                     </motion.div>
                 </div>
 

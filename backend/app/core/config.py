@@ -114,6 +114,10 @@ class Settings(BaseSettings):
         if self.R2_PUBLIC_DOMAIN and not self.R2_PUBLIC_URL:
             self.R2_PUBLIC_URL = self.R2_PUBLIC_DOMAIN
 
+    # IA generativa (plantillas para redes): plataformas, modelos y API keys se
+    # configuran en Configuración Global → Plataformas IA, y el consumo se
+    # controla con créditos por plan (sys_ai_credit_*), no con variables de entorno.
+
     # Polar.sh Payments
     POLAR_ACCESS_TOKEN: str = ""
     POLAR_WEBHOOK_SECRET: str = ""

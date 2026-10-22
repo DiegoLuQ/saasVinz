@@ -73,6 +73,7 @@ class SubscriptionPlanBase(BaseModel):
     stripe_price_id: Optional[str] = None
     polar_product_id: Optional[str] = None
     polar_price_id: Optional[str] = None
+    ai_monthly_credits: int = 0
 
 class SubscriptionPlanCreate(SubscriptionPlanBase):
     pass
@@ -634,6 +635,9 @@ class BootstrapTenantData(BaseModel):
     # Credencial del enlace permanente del formulario público (Navbar > Compartir).
     # Solo se entrega en la sesión interna; el endpoint público ya no la expone.
     public_token: Optional[str] = None
+    # Solo {"custom_forms": [...]}: los enlaces de formulario propios del tenant
+    # que ofrece Navbar > Compartir (no la configuración completa del formulario).
+    form_config: Optional[dict] = None
     logo_url: Optional[str] = None
     pending_reason: Optional[str] = None
     status: TenantStatus

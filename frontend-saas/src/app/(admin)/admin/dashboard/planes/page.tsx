@@ -8,6 +8,7 @@ import { useAdminPlans, useAdminBootstrap } from '@/hooks/useAdminBootstrap';
 import DeleteConfirmationModal from '@/components/admin/DeleteConfirmationModal';
 import PlanCard, { type PlanData } from '@/components/admin/plans/PlanCard';
 import CreatePlanModal from '@/components/admin/plans/CreatePlanModal';
+import AnnualDiscountCard from '@/components/admin/plans/AnnualDiscountCard';
 import type { PlanModuleDef } from '@/components/admin/plans/PlanModuleToggle';
 
 const ALL_MODULES: PlanModuleDef[] = [
@@ -150,6 +151,8 @@ export default function PlansPage() {
                     <span className="ml-2 text-[10px] opacity-60">({plans.length}/{MAX_PLANS})</span>
                 </button>
             </header>
+
+            <AnnualDiscountCard plans={plans} onSaved={refetchBootstrap} onToast={showToast} />
 
             {isLoading && plans.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 opacity-50">

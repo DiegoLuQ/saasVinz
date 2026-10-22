@@ -3,9 +3,19 @@ from typing import Optional, List, Literal, Any, Dict
 from datetime import datetime
 
 
-AspectRatio = Literal["9:16", "3:4", "4:3", "1:1"]
-FontFamily = Literal["Playfair Display", "Cormorant Garamond", "Lora"]
-TextBinding = Literal["pet_name", "date", "phrase", "static"]
+AspectRatio = Literal["9:16", "4:5", "3:4", "4:3", "1:1"]
+FontFamily = Literal[
+    "Playfair Display", "Cormorant Garamond", "Lora", "Cinzel", "Great Vibes",
+    "Alex Brush", "Dancing Script", "Montserrat", "Quicksand",
+]
+# Mismas claves que template_bindings() en app/services/image_template_ai.py.
+TextBinding = Literal[
+    "pet_name", "species", "breed", "age", "size", "birth_date", "death_date", "life_range",
+    "owner_name", "owner_phone", "owner_email",
+    "tenant_name", "tenant_rut", "tenant_phone", "tenant_email", "tenant_address", "tenant_city", "tenant_legal_rep",
+    "tenant_instagram", "tenant_facebook", "tenant_tiktok", "tenant_youtube", "tenant_website", "tenant_whatsapp",
+    "date", "phrase", "ai_text", "static",
+]
 PhotoShape = Literal["circle", "square", "rounded"]
 
 
@@ -59,6 +69,11 @@ class ImageTemplateBase(BaseModel):
     supported_ratios: List[AspectRatio] = Field(..., min_length=1)
     definition: Dict[str, Any]
     thumbnail_url: Optional[str] = None
+    ai_text_prompt: Optional[str] = Field(None, max_length=3000)
+    ai_image_prompt: Optional[str] = Field(None, max_length=3000)
+    ai_text_max_chars: int = Field(500, ge=20, le=500)
+    # None = global; con valor = exclusiva de ese tenant.
+    tenant_id: Optional[int] = None
     is_active: bool = True
 
 
@@ -73,6 +88,10 @@ class ImageTemplateUpdate(BaseModel):
     supported_ratios: Optional[List[AspectRatio]] = None
     definition: Optional[Dict[str, Any]] = None
     thumbnail_url: Optional[str] = None
+    ai_text_prompt: Optional[str] = Field(None, max_length=3000)
+    ai_image_prompt: Optional[str] = Field(None, max_length=3000)
+    ai_text_max_chars: Optional[int] = Field(None, ge=20, le=500)
+    tenant_id: Optional[int] = None
     is_active: Optional[bool] = None
 
 
@@ -83,3 +102,27 @@ class ImageTemplateInDB(ImageTemplateBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     model_config = {"from_attributes": True}
+
+
+class AiTextTestRequest(BaseModel):
+    """Prueba de prompt desde el editor del SuperAdmin con datos de ejemplo."""
+    prompt: str = Field(..., min_length=1, max_length=3000)
+    max_chars: int = Field(500, ge=20, le=500)
+
+
+class AiTextResult(BaseModel):
+    text: str
+    chars: int
+    max_chars: int
+    duration_ms: Optional[int] = None
+
+
+class AiImageResult(BaseModel):
+    url: str
+    # Generación registrada (para asociarle la imagen si el tenant la guarda).
+    generation_id: Optional[int] = None
+    duration_ms: Optional[int] = None
+
+
+class SavedImageResult(BaseModel):
+    url: str

@@ -31,6 +31,12 @@ export function BillingTab({ bootstrapTenant, bootstrapData, bootstrapUser }: Bi
     const [loadingBilling, setLoadingBilling] = useState(false);
     const [reportModalOpen, setReportModalOpen] = useState(false);
     const [confirmModal, setConfirmModal] = useState({ isOpen: false, plan: null, cycle: 'monthly' as any });
+    // Descuento anual vigente (lo define el SuperAdmin) y precio congelado del crematorio.
+    const [pricing, setPricing] = useState<{ annual_discount: { pct: number; launch: boolean }; contracted_price: number | null } | null>(null);
+
+    useEffect(() => {
+        apiRequest('/api/internal/billing/pricing').then(setPricing).catch(() => setPricing(null));
+    }, []);
 
     const fetchBillingData = async () => {
         if (availablePlans.length > 0 && billingHistory.length > 0) return;
@@ -124,6 +130,9 @@ export function BillingTab({ bootstrapTenant, bootstrapData, bootstrapUser }: Bi
     };
     const nextBilling = (bootstrapTenant as any).next_billing_date;
     const billingCycle = (bootstrapTenant as any).billing_cycle || 'monthly';
+    // Lo que paga por ciclo: el precio congelado al contratar; si no hay, el de lista.
+    const cyclePrice = pricing?.contracted_price
+        ?? (billingCycle === 'annual' ? (currentPlan.annual_price || currentPlan.monthly_price * 12) : currentPlan.monthly_price);
 
     return (
         <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
@@ -132,7 +141,7 @@ export function BillingTab({ bootstrapTenant, bootstrapData, bootstrapUser }: Bi
                     <CurrentPlanCard
                         planName={currentPlan.name}
                         status={bootstrapTenant.status || 'active'}
-                        price={currentPlan.monthly_price}
+                        price={cyclePrice}
                         billingCycle={billingCycle}
                         nextBillingDate={nextBilling}
                         limits={limits as any}
@@ -196,22 +205,21 @@ export function BillingTab({ bootstrapTenant, bootstrapData, bootstrapUser }: Bi
                 </div>
             </div>
 
-            <div id="plan-comparison" className="pt-8 border-t border-white/10">
+            <div id="plan-comparison" className="pt-8 border-t border-slate-200 dark:border-white/10">
                 <div className="mb-6">
                     <h3 className="text-2xl font-bold">Planes Disponibles</h3>
-                    <p className="text-muted-foreground">Mejora tu plan para acceder a más recursos.</p>
+                    <p className="text-muted-foreground">Compara precios, topes y funciones de cada plan.</p>
                 </div>
 
                 {loadingBilling ? (
                     <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>
                 ) : (
-                    <div className="bg-black/20 rounded-xl p-6 border border-white/5">
-                        <PlanComparison
-                            plans={availablePlans}
-                            currentPlanId={currentPlan.id}
-                            onSelectPlan={handleUpgradePlan}
-                        />
-                    </div>
+                    <PlanComparison
+                        plans={availablePlans}
+                        currentPlanId={currentPlan.id}
+                        onSelectPlan={handleUpgradePlan}
+                        launchPromo={pricing?.annual_discount.launch ?? false}
+                    />
                 )}
             </div>
 
@@ -232,7 +240,7 @@ export function BillingTab({ bootstrapTenant, bootstrapData, bootstrapUser }: Bi
                 isOpen={reportModalOpen}
                 onClose={() => setReportModalOpen(false)}
                 onSuccess={fetchBillingData}
-                amountToPay={currentPlan.monthly_price}
+                amountToPay={cyclePrice}
             />
 
             <PlanChangeModal

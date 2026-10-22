@@ -193,6 +193,8 @@ class MediaLibrary(Base):
     duration = Column(Float) # For videos
     thumbnail_url = Column(String, nullable=True) # For video covers or optimized image previews
     theme_config = Column(JSON, nullable=True) # Per-background theme overrides (mode, colors)
+    # Usuario que lo subió (NULL en archivos antiguos o de procesos sin sesión).
+    created_by = Column(Integer, ForeignKey("sys_users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
 
 

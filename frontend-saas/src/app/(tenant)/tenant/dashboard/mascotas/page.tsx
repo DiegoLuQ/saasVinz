@@ -67,7 +67,7 @@ interface Customer {
 
 export default function PetsPage() {
     const { showToast } = useToast();
-    const { canDelete, canCreate } = usePermissions();
+    const { canDelete, canCreate, canEdit } = usePermissions();
     const { tenantData, formatLimit } = useTenant();
     const { hasFeature } = useFeatures();
 
@@ -127,15 +127,17 @@ export default function PetsPage() {
     ).length;
     const isLimitReached = maxPets > 0 && maxPets < 999999 && monthlyUsage >= maxPets;
 
+    const allowCreatePet = canCreate('mascotas');
+
     useEffect(() => {
-        if (autoOpenParam === 'true' && customerIdParam && Number(customerIdParam)) {
+        if (autoOpenParam === 'true' && customerIdParam && Number(customerIdParam) && allowCreatePet) {
             const cid = Number(customerIdParam);
             setCurrentPet({ name: '', species: 'canino', breed: '', customer_id: cid, status: 'received' });
             setSelectedImages([]);
             setImagePreviews([]);
             setIsModalOpen(true);
         }
-    }, [autoOpenParam, customerIdParam]);
+    }, [autoOpenParam, customerIdParam, allowCreatePet]);
 
     const handleOpenModal = (pet?: Pet) => {
         if (!pet && isLimitReached) {
@@ -642,6 +644,7 @@ export default function PetsPage() {
                                                         exit={{ opacity: 0, scale: 0.95, y: -10 }}
                                                         className="absolute right-0 mt-2 w-52 bg-white border border-slate-200 text-slate-800 dark:bg-[#1a1f2e] dark:border-white/10 dark:text-slate-100 rounded-2xl shadow-xl z-20 overflow-hidden"
                                                     >
+                                                        {canEdit('mascotas') && (
                                                         <button
                                                             onClick={() => {
                                                                 handleOpenModal(pet);
@@ -652,6 +655,7 @@ export default function PetsPage() {
                                                             <Edit2 size={14} className="text-primary" />
                                                             Editar Mascota
                                                         </button>
+                                                        )}
 
                                                         {/* Configurar Memorial — habilitado por feature flag del plan */}
                                                         {canUseMemorial && (

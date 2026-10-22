@@ -6,6 +6,7 @@ from app import models
 from app import schemas
 from app import auth
 from app.api.deps import get_current_user, get_tenant_id
+from app.api.deps_features import check_feature
 from typing import List, Optional
 from datetime import datetime, time, timedelta
 from app.utils import tz
@@ -294,7 +295,8 @@ def create_workflow_step(
     step_in: schemas.WorkflowStepCreate,
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_user),
+    _f: bool = Depends(check_feature("configuracion:flujo", default=True))
 ):
     """Crea un nuevo paso en el flujo (Solo Admin)."""
     if current_user.role not in [models.UserRole.admin, models.UserRole.creator]:
@@ -315,7 +317,8 @@ def update_workflow_step(
     step_in: schemas.WorkflowStepUpdate,
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_user),
+    _f: bool = Depends(check_feature("configuracion:flujo", default=True))
 ):
     """Actualiza un paso del flujo (Solo Admin)."""
     if current_user.role not in [models.UserRole.admin, models.UserRole.creator]:

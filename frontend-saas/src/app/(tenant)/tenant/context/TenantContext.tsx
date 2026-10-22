@@ -36,6 +36,7 @@ interface TenantData {
     contracted_plan_name?: string | null;
     // Plantilla de certificado elegida en Configuración (null = automática)
     default_certificate_template_id?: number | null;
+    form_config?: any;
 }
 
 interface TenantContextType {

@@ -24,6 +24,13 @@ const nextConfig: NextConfig = {
     'huellas.lvh.me',
   ],
   experimental: {
+    // El proxy de rewrites (/api → backend) corta a los 30 s por defecto. Generar
+    // una ilustración con IA puede tardar más (el backend espera hasta 180 s):
+    // sin esto el navegador recibe un 500 aunque el backend termine bien.
+    proxyTimeout: 180_000,
+    // El proxy corta en silencio los cuerpos de más de 10 MB (por defecto): el
+    // video de bienvenida (hasta 80 MB) llegaba truncado y el backend lo rechazaba.
+    proxyClientMaxBodySize: '90mb',
     serverActions: {
       allowedOrigins: [
         'localhost:3000',

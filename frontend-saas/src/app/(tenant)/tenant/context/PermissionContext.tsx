@@ -30,6 +30,16 @@ interface PermissionContextType {
 
 const PermissionContext = createContext<PermissionContextType | undefined>(undefined);
 
+// Acciones que además dependen de una característica del plan (admin → Planes →
+// "Configurar Características"). Espejo de PLAN_ACTION_FEATURES en
+// backend/app/api/internal/admin/rbac/router.py. Sin el flag configurado se permite.
+const PLAN_ACTION_FEATURES: Record<string, Partial<Record<keyof Actions, string>>> = {
+    clientes: { create: 'clientes:crear', edit: 'clientes:editar', delete: 'clientes:eliminar' },
+    mascotas: { create: 'mascotas:crear', edit: 'mascotas:editar', delete: 'mascotas:eliminar' },
+    servicios: { create: 'servicios:crear', edit: 'servicios:editar' },
+    ordenes: { create: 'ordenes:crear', edit: 'ordenes:editar', delete: 'ordenes:eliminar' },
+};
+
 export function PermissionProvider({ children }: { children: React.ReactNode }) {
     // Use the consolidated bootstrap hook instead of individual API call
     const { data: bootstrap, isLoading, refetch } = useSessionBootstrap();
@@ -41,11 +51,14 @@ export function PermissionProvider({ children }: { children: React.ReactNode }) 
     };
 
     const permissions = bootstrap?.rbac.modules || [];
+    const planFeatures = (bootstrap?.tenant?.subscription_plan?.features || {}) as Record<string, unknown>;
 
     const hasPermission = (moduleKey: string, action: keyof Actions) => {
         const perm = permissions.find(p => p.module_key === moduleKey);
         if (!perm) return false;
         if (!perm.is_active) return false;
+        const feature = PLAN_ACTION_FEATURES[moduleKey]?.[action];
+        if (feature && planFeatures[feature] === false) return false;
         return perm.actions[action] === true;
     };
 

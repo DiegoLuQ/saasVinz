@@ -5,7 +5,7 @@ import { SITE_URL, siteUrl } from '@/lib/vinzer/site';
 import { GUIAS, guiaPath } from '@/lib/vinzer/guias';
 
 const TITLE = 'Guías para Crematorios de Mascotas | Vinzer';
-const DESCRIPTION = 'Protocolos y buenas prácticas para crematorios de mascotas: trazabilidad y cadena de custodia, recepción sin papel, formulario online para familias e inventario de urnas.';
+const DESCRIPTION = 'Protocolos y buenas prácticas para crematorios de mascotas: trazabilidad y cadena de custodia, recepción sin papel, formulario online e inventario de urnas. Incluye una guía para familias sobre cremación de mascotas en Chile.';
 
 export const metadata: Metadata = {
     metadataBase: new URL(SITE_URL),

@@ -5,6 +5,7 @@ from app import models
 from app.core.tenant_context import apply_tenant_rls
 from pydantic import BaseModel
 from app.services.public_form_config import normalize_form_config, public_weight_tiers
+from app.services.form_video import strip_videos, tenant_can_use_form_video
 
 router = APIRouter()
 
@@ -37,6 +38,8 @@ def get_tenant_by_slug(slug: str, db: Session = Depends(get_db)):
 
     apply_tenant_rls(db, tenant.id)
     form_config = normalize_form_config(tenant.form_config)
+    if not tenant_can_use_form_video(tenant):
+        strip_videos(form_config)  # el video de bienvenida es solo PRO/ULTRA
     info = TenantPublicInfo.model_validate(tenant)
     info.form_config = form_config
     info.weight_tiers = public_weight_tiers(db, tenant.id, include_price=form_config["show_weight_prices"])

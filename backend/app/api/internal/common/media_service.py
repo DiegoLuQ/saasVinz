@@ -75,20 +75,26 @@ class MediaService:
                 img = img.resize((max_dim, max_dim), Image.Resampling.LANCZOS)
             elif w > max_dim or h > max_dim:
                 img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+        elif processing_mode == "template":
+            # Fondos/adornos de plantillas de imagen: 2160 px cubre la exportación
+            # a 1080 px de Instagram con margen (2x) sin pesar como un original.
+            w, h = img.size
+            if w > 2160 or h > 2160:
+                img.thumbnail((2160, 2160), Image.Resampling.LANCZOS)
         elif processing_mode == "original":
             # high quality but still limit to something reasonable for web (e.g. 4K)
             w, h = img.size
             if w > 3840 or h > 3840:
                 img.thumbnail((3840, 3840), Image.Resampling.LANCZOS)
-        
+
         output_path = f"{file_path}_processed.webp"
-        
+
         # 3. Compresión Iterativa (Cuello de Botella)
-        quality = 80 if processing_mode == "optimized" else 95
+        quality = {"optimized": 80, "template": 85}.get(processing_mode, 95)
         img.save(output_path, format=target_format, quality=quality, optimize=True)
-        
+
         # Lógica de peso máximo
-        max_size = (500 * 1024) if processing_mode == "optimized" else (2048 * 1024) # 500KB vs 2MB
+        max_size = {"optimized": 500 * 1024, "template": 900 * 1024}.get(processing_mode, 2048 * 1024)
         attempts = 0
         
         while os.path.getsize(output_path) > max_size and quality > 30 and attempts < 6:
@@ -170,12 +176,14 @@ class MediaService:
             unique_name = f"{category}/{filename}"
             
             if settings.USE_R2:
-                # Use 'recuerdos' folder if category matches
-                cloud_folder = "library" if category != "recuerdos" else "recuerdos"
+                # 'recuerdos' e 'ia' (generadas con IA y diseños finales) tienen
+                # carpeta propia por tenant; el resto va a library/{categoria}/.
+                own_folder = category in ("recuerdos", "ia")
+                cloud_folder = category if own_folder else "library"
                 if tenant_id:
-                    cloud_name = f"tenant_{tenant_id}/{cloud_folder}/{filename}" if category == "recuerdos" else f"tenant_{tenant_id}/library/{unique_name}"
+                    cloud_name = f"tenant_{tenant_id}/{cloud_folder}/{filename}" if own_folder else f"tenant_{tenant_id}/library/{unique_name}"
                 else:
-                    cloud_name = f"{cloud_folder}/{filename}" if category == "recuerdos" else f"library/{unique_name}"
+                    cloud_name = f"{cloud_folder}/{filename}" if own_folder else f"library/{unique_name}"
                 r2_url = upload_file_to_r2(processed_path, settings.R2_BUCKET_NAME, cloud_name)
                 if not r2_url:
                     raise Exception("Failed to upload to R2")
@@ -215,7 +223,9 @@ class MediaService:
                 ratio=ratio,
                 description=description,
                 alt_text=alt_text,
-                file_size=file_size
+                file_size=file_size,
+                # Lo deja get_current_user en la sesión de la petición.
+                created_by=db.info.get("current_user_id"),
             )
             
             # Obtener datos extras (and generate thumbnail for video)

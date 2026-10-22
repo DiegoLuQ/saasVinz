@@ -210,8 +210,9 @@ async def process_subscription_event(data: Any, db: Session):
                     if not obj.billing_info:
                         obj.billing_info = TenantBillingInfo(tenant_id=obj.id)
                     
-                    # Si es anual, guardamos el equivalente mensual (MRR)
-                    obj.billing_info.monthly_price = amount / 12 if recurring_interval == "year" else amount
+                    # Precio congelado del crematorio + equivalente mensual (MRR)
+                    from app.services.plan_pricing import lock_contracted_price
+                    lock_contracted_price(obj, amount, "annual" if recurring_interval == "year" else "monthly")
                     
                     if not existing_tx:
                         new_tx = BillingTransaction(

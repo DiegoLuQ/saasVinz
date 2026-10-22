@@ -4,34 +4,8 @@ import React, { useRef, useState } from 'react';
 import html2canvas from 'html2canvas';
 import { Download, Loader2, Heart } from 'lucide-react';
 import FarewellPreview from '@/app/(tenant)/tenant/dashboard/documentos/disenos/components/FarewellPreview';
-import { getImageUrl } from '@/lib/tenant/api';
+import { buildFarewellConfig, farewellCardDims } from '@/lib/tenant/farewellCard';
 import { useCurrentTenant } from '@/hooks/useSessionBootstrap';
-
-/** Config de plantilla de homenaje (forma libre; la interpreta FarewellPreview). */
-type FarewellConfig = { format?: string; elements?: Record<string, unknown>; [key: string]: unknown };
-
-const DEFAULT_CONFIG: FarewellConfig = {
-    format: '1:1',
-    theme: 'warm',
-    styles: { font: 'serif', color: '#1e293b', background: '#FDFBF7' },
-    frame: { enabled: true, color: '#d4af37', width: 6, margin: 10 },
-    petNameFormatting: { bold: true, fontSize: 38, fontFamily: 'Playfair Display', textAlign: 'center', letterSpacing: 2 },
-    subtitleFormatting: { bold: false, italic: true, fontSize: 14, textAlign: 'center', width: 420 },
-    textFormatting: { bold: false, italic: true, fontSize: 15, textAlign: 'center', width: 440, lineHeight: 1.6 },
-    imageSettings: {
-        image2: { shape: 'circle', size: 180, borderColor: '#d4af37', borderWidth: 4, glow: { enabled: true, color: 'rgba(212, 175, 55, 0.5)', size: 24 } },
-    },
-    backgroundImage: { url: null, opacity: 0 },
-};
-const DEFAULT_TEXT = 'Gracias por cada instante de ternura y amor incondicional. Tu recuerdo vivirá por siempre en nuestra memoria.';
-
-/** Dimensiones reales de la tarjeta según el formato de la plantilla (mismo cálculo que el formulario público). */
-function cardDims(format: string) {
-    const h = 550;
-    if (format === '9:16') return { width: h * (9 / 16), height: h };
-    if (format === '3:4' || format === '4:3') return { width: h * (3 / 4), height: h };
-    return { width: h, height: h };
-}
 
 interface Props {
     templateConfig: Record<string, unknown> | null | undefined;
@@ -49,25 +23,8 @@ export default function FarewellCardSection({ templateConfig, petName, dedicatio
     // Datos del crematorio (logo, nombre, web/redes) igual que el seguimiento
     // público y el formulario: sin ellos la plantilla los dejaba vacíos o con
     // los textos de ejemplo.
-    const base: FarewellConfig = (templateConfig as FarewellConfig) || DEFAULT_CONFIG;
-    const baseEls = (base.elements || {}) as Record<string, unknown>;
-    const socialMedia = tenant?.social_media || {};
-    const config: FarewellConfig = {
-        ...base,
-        elements: {
-            ...baseEls,
-            petName: petName || 'Tu Angelito',
-            subtitle: '',
-            farewellText: dedication || DEFAULT_TEXT,
-            image2Url: photoUrl ? getImageUrl(photoUrl) : null,
-            tenantLogoUrl: tenant?.logo_url ? getImageUrl(tenant.logo_url) : null,
-            tenantName: (baseEls.tenantName && String(baseEls.tenantName).trim()) || tenant?.name || '',
-            tenantWebsite: (baseEls.tenantWebsite && String(baseEls.tenantWebsite).trim()) || '{sitio_web}',
-            tenantSocialMedia: socialMedia,
-        },
-        tenantSocialMedia: socialMedia,
-    };
-    const dims = cardDims(config.format || '1:1');
+    const config = buildFarewellConfig(templateConfig, { petName, dedication, photoUrl }, tenant);
+    const dims = farewellCardDims(config.format || '1:1');
     const scale = 0.5;
 
     const handleDownload = async () => {
