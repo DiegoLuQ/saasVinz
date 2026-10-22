@@ -200,7 +200,7 @@ export interface TemplateExport {
     created_at: string;
 }
 
-export function listTemplateExports(params: { q?: string; kind?: 'design' | 'illustration' | 'digital' | 'design,digital';template_id?: number; pet_id?: number; page?: number; page_size?: number }): Promise<{
+export function listTemplateExports(params: { q?: string; kind?: 'design' | 'illustration' | 'digital' | 'design,digital'; template_id?: number; pet_id?: number; unassigned?: boolean; page?: number; page_size?: number }): Promise<{
     total: number; page: number; page_size: number; items: TemplateExport[];
 }> {
     const qs = new URLSearchParams();
@@ -208,6 +208,7 @@ export function listTemplateExports(params: { q?: string; kind?: 'design' | 'ill
     if (params.kind) qs.set('kind', params.kind);
     if (params.template_id != null) qs.set('template_id', String(params.template_id));
     if (params.pet_id != null) qs.set('pet_id', String(params.pet_id));
+    if (params.unassigned) qs.set('unassigned', 'true');
     qs.set('page', String(params.page ?? 1));
     qs.set('page_size', String(params.page_size ?? 24));
     return apiRequest(`${BASE}/exports?${qs.toString()}`);

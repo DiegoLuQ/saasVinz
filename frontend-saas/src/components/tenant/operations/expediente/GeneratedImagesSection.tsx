@@ -3,11 +3,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Images, Eye, Download, Loader2, X, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
+import { Images, Eye, Download, Loader2, X, Sparkles, AlertCircle, RefreshCw, Link2 } from 'lucide-react';
 import { listTemplateExports, type TemplateExport } from '@/lib/tenant/imageTemplates';
 import { apiRequest, getImageUrl } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { RecipeDesignView, isRecipeDesign, useDesignDownload } from '@/components/tenant/redes/RecipeDesign';
+import AssignExistingImageModal from './AssignExistingImageModal';
 
 const KIND_LABEL: Record<TemplateExport['kind'], string> = {
     digital: 'Tarjeta digital',
@@ -46,11 +47,12 @@ export default function GeneratedImagesSection({ orderId, petId, petName }: Prop
     const queryClient = useQueryClient();
     const [zoom, setZoom] = useState<TemplateExport | null>(null);
     const [isTriggering, setIsTriggering] = useState(false);
+    const [assigning, setAssigning] = useState(false);
 
     // Consulta de imágenes ya generadas
     const { data, isLoading } = useQuery({
         queryKey: ['tenant', 'template-exports', 'order', petId],
-        queryFn: () => listTemplateExports({ kind: 'design,digital', pet_id: petId!, page_size: 12 }),
+        queryFn: () => listTemplateExports({ pet_id: petId!, page_size: 12 }),
         enabled: !!petId,
     });
     const items = data?.items || [];
@@ -105,7 +107,7 @@ export default function GeneratedImagesSection({ orderId, petId, petName }: Prop
     // Descarga de diseño
     const { download: downloadItem, busyId: downloading, node: downloadNode } = useDesignDownload(msg => showToast(msg, 'error'));
     const download = (d: TemplateExport) =>
-        downloadItem(d, `${(petName || 'mascota').replace(/\s+/g, '-').toLowerCase()}-${d.kind === 'design' ? 'redes' : 'tarjeta'}-${d.id}`);
+        downloadItem(d, `${(petName || 'mascota').replace(/\s+/g, '-').toLowerCase()}-${d.kind === 'design' ? 'redes' : d.kind === 'illustration' ? 'ilustracion' : 'tarjeta'}-${d.id}`);
 
     return (
         <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
@@ -118,6 +120,16 @@ export default function GeneratedImagesSection({ orderId, petId, petName }: Prop
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {petId && (
+                        <button
+                            type="button"
+                            onClick={() => setAssigning(true)}
+                            className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white border border-white/10 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                            title="Asignar una imagen ya creada en Diseños para Redes sin mascota"
+                        >
+                            <Link2 size={13} /> Asignar existente
+                        </button>
+                    )}
                     {orderId && (
                         <button
                             type="button"
@@ -227,6 +239,9 @@ export default function GeneratedImagesSection({ orderId, petId, petName }: Prop
                 </div>
             )}
 
+            {assigning && petId && (
+                <AssignExistingImageModal petId={petId} petName={petName} onClose={() => setAssigning(false)} />
+            )}
             {downloadNode}
 
             {/* Modal de Zoom y descarga */}

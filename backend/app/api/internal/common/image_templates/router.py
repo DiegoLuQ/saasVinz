@@ -531,6 +531,7 @@ def list_exports(
     kind: Optional[str] = None,
     template_id: Optional[int] = None,
     pet_id: Optional[int] = None,
+    unassigned: bool = False,
     page: int = 1,
     page_size: int = 24,
     db: Session = Depends(get_db),
@@ -547,6 +548,9 @@ def list_exports(
         query = query.filter(models.TemplateExport.template_id == template_id)
     if pet_id is not None:
         query = query.filter(models.TemplateExport.pet_id == pet_id)
+    elif unassigned:
+        # Lo creado sin mascota: se puede asignar desde la orden (lateral de Recepción y Pedidos).
+        query = query.filter(models.TemplateExport.pet_id.is_(None))
     if q and q.strip():
         query = query.filter(models.TemplateExport.title.ilike(f"%{q.strip()[:80]}%"))
     total = query.count()

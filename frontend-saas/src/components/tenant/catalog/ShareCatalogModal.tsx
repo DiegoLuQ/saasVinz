@@ -221,25 +221,25 @@ export default function ShareCatalogModal({
                 if (e.target === e.currentTarget) onClose();
             }}
         >
-            <div className="bg-[#12151d] border border-white/10 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+            <div className="bg-white border border-slate-200 dark:bg-slate-900 dark:border-white/15 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
                 {/* Header */}
-                <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
+                <div className="px-6 py-5 border-b border-slate-200 dark:border-white/10 flex items-center justify-between bg-slate-50 dark:bg-white/[0.03]">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shrink-0">
+                        <div className="w-10 h-10 rounded-2xl bg-amber-100 border border-amber-200 dark:bg-amber-500/15 dark:border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
                             <Share2 size={20} />
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold text-white leading-tight">
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-50 leading-tight">
                                 {copy.title}
                             </h3>
-                            <p className="text-xs text-muted-foreground mt-0.5">
+                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
                                 Genera enlaces privados con fecha de vencimiento y botón de WhatsApp
                             </p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 text-muted-foreground hover:text-white rounded-xl hover:bg-white/5 transition-colors"
+                        className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-200/70 dark:text-slate-300 dark:hover:text-slate-50 dark:hover:bg-white/10 rounded-xl transition-colors" aria-label="Cerrar"
                     >
                         <X size={18} />
                     </button>
@@ -248,12 +248,12 @@ export default function ShareCatalogModal({
                 {/* Body */}
                 <div className="p-6 overflow-y-auto space-y-6">
                     {/* Generador de enlace nuevo */}
-                    <form onSubmit={handleCreateLink} className="space-y-4 bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+                    <form onSubmit={handleCreateLink} className="space-y-4 bg-slate-50 border border-slate-200 dark:bg-white/[0.04] dark:border-white/10 rounded-2xl p-5">
                         <div className="flex items-center justify-between">
-                            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                            <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
                                 Vigencia del Enlace
                             </label>
-                            <span className="text-[11px] text-amber-400 font-medium">
+                            <span className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
                                 {copy.expiredHint}
                             </span>
                         </div>
@@ -269,14 +269,14 @@ export default function ShareCatalogModal({
                                         onClick={() => setSelectedHours(opt.value)}
                                         className={`py-3 px-3 rounded-xl text-left border transition-all cursor-pointer ${
                                             isSelected
-                                                ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-sm'
-                                                : 'bg-white/[0.02] border-white/5 text-muted-foreground hover:bg-white/[0.05] hover:text-white'
+                                                ? 'bg-amber-50 border-amber-400 text-amber-800 shadow-sm dark:bg-amber-500/15 dark:border-amber-400/60 dark:text-amber-200'
+                                                : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-100 dark:bg-white/[0.04] dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.08]'
                                         }`}
                                     >
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs font-bold">{opt.label}</span>
                                             {opt.badge && (
-                                                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-black uppercase">
+                                                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 font-black uppercase whitespace-nowrap">
                                                     {opt.badge}
                                                 </span>
                                             )}
@@ -288,7 +288,7 @@ export default function ShareCatalogModal({
 
                         {/* Etiqueta opcional del cliente */}
                         <div className="space-y-1.5 pt-1">
-                            <label className="text-xs font-bold text-muted-foreground ml-1">
+                            <label className="text-xs font-bold text-slate-700 dark:text-slate-200 ml-1">
                                 Etiqueta de referencia (opcional)
                             </label>
                             <input
@@ -296,7 +296,7 @@ export default function ShareCatalogModal({
                                 placeholder="Ej: Familia Rodríguez / Atención WhatsApp"
                                 value={linkLabel}
                                 onChange={(e) => setLinkLabel(e.target.value)}
-                                className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 px-3.5 text-xs text-white placeholder:text-muted-foreground/40 outline-none focus:border-amber-500/40 transition-all"
+                                className="w-full bg-white border border-slate-300 dark:bg-slate-950/60 dark:border-white/15 rounded-xl py-2.5 px-3.5 text-xs text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-amber-500 transition-all"
                             />
                         </div>
 
@@ -304,10 +304,10 @@ export default function ShareCatalogModal({
                         {isPlans && (
                             <div className="space-y-1.5">
                                 <div className="flex items-center justify-between ml-1">
-                                    <label htmlFor="catalog-message" className="text-xs font-bold text-muted-foreground">
+                                    <label htmlFor="catalog-message" className="text-xs font-bold text-slate-700 dark:text-slate-200">
                                         Mensaje para la familia (opcional)
                                     </label>
-                                    <span className="text-[10px] text-muted-foreground/60 font-mono">
+                                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                                         {linkMessage.length}/{MESSAGE_MAX}
                                     </span>
                                 </div>
@@ -318,9 +318,9 @@ export default function ShareCatalogModal({
                                     placeholder="Ej: Te acompañamos en este momento. Escríbenos y te ayudamos a elegir el plan adecuado."
                                     value={linkMessage}
                                     onChange={(e) => setLinkMessage(e.target.value.slice(0, MESSAGE_MAX))}
-                                    className="w-full resize-none bg-white/5 border border-white/10 rounded-xl py-2.5 px-3.5 text-xs text-white placeholder:text-muted-foreground/40 outline-none focus:border-amber-500/40 transition-all"
+                                    className="w-full resize-none bg-white border border-slate-300 dark:bg-slate-950/60 dark:border-white/15 rounded-xl py-2.5 px-3.5 text-xs text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-amber-500 transition-all"
                                 />
-                                <p className="text-[10px] text-muted-foreground/70 ml-1">
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 ml-1">
                                     Aparece en negrita en el catálogo, entre &quot;¿Cuál es el tamaño aproximado de tu mascota?&quot; y los planes.
                                 </p>
                             </div>
@@ -349,7 +349,7 @@ export default function ShareCatalogModal({
                                 type="button"
                                 onClick={handleUpdateAll}
                                 disabled={isUpdatingAll || isGenerating}
-                                className="w-full py-2.5 px-4 rounded-xl border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 text-amber-300 font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                                className="w-full py-2.5 px-4 rounded-xl border border-amber-400 bg-amber-50 hover:bg-amber-100 text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 dark:text-amber-200 font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
                                 title={isPlans ? 'Aplica la etiqueta y el mensaje a todos los enlaces generados' : 'Aplica la etiqueta a todos los enlaces generados'}
                             >
                                 {isUpdatingAll ? (
@@ -369,23 +369,23 @@ export default function ShareCatalogModal({
 
                     {/* Enlace recién generado */}
                     {recentCreatedUrl && (
-                        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-3 animate-in fade-in duration-300">
-                            <div className="flex items-center gap-2 text-emerald-400">
+                        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 dark:bg-emerald-500/10 dark:border-emerald-500/30 space-y-3 animate-in fade-in duration-300">
+                            <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
                                 <Sparkles size={16} />
                                 <span className="text-xs font-black uppercase tracking-wider">
                                     ¡Enlace Generado y Listo para Compartir!
                                 </span>
                             </div>
-                            <div className="flex items-center gap-2 bg-black/40 p-2.5 rounded-xl border border-emerald-500/20">
+                            <div className="flex items-center gap-2 bg-white dark:bg-slate-950/60 p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-500/25">
                                 <input
                                     readOnly
                                     value={recentCreatedUrl}
-                                    className="bg-transparent text-xs text-emerald-200 font-mono flex-1 outline-none truncate select-all"
+                                    className="bg-transparent text-xs text-emerald-800 dark:text-emerald-200 font-mono flex-1 outline-none truncate select-all"
                                 />
                                 <button
                                     type="button"
                                     onClick={() => handleCopy(recentCreatedUrl, 'recent')}
-                                    className="p-2 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 transition-colors shrink-0 cursor-pointer"
+                                    className="p-2 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 dark:bg-emerald-500/20 dark:hover:bg-emerald-500/30 dark:text-emerald-200 transition-colors shrink-0 cursor-pointer"
                                     title="Copiar enlace"
                                 >
                                     {copiedToken === 'recent' ? <Check size={15} /> : <Copy size={15} />}
@@ -394,7 +394,7 @@ export default function ShareCatalogModal({
                                     href={recentCreatedUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="p-2 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 transition-colors shrink-0 cursor-pointer"
+                                    className="p-2 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-700 dark:bg-emerald-500/20 dark:hover:bg-emerald-500/30 dark:text-emerald-200 transition-colors shrink-0 cursor-pointer"
                                     title="Abrir en pestaña nueva"
                                 >
                                     <ExternalLink size={15} />
@@ -417,13 +417,13 @@ export default function ShareCatalogModal({
                     {/* Historial de enlaces activos */}
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
                                 Enlaces Generados ({links.length})
                             </h4>
                             <button
                                 type="button"
                                 onClick={fetchLinks}
-                                className="text-[11px] text-amber-400 hover:underline font-medium cursor-pointer"
+                                className="text-[11px] text-amber-700 dark:text-amber-300 hover:underline font-medium cursor-pointer"
                             >
                                 Actualizar lista
                             </button>
@@ -434,7 +434,7 @@ export default function ShareCatalogModal({
                                 <Loader2 size={24} className="animate-spin text-amber-500" />
                             </div>
                         ) : links.length === 0 ? (
-                            <div className="py-8 text-center text-xs text-muted-foreground bg-white/[0.01] rounded-2xl border border-white/5">
+                            <div className="py-8 text-center text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-white/[0.03] rounded-2xl border border-dashed border-slate-300 dark:border-white/10">
                                 {copy.empty}
                             </div>
                         ) : (
@@ -448,37 +448,37 @@ export default function ShareCatalogModal({
                                             key={link.id}
                                             className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all ${
                                                 link.is_expired
-                                                    ? 'bg-rose-500/[0.03] border-rose-500/20 opacity-70'
-                                                    : 'bg-white/[0.02] border-white/5 hover:border-white/10'
+                                                    ? 'bg-rose-50 border-rose-200 opacity-80 dark:bg-rose-500/[0.06] dark:border-rose-500/25'
+                                                    : 'bg-white border-slate-200 hover:border-slate-300 dark:bg-white/[0.04] dark:border-white/10 dark:hover:border-white/20'
                                             }`}
                                         >
                                             <div className="min-w-0 flex-1 space-y-1">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-bold text-white truncate">
+                                                    <span className="text-xs font-bold text-slate-900 dark:text-slate-50 truncate">
                                                         {link.name || copy.defaultName}
                                                     </span>
                                                     {link.is_expired ? (
-                                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30">
                                                             Expirado
                                                         </span>
                                                     ) : link.expires_at ? (
-                                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30">
                                                             Vigente
                                                         </span>
                                                     ) : (
-                                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30">
                                                             Permanente
                                                         </span>
                                                     )}
                                                 </div>
 
                                                 {link.message && (
-                                                    <p className="text-[11px] text-white/60 italic truncate" title={link.message}>
+                                                    <p className="text-[11px] text-slate-600 dark:text-slate-300 italic truncate" title={link.message}>
                                                         “{link.message}”
                                                     </p>
                                                 )}
 
-                                                <div className="flex items-center gap-3 text-[10px] text-muted-foreground font-mono">
+                                                <div className="flex items-center gap-3 text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                                                     <span>
                                                         {link.expires_at ? (
                                                             <>Vence: {new Date(link.expires_at).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</>
@@ -495,16 +495,16 @@ export default function ShareCatalogModal({
                                                 <button
                                                     type="button"
                                                     onClick={() => handleCopy(fullUrl, link.token)}
-                                                    className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white transition-colors cursor-pointer"
+                                                    className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 dark:bg-white/10 dark:hover:bg-white/20 dark:text-slate-200 dark:hover:text-slate-50 transition-colors cursor-pointer"
                                                     title="Copiar enlace"
                                                 >
-                                                    {isCopied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                                                    {isCopied ? <Check size={14} className="text-emerald-600 dark:text-emerald-400" /> : <Copy size={14} />}
                                                 </button>
                                                 <a
                                                     href={fullUrl}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white transition-colors cursor-pointer"
+                                                    className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 dark:bg-white/10 dark:hover:bg-white/20 dark:text-slate-200 dark:hover:text-slate-50 transition-colors cursor-pointer"
                                                     title="Ver catálogo"
                                                 >
                                                     <ExternalLink size={14} />
@@ -512,7 +512,7 @@ export default function ShareCatalogModal({
                                                 <button
                                                     type="button"
                                                     onClick={() => handleDeleteLink(link.id)}
-                                                    className="p-2 rounded-xl bg-white/5 hover:bg-rose-500/20 text-muted-foreground hover:text-rose-400 transition-colors cursor-pointer"
+                                                    className="p-2 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-600 dark:bg-white/10 dark:hover:bg-rose-500/20 dark:text-slate-200 dark:hover:text-rose-300 transition-colors cursor-pointer"
                                                     title="Eliminar enlace"
                                                 >
                                                     <Trash2 size={14} />
@@ -527,11 +527,11 @@ export default function ShareCatalogModal({
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-white/10 flex items-center justify-end bg-white/[0.01]">
+                <div className="px-6 py-4 border-t border-slate-200 dark:border-white/10 flex items-center justify-end bg-slate-50 dark:bg-white/[0.03]">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="py-2.5 px-5 rounded-xl border border-white/10 text-xs font-bold text-white hover:bg-white/5 transition-all cursor-pointer"
+                        className="py-2.5 px-5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 dark:border-white/15 dark:text-slate-100 dark:hover:bg-white/10 transition-all cursor-pointer"
                     >
                         Cerrar
                     </button>
