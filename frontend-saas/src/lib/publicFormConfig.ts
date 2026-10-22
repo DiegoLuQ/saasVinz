@@ -27,6 +27,16 @@ export interface MemoriesConfig {
 export interface FormFieldSetting {
     visible: boolean;
     required: boolean;
+    /** Nombre propio del campo en un formulario personalizado (vacío = el de siempre). */
+    label?: string | null;
+}
+
+/** Máximo del nombre propio de un campo (igual que MAX_FIELD_LABEL del backend). */
+export const MAX_FIELD_LABEL = 40;
+
+/** Nombre a mostrar de un campo: el propio del formulario o el de siempre. */
+export function fieldLabel(setting: FormFieldSetting | undefined, fallback: string): string {
+    return setting?.label?.trim() || fallback;
 }
 
 /** Video de bienvenida (planes PRO/ULTRA): archivo en R2 o reproductor de Vimeo / Cloudflare Stream. Máx. 30 s. */

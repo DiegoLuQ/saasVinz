@@ -94,10 +94,10 @@ export function CertificatesTab({ bootstrapTenant }: CertificatesTabProps) {
                 <button
                     onClick={handleSave}
                     disabled={saving}
-                    className="flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-primary to-orange-600 text-white rounded-2xl font-black shadow-lg shadow-primary/30 hover:shadow-primary/50 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+                    className="w-full sm:w-auto justify-center bg-primary text-primary-foreground font-bold py-2.5 px-7 rounded-xl flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-60 shadow-lg shadow-primary/20 cursor-pointer whitespace-nowrap"
                 >
-                    <Save size={20} />
-                    {saving ? 'GUARDANDO...' : 'GUARDAR CAMBIOS'}
+                    <Save size={18} />
+                    {saving ? 'Guardando…' : 'Guardar cambios'}
                 </button>
             </div>
 

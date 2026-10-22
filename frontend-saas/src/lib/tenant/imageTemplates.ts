@@ -213,6 +213,11 @@ export function listTemplateExports(params: { q?: string; kind?: 'design' | 'ill
     return apiRequest(`${BASE}/exports?${qs.toString()}`);
 }
 
+/** Asigna (o quita con null) la mascota de un diseño: aparece en las órdenes de esa mascota. */
+export function assignTemplateExportPet(id: number, pet_id: number | null): Promise<{ id: number; pet_id: number | null; title: string }> {
+    return apiRequest(`${BASE}/exports/${id}`, { method: 'PATCH', body: { pet_id } });
+}
+
 export function deleteTemplateExport(id: number): Promise<{ status: string }> {
     return apiRequest(`${BASE}/exports/${id}`, { method: 'DELETE' });
 }

@@ -15,7 +15,7 @@ interface Props {
 const SLOT_TITLES = ['Foto Principal', 'Segundo Recuerdo', 'Tercer Recuerdo'];
 
 // Fotos de los portarretratos del homenaje (certificado y memorial)
-export const MAX_MEMORIAL_PHOTOS = 2;
+export const MAX_MEMORIAL_PHOTOS = 3;
 
 export default function ImageUploadStep({ images, setImages, petName }: Props) {
     const [isDragging, setIsDragging] = useState(false);
@@ -102,9 +102,11 @@ export default function ImageUploadStep({ images, setImages, petName }: Props) {
         if (!imageSrc || !croppedAreaPixels) return;
 
         try {
-            const croppedBlob = (await getCroppedImg(imageSrc, croppedAreaPixels)) as Blob;
-            const newFile = new File([croppedBlob], `${currentFileName}_memorial.png`, {
-                type: 'image/png',
+            // JPEG ≤ 1600 px: sube rápido y bajo el límite de 8 MB; el servidor lo
+            // convierte a WebP optimizado (MediaService, modo "optimized").
+            const croppedBlob = (await getCroppedImg(imageSrc, croppedAreaPixels, 0, undefined, { maxSize: 1600, type: 'image/jpeg', quality: 0.9 })) as Blob;
+            const newFile = new File([croppedBlob], `${currentFileName}_memorial.jpg`, {
+                type: 'image/jpeg',
             });
 
             if (targetSlotIndex !== null && targetSlotIndex < images.length) {
@@ -166,7 +168,7 @@ export default function ImageUploadStep({ images, setImages, petName }: Props) {
                             Portarretratos del Homenaje
                         </h3>
                         <p className="text-xs text-slate-400 dark:text-slate-500 font-normal">
-                            Sube hasta {MAX_MEMORIAL_PHOTOS} fotos especiales para su certificado y memorial
+                            Sube de 1 a {MAX_MEMORIAL_PHOTOS} fotos especiales para su certificado y memorial
                         </p>
                     </div>
                 </div>
@@ -183,7 +185,7 @@ export default function ImageUploadStep({ images, setImages, petName }: Props) {
             )}
 
             {/* Marcos grandes (MAX_MEMORIAL_PHOTOS) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto w-full">
                 {Array.from({ length: MAX_MEMORIAL_PHOTOS }, (_, index) => index).map((index) => {
                     const file = images[index];
                     const hasImage = !!file;

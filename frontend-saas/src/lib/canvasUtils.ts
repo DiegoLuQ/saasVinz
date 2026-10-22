@@ -32,7 +32,9 @@ export default async function getCroppedImg(
     imageSrc: string,
     pixelCrop: { x: number; y: number; width: number; height: number },
     rotation = 0,
-    flip = { horizontal: false, vertical: false }
+    flip = { horizontal: false, vertical: false },
+    /** Lado máximo de salida y formato (por defecto: tamaño del recorte, PNG). */
+    output: { maxSize?: number; type?: 'image/png' | 'image/jpeg' | 'image/webp'; quality?: number } = {}
 ): Promise<Blob | null> {
     const image = await createImage(imageSrc)
     const canvas = document.createElement('canvas')
@@ -80,10 +82,23 @@ export default async function getCroppedImg(
     // paste generated rotate image at the top left corner
     ctx.putImageData(data, 0, 0)
 
+    // Reducir si el recorte supera el lado máximo pedido
+    let out = canvas
+    const scale = output.maxSize ? Math.min(1, output.maxSize / Math.max(canvas.width, canvas.height)) : 1
+    if (scale < 1) {
+        out = document.createElement('canvas')
+        out.width = Math.round(canvas.width * scale)
+        out.height = Math.round(canvas.height * scale)
+        const octx = out.getContext('2d')
+        if (!octx) return null
+        octx.imageSmoothingQuality = 'high'
+        octx.drawImage(canvas, 0, 0, out.width, out.height)
+    }
+
     // As a blob
-    return new Promise((resolve, reject) => {
-        canvas.toBlob((file) => {
+    return new Promise((resolve) => {
+        out.toBlob((file) => {
             resolve(file)
-        }, 'image/png')
+        }, output.type || 'image/png', output.quality)
     })
 }

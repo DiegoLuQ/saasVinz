@@ -2,8 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, Eye, Trash2, Loader2, Search, ImageIcon, X, ChevronLeft, ChevronRight, Sparkles, LayoutTemplate, Heart } from 'lucide-react';
+import { Download, Eye, Trash2, Loader2, Search, ImageIcon, X, ChevronLeft, ChevronRight, Sparkles, LayoutTemplate, Heart, PawPrint } from 'lucide-react';
 import { deleteTemplateExport, listTemplateExports, type TemplateExport } from '@/lib/tenant/imageTemplates';
+import AssignPetModal from './AssignPetModal';
 import { getImageUrl } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { RecipeDesignView, isRecipeDesign, useDesignDownload } from './RecipeDesign';
@@ -33,6 +34,7 @@ export default function MyDesigns({ canDelete }: { canDelete: boolean }) {
     const [kind, setKind] = useState<'' | 'design' | 'illustration' | 'digital'>('');
     const [preview, setPreview] = useState<TemplateExport | null>(null);
     const [toDelete, setToDelete] = useState<TemplateExport | null>(null);
+    const [assigning, setAssigning] = useState<TemplateExport | null>(null);
 
     useEffect(() => {
         const t = setTimeout(() => { setSearch(query.trim()); setPage(1); }, 350);
@@ -108,6 +110,13 @@ export default function MyDesigns({ canDelete }: { canDelete: boolean }) {
                             <div className="p-3">
                                 <p className="text-sm font-bold text-slate-900 dark:text-white truncate" title={d.title}>{d.title}</p>
                                 <p className="text-[11px] text-slate-500 dark:text-slate-400">{new Date(d.created_at).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                                {/* Sin mascota no aparece en ninguna orden: se puede asignar aquí */}
+                                {d.pet_id == null && (
+                                    <button onClick={() => setAssigning(d)}
+                                        className="mt-2 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-dashed border-amber-400/70 bg-amber-50 text-amber-800 hover:bg-amber-100 text-xs font-bold dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/40 dark:hover:bg-amber-500/20">
+                                        <PawPrint size={13} /> Asignar a mascota
+                                    </button>
+                                )}
                                 <div className="flex gap-1.5 mt-2.5">
                                     <button onClick={() => download(d)} disabled={downloading === d.id}
                                         className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 text-xs font-bold disabled:opacity-50">
@@ -117,6 +126,12 @@ export default function MyDesigns({ canDelete }: { canDelete: boolean }) {
                                         className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10">
                                         <Eye size={14} />
                                     </button>
+                                    {d.pet_id != null && (
+                                        <button onClick={() => setAssigning(d)} title="Cambiar mascota" aria-label="Cambiar mascota"
+                                            className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10">
+                                            <PawPrint size={14} />
+                                        </button>
+                                    )}
                                     {canDelete && (
                                         <button onClick={() => setToDelete(d)} title="Eliminar" aria-label="Eliminar"
                                             className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-red-500/15 dark:hover:text-red-400">
@@ -164,6 +179,7 @@ export default function MyDesigns({ canDelete }: { canDelete: boolean }) {
                 </div>
             )}
 
+            {assigning && <AssignPetModal item={assigning} onClose={() => setAssigning(null)} />}
             {downloadNode}
 
             {toDelete && (

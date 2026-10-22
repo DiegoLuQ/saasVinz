@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DEFAULT_FORM_CONFIG, fieldSuffix, formatCLP, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
+import { DEFAULT_FORM_CONFIG, fieldLabel, fieldSuffix, formatCLP, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
 
 export interface PetData {
     name: string;
@@ -102,7 +102,7 @@ export default function PetInfoStep({ data, updateData, errors, formConfig = DEF
                     </div>
                     {f.nickname.visible && (
                         <div>
-                            <label className={LABEL}>Cómo le decían{fieldSuffix(f.nickname)}</label>
+                            <label className={LABEL}>{fieldLabel(f.nickname, 'Cómo le decían')}{fieldSuffix(f.nickname)}</label>
                             <input
                                 type="text"
                                 value={data.nickname || ''}
@@ -135,7 +135,7 @@ export default function PetInfoStep({ data, updateData, errors, formConfig = DEF
                     </div>
                     {f.breed.visible && (
                         <div>
-                            <label className={LABEL}>Raza{fieldSuffix(f.breed)}</label>
+                            <label className={LABEL}>{fieldLabel(f.breed, 'Raza')}{fieldSuffix(f.breed)}</label>
                             <input
                                 type="text"
                                 value={data.breed || ''}
@@ -153,7 +153,7 @@ export default function PetInfoStep({ data, updateData, errors, formConfig = DEF
                 {f.weight.visible && (
                 <div>
                     <div className="flex items-center justify-between mb-2 px-1">
-                        <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tamaño / Peso{fieldSuffix(f.weight)}</label>
+                        <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{fieldLabel(f.weight, 'Tamaño / Peso')}{fieldSuffix(f.weight)}</label>
                         <button
                             type="button"
                             onClick={toggleExactWeight}
@@ -215,7 +215,7 @@ export default function PetInfoStep({ data, updateData, errors, formConfig = DEF
 
                 {f.age.visible && (
                 <div>
-                    <label className={LABEL}>Edad (años){fieldSuffix(f.age)}</label>
+                    <label className={LABEL}>{fieldLabel(f.age, 'Edad (años)')}{fieldSuffix(f.age)}</label>
                     <input
                         type="text"
                         value={data.age}
@@ -232,7 +232,7 @@ export default function PetInfoStep({ data, updateData, errors, formConfig = DEF
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {f.birthDate.visible && (
                             <div>
-                                <label className={LABEL}>Nacimiento{fieldSuffix(f.birthDate)}</label>
+                                <label className={LABEL}>{fieldLabel(f.birthDate, 'Nacimiento')}{fieldSuffix(f.birthDate)}</label>
                                 <input
                                     type="date"
                                     value={data.birthDate || ''}
@@ -244,7 +244,7 @@ export default function PetInfoStep({ data, updateData, errors, formConfig = DEF
                         )}
                         {f.deathDate.visible && (
                             <div>
-                                <label className={LABEL}>Fallecimiento{fieldSuffix(f.deathDate)}</label>
+                                <label className={LABEL}>{fieldLabel(f.deathDate, 'Fallecimiento')}{fieldSuffix(f.deathDate)}</label>
                                 <input
                                     type="date"
                                     value={data.deathDate || ''}
@@ -259,7 +259,7 @@ export default function PetInfoStep({ data, updateData, errors, formConfig = DEF
 
                 {f.healthStatus?.visible && (
                     <div>
-                        <label className={LABEL}>Estado de salud / Diagnóstico clínico{fieldSuffix(f.healthStatus)}</label>
+                        <label className={LABEL}>{fieldLabel(f.healthStatus, 'Estado de salud / Diagnóstico clínico')}{fieldSuffix(f.healthStatus)}</label>
                         <textarea
                             value={data.healthStatus || ''}
                             onChange={(e) => updateData({ healthStatus: e.target.value.slice(0, 500) })}

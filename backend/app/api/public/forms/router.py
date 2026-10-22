@@ -263,7 +263,8 @@ async def submit_public_form(
         raise HTTPException(status_code=400, detail="Datos inválidos (JSON)")
 
     # 2.1 Campos obligatorios configurados por el crematorio + tramo de peso
-    apply_form_config_to_submission(db, tenant, owner_dict, pet_dict, form_preset_id=form_preset_id)
+    apply_form_config_to_submission(db, tenant, owner_dict, pet_dict, form_preset_id=form_preset_id,
+                                    photo_count=len(validated_files))
 
     # 2.2 Si el formulario personalizado tiene un servicio/plan asociado predeterminado, asegurarlo en la orden
     if form_preset_id and tenant.form_config:

@@ -113,8 +113,8 @@ export function AutoDocumentsTab() {
 
             <div className="flex justify-end">
                 <button onClick={() => save.mutate(form)} disabled={save.isPending}
-                    className="w-full sm:w-auto justify-center flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-xl text-sm font-bold disabled:opacity-50">
-                    {save.isPending ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Guardar
+                    className="w-full sm:w-auto justify-center bg-primary text-primary-foreground font-bold py-2.5 px-7 rounded-xl flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-60 shadow-lg shadow-primary/20 cursor-pointer">
+                    {save.isPending ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} {save.isPending ? 'Guardando…' : 'Guardar cambios'}
                 </button>
             </div>
         </div>

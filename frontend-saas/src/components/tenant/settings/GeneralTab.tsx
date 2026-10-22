@@ -151,9 +151,9 @@ export function GeneralTab({ bootstrapTenant, billingInfo, onNavigateToBilling, 
             <div className="flex justify-end">
                 <button
                     onClick={handleSaveGeneral}
-                    className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-primary to-orange-600 text-white rounded-2xl font-black shadow-lg shadow-primary/30 hover:shadow-primary/50 transition-all active:scale-95">
-                    <Save size={20} />
-                    GUARDAR CAMBIOS
+                    className="w-full sm:w-auto justify-center bg-primary text-primary-foreground font-bold py-2.5 px-7 rounded-xl flex items-center gap-2 hover:opacity-90 transition-all disabled:opacity-60 shadow-lg shadow-primary/20 cursor-pointer">
+                    <Save size={18} />
+                    Guardar cambios
                 </button>
             </div>
 

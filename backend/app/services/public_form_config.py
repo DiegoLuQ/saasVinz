@@ -20,6 +20,8 @@ from app import models
 from app.services.form_video import DEFAULT_BUTTON_TEXT as VIDEO_BUTTON_TEXT, normalize_video
 
 MAX_WEIGHT_TIERS = 20
+# Nombre propio de un campo en un formulario personalizado (ej. «Dirección» en vez de «Lugar de retiro»).
+MAX_FIELD_LABEL = 40
 
 # key -> (sección, etiqueta, visible por defecto, obligatorio por defecto)
 DEFAULT_FIELDS: dict[str, tuple[str, str, bool, bool]] = {
@@ -126,6 +128,9 @@ def normalize_form_config(raw: Any) -> dict:
                         v = bool(cf_fields_raw[k].get("visible", def_v))
                         r = bool(cf_fields_raw[k].get("required", def_r)) and v
                         cf_fields[k] = {"visible": v, "required": r}
+                        label = " ".join(str(cf_fields_raw[k].get("label") or "").split())[:MAX_FIELD_LABEL]
+                        if label:
+                            cf_fields[k]["label"] = label
 
             cf_welcome_raw = cf.get("welcome_modal") if isinstance(cf.get("welcome_modal"), dict) else None
             cf_welcome = None
@@ -278,7 +283,8 @@ def apply_form_config_to_submission(
     tenant: models.Tenant, 
     owner: dict, 
     pet: dict, 
-    form_preset_id: str | None = None
+    form_preset_id: str | None = None,
+    photo_count: int = 0,
 ) -> None:
     """Valida obligatorios según la configuración del tenant y completa
     pet["size"] / pet["weightTier"] a partir del tramo elegido (snapshot del
@@ -299,8 +305,14 @@ def apply_form_config_to_submission(
                 if isinstance(cf.get("fields"), dict):
                     cfg = {**cfg, **cf["fields"]}
                 if cf.get("include_health_status"):
-                    cfg["healthStatus"] = {"visible": True, "required": True}
+                    cfg["healthStatus"] = {**cfg.get("healthStatus", {}), "visible": True, "required": True}
                 break
+
+    # Fotos (fase Recuerdos): "Al menos una foto obligatoria" se exige también aquí,
+    # no solo en el navegador. El máximo (3) lo controla enforce_max_files.
+    mem = norm["memories"]
+    if phases.get("recuerdos", True) and mem.get("allow_photos") and mem.get("require_photos") and photo_count < 1:
+        raise HTTPException(status_code=400, detail="Sube al menos una fotografía de tu mascota.")
 
     # Peso: solo si la fase de la mascota (Ángel) está activa
     if phases.get("angel", True):
@@ -357,7 +369,13 @@ def apply_form_config_to_submission(
         phase_active = (section == "owner" and phases.get("familia", True)) or \
                        (section == "pet" and phases.get("angel", True))
         if phase_active and c["required"] and not present[k]:
-            missing.append(DEFAULT_FIELDS[k][1])
+            missing.append(c.get("label") or DEFAULT_FIELDS[k][1])
 
     if missing:
         raise HTTPException(status_code=400, detail=f"Faltan campos obligatorios: {', '.join(missing)}")
+
+    # Nombres propios del formulario usado: el detalle del registro los muestra igual
+    # que los vio la familia (ej. «Dirección» en vez de «Lugar de retiro»).
+    labels = {k: c["label"] for k, c in cfg.items() if c.get("label")}
+    if labels:
+        owner["formLabels"] = labels

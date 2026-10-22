@@ -333,7 +333,7 @@ export function useTenantForm(
             fields: {
                 ...base.fields,
                 ...(matched.fields || {}),
-                healthStatus: matched.include_health_status ? { visible: true, required: true } : (matched.fields?.healthStatus || base.fields.healthStatus),
+                healthStatus: matched.include_health_status ? { visible: true, required: true, label: matched.fields?.healthStatus?.label } : (matched.fields?.healthStatus || base.fields.healthStatus),
             },
             delivery_notice: matched.delivery_notice || base.delivery_notice,
             welcome_modal: mergeWelcomeModal(base.welcome_modal, matched.welcome_modal),

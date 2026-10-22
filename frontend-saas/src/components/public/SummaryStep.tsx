@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { User, PawPrint, Package, Heart, Pencil, ImageIcon, Check, Sparkles, Gem, ChevronDown, Camera, Eye, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import FarewellPreview from '@/app/(tenant)/tenant/dashboard/documentos/disenos/components/FarewellPreview';
-import { DEFAULT_FORM_CONFIG, formatCLP, tierDisplay, tierForWeight, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
+import { DEFAULT_FORM_CONFIG, fieldLabel, formatCLP, tierDisplay, tierForWeight, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
 
 interface OwnerData {
     fullName: string;
@@ -313,26 +313,26 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
                 <SectionCard icon={User} title="Datos de la Familia" step="familia" onEdit={onEditStep}>
                     <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
                         <DataRow label="Nombre" value={ownerData.fullName} />
-                        {f.email.visible && ownerData.email && <DataRow label="Email" value={ownerData.email} />}
+                        {f.email.visible && ownerData.email && <DataRow label={fieldLabel(f.email, 'Email')} value={ownerData.email} />}
                         <DataRow label="Teléfono" value={ownerData.phone} />
-                        {f.rut.visible && ownerData.rut && <DataRow label="RUT" value={ownerData.rut} />}
+                        {f.rut.visible && ownerData.rut && <DataRow label={fieldLabel(f.rut, 'RUT')} value={ownerData.rut} />}
                         {/* Retiro y entrega con la misma estructura: dirección, comuna, región */}
                         {f.pickup.visible && ownerData.veterinary && !sameAddress && (
                             <DataRow
-                                label="Lugar de Retiro"
+                                label={fieldLabel(f.pickup, 'Lugar de Retiro')}
                                 value={[ownerData.veterinary, ownerData.pickupCommune, ownerData.pickupRegion].filter(Boolean).join(', ')}
                             />
                         )}
                         {f.address.visible && (
                             <DataRow
-                                label={sameAddress ? 'Retiro y Entrega' : 'Dirección Entrega'}
+                                label={sameAddress ? 'Retiro y Entrega' : fieldLabel(f.address, 'Dirección Entrega')}
                                 value={[ownerData.address, ownerData.commune, ownerData.region].filter(Boolean).join(', ')}
                             />
                         )}
                         {f.contactPreference.visible && ownerData.contactPreference && (
-                            <DataRow label="Contacto" value={CONTACT_LABELS[ownerData.contactPreference] || ownerData.contactPreference} />
+                            <DataRow label={fieldLabel(f.contactPreference, 'Contacto')} value={CONTACT_LABELS[ownerData.contactPreference] || ownerData.contactPreference} />
                         )}
-                        {f.comments.visible && ownerData.comments && <DataRow label="Comentarios" value={ownerData.comments} />}
+                        {f.comments.visible && ownerData.comments && <DataRow label={fieldLabel(f.comments, 'Comentarios')} value={ownerData.comments} />}
                     </div>
                 </SectionCard>
             )}
@@ -342,16 +342,16 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
                 <SectionCard icon={PawPrint} title="Tu Angelito" step="angel" onEdit={onEditStep}>
                     <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
                         <DataRow label="Nombre" value={petData.name} />
-                        {f.nickname.visible && petData.nickname && <DataRow label="Apodo" value={petData.nickname} />}
+                        {f.nickname.visible && petData.nickname && <DataRow label={fieldLabel(f.nickname, 'Apodo')} value={petData.nickname} />}
                         <DataRow label="Especie" value={petData.type} />
-                        {f.breed.visible && petData.breed && <DataRow label="Raza" value={petData.breed} />}
-                        {f.age.visible && <DataRow label="Edad" value={petData.age ? `${petData.age} años` : undefined} />}
-                        {f.weight.visible && tierText && <DataRow label="Peso" value={tierText} />}
+                        {f.breed.visible && petData.breed && <DataRow label={fieldLabel(f.breed, 'Raza')} value={petData.breed} />}
+                        {f.age.visible && <DataRow label={fieldLabel(f.age, 'Edad')} value={petData.age ? `${petData.age} años` : undefined} />}
+                        {f.weight.visible && tierText && <DataRow label={fieldLabel(f.weight, 'Peso')} value={tierText} />}
                         {f.weight.visible && !tier && weightTiers.length === 0 && petData.weightRange && <DataRow label="Peso" value={WEIGHT_LABELS[petData.weightRange]} />}
                         {f.weight.visible && petData.weightKg && <DataRow label="Peso exacto" value={`${petData.weightKg} kg`} />}
-                        {f.healthStatus?.visible && petData.healthStatus && <DataRow label="Estado de salud" value={petData.healthStatus} />}
-                        {f.birthDate.visible && petData.birthDate && <DataRow label="Nacimiento" value={formatDate(petData.birthDate)} />}
-                        {f.deathDate.visible && petData.deathDate && <DataRow label="Fallecimiento" value={formatDate(petData.deathDate)} />}
+                        {f.healthStatus?.visible && petData.healthStatus && <DataRow label={fieldLabel(f.healthStatus, 'Estado de salud')} value={petData.healthStatus} />}
+                        {f.birthDate.visible && petData.birthDate && <DataRow label={fieldLabel(f.birthDate, 'Nacimiento')} value={formatDate(petData.birthDate)} />}
+                        {f.deathDate.visible && petData.deathDate && <DataRow label={fieldLabel(f.deathDate, 'Fallecimiento')} value={formatDate(petData.deathDate)} />}
                     </div>
                 </SectionCard>
             )}

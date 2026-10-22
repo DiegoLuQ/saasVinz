@@ -41,6 +41,7 @@ import CondolenceModal from '@/components/public/CondolenceModal';
 import WelcomeVideoField, { uploadPendingVideo } from './WelcomeVideoField';
 import {
     formatCLP,
+    MAX_FIELD_LABEL,
     type PhaseConfig,
     type MemoriesConfig,
     type CustomFormPreset,
@@ -73,6 +74,8 @@ interface FieldRow {
     label: string;
     visible: boolean;
     required: boolean;
+    /** Nombre propio en un formulario personalizado (vacío = el de siempre). */
+    customLabel?: string;
 }
 
 interface TierRow {
@@ -568,12 +571,13 @@ export function PublicFormTab() {
                     ...f,
                     visible: vis,
                     required: Boolean(override.required) && vis,
+                    customLabel: override.label || '',
                 };
             }
             if (f.key === 'healthStatus' && preset.include_health_status) {
                 return { ...f, visible: true, required: true };
             }
-            return { ...f };
+            return { ...f, customLabel: '' };
         });
         setPresetFields(initializedFields);
         setPresetSectionTab('owner');
@@ -639,6 +643,7 @@ export function PublicFormTab() {
             presetFieldsMap[f.key as FormFieldKey] = {
                 visible: f.visible,
                 required: f.required && f.visible,
+                ...(f.customLabel?.trim() ? { label: f.customLabel.trim().slice(0, MAX_FIELD_LABEL) } : {}),
             };
         });
 
@@ -1020,7 +1025,7 @@ export function PublicFormTab() {
                                             <div>
                                                 <p className="text-sm font-medium text-white">Subida de fotos de la mascota</p>
                                                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                                                    Permite a la familia adjuntar hasta 5 fotos para enmarcar su recuerdo y generar la tarjeta conmemorativa.
+                                                    Permite a la familia adjuntar de 1 a 3 fotos para enmarcar su recuerdo y generar la tarjeta conmemorativa. Se recortan en cuadrado y se optimizan automáticamente.
                                                 </p>
                                             </div>
                                         </div>
@@ -2089,6 +2094,17 @@ export function PublicFormTab() {
                                                                 <p className={`text-[10px] mt-0.5 ${statusClass}`}>
                                                                     {status}
                                                                 </p>
+                                                                {f.visible && (
+                                                                    <input
+                                                                        type="text"
+                                                                        value={f.customLabel || ''}
+                                                                        onChange={e => updatePresetField(f.key, { customLabel: e.target.value })}
+                                                                        maxLength={MAX_FIELD_LABEL}
+                                                                        placeholder={`Nombre en este formulario (ej. ${f.key === 'pickup' ? 'Dirección' : f.label})`}
+                                                                        aria-label={`Nombre de ${f.label} en este formulario`}
+                                                                        className="mt-1.5 w-full max-w-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-[11px] text-slate-900 dark:text-white placeholder:text-slate-400 rounded-lg py-1.5 px-2.5 outline-none focus:border-violet-600"
+                                                                    />
+                                                                )}
                                                             </div>
                                                             <div className="flex justify-center">
                                                                 <Toggle

@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.api.deps import get_tenant_id
+from app.api.internal.admin.rbac.router import check_permission
 from app.api.internal.admin.image_templates.schemas import ImageTemplateInDB, AiTextResult, AiImageResult, SavedImageResult
 from app.auth import get_current_user
 from app.core.rate_limiter import limiter
@@ -583,6 +584,34 @@ async def upload_export(
     db.add(row)
     db.commit()
     return {"id": row.id, "url": url}
+
+
+class ExportPetIn(BaseModel):
+    pet_id: Optional[int] = None
+
+
+@router.patch("/exports/{export_id}")
+def assign_export_pet(
+    export_id: int,
+    payload: ExportPetIn,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    _perm: bool = Depends(check_permission("mascotas", "edit")),
+):
+    """Asigna (o quita) la mascota de lo creado en Diseños para Redes: así aparece
+    en las órdenes de esa mascota (lateral de Recepción y Pedidos, registros)."""
+    row = db.query(models.TemplateExport).filter(
+        models.TemplateExport.id == export_id, models.TemplateExport.tenant_id == tenant_id,
+    ).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Diseño no encontrado")
+    pet = _pet(db, tenant_id, payload.pet_id)
+    row.pet_id = pet.id if pet else None
+    # El título termina en «· <mascota>»: se actualiza con la nueva.
+    base = row.title.rsplit(" · ", 1)[0] if " · " in (row.title or "") else (row.title or "Diseño")
+    row.title = f"{base} · {pet.name if pet else 'sin mascota'}"[:250]
+    db.commit()
+    return {"id": row.id, "pet_id": row.pet_id, "title": row.title}
 
 
 @router.delete("/exports/{export_id}")

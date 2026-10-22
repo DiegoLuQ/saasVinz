@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { formatRut } from '@/lib/formatters';
 import { ChevronDown, MessageCircle, Phone, Sparkles, MapPin } from 'lucide-react';
 import { Country, State, City } from 'country-state-city';
-import { DEFAULT_FORM_CONFIG, fieldSuffix, type PublicFormConfig } from '@/lib/publicFormConfig';
+import { DEFAULT_FORM_CONFIG, fieldLabel, fieldSuffix, type PublicFormConfig } from '@/lib/publicFormConfig';
 
 export interface OwnerData {
     fullName: string;
@@ -273,7 +273,7 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                     <div className={`grid grid-cols-1 gap-5 ${f.rut.visible && f.email.visible ? 'sm:grid-cols-2' : ''}`}>
                         {f.rut.visible && (
                             <div>
-                                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">RUT{fieldSuffix(f.rut)}</label>
+                                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">{fieldLabel(f.rut, 'RUT')}{fieldSuffix(f.rut)}</label>
                                 <input
                                     type="text"
                                     value={data.rut || ''}
@@ -287,7 +287,7 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                         )}
                         {f.email.visible && (
                             <div>
-                                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Email{fieldSuffix(f.email)}</label>
+                                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">{fieldLabel(f.email, 'Email')}{fieldSuffix(f.email)}</label>
                                 <input
                                     type="email"
                                     value={data.email || ''}
@@ -336,7 +336,7 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                 {/* Preferencia de contacto */}
                 {f.contactPreference.visible && (
                 <div className="pt-2">
-                    <label className="block text-xs font-semibold text-slate-400 dark:text-slate-500 ml-1 mb-3">¿Cómo prefieres que te contactemos?{f.contactPreference.required ? ' *' : ''}</label>
+                    <label className="block text-xs font-semibold text-slate-400 dark:text-slate-500 ml-1 mb-3">{fieldLabel(f.contactPreference, '¿Cómo prefieres que te contactemos?')}{f.contactPreference.required ? ' *' : ''}</label>
                     <div className="grid grid-cols-3 gap-3">
                         {CONTACT_OPTIONS.map(opt => {
                             const isSelected = data.contactPreference === opt.value;
@@ -372,7 +372,7 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                             <Sparkles size={16} className="text-amber-600 dark:text-amber-400" />
                         </div>
                         <div>
-                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">{sameAddress ? 'Dirección de Retiro y Entrega' : 'Lugar de Retiro'}</h3>
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">{sameAddress ? 'Dirección de Retiro y Entrega' : fieldLabel(f.pickup, 'Lugar de Retiro')}</h3>
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">
                                 {sameAddress ? 'Retiramos a tu mascota y entregamos las cenizas aquí' : '¿Dónde se encuentra ahora tu mascota?'}
                             </p>
@@ -403,7 +403,7 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                     ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                         <div className="sm:col-span-2">
-                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Dirección o Lugar de Retiro{fieldSuffix(f.pickup)}</label>
+                            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">{fieldLabel(f.pickup, 'Dirección o Lugar de Retiro')}{fieldSuffix(f.pickup)}</label>
                             <input
                                 type="text"
                                 value={data.veterinary || ''}
@@ -474,7 +474,7 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                             <MapPin size={16} className="text-emerald-600 dark:text-emerald-400" />
                         </div>
                         <div>
-                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">Dirección de Entrega</h3>
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">{fieldLabel(f.address, 'Dirección de Entrega')}</h3>
                             <p className="text-[10px] text-slate-400 dark:text-slate-500">¿Dónde llevaremos las cenizas?</p>
                         </div>
                     </div>
@@ -499,7 +499,7 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
 
                 {f.comments.visible && (
                 <div className={showDeliveryAddress ? 'pt-4 border-t border-slate-50 dark:border-slate-800/50' : ''}>
-                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">Comentarios / Referencias{fieldSuffix(f.comments)}</label>
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">{fieldLabel(f.comments, 'Comentarios / Referencias')}{fieldSuffix(f.comments)}</label>
                     <textarea
                         value={data.comments || ''}
                         onChange={(e) => updateData({ comments: e.target.value.slice(0, 250) })}

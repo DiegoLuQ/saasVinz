@@ -452,7 +452,7 @@ export default function SubmissionDetailPage() {
                                         <p className="text-sm font-semibold text-foreground/90 mt-1 capitalize">{submission.pet_data?.type}</p>
                                     </div>
                                     <div>
-                                        <p className="text-[10px] text-muted-foreground uppercase font-black">Raza</p>
+                                        <p className="text-[10px] text-muted-foreground uppercase font-black">{submission.owner_data?.formLabels?.breed || 'Raza'}</p>
                                         <p className="text-sm font-semibold text-foreground/90 mt-1">{submission.pet_data?.breed || 'N/A'}</p>
                                     </div>
                                 </div>
@@ -462,7 +462,7 @@ export default function SubmissionDetailPage() {
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <p className="text-[10px] text-muted-foreground uppercase font-black">Edad</p>
+                                        <p className="text-[10px] text-muted-foreground uppercase font-black">{submission.owner_data?.formLabels?.age || 'Edad'}</p>
                                         <p className="text-sm font-semibold text-foreground/90 mt-1">{submission.pet_data?.age} años</p>
                                     </div>
                                     <div>
@@ -471,7 +471,7 @@ export default function SubmissionDetailPage() {
                                     </div>
                                 </div>
                                 <div>
-                                    <p className="text-[10px] text-muted-foreground uppercase font-black">Fallecimiento</p>
+                                    <p className="text-[10px] text-muted-foreground uppercase font-black">{submission.owner_data?.formLabels?.deathDate || 'Fallecimiento'}</p>
                                     <p className="text-sm font-semibold text-foreground/90 mt-1">{submission.pet_data?.deathDate || 'N/A'}</p>
                                 </div>
                             </div>
@@ -681,7 +681,7 @@ export default function SubmissionDetailPage() {
                                 <div>
                                     <p className="text-[10px] text-muted-foreground uppercase font-black flex items-center gap-1.5">
                                         <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                                        Dirección / Lugar de Retiro
+                                        {submission.owner_data?.formLabels?.pickup || 'Dirección / Lugar de Retiro'}
                                     </p>
                                     <p className="text-sm font-semibold text-foreground mt-1">
                                         {submission.owner_data?.veterinary
@@ -696,7 +696,7 @@ export default function SubmissionDetailPage() {
                                 <div>
                                     <p className="text-[10px] text-muted-foreground uppercase font-black flex items-center gap-1.5">
                                         <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                                        Dirección de Entrega (Cenizas)
+                                        {submission.owner_data?.formLabels?.address || 'Dirección de Entrega (Cenizas)'}
                                     </p>
                                     <p className="text-sm font-semibold text-foreground mt-1">
                                         {submission.owner_data?.address
@@ -708,7 +708,7 @@ export default function SubmissionDetailPage() {
                                 {/* Comentarios / Referencias */}
                                 {submission.owner_data?.comments && (
                                     <div>
-                                        <p className="text-[10px] text-muted-foreground uppercase font-black">Comentarios / Referencias</p>
+                                        <p className="text-[10px] text-muted-foreground uppercase font-black">{submission.owner_data?.formLabels?.comments || 'Comentarios / Referencias'}</p>
                                         <p className="text-sm font-semibold text-foreground/90 mt-1 whitespace-pre-wrap leading-relaxed">{submission.owner_data.comments}</p>
                                     </div>
                                 )}

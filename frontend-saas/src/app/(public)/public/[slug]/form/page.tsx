@@ -31,7 +31,7 @@ import html2canvas from 'html2canvas';
 
 // Hook
 import { useTenantForm } from '@/hooks/useTenantForm';
-import { formatCLP } from '@/lib/publicFormConfig';
+import { fieldLabel, formatCLP } from '@/lib/publicFormConfig';
 import { useEmbedAutoHeight, postToEmbedParent } from '@/hooks/useEmbedAutoHeight';
 
 // Components
@@ -233,21 +233,21 @@ export default function TenantFormPage() {
             '',
             '👤 *DATOS DEL TUTOR*',
             line('Nombre', ownerData.fullName),
-            line('RUT', ownerData.rut),
+            line(fieldLabel(formConfig.fields.rut, 'RUT'), ownerData.rut),
             line('Celular', ownerData.phone),
-            line('Email', ownerData.email),
+            line(fieldLabel(formConfig.fields.email, 'Email'), ownerData.email),
             line('Prefiere contacto por', contactLabel),
             '',
             '🐶 *DATOS DE LA MASCOTA*',
             line('Nombre', petData.name),
             line('Especie', petData.type ? `${petData.type}${petData.breed ? ` (${petData.breed})` : ''}` : ''),
-            line('Edad', petData.age ? `${petData.age} años` : ''),
-            line('Peso', tierText || (petData.weightKg ? `${petData.weightKg} kg` : '')),
-            line('Fecha de fallecimiento', petData.deathDate),
+            line(fieldLabel(formConfig.fields.age, 'Edad'), petData.age ? `${petData.age} años` : ''),
+            line(fieldLabel(formConfig.fields.weight, 'Peso'), tierText || (petData.weightKg ? `${petData.weightKg} kg` : '')),
+            line(fieldLabel(formConfig.fields.deathDate, 'Fecha de fallecimiento'), petData.deathDate),
             '',
             '📍 *DIRECCIONES*',
-            line('Retiro', pickupAddr || 'Por coordinar'),
-            line('Entrega', deliveryAddr || 'Por coordinar'),
+            formConfig.fields.pickup.visible ? line(fieldLabel(formConfig.fields.pickup, 'Retiro'), pickupAddr || 'Por coordinar') : null,
+            formConfig.fields.address.visible ? line(fieldLabel(formConfig.fields.address, 'Entrega'), deliveryAddr || 'Por coordinar') : null,
             ...(chosenPlans.length ? ['', '📦 *PLAN ELEGIDO*', ...chosenPlans] : []),
             ...(chosenExtras.length ? ['', '➕ *SERVICIOS ADICIONALES*', ...chosenExtras] : []),
             ...(ownerData.comments?.trim() ? ['', '📝 *COMENTARIOS*', ownerData.comments.trim()] : []),
