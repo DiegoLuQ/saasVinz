@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
     Mail, Lock, LogIn, ShieldCheck, MessageCircle, Compass, FileCheck2, HeartHandshake,
@@ -230,6 +231,12 @@ export default function LoginPage() {
                             )}
                         </button>
                     </form>
+
+                    <p className="mt-4 text-center">
+                        <Link href="/olvide-contrasena" className="text-sm font-semibold text-primary hover:underline">
+                            ¿Olvidaste tu contraseña?
+                        </Link>
+                    </p>
 
                     <div className="mt-8 text-center lg:text-left space-y-3">
                         <p className="text-sm text-muted-foreground">

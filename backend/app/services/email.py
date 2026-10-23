@@ -197,14 +197,23 @@ async def send_demo_lead_email(data: DemoLeadData):
 
 async def send_vet_password_reset_email(to_email: str, vet_name: str, reset_url: str) -> None:
     """Enlace para restablecer la contraseña del portal veterinario (vence en 30 min)."""
+    await send_password_reset_email(
+        to_email, vet_name, reset_url,
+        portal="Portal Veterinario", subject="Restablece tu contraseña del Portal Veterinario",
+    )
+
+
+async def send_password_reset_email(to_email: str, user_name: str, reset_url: str, *, portal: str, subject: str) -> None:
+    """Enlace para restablecer la contraseña (vence en 30 min, uso único)."""
     import html as _html
-    name = _html.escape(vet_name or "")
+    name = _html.escape(user_name or "")
     url = _html.escape(reset_url, quote=True)
+    portal_label = _html.escape(portal)
     html_body = f"""
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 560px; margin: 0 auto; background: #fafafa; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0;">
         <div style="background: linear-gradient(135deg, #0f172a, #14b8a6); padding: 28px 24px; text-align: center;">
             <h1 style="color: #ffffff; font-size: 20px; margin: 0;">Restablecer contraseña</h1>
-            <p style="color: #ccfbf1; font-size: 13px; margin: 6px 0 0 0;">Portal Veterinario</p>
+            <p style="color: #ccfbf1; font-size: 13px; margin: 6px 0 0 0;">{portal_label}</p>
         </div>
         <div style="padding: 28px 24px; color: #0f172a; font-size: 14px; line-height: 1.6;">
             <p style="margin: 0 0 16px 0;">Hola {name},</p>
@@ -217,7 +226,7 @@ async def send_vet_password_reset_email(to_email: str, vet_name: str, reset_url:
     </div>
     """
     message = MessageSchema(
-        subject="Restablece tu contraseña del Portal Veterinario",
+        subject=subject,
         recipients=[to_email],
         body=html_body,
         subtype=MessageType.html,

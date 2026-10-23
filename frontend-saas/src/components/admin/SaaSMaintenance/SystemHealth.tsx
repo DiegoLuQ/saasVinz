@@ -22,7 +22,8 @@ export default function SystemHealth() {
             // Check API
             const apiResp = await fetch('/api/internal/health');
             const apiOk = apiResp.ok;
-            const data = apiOk ? await apiResp.json() : null;
+            // 503 = algo falla (BD o Redis): el cuerpo igual trae el detalle.
+            const data = await apiResp.json().catch(() => null);
 
             setStatus({
                 api: data?.api || (apiOk ? 'active' : 'error'),

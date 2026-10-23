@@ -6,6 +6,10 @@ console.log('Next.js API Proxy Destination:', API_URL);
 const nextConfig: NextConfig = {
   /* config options here */
   output: 'standalone', // Required for the optimized Dockerfile
+  // Sentry del servidor se carga desde node_modules y no se empaqueta: empaquetado
+  // genera un chunk llamado "node:inspector" y en Windows ':' no es válido en un
+  // nombre de archivo (el build standalone fallaba al copiarlo).
+  serverExternalPackages: ['@sentry/node', '@sentry/nextjs'],
   // Orígenes cross-domain permitidos para pedir recursos /_next/* en DEV.
   // Solo aplica a `next dev` (con subdominios lvh.me); en producción no se usa.
   allowedDevOrigins: [

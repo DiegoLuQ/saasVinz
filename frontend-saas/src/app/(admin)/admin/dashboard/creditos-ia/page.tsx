@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     Coins, BarChart3, Wallet, History, Settings2, Gift, Loader2, X, CheckCircle2, AlertCircle, Save, ChevronLeft, ChevronRight,
-    Inbox, Check, RefreshCw, Server, AlertTriangle,
+    Inbox, Check, RefreshCw, Server, AlertTriangle, Bell,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/admin/api';
 import GrantCreditsModal from '@/components/admin/aiCredits/GrantCreditsModal';
@@ -203,7 +203,7 @@ interface ProviderBalance {
 const PROVIDER_LABEL: Record<string, string> = { openrouter: 'OpenRouter', gemini: 'Google Gemini', anthropic: 'Claude', openai: 'ChatGPT', deepseek: 'DeepSeek' };
 
 function ProviderBalances() {
-    const { data, isLoading, isFetching, refetch, error } = useQuery<{ items: ProviderBalance[]; checked_at: string }>({
+    const { data, isLoading, isFetching, refetch, error } = useQuery<{ items: ProviderBalance[]; checked_at: string; alert_usd: number | null }>({
         queryKey: ['admin', 'ai-credits', 'provider-balances'],
         queryFn: () => apiRequest(`${BASE}/provider-balances`),
         staleTime: 60_000,
@@ -238,7 +238,7 @@ function ProviderBalances() {
                         const usable = acc ? Math.min(acc.remaining_usd, b.key_limit?.remaining_usd ?? Infinity) : null;
                         const pctUsed = acc && acc.total_usd > 0 ? Math.min(100, (acc.used_usd / acc.total_usd) * 100) : 0;
                         const images = usable != null && b.avg_image_cost_usd ? Math.floor(usable / b.avg_image_cost_usd) : null;
-                        const low = usable != null && usable < 1;
+                        const low = usable != null && usable < (data.alert_usd || 1);
                         return (
                             <div key={`${b.provider}${b.key_hint}`} className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
                                 <div className="flex items-start justify-between gap-2">
@@ -293,6 +293,54 @@ function ProviderBalances() {
                     })}
                 </div>
             )}
+
+            {data && <BalanceAlertField current={data.alert_usd} />}
+        </div>
+    );
+}
+
+/** Umbral del aviso automático de saldo bajo (correo + notificación, revisado cada 6 h). */
+function BalanceAlertField({ current }: { current: number | null }) {
+    const qc = useQueryClient();
+    const [value, setValue] = useState(current != null ? String(current) : '');
+    const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+    const save = useMutation({
+        mutationFn: () => {
+            const n = value.trim() === '' ? null : Number(value.replace(',', '.'));
+            if (n != null && (!Number.isFinite(n) || n < 0)) throw new Error('Ingresa un monto válido');
+            return apiRequest(`${BASE}/balance-alert`, { method: 'PUT', body: { alert_usd: n } });
+        },
+        onSuccess: (res: { alert_usd: number | null; alerts_sent: unknown[] }) => {
+            qc.invalidateQueries({ queryKey: ['admin', 'ai-credits', 'provider-balances'] });
+            setMsg({
+                ok: true,
+                text: !res.alert_usd ? 'Aviso desactivado.'
+                    : res.alerts_sent.length ? 'Guardado. El saldo ya está bajo ese monto: te enviamos el aviso.'
+                    : 'Guardado. Te avisaremos cuando baje de ese monto.',
+            });
+        },
+        onError: (e: Error) => setMsg({ ok: false, text: e.message }),
+    });
+
+    return (
+        <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-white/10">
+            <Bell size={15} className="text-amber-300 shrink-0" />
+            <label htmlFor="balance-alert" className="text-xs text-white/70">
+                Avisarme por correo cuando queden menos de
+            </label>
+            <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-white/50">USD</span>
+                <input id="balance-alert" type="text" inputMode="decimal" value={value} placeholder="Sin aviso"
+                    onChange={(e) => { setValue(e.target.value); setMsg(null); }}
+                    className={`${inputCls} w-24`} />
+            </div>
+            <button onClick={() => save.mutate()} disabled={save.isPending}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-white text-xs font-bold disabled:opacity-50">
+                {save.isPending ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Guardar
+            </button>
+            <p className={`basis-full text-[11px] ${msg ? (msg.ok ? 'text-emerald-300' : 'text-red-300') : 'text-white/40'}`}>
+                {msg?.text || 'Se revisa cada 6 horas. Llega al «Correo para recibir mensajes» (Datos del SaaS) y como notificación del admin; también avisa si la clave deja de responder. Vacío = sin aviso.'}
+            </p>
         </div>
     );
 }

@@ -127,6 +127,13 @@ class Settings(BaseSettings):
     # URL del portal veterinario (enlaces de correo). Vacío = se deriva de
     # FRONTEND_URL anteponiendo el subdominio "veterinary.".
     VETERINARY_PORTAL_URL: str = ""
+    # URL del panel de los crematorios (enlaces de los correos). Vacío = se deriva
+    # de FRONTEND_URL anteponiendo el subdominio "app.".
+    TENANT_APP_URL: str = ""
+
+    # Monitoreo de errores (Sentry). Vacío = desactivado. Ver app/core/sentry.py.
+    SENTRY_DSN: str = ""
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.0
 
     class Config:
         # Buscamos el .env en la carpeta backend (subiendo desde backend/app/core)

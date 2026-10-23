@@ -11,12 +11,23 @@
 #  Todos los valores provienen del .env de la raíz.
 # =============================================================================
 
+# Logs de Docker con rotación (sin esto crecen sin límite y llenan el disco).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   # --- POSTGRESQL (BD propia del stack) ---
   postgres:
     image: postgres:16-alpine
     container_name: vinzer_postgres
     restart: unless-stopped
+    logging: *default-logging
+    # Topes de memoria (VPS de 2 GB): un proceso pesado de otro contenedor no
+    # debe dejar sin memoria a la base de datos, ni al revés.
+    mem_limit: 512m
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -44,6 +55,9 @@ services:
       dockerfile: Dockerfile
     container_name: vinzer_backend
     restart: unless-stopped
+    logging: *default-logging
+    # Holgado: ffmpeg (video de bienvenida), imágenes IA y pg_dump corren aquí.
+    mem_limit: 900m
     expose:
       - "8000"
     # Fuente ÚNICA de config: el .env de la raíz (secretos del backend incluidos).
@@ -84,11 +98,15 @@ services:
     image: redis:7-alpine
     container_name: vinzer_redis
     restart: unless-stopped
+    logging: *default-logging
+    mem_limit: 160m
     command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
     expose:
       - "6379"
+    # Solo en la red interna: Redis no tiene contraseña y no debe ser alcanzable
+    # desde la red compartida del reverse-proxy (el backend está en ambas).
     networks:
-      - web
+      - db_internal
 
   # --- FRONTEND (Next.js) ---
   frontend:
@@ -109,8 +127,12 @@ services:
         NEXT_PUBLIC_WIDGET_BASE_URL: ${NEXT_PUBLIC_WIDGET_BASE_URL}
         NEXT_PUBLIC_VINZER_URL: ${NEXT_PUBLIC_VINZER_URL}
         NEXT_PUBLIC_VINZER_SLOGAN: ${NEXT_PUBLIC_VINZER_SLOGAN}
+        # Monitoreo de errores del navegador (vacío = desactivado).
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
     container_name: vinzer_frontend
     restart: unless-stopped
+    logging: *default-logging
+    mem_limit: 512m
     expose:
       - "3000"
     environment:
@@ -127,6 +149,8 @@ services:
     image: dpage/pgadmin4:latest
     container_name: vinzer_pgadmin
     restart: unless-stopped
+    logging: *default-logging
+    mem_limit: 256m
     expose:
       - "80"
     environment:

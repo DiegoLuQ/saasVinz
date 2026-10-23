@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { apiRequest, getImageUrl } from '@/lib/admin/api';
 import ImageCropper from '@/components/tenant/ImageCropper';
+import LibraryPickerModal from '@/components/admin/imageTemplates/LibraryPickerModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CertFrame, FRAME_COLOR_LIST, frameActive, frameWrapperStyle, frameInnerInsetPct, frameImageMaskStyle } from '@/lib/certFrame';
 import { TextBg, TEXT_BG_DEFAULTS, textBgActive, textBgStyle, resolveTextBg } from '@/lib/certText';
@@ -343,6 +344,8 @@ function EditorImagenContent() {
     const [bgPreview, setBgPreview] = useState<string | null>(null);
     const [pendingBgBlob, setPendingBgBlob] = useState<Blob | null>(null);
     const [cropImage, setCropImage] = useState<string | null>(null);
+    // Elegir un fondo ya subido a la Biblioteca de Medios (no se vuelve a subir).
+    const [bgLibraryOpen, setBgLibraryOpen] = useState(false);
 
     const [loading, setLoading] = useState(!!templateId);
     const [saving, setSaving] = useState(false);
@@ -575,13 +578,24 @@ function EditorImagenContent() {
     };
 
     // --- Imagen de fondo --------------------------------------------------
-    const handleBgSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+    const openCropper = (file: File) => {
         const reader = new FileReader();
         reader.onload = () => setCropImage(reader.result as string);
         reader.readAsDataURL(file);
+    };
+
+    const handleBgSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        openCropper(file);
         e.target.value = '';
+    };
+
+    // Imagen de la biblioteca: se usa tal cual (se ve con background-size: cover).
+    const handleBgFromLibrary = (url: string) => {
+        setSavedBgUrl(url);
+        setPendingBgBlob(null);
+        setBgPreview(null);
     };
 
     const handleCropComplete = (blob: Blob) => {
@@ -914,10 +928,19 @@ function EditorImagenContent() {
                                 <ImageIcon size={48} className="text-white/10 mb-4" />
                                 <h3 className="text-white font-black mb-2">Sube una imagen de fondo</h3>
                                 <p className="text-white/30 text-sm mb-6 max-w-sm">Elige una imagen en proporción {aspectRatio}. Luego podrás arrastrar los campos encima.</p>
-                                <label className="cursor-pointer bg-primary hover:bg-primary/90 text-white text-xs font-black uppercase py-3 px-6 rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center gap-2">
-                                    <Upload size={16} /> Subir Imagen
-                                    <input type="file" className="hidden" accept="image/*" onChange={handleBgSelect} />
-                                </label>
+                                <div className="flex flex-wrap items-center justify-center gap-3">
+                                    <label className="cursor-pointer bg-primary hover:bg-primary/90 text-white text-xs font-black uppercase py-3 px-6 rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center gap-2">
+                                        <Upload size={16} /> Subir Imagen
+                                        <input type="file" className="hidden" accept="image/*" onChange={handleBgSelect} />
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setBgLibraryOpen(true)}
+                                        className="bg-white/5 hover:bg-white/10 text-white text-xs font-black uppercase py-3 px-6 rounded-xl border border-white/10 transition-all flex items-center gap-2"
+                                    >
+                                        <Library size={16} /> Biblioteca
+                                    </button>
+                                </div>
                             </div>
                         )}
                         <p className="text-[10px] text-white/20 font-bold uppercase tracking-widest text-center italic mt-4">
@@ -964,6 +987,13 @@ function EditorImagenContent() {
                                 <Upload size={14} /> {bgUrlToShow ? 'Cambiar imagen' : 'Subir imagen'}
                                 <input type="file" className="hidden" accept="image/*" onChange={handleBgSelect} />
                             </label>
+                            <button
+                                type="button"
+                                onClick={() => setBgLibraryOpen(true)}
+                                className="flex-1 bg-white/5 hover:bg-white/10 text-white text-[11px] font-black uppercase py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 border border-white/5"
+                            >
+                                <Library size={14} /> Biblioteca
+                            </button>
                         </div>
                         <div
                             onClick={() => setIsDefault((v) => !v)}
@@ -1373,6 +1403,16 @@ function EditorImagenContent() {
                     title={`Recortar fondo (${aspectRatio})`}
                 />
             )}
+
+            <LibraryPickerModal
+                isOpen={bgLibraryOpen}
+                title="Elegir imagen de fondo"
+                defaultCategory="ImgCertificado"
+                onClose={() => setBgLibraryOpen(false)}
+                onSelect={(item) => handleBgFromLibrary(item.url)}
+                onPickFile={openCropper}
+                uploadHint={`Se recorta a ${aspectRatio} y se sube al guardar.`}
+            />
 
             {/* Selector de elementos (subir / biblioteca) */}
             <AnimatePresence>

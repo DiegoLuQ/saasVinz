@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { isOwnerRole } from '@/lib/tenant/roles';
 import { apiRequest } from '@/lib/tenant/api';
+import { isPublicAuthPath } from '@/lib/auth/token';
 
 // Types matching backend Bootstrap schemas
 export interface BootstrapUserData {
@@ -186,7 +187,7 @@ export function useSessionBootstrap() {
         refetchOnMount: true,
         enabled: typeof window !== 'undefined'
             && !window.location.pathname.startsWith('/iniciar-sesion')
-            && !window.location.pathname.includes('/login')
+            && !isPublicAuthPath(window.location.pathname)
             && !window.location.pathname.includes('/public/')
     });
 }

@@ -39,6 +39,10 @@ error_logger.addHandler(_error_handler)
 error_logger.setLevel(logging.ERROR)
 
 from app.core.config import settings as app_settings
+from app.core.sentry import init_sentry, capture_exception as sentry_capture
+
+# Antes de crear la app: así la integración de Sentry instrumenta FastAPI.
+init_sentry()
 
 app = FastAPI(
     title="SaaS Crematorio API",
@@ -91,6 +95,9 @@ class ErrorLoggingMiddleware:
             error_logger.exception(
                 f"[cid={correlation_id}] ERROR on {scope['method']} {scope['path']}"
             )
+            # Este middleware responde el 500 y la excepción no sigue subiendo:
+            # se envía a Sentry aquí, con el mismo id que ve el usuario.
+            sentry_capture(e, correlation_id=correlation_id)
 
             response = JSONResponse(
                 status_code=500,
@@ -112,6 +119,14 @@ async def _start_backup_scheduler():
     import asyncio
     from app.services.backup_scheduler import backup_scheduler_loop
     asyncio.create_task(backup_scheduler_loop())
+
+
+# Aviso de saldo bajo en OpenRouter (cada 6 h; ver services/ai_balance.py).
+@app.on_event("startup")
+async def _start_ai_balance_monitor():
+    import asyncio
+    from app.services.ai_balance import ai_balance_monitor_loop
+    asyncio.create_task(ai_balance_monitor_loop())
 
 # Startup tasks removed. DDL migrations are handled by deployment scripts.
 

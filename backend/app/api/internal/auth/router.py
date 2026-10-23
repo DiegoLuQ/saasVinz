@@ -1,6 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
+import hashlib
+import logging
+from urllib.parse import urlparse
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Request, Response
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import text, or_
+from sqlalchemy import func, text, or_
 from app.database import get_db
 from app import models
 from app import schemas
@@ -131,6 +135,111 @@ def logout(
             db.commit()
     auth.clear_auth_cookies(response)
     return {"detail": "Sesión cerrada"}
+
+# --- Recuperación de contraseña (usuarios de los crematorios) ---
+# Mismo esquema que el portal veterinario: enlace firmado de 30 min que deja de
+# valer apenas cambia la contraseña (uso único). El SuperAdmin queda fuera a
+# propósito: su cuenta no se recupera por correo.
+
+logger = logging.getLogger(__name__)
+
+RESET_TOKEN_MINUTES = 30
+RESET_ROLE = "tenant_password_reset"  # no sirve como sesión: ningún rol real se llama así
+MIN_PASSWORD_LENGTH = 8
+_GENERIC_FORGOT_MSG = "Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña."
+
+
+def _password_fingerprint(password_hash: str) -> str:
+    return hashlib.sha256((password_hash or "").encode()).hexdigest()[:16]
+
+
+def _tenant_app_url() -> str:
+    if settings.TENANT_APP_URL:
+        return settings.TENANT_APP_URL.rstrip("/")
+    parsed = urlparse(settings.FRONTEND_URL)
+    host = parsed.netloc
+    if host.startswith("www."):
+        host = host[4:]
+    return f"{parsed.scheme or 'https'}://app.{host}"
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+async def _send_reset_email(to_email: str, name: str, url: str) -> None:
+    from app.services.email import send_password_reset_email
+    try:
+        await send_password_reset_email(
+            to_email, name, url,
+            portal="Panel del crematorio", subject="Restablece tu contraseña de Vinzer",
+        )
+    except Exception:  # noqa: BLE001 - el endpoint responde igual; se registra el fallo
+        logger.exception("No se pudo enviar el correo de restablecimiento de contraseña")
+
+
+def _resettable_user(db: Session, **filters):
+    return db.query(models.User).filter(
+        models.User.is_active == True,  # noqa: E712
+        models.User.role != models.UserRole.creator,
+        *[getattr(models.User, k) == v for k, v in filters.items()],
+    )
+
+
+@router.post("/forgot-password")
+@limiter.limit("3/minute")
+def forgot_password(
+    request: Request,
+    data: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """Envía un enlace para restablecer la contraseña. Responde lo mismo exista o
+    no el correo, para no revelar qué cuentas están registradas."""
+    user = _resettable_user(db).filter(
+        func.lower(models.User.email) == data.email.strip().lower()
+    ).first()
+    if user:
+        token = auth.create_access_token(
+            data={"sub": str(user.id), "role": RESET_ROLE, "pwh": _password_fingerprint(user.password_hash)},
+            expires_delta=timedelta(minutes=RESET_TOKEN_MINUTES),
+        )
+        url = f"{_tenant_app_url()}/restablecer?token={token}"
+        background_tasks.add_task(_send_reset_email, user.email, user.name, url)
+    return {"detail": _GENERIC_FORGOT_MSG}
+
+
+@router.post("/reset-password")
+@limiter.limit("10/minute")
+def reset_password(
+    request: Request,
+    data: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    """Define una nueva contraseña con el enlace del correo (30 min, uso único)
+    y cierra todas las sesiones abiertas de esa cuenta."""
+    invalid = HTTPException(status_code=400, detail="El enlace no es válido o ya venció.")
+    payload = auth.decode_access_token(data.token)
+    if not payload or payload.get("role") != RESET_ROLE or not str(payload.get("sub") or "").isdigit():
+        raise invalid
+    if len(data.new_password or "") < MIN_PASSWORD_LENGTH:
+        raise HTTPException(status_code=422, detail=f"La contraseña debe tener al menos {MIN_PASSWORD_LENGTH} caracteres.")
+
+    user = _resettable_user(db, id=int(payload["sub"])).first()
+    if not user or payload.get("pwh") != _password_fingerprint(user.password_hash):
+        raise invalid
+
+    user.password_hash = auth.get_password_hash(data.new_password)
+    user.token_version = (user.token_version or 0) + 1  # invalida los access tokens vigentes
+    db.commit()
+    auth.revoke_user_refresh_tokens(db, user.id)
+    return {"detail": "Contraseña actualizada. Ya puedes ingresar con tu nueva contraseña."}
+
 
 class AdminCredentials(BaseModel):
     admin_name: str

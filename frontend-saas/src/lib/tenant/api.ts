@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { authHeader, clearToken, tryRefreshSession } from '@/lib/auth/token';
+import { authHeader, clearToken, isPublicAuthPath, tryRefreshSession } from '@/lib/auth/token';
 
 const isServer = typeof window === 'undefined';
 // v1.4 - ULTIMATE PROXY ENFORCEMENT
@@ -54,7 +54,7 @@ export const apiRequest = async (url: string, options: any = {}, _isRetry = fals
             // Handle 401 Unauthorized: intenta renovar la sesión una vez
             // (refresh token en cookie httpOnly) y reintenta la request.
             if (error.response.status === 401) {
-                if (!_isRetry && typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+                if (!_isRetry && typeof window !== 'undefined' && !isPublicAuthPath(window.location.pathname)) {
                     const refreshed = await tryRefreshSession();
                     if (refreshed) {
                         return apiRequest(url, options, true);

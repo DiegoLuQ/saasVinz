@@ -223,6 +223,9 @@ def decode_access_token(token: str):
     except JWTError:
         return None
 
+_SESSION_ROLES = {r.value for r in models.UserRole}
+
+
 def get_current_user(db: Session = Depends(get_db), token: Optional[str] = Depends(get_token_from_request), request: Request = None):
     if token is None:
         raise HTTPException(
@@ -239,6 +242,17 @@ def get_current_user(db: Session = Depends(get_db), token: Optional[str] = Depen
             headers={"WWW-Authenticate": "Bearer"},
         )
         
+    # Solo tokens de sesión del panel: el mismo SECRET_KEY firma los del portal
+    # veterinario y los enlaces de restablecer contraseña, cuyo "sub" es el id de
+    # OTRA tabla. Sin esto, una veterinaria con el mismo id que el SuperAdmin
+    # entraba como SuperAdmin (su token no trae tenant_id y el creator no lo exige).
+    if payload.get("role") not in _SESSION_ROLES or "tenant_id" not in payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sesión expirada o token inválido.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     user_id_str: str = payload.get("sub")
     if user_id_str is None:
         raise HTTPException(
@@ -279,6 +293,14 @@ def get_current_user(db: Session = Depends(get_db), token: Optional[str] = Depen
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Sesión expirada por cambio de credenciales. Inicia sesión nuevamente.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Un token emitido para otro rol nunca da acceso de SuperAdmin.
+    if user.role in ("creator", models.UserRole.creator) and payload.get("role") != models.UserRole.creator.value:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sesión expirada o token inválido.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

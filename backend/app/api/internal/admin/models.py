@@ -273,6 +273,10 @@ class SaaSConfig(Base):
     ai_session_days = Column(Integer, nullable=False, default=7)
     # Tipo de cambio fijo (CLP por 1 USD) para mostrar y cobrar los créditos en CLP.
     usd_clp_rate = Column(Integer, nullable=True, default=950)
+    # Aviso de saldo bajo en OpenRouter (services/ai_balance.py): umbral en USD
+    # (NULL/0 = sin aviso) y último estado por clave, para avisar una vez por cruce.
+    ai_balance_alert_usd = Column(Numeric(10, 2), nullable=True, default=2)
+    ai_balance_alert_state = Column(JSON, nullable=True)
 
     # --- Datos de pago de Vinzer (compra de créditos) ---
     # {holder_name, rut, bank, account_type, account_number, email}

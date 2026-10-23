@@ -27,9 +27,11 @@ import {
     Globe,
     Instagram,
     Facebook,
+    Library,
 } from 'lucide-react';
 import { apiRequest, getImageUrl } from '@/lib/admin/api';
 import { motion, AnimatePresence } from 'framer-motion';
+import LibraryPickerModal from '@/components/admin/imageTemplates/LibraryPickerModal';
 import FarewellPreview from '@/app/(tenant)/tenant/dashboard/documentos/disenos/components/FarewellPreview';
 
 const TikTokIcon = ({ size = 13, className = "" }: { size?: number; className?: string }) => (
@@ -887,6 +889,8 @@ function EditModal({
 
     const [uploading, setUploading] = useState(false);
     const [saving, setSaving] = useState(false);
+    // Elegir un fondo ya subido a la Biblioteca de Medios (evita duplicar archivos).
+    const [libraryOpen, setLibraryOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleUpload = async (file: File) => {
@@ -2135,6 +2139,13 @@ function EditModal({
                                     {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                                     {uploading ? 'Subiendo…' : previewBg ? 'Reemplazar' : 'Subir imagen'}
                                 </button>
+                                <button
+                                    onClick={() => setLibraryOpen(true)}
+                                    disabled={uploading}
+                                    className="flex-1 flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white/80 border border-white/10 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all disabled:opacity-50"
+                                >
+                                    <Library size={14} /> Biblioteca
+                                </button>
                                 {previewBg && (
                                     <button
                                         onClick={() => { setBgUrl(null); setBgOpacity(0); }}
@@ -2154,6 +2165,18 @@ function EditModal({
                                     if (f) handleUpload(f);
                                     e.target.value = '';
                                 }}
+                            />
+                            <LibraryPickerModal
+                                isOpen={libraryOpen}
+                                title="Elegir imagen de fondo"
+                                defaultCategory="backgrounds"
+                                onClose={() => setLibraryOpen(false)}
+                                onSelect={(item) => {
+                                    setBgUrl(item.url);
+                                    if (bgOpacity === 0) setBgOpacity(0.4);
+                                }}
+                                onPickFile={handleUpload}
+                                uploadHint="Se sube a la biblioteca (categoría fondos)."
                             />
                             {previewBg && (
                                 <div>

@@ -209,67 +209,37 @@ async def provider_balances(db: Session = Depends(_db)):
     OpenRouter informa el saldo de la cuenta (cargado / gastado) y el tope propio
     de la clave, si tiene: cuando la clave llega a su tope deja de funcionar
     aunque la cuenta tenga saldo. Otras plataformas no exponen el saldo por API.
-    Se agrupa por clave (varias conexiones pueden compartirla) y se estima cuántas
-    generaciones de imagen alcanzan con el costo promedio de los últimos 30 días.
+    Ver services/ai_balance.py (también avisa cuando baja del umbral).
     """
-    import asyncio
-    from datetime import timedelta
+    from app.services import ai_balance
 
-    import httpx
+    items = await ai_balance.fetch_provider_balances(db)
+    for it in items:
+        it["available_usd"] = ai_balance.available_usd(it)
+    config = db.query(models.SaaSConfig).first()
+    threshold = float(config.ai_balance_alert_usd or 0) if config else 0
+    return {"items": items, "checked_at": tz.get_now(), "alert_usd": threshold or None}
 
-    from app.api.internal.creator.ai_providers.models import AiProvider
-    from app.utils import secrets_box
 
-    rows = db.query(AiProvider).filter(AiProvider.is_active.is_(True)).order_by(AiProvider.provider, AiProvider.id).all()
-    groups: dict[str, dict] = {}
-    for p in rows:
-        key = secrets_box.decrypt(p.api_key_encrypted) if p.api_key_encrypted else None
-        gid = f"{p.provider}:{secrets_box.hint(key) if key else p.id}"
-        g = groups.setdefault(gid, {"provider": p.provider, "key_hint": secrets_box.hint(key) if key else None,
-                                    "key": key, "connections": [], "models": []})
-        g["connections"].append(p.name)
-        g["models"].append(p.model)
+class BalanceAlertUpdate(BaseModel):
+    # None o 0 = sin aviso.
+    alert_usd: Optional[float] = Field(default=None, ge=0, le=10000)
 
-    since = tz.get_now() - timedelta(days=30)
-    gen = models.AiGeneration
 
-    async def fetch(client: httpx.AsyncClient, g: dict) -> dict:
-        out = {k: g[k] for k in ("provider", "key_hint", "connections", "models")}
-        out["supported"] = g["provider"] == "openrouter" and bool(g["key"])
-        # Costo promedio real por generación de imagen con estos modelos (últimos 30 días).
-        avg = db.query(func.avg(gen.cost_usd)).filter(
-            gen.model.in_(g["models"]), gen.kind == "image", gen.success.is_(True),
-            gen.cost_usd > 0, gen.created_at >= since,
-        ).scalar()
-        recorded = db.query(func.coalesce(func.sum(gen.cost_usd), 0)).filter(gen.model.in_(g["models"])).scalar()
-        out["avg_image_cost_usd"] = round(float(avg), 5) if avg else None
-        out["recorded_cost_usd"] = round(float(recorded or 0), 4)
-        if not out["supported"]:
-            return out
-        headers = {"Authorization": f"Bearer {g['key']}"}
-        try:
-            credits, key_info = await asyncio.gather(
-                client.get("https://openrouter.ai/api/v1/credits", headers=headers),
-                client.get("https://openrouter.ai/api/v1/key", headers=headers),
-            )
-            if credits.status_code == 200:
-                d = credits.json().get("data") or {}
-                total, used = float(d.get("total_credits") or 0), float(d.get("total_usage") or 0)
-                out["account"] = {"total_usd": total, "used_usd": round(used, 4), "remaining_usd": round(total - used, 4)}
-            else:
-                out["error"] = f"OpenRouter respondió {credits.status_code} al consultar el saldo"
-            if key_info.status_code == 200:
-                k = key_info.json().get("data") or {}
-                if k.get("limit") is not None:
-                    out["key_limit"] = {"limit_usd": float(k["limit"]), "remaining_usd": float(k.get("limit_remaining") or 0),
-                                        "used_usd": round(float(k["limit"]) - float(k.get("limit_remaining") or 0), 4)}
-        except httpx.HTTPError as e:
-            out["error"] = f"No se pudo consultar OpenRouter: {e.__class__.__name__}"
-        return out
+@router.put("/balance-alert")
+async def update_balance_alert(data: BalanceAlertUpdate, db: Session = Depends(_db)):
+    """Umbral del aviso de saldo bajo. Al guardarlo se revisa de inmediato, así
+    se sabe al tiro si ya está bajo."""
+    from app.services import ai_balance
 
-    async with httpx.AsyncClient(timeout=10) as client:
-        items = await asyncio.gather(*(fetch(client, g) for g in groups.values()))
-    return {"items": items, "checked_at": tz.get_now()}
+    config = db.query(models.SaaSConfig).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="Configuración no encontrada")
+    config.ai_balance_alert_usd = round(data.alert_usd, 2) if data.alert_usd else None
+    config.ai_balance_alert_state = None  # rearma los avisos con el umbral nuevo
+    db.commit()
+    sent = await ai_balance.check_balances_and_alert(db) if config.ai_balance_alert_usd else []
+    return {"alert_usd": float(config.ai_balance_alert_usd or 0) or None, "alerts_sent": sent}
 
 
 @router.get("/report")
