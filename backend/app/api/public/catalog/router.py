@@ -66,7 +66,9 @@ def get_public_catalog(
             k: v for k, v in tenant.social_media.items()
             if k in PUBLIC_SOCIAL_KEYS and isinstance(v, str) and v.strip()
         } or None
+    from app.services.plan_features import show_vinzer_brand
     tenant_info = dict(
+        show_vinzer_brand=show_vinzer_brand(tenant),
         tenant_name=tenant.name,
         tenant_slug=tenant.slug,
         tenant_logo=tenant.logo_url,

@@ -36,6 +36,8 @@ import { useCurrentUser, useInitialSubmissions, type BootstrapSubmissionData } f
 import QuickRegistrationModal from '@/components/tenant/dashboard/QuickRegistrationModal';
 import QuickTrackingModal from '@/components/tenant/dashboard/QuickTrackingModal';
 import DashboardHeroCarousel from '@/components/tenant/dashboard/DashboardHeroCarousel';
+import OnboardingChecklist from '@/components/tenant/dashboard/OnboardingChecklist';
+import SatisfactionCard from '@/components/tenant/dashboard/SatisfactionCard';
 import { useFeatures } from '@/hooks/useFeatures';
 
 const OWNER_ROLES = ['admin', 'contabilidad', 'creator'];
@@ -81,13 +83,21 @@ function DashboardSkeleton() {
     );
 }
 
-function reachedLimits(data: DashboardSummary) {
-    const monthly = [
-        { name: 'Órdenes', item: data.limits.orders },
-        { name: 'Clientes', item: data.limits.customers },
-        { name: 'Mascotas', item: data.limits.pets },
-    ];
-    return monthly.filter(l => l.item && l.item.max > 0 && l.item.max < UNLIMITED && l.item.usage >= l.item.max);
+// Solo los topes que se aplican (órdenes del mes y usuarios; mascotas y clientes no
+// tienen límite). Al 80 % se avisa con tiempo; al 100 % ya no se puede crear más.
+// El mismo aviso llega como notificación y correo (backend services/limit_alerts.py).
+const NEAR_LIMIT = 0.8;
+
+function planLimits(data: DashboardSummary) {
+    const items = [
+        { name: 'Órdenes', unit: ['orden', 'órdenes'], monthly: true, item: data.limits.orders },
+        { name: 'Usuarios', unit: ['usuario', 'usuarios'], monthly: false, item: data.limits.users },
+    ].filter(l => l.item && l.item.max > 0 && l.item.max < UNLIMITED);
+    return {
+        reached: items.filter(l => l.item.usage >= l.item.max),
+        // Usuarios con tope 1 no se avisan antes: con un solo usuario siempre está «al 100 %».
+        near: items.filter(l => l.item.usage < l.item.max && l.item.max > 1 && l.item.usage >= Math.ceil(l.item.max * NEAR_LIMIT)),
+    };
 }
 
 export default function DashboardPage() {
@@ -142,7 +152,8 @@ export default function DashboardPage() {
     const pendingCount = data.active_count ?? 0;
     const scheduledToday = todayItems.filter(i => statusTone(i.status).label !== 'Entregado').length;
 
-    const limitsHit = isOwner ? reachedLimits(data) : [];
+    const limits = isOwner ? planLimits(data) : { reached: [], near: [] };
+    const limitsHit = limits.reached.filter(l => l.monthly);
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto pb-10">
@@ -189,6 +200,9 @@ export default function DashboardPage() {
             {/* 1. Banner del inicio: carrusel editable desde el admin (Configuración → Banner del panel) */}
             <DashboardHeroCarousel />
 
+            {/* Primeros pasos de los crematorios nuevos (solo el admin; se oculta al completar o cerrar) */}
+            <OnboardingChecklist />
+
             {/* Solicitudes web pendientes (Alerta compacta si existen) */}
             {pendingSubmissions.length > 0 && (
                 <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -226,13 +240,34 @@ export default function DashboardPage() {
                 >
                     <AlertTriangle size={18} className="text-red-500 shrink-0" />
                     <span className="text-sm text-slate-800 dark:text-slate-200 flex-1">
-                        Alcanzaste el límite mensual de <strong>{limitsHit.map(l => l.name).join(', ')}</strong> de tu plan.
+                        Alcanzaste el límite mensual de <strong>{limitsHit.map(l => l.name.toLowerCase()).join(', ')}</strong> de tu plan: no podrás crear más hasta el próximo mes.
                     </span>
                     <span className="text-xs font-bold text-red-500 flex items-center gap-1 shrink-0">
                         Mejorar plan <ArrowRight size={12} />
                     </span>
                 </button>
             )}
+
+            {/* Aviso previo: desde el 80 % del tope */}
+            {limitsHit.length === 0 && limits.near.length > 0 && (() => {
+                const l = limits.near[0];
+                const left = l.item.max - l.item.usage;
+                return (
+                    <Link
+                        href="/dashboard/configuracion?tab=facturacion"
+                        className="w-full text-left p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center gap-3 hover:bg-amber-500/15 transition-colors"
+                    >
+                        <Gauge size={18} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                        <span className="text-sm text-slate-800 dark:text-slate-200 flex-1">
+                            Te {left === 1 ? 'queda' : 'quedan'} <strong>{left} {left === 1 ? l.unit[0] : l.unit[1]}</strong>
+                            {l.monthly ? ' este mes' : ''} en tu plan ({l.item.usage} de {l.item.max}).
+                        </span>
+                        <span className="text-xs font-bold text-amber-700 dark:text-amber-400 flex items-center gap-1 shrink-0">
+                            Ver planes <ArrowRight size={12} />
+                        </span>
+                    </Link>
+                );
+            })()}
 
             {/* 2. KPIs del crematorio (datos reales; comparación mes a la fecha) */}
             {showMetrics && (
@@ -272,6 +307,9 @@ export default function DashboardPage() {
                 />
             </div>
             )}
+
+            {/* Satisfacción de las familias (encuesta al concluir; solo con respuestas) */}
+            {isOwner && showMetrics && <SatisfactionCard />}
 
             {/* 3. SECCIÓN CENTRAL: GRÁFICO (60%) + ÚLTIMOS PROCESOS (40%) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">

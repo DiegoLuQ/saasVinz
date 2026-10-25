@@ -22,6 +22,8 @@ export interface Tenant {
     form_config?: PublicFormConfig | null;
     /** Tramos de peso del crematorio (precio solo si los muestra) */
     weight_tiers?: WeightTier[];
+    /** «Con tecnología de Vinzer» en el pie (false = plan con marca blanca) */
+    show_vinzer_brand?: boolean;
 }
 
 export interface OwnerData {

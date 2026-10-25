@@ -11,6 +11,7 @@ dominio raíz sin ambas cosas recibe spam desde el primer día.
 """
 import logging
 import os
+from app.core.config import settings  # reCAPTCHA: solo se omite fuera de producción
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 from pydantic import BaseModel, Field
 
@@ -46,7 +47,7 @@ async def submit_demo_lead(
 
     # Mismo criterio que el formulario de contacto: fuera de producción no se
     # bloquea el flujo local si reCAPTCHA no está configurado.
-    if not is_valid and os.getenv("ENV") != "production":
+    if not is_valid and not settings.IS_PRODUCTION:
         logger.warning("reCAPTCHA no validado; se permite la ejecucion fuera de produccion")
         is_valid = True
 

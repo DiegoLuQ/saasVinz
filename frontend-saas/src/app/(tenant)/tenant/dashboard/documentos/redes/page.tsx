@@ -20,6 +20,7 @@ import {
 } from '@/lib/tenant/imageTemplates';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { useSessionBootstrap } from '@/hooks/useSessionBootstrap';
+import { useCanOpen } from '@/hooks/useCanOpen';
 import MyDesigns from '@/components/tenant/redes/MyDesigns';
 import LayerAdjustPanel from '@/components/tenant/redes/LayerAdjustPanel';
 import { applyOverrides, geometryPatch, type LayerOverrides } from '@/lib/admin/imageTemplates/overrides';
@@ -81,6 +82,7 @@ function Slider({ label, value, min, max, step = 1, onChange }: {
 }
 
 export default function RedesDesignsPage() {
+    const { canOpen } = useCanOpen();
     const { showToast } = useToast();
     const queryClient = useQueryClient();
     const { data: bootstrap } = useSessionBootstrap();
@@ -963,10 +965,17 @@ export default function RedesDesignsPage() {
                                         className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 text-sm font-bold">
                                         Cerrar
                                     </button>
-                                    <a href="/dashboard/configuracion?tab=creditos" onClick={cancelUseCredit}
-                                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-sm font-black">
-                                        Comprar créditos
-                                    </a>
+                                    {canOpen('/dashboard/configuracion?tab=creditos') ? (
+                                        <a href="/dashboard/configuracion?tab=creditos" onClick={cancelUseCredit}
+                                            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-sm font-black">
+                                            Comprar créditos
+                                        </a>
+                                    ) : canOpen('/dashboard/configuracion?tab=facturacion') && (
+                                        <a href="/dashboard/configuracion?tab=facturacion" onClick={cancelUseCredit}
+                                            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-sm font-black">
+                                            Ver planes
+                                        </a>
+                                    )}
                                 </div>
                             </>
                         )}

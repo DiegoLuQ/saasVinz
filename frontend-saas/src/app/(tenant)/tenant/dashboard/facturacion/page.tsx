@@ -207,20 +207,6 @@ export default function BillingPage() {
                                 </div>
                             </div>
 
-                            {/* Customers Limit */}
-                            <div className="space-y-3">
-                                <div className="flex justify-between text-sm font-bold">
-                                    <span className="text-white/60">Base de Clientes</span>
-                                    <span>{stats?.customers_total || 0} / {limits.max_customers || '∞'}</span>
-                                </div>
-                                <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full bg-purple-500 transition-all duration-1000 ease-out"
-                                        style={{ width: `${getPercentage(stats?.customers_total || 0, limits.max_customers)}%` }}
-                                    />
-                                </div>
-                            </div>
-
                             {/* Users Limit */}
                             <div className="space-y-3">
                                 <div className="flex justify-between text-sm font-bold">

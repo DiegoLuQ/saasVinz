@@ -22,12 +22,13 @@ def encrypt(value: str) -> str:
     return _fernet().encrypt(value.encode()).decode()
 
 
-def decrypt(token: Optional[str]) -> Optional[str]:
+def decrypt(token: Optional[str], ttl: Optional[int] = None) -> Optional[str]:
+    """None si el token no es válido o (con `ttl`, en segundos) si es más antiguo."""
     if not token:
         return None
     try:
-        return _fernet().decrypt(token.encode()).decode()
-    except InvalidToken:
+        return _fernet().decrypt(token.encode(), ttl=ttl).decode()
+    except (InvalidToken, ValueError):
         return None
 
 

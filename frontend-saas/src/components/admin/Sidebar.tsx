@@ -26,6 +26,7 @@ import {
     Receipt,
     Code2,
     Coins,
+    TrendingUp,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAdminMetadata, useAdminSaasConfig } from '@/hooks/useAdminBootstrap';
@@ -88,6 +89,7 @@ export default function Sidebar({ onLogout, isCollapsed: isCollapsedProp, setIsC
         {
             title: 'Comercial',
             items: [
+                { href: '/dashboard/negocio', icon: TrendingUp, label: 'Métricas del negocio' },
                 { href: '/dashboard/transacciones', icon: Receipt, label: 'Transacciones y Recibos' },
                 {
                     href: '/dashboard/suscripciones',

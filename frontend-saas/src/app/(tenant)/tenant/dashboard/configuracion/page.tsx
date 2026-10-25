@@ -23,6 +23,7 @@ import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { useTheme } from '@/app/(tenant)/tenant/context/ThemeContext';
 import { usePolar } from '@/hooks/usePolar';
 import { useFeatures } from '@/hooks/useFeatures';
+import { CONFIG_TAB_FEATURES, CONFIG_TAB_MODULES } from '@/hooks/useCanOpen';
 import { apiRequest } from '@/lib/tenant/api';
 import DeactivateTenantModal from '@/components/tenant/modals/DeactivateTenantModal';
 
@@ -71,16 +72,15 @@ export default function SettingsPage() {
         if (urlTab) setActiveTab(urlTab);
     }
 
-    // Pestañas que son características del plan (admin → "Configurar Características").
-    // Sin el flag configurado se muestran (mismo criterio que el menú).
+    // Configuración está en todos los planes (General, Facturación y Notificaciones
+    // siempre); las demás pestañas dependen de una característica del plan
+    // (admin → "Configurar Características"; sin el flag se muestran, como el menú)
+    // o de un módulo del plan (Certificados). Ver hooks/useCanOpen.ts.
     const { hasFeature } = useFeatures();
-    const TAB_FEATURES: Record<string, string> = {
-        flujo: 'configuracion:flujo',
-        formulario: 'configuracion:formulario',
-        'documentos-auto': 'certificados:generar_todo',
-        creditos: 'configuracion:creditos_ia',
-    };
-    const tabAllowed = (id: string) => !TAB_FEATURES[id] || hasFeature(TAB_FEATURES[id], true);
+    const activeModules = (bootstrapData?.rbac.modules ?? []).filter(m => m.is_active).map(m => m.module_key);
+    const tabAllowed = (id: string) =>
+        (!CONFIG_TAB_FEATURES[id] || hasFeature(CONFIG_TAB_FEATURES[id], true))
+        && (!CONFIG_TAB_MODULES[id] || activeModules.includes(CONFIG_TAB_MODULES[id]));
     const currentTab = tabAllowed(activeTab) ? activeTab : 'general';
 
     // Agrupadas por tema: menú lateral en pantallas grandes, chips en móvil.

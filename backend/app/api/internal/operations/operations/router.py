@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Query, Form
+from fastapi import BackgroundTasks, APIRouter, Depends, HTTPException, File, UploadFile, Query, Form
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
@@ -334,6 +334,8 @@ def update_workflow_step(
         step.order_index = step_in.order_index
     if step_in.is_active is not None:
         step.is_active = step_in.is_active
+    if step_in.notify_family is not None:
+        step.notify_family = step_in.notify_family
         
     db.commit()
     db.refresh(step)
@@ -627,6 +629,7 @@ async def delete_evidence(
 @router.patch("/ops/orders/{cremation_id}/advance", response_model=schemas.DailyOrderSchema)
 def advance_order_step(
     cremation_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
     current_user: models.User = Depends(get_current_user)
@@ -688,6 +691,12 @@ def advance_order_step(
 
     db.commit()
     db.refresh(cremation)
+
+    # Aviso a la familia si la nueva fase lo tiene activo (correo en segundo plano).
+    new_step = next((st for st in steps if st.id == tech.step_id), None)
+    if new_step is not None and new_step.notify_family:
+        from app.services.family_notices import notify_in_background
+        background_tasks.add_task(notify_in_background, cremation.id, new_step.id, False, current_user.id)
 
     return get_enriched_order(db, cremation_id, tenant_id)
 
@@ -762,6 +771,7 @@ def revert_order_step(
 @router.patch("/ops/orders/{cremation_id}/finalize", response_model=schemas.DailyOrderSchema)
 def finalize_order(
     cremation_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
     current_user: models.User = Depends(get_current_user)
@@ -802,10 +812,14 @@ def finalize_order(
     if cremation.scheduling:
         cremation.scheduling.completed_at = now
     else:
-        db.add(models.CremationScheduling(cremation_id=cremation.id, completed_at=now))
+        db.add(models.CremationScheduling(cremation_id=cremation.id, tenant_id=tenant_id, completed_at=now))
 
     db.commit()
     db.refresh(cremation)
+
+    # Agradecimiento + encuesta a la familia, si el crematorio lo activó.
+    from app.services.family_notices import notify_in_background
+    background_tasks.add_task(notify_in_background, cremation.id, None, True, current_user.id)
 
     return get_enriched_order(db, cremation_id, tenant_id)
 

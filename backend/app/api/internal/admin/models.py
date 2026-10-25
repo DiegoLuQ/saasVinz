@@ -55,6 +55,20 @@ class SubscriptionPlan(Base):
     def monthly_price(self):
         return self.price
 
+class TenantEvent(Base):
+    """Historial de altas, cambios de plan y de estado de un crematorio.
+    Lo escribe solo services/tenant_events.py (listener de SQLAlchemy)."""
+    __tablename__ = "sys_tenant_events"
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("sys_tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind = Column(String(30), nullable=False)  # created | plan_change | status_change
+    from_value = Column(String(60), nullable=True)
+    to_value = Column(String(60), nullable=True)
+    from_mrr = Column(Float, nullable=True)
+    to_mrr = Column(Float, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=tz.get_now)
+
+
 class Tenant(Base):
     __tablename__ = "sys_tenants"
     id = Column(Integer, primary_key=True, index=True)
@@ -118,6 +132,15 @@ class Tenant(Base):
     # Monto por ciclo congelado al contratar (no cambia si después cambia el precio
     # o el descuento anual de los planes). NULL = se usa el precio de lista.
     contracted_price = Column(Float, nullable=True)
+
+    # --- Registro autoservicio (vinzer.cl/crear-cuenta) y primeros pasos ---
+    signup_source = Column(String(20), nullable=True)  # 'self' | NULL = creado por el admin
+    terms_accepted_at = Column(DateTime(timezone=True), nullable=True)
+    terms_version = Column(String(20), nullable=True)
+    onboarding_dismissed_at = Column(DateTime(timezone=True), nullable=True)
+    # Avisos a la familia: {"on_finish": bool} (correo de agradecimiento + encuesta
+    # al concluir). NULL = apagado. Ver services/family_notices.py.
+    family_notices = Column(JSON, nullable=True)
 
     # --- Polar.sh Integration ---
     polar_customer_id = Column(String, nullable=True)
@@ -266,6 +289,10 @@ class SaaSConfig(Base):
     backup_time = Column(String, default="03:00") # HH:MM
     last_backup_at = Column(DateTime(timezone=True), nullable=True)
     last_backup_status = Column(String, nullable=True) # success, error
+    # Prueba mensual de restauración (services/backup_restore_check.py).
+    restore_check_at = Column(DateTime(timezone=True), nullable=True)
+    restore_check_status = Column(String(255), nullable=True)  # success | error: … | in_progress
+    restore_check_detail = Column(JSON, nullable=True)         # {backup, size_mb, counts, alembic, seconds}
 
     # --- Créditos IA (plantillas para redes) ---
     ai_credit_price_usd = Column(Numeric(10, 2), nullable=False, default=1)  # puede subir con el tiempo

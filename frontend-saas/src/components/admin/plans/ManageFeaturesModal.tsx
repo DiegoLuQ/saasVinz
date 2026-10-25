@@ -18,6 +18,8 @@ export interface FeatureDef {
     key: string;
     label: string;
     description?: string;
+    /** Valor cuando el plan aún no lo tiene guardado (por defecto: encendido). */
+    defaultFor?: (planName: string) => boolean;
 }
 
 export interface SectionDef {
@@ -217,6 +219,18 @@ export const FEATURES_REGISTRY: Record<string, ModuleDef> = {
                 ],
             },
             {
+                label: 'Marca',
+                features: [
+                    {
+                        key: 'configuracion:sin_marca_vinzer',
+                        label: 'Sin la marca Vinzer (marca blanca)',
+                        description: 'Quita «con tecnología de Vinzer» del seguimiento, el formulario, el catálogo y los correos a las familias. Apagado = publicidad gratis para Vinzer',
+                        // Por defecto solo FREE muestra la marca (igual que el backend, plan_features.NAME_FALLBACK).
+                        defaultFor: (planName) => planName.trim().toUpperCase() !== 'FREE',
+                    },
+                ],
+            },
+            {
                 label: 'Integraciones',
                 features: [
                     { key: 'integraciones:widget', label: 'Widget web', description: 'Catálogo y seguimiento incrustables en el sitio del crematorio (API key pública)' },
@@ -260,11 +274,17 @@ interface ManageFeaturesModalProps {
  *    else FALSE. This keeps "Configurar Características" coherent with
  *    "Módulos Activados en el Plan".
  */
+/** Módulos que ningún plan bloquea (backend: PLAN_EXEMPT_MODULES). Sus características
+ *  se configuran siempre: si no, al guardar se escribían en false (p. ej. Formulario y
+ *  Flujo en FREE) y esas pestañas desaparecían. */
+const PLAN_EXEMPT_MODULES = ['dashboard', 'perfil', 'configuracion'];
+
 function buildDraftFromPlan(
     initialFeatures: Record<string, boolean>,
-    allowedModules: string[]
+    allowedModules: string[],
+    planName: string,
 ): Record<string, boolean> {
-    const allowed = new Set(allowedModules);
+    const allowed = new Set([...allowedModules, ...PLAN_EXEMPT_MODULES]);
     const merged: Record<string, boolean> = {};
     for (const [moduleKey, mod] of Object.entries(FEATURES_REGISTRY)) {
         const moduleActive = allowed.has(moduleKey);
@@ -276,7 +296,7 @@ function buildDraftFromPlan(
                 } else if (typeof initialFeatures[feat.key] === 'boolean') {
                     merged[feat.key] = initialFeatures[feat.key];
                 } else {
-                    merged[feat.key] = true;
+                    merged[feat.key] = feat.defaultFor ? feat.defaultFor(planName) : true;
                 }
             }
         }
@@ -296,16 +316,16 @@ export default function ManageFeaturesModal({
     const [draft, setDraft] = useState<Record<string, boolean>>({});
     const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
 
-    const allowedSet = useMemo(() => new Set(allowedModules), [allowedModules]);
+    const allowedSet = useMemo(() => new Set([...allowedModules, ...PLAN_EXEMPT_MODULES]), [allowedModules]);
 
     // Initialise draft from prop whenever modal opens
     useEffect(() => {
         if (isOpen) {
-            setDraft(buildDraftFromPlan(initialFeatures, allowedModules));
+            setDraft(buildDraftFromPlan(initialFeatures, allowedModules, planName));
             // Expand all modules by default for better UX
             setExpandedModules(new Set(Object.keys(FEATURES_REGISTRY)));
         }
-    }, [isOpen, initialFeatures, allowedModules]);
+    }, [isOpen, initialFeatures, allowedModules, planName]);
 
     const toggleFeature = (key: string, moduleKey: string) => {
         if (!allowedSet.has(moduleKey)) return; // ignore toggles on disabled modules
@@ -324,7 +344,7 @@ export default function ManageFeaturesModal({
     const isDirty = useMemo(() => {
         // 1) Cambios explícitos respecto al estado por defecto del plan.
         if (JSON.stringify(draft) !== JSON.stringify(
-            buildDraftFromPlan(initialFeatures, allowedModules)
+            buildDraftFromPlan(initialFeatures, allowedModules, planName)
         )) {
             return true;
         }
@@ -333,7 +353,7 @@ export default function ManageFeaturesModal({
         //    nuevo que aparece en ON por defecto se veía como "sin cambios" y nunca
         //    se persistía. Guardar ahora escribe todas las features explícitamente.
         return getAllFeatureKeys().some((k) => typeof initialFeatures[k] !== 'boolean');
-    }, [draft, initialFeatures, allowedModules]);
+    }, [draft, initialFeatures, allowedModules, planName]);
 
     // Bulk enable / disable all features in a module
     const setAllInModule = (moduleKey: string, value: boolean) => {

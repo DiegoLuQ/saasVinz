@@ -108,8 +108,13 @@ def run_db_backup(db: Session = None):
     from app.database import SessionLocal
 
     def _set_status(status: str, set_time: bool = False):
+        from app.core.tenant_context import apply_bypass_rls
         session = SessionLocal()
         try:
+            # sys_saas_config solo se escribe con bypass de RLS: sin esto el UPDATE
+            # no afectaba filas, el estado quedaba en 'in_progress' para siempre y el
+            # respaldo automático no volvía a correr.
+            apply_bypass_rls(session)
             config = session.query(models.SaaSConfig).first()
             if config:
                 if set_time:

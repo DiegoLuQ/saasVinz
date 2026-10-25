@@ -129,7 +129,9 @@ const navItems: NavItem[] = [
 ];
 
 export default function Sidebar() {
-    const { collapsed, toggleSidebar, mobileOpen, closeMobile } = useSidebar();
+    const { collapsed: collapsedPref, toggleSidebar, mobileOpen, closeMobile } = useSidebar();
+    // Solo íconos en escritorio; el cajón del celular siempre se ve completo.
+    const collapsed = collapsedPref && !mobileOpen;
     const { data: bootstrapData, isLoading: loadingModules, error: bootstrapError } = useSessionBootstrap();
     const { hasFeature } = useFeatures();
     const pathname = usePathname();
@@ -344,7 +346,12 @@ export default function Sidebar() {
                             <div key={item.name}>
                                 {hasChildren ? (
                                     <button
-                                        onClick={() => !collapsed && toggleSubmenu(item.name)}
+                                        onClick={() => {
+                                            // Colapsado: abre el menú y despliega el grupo
+                                            if (collapsed) { toggleSidebar(); setExpandedItem(item.name); }
+                                            else toggleSubmenu(item.name);
+                                        }}
+                                        title={collapsed ? item.name : undefined}
                                         className={cn(
                                             "w-full flex items-center p-2.5 rounded-xl transition-all duration-200 group relative select-none text-xs",
                                             (isActive || isExpanded) ? "text-white bg-primary font-bold shadow-md shadow-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-300 dark:shadow-none" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white font-medium",
@@ -373,6 +380,7 @@ export default function Sidebar() {
                                 ) : (
                                     <Link
                                         href={item.href}
+                                        title={collapsed ? item.name : undefined}
                                         className={cn(
                                             "flex items-center p-2.5 rounded-xl transition-all duration-200 group relative text-xs",
                                             isActive

@@ -540,6 +540,10 @@ class BackupScheduleUpdate(BaseModel):
 class BackupStatus(BaseModel):
     last_backup_at: Optional[datetime] = None
     last_backup_status: Optional[str] = None
+    # Prueba mensual de restauración (services/backup_restore_check.py)
+    restore_check_at: Optional[datetime] = None
+    restore_check_status: Optional[str] = None
+    restore_check_detail: Optional[dict] = None
 
 # Landing Configuration Schemas
 class LandingConfigBase(BaseModel):

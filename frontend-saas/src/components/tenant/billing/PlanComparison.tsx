@@ -61,10 +61,9 @@ type Row =
     | { label: string; value: (p: Plan) => string | null }
     | { label: string; check: (p: Plan) => boolean };
 
+// Solo topes que se aplican (mascotas y clientes no tienen límite: ver backend app/utils/limit_checker.py).
 const LIMIT_ROWS: Row[] = [
     { label: 'Cremaciones al mes', value: p => num(p.max_orders) },
-    { label: 'Mascotas al mes', value: p => num(p.max_pets) },
-    { label: 'Clientes', value: p => num(p.max_customers) },
     { label: 'Usuarios', value: p => num(p.max_users) },
     { label: 'Convenios veterinarios', value: p => (p.max_partners ? num(p.max_partners) : null) },
     { label: 'Productos', value: p => num(p.max_products) },
@@ -89,7 +88,7 @@ const FEATURE_ROWS: Row[] = [
 function cardHighlights(p: Plan): string[] {
     const out = [
         `${num(p.max_orders)} cremaciones al mes`,
-        `${num(p.max_customers)} clientes · ${num(p.max_users)} usuarios`,
+        `${num(p.max_users)} usuarios`,
     ];
     if (p.max_partners) out.push(`${num(p.max_partners)} convenios veterinarios`);
     if (p.ai_monthly_credits) out.push(`${p.ai_monthly_credits} créditos IA al mes`);

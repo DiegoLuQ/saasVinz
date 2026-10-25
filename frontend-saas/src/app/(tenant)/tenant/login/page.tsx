@@ -11,6 +11,7 @@ import { motion } from 'framer-motion';
 import { apiRequest } from '@/lib/tenant/api';
 import { hasSession } from '@/lib/auth/token';
 import { usePlatformInfo, whatsappLink, socialUrl } from '@/lib/platformInfo';
+import { getMainRootUrl } from '@/lib/publicUrls';
 
 const SOCIAL_ICON: Record<string, React.ElementType> = {
     instagram: Instagram, facebook: Facebook, linkedin: Linkedin, youtube: Youtube,
@@ -238,9 +239,14 @@ export default function LoginPage() {
                         </Link>
                     </p>
 
+                    <p className="mt-6 text-center text-sm text-muted-foreground">
+                        ¿Tu crematorio aún no tiene cuenta?{' '}
+                        <a href={`${getMainRootUrl()}/crear-cuenta`} className="font-semibold text-primary hover:underline">Créala gratis</a>
+                    </p>
+
                     <div className="mt-8 text-center lg:text-left space-y-3">
                         <p className="text-sm text-muted-foreground">
-                            ¿Problemas para ingresar o tu crematorio aún no está registrado?{' '}
+                            ¿Problemas para ingresar?{' '}
                             {waHelp ? (
                                 <a href={waHelp} target="_blank" rel="noopener noreferrer" className="text-primary font-semibold hover:underline">
                                     Escríbenos por WhatsApp

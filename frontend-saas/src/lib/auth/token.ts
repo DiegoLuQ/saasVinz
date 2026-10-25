@@ -18,10 +18,11 @@ function readCookie(name: string): string | null {
     return null;
 }
 
-/** Páginas sin sesión (login y recuperar contraseña): ahí un 401 no redirige
+/** Páginas sin sesión (login, recuperar contraseña, confirmar registro): ahí un 401 no redirige
  *  y no se carga el bootstrap de la sesión. */
 export function isPublicAuthPath(pathname: string): boolean {
-    return pathname.includes('/login') || pathname.startsWith('/olvide-contrasena') || pathname.startsWith('/restablecer');
+    return pathname.includes('/login') || pathname.startsWith('/olvide-contrasena') || pathname.startsWith('/restablecer')
+        || pathname.startsWith('/confirmar-cuenta');
 }
 
 /** true si hay sesión activa (marcador nuevo o cookie legacy legible). */

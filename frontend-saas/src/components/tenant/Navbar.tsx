@@ -16,6 +16,8 @@ import {
     Copy,
     Share2,
     Menu,
+    PanelLeftClose,
+    PanelLeftOpen,
     Search,
     Link2,
     Clock,
@@ -44,6 +46,7 @@ import { copyToClipboard } from '@/lib/clipboard';
 import { useInitialNotifications } from '@/hooks/useSessionBootstrap';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAiUsage } from '@/lib/tenant/imageTemplates';
+import { useCanOpen } from '@/hooks/useCanOpen';
 
 const themes = [
     { id: 'esmeralda', name: 'Esmeralda', color: '#10b981' },
@@ -56,12 +59,13 @@ const themes = [
 ] as const;
 
 export default function Navbar() {
-    const { collapsed, setCollapsed, toggleMobile } = useSidebar();
+    const { collapsed, toggleSidebar, toggleMobile } = useSidebar();
     const bootstrapNotifications = useInitialNotifications();
     const queryClient = useQueryClient();
     const { activeTheme, toggleTheme } = useTheme();
     const { showToast } = useToast();
     const router = useRouter();
+    const { canOpen } = useCanOpen();
     const [showPalette, setShowPalette] = useState(false);
     const [showUserMenu, setShowUserMenu] = useState(false);
     // Créditos IA del crematorio: se consultan al abrir el menú de usuario
@@ -304,6 +308,15 @@ export default function Navbar() {
                     >
                         <Menu size={20} aria-hidden="true" />
                     </button>
+                    {/* Colapsar / abrir el menú lateral — escritorio (se recuerda en el navegador) */}
+                    <button
+                        onClick={toggleSidebar}
+                        className="hidden lg:flex p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors shadow-2xs"
+                        aria-label={collapsed ? 'Abrir menú lateral' : 'Colapsar menú lateral'}
+                        title={collapsed ? 'Abrir menú' : 'Colapsar menú'}
+                    >
+                        {collapsed ? <PanelLeftOpen size={20} aria-hidden="true" /> : <PanelLeftClose size={20} aria-hidden="true" />}
+                    </button>
                 </div>
 
                 {/* Buscador grande y redondeado como en la imagen */}
@@ -523,7 +536,8 @@ export default function Navbar() {
                                             const total = aiCredits ? aiCredits.monthly_granted + aiCredits.extra_remaining : 0;
                                             const available = aiCredits?.available ?? 0;
                                             const pct = total > 0 ? Math.round((available / total) * 100) : 0;
-                                            const canBuy = userData?.role === 'admin' || userData?.role === 'creator';
+                                            const canBuy = (userData?.role === 'admin' || userData?.role === 'creator')
+                                                && canOpen('/dashboard/configuracion?tab=creditos');
                                             return (
                                                 <div className="mt-2.5 rounded-xl bg-violet-50 px-2.5 py-2 dark:bg-violet-500/10">
                                                     <div className="flex items-center justify-between">

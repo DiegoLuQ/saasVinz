@@ -38,6 +38,9 @@ class User(Base):
     # invalidar los JWT emitidos antes (el token lleva "ver" y debe coincidir).
     token_version = Column(Integer, nullable=False, default=0, server_default="0")
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
+    # Último uso del panel (login / renovación / carga, como mucho cada 10 min).
+    # Lo usan las métricas del SuperAdmin para detectar crematorios inactivos.
+    last_seen_at = Column(DateTime(timezone=True), nullable=True)
 
     # Use simple class name for resolution
     tenant = relationship("Tenant", back_populates="users")

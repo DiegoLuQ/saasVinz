@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useCanOpen } from '@/hooks/useCanOpen';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     Wand2, Award, Heart, Sparkles, Loader2, CheckCircle2, XCircle, Circle, MinusCircle, Settings2, User, Dog, Package,
@@ -75,6 +76,7 @@ interface Props {
  * redes usa créditos IA si su plantilla tiene IA (se avisa antes).
  */
 export default function GenerateAllPanel({ submission, existing, canRun, tenant, processRegistro }: Props) {
+    const { canOpen } = useCanOpen();
     const { showToast } = useToast();
     const qc = useQueryClient();
     const { data: auto } = useQuery({ queryKey: ['tenant', 'auto-documents'], queryFn: getAutoDocuments });
@@ -418,16 +420,20 @@ export default function GenerateAllPanel({ submission, existing, canRun, tenant,
                 <h3 className="text-sm font-black uppercase tracking-widest text-foreground flex items-center gap-2">
                     <Wand2 size={16} className="text-violet-500" /> Documentos
                 </h3>
-                <Link href="/dashboard/configuracion?tab=documentos-auto" className="text-[11px] font-bold text-muted-foreground hover:text-primary flex items-center gap-1">
-                    <Settings2 size={12} /> Configurar
-                </Link>
+                {canOpen('/dashboard/configuracion?tab=documentos-auto') && (
+                    <Link href="/dashboard/configuracion?tab=documentos-auto" className="text-[11px] font-bold text-muted-foreground hover:text-primary flex items-center gap-1">
+                        <Settings2 size={12} /> Configurar
+                    </Link>
+                )}
             </div>
 
             {!auto ? (
                 <div className="flex justify-center py-4"><Loader2 className="animate-spin text-primary" size={20} /></div>
             ) : !configured ? (
                 <p className="text-xs text-muted-foreground">
-                    No hay documentos configurados. Elige las plantillas en <Link href="/dashboard/configuracion?tab=documentos-auto" className="text-primary font-bold">Configuración → Documentos automáticos</Link>.
+                    {canOpen('/dashboard/configuracion?tab=documentos-auto')
+                        ? <>No hay documentos configurados. Elige las plantillas en <Link href="/dashboard/configuracion?tab=documentos-auto" className="text-primary font-bold">Configuración → Documentos automáticos</Link>.</>
+                        : <>Los documentos automáticos no están incluidos en tu plan.</>}
                 </p>
             ) : (
                 <>
@@ -596,7 +602,7 @@ export default function GenerateAllPanel({ submission, existing, canRun, tenant,
                                 {socialSession?.active && socialSession.attempts_left > 0 ? (
                                     <p><b>No se usará otro crédito:</b> este diseño ya tiene un crédito abierto. Se usará 1 intento y te quedarán <b>{socialSession.attempts_left - 1}</b> para regenerar en Diseños para Redes.</p>
                                 ) : noCreditsForSocial ? (
-                                    <p><b>Sin créditos IA:</b> la imagen para redes se omitirá. <Link href="/dashboard/configuracion?tab=creditos" className="underline font-bold">Comprar créditos</Link></p>
+                                    <p><b>Sin créditos IA:</b> la imagen para redes se omitirá.{canOpen('/dashboard/configuracion?tab=creditos') && <> <Link href="/dashboard/configuracion?tab=creditos" className="underline font-bold">Comprar créditos</Link></>}</p>
                                 ) : (
                                     <>
                                         <p><b>La imagen para redes usará 1 crédito IA.</b> Tienes {credits?.available ?? 0}; te quedarán {(credits?.available ?? 1) - 1}.</p>

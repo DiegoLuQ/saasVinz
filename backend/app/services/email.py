@@ -3,6 +3,7 @@ Servicio de envío de correos electrónicos asíncrono.
 Usa fastapi-mail para enviar notificaciones de formularios de contacto.
 """
 import os
+from urllib.parse import quote
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 from pydantic import BaseModel
 from typing import Optional
@@ -10,18 +11,28 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-mail_config = ConnectionConfig(
-    MAIL_USERNAME=os.getenv("MAIL_USERNAME", ""),
-    MAIL_PASSWORD=os.getenv("MAIL_PASSWORD", ""),
-    MAIL_FROM=os.getenv("MAIL_FROM", ""),
-    MAIL_PORT=int(os.getenv("MAIL_PORT", "587")),
-    MAIL_SERVER=os.getenv("MAIL_SERVER", "smtp.gmail.com"),
-    MAIL_STARTTLS=True,
-    MAIL_SSL_TLS=False,
-    USE_CREDENTIALS=True,
-    VALIDATE_CERTS=True,
-)
+# SMTP (Hostinger: smtp.hostinger.com, 587 = STARTTLS o 465 = SSL). El puerto 465
+# usa SSL directo; cualquier otro, STARTTLS. MAIL_FROM_NAME = nombre del remitente.
+_MAIL_PORT = int(os.getenv("MAIL_PORT", "587") or 587)
+MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "Vinzer") or "Vinzer"
 
+
+def _mail_config(from_name: str) -> ConnectionConfig:
+    return ConnectionConfig(
+        MAIL_USERNAME=os.getenv("MAIL_USERNAME", ""),
+        MAIL_PASSWORD=os.getenv("MAIL_PASSWORD", ""),
+        MAIL_FROM=os.getenv("MAIL_FROM", "") or os.getenv("MAIL_USERNAME", ""),
+        MAIL_FROM_NAME=from_name,
+        MAIL_PORT=_MAIL_PORT,
+        MAIL_SERVER=os.getenv("MAIL_SERVER", "smtp.gmail.com"),
+        MAIL_STARTTLS=_MAIL_PORT != 465,
+        MAIL_SSL_TLS=_MAIL_PORT == 465,
+        USE_CREDENTIALS=True,
+        VALIDATE_CERTS=True,
+    )
+
+
+mail_config = _mail_config(MAIL_FROM_NAME)
 fm = FastMail(mail_config)
 
 
@@ -59,78 +70,41 @@ class ContactFormData(BaseModel):
     foto_base64: Optional[str] = None
 
 
-async def send_contact_email(data: ContactFormData):
-    """
-    Envía un email de notificación con los datos del formulario de contacto.
-    Destinatario: notification_recipients() (Datos del SaaS o MAIL_FROM).
-    """
-    html_body = f"""
-    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fafafa; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0;">
-        <!-- Header -->
-        <div style="background: linear-gradient(135deg, #1e3a8a, #3b82f6); padding: 32px 24px; text-align: center;">
-            <h1 style="color: #ffffff; font-size: 22px; margin: 0 0 8px 0; font-weight: 700;">🕊️ Nueva Solicitud de Memorial Gratuito</h1>
-            <p style="color: #bfdbfe; font-size: 13px; margin: 0;">Plan Recuerdo — Formulario de Contacto</p>
-        </div>
-
-        <div style="padding: 28px 24px;">
-            <!-- Pet Info -->
-            <div style="background: #ffffff; border-radius: 12px; padding: 20px; margin-bottom: 16px; border: 1px solid #e2e8f0;">
-                <h2 style="font-size: 14px; color: #1e3a8a; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 16px 0; border-bottom: 2px solid #dbeafe; padding-bottom: 8px;">
-                    🐾 Datos de la Mascota
-                </h2>
-                <table style="width: 100%; font-size: 14px; color: #334155;">
-                    <tr><td style="padding: 6px 0; font-weight: 600; width: 140px;">Nombre:</td><td>{data.nombre_mascota}</td></tr>
-                    <tr><td style="padding: 6px 0; font-weight: 600;">Especie:</td><td>{data.especie}</td></tr>
-                    <tr><td style="padding: 6px 0; font-weight: 600;">Raza:</td><td>{data.raza}</td></tr>
-                    <tr><td style="padding: 6px 0; font-weight: 600;">Nacimiento:</td><td>{data.fecha_nacimiento}</td></tr>
-                    <tr><td style="padding: 6px 0; font-weight: 600;">Fallecimiento:</td><td>{data.fecha_fallecimiento}</td></tr>
-                </table>
-            </div>
-
-            <!-- Client Info -->
-            <div style="background: #ffffff; border-radius: 12px; padding: 20px; margin-bottom: 16px; border: 1px solid #e2e8f0;">
-                <h2 style="font-size: 14px; color: #1e3a8a; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 16px 0; border-bottom: 2px solid #dbeafe; padding-bottom: 8px;">
-                    👤 Datos del Cliente
-                </h2>
-                <table style="width: 100%; font-size: 14px; color: #334155;">
-                    <tr><td style="padding: 6px 0; font-weight: 600; width: 140px;">Nombre:</td><td>{data.nombre_cliente}</td></tr>
-                    <tr><td style="padding: 6px 0; font-weight: 600;">Email:</td><td><a href="mailto:{data.email}" style="color: #3b82f6;">{data.email}</a></td></tr>
-                    <tr><td style="padding: 6px 0; font-weight: 600;">Teléfono:</td><td>{data.telefono}</td></tr>
-                </table>
-            </div>
-
-            <!-- Message -->
-            <div style="background: #ffffff; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
-                <h2 style="font-size: 14px; color: #1e3a8a; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 16px 0; border-bottom: 2px solid #dbeafe; padding-bottom: 8px;">
-                    💬 Mensaje
-                </h2>
-                <p style="font-size: 14px; color: #475569; line-height: 1.7; margin: 0; white-space: pre-wrap;">{data.mensaje}</p>
-            </div>
-
-            {"<p style='margin-top: 16px; font-size: 12px; color: #94a3b8; text-align: center;'>📸 El cliente adjuntó una fotografía (ver adjunto).</p>" if data.foto_base64 else ""}
-        </div>
-
-        <!-- Footer -->
-        <div style="background: #f1f5f9; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0;">
-            <p style="font-size: 11px; color: #94a3b8; margin: 0;">
-                Enviado desde el formulario de contacto de Vinzer · Plan Recuerdo
-            </p>
-        </div>
-    </div>
-    """
-
-    message = MessageSchema(
-        subject=f"🕊️ Solicitud Memorial Gratuito — {data.nombre_mascota} ({data.nombre_cliente})",
-        recipients=notification_recipients(),
-        body=html_body,
-        subtype=MessageType.html,
-    )
-
+async def send_contact_email(data: ContactFormData, photo_url: str | None = None) -> None:
+    """Solicitud de memorial gratuito (Plan Recuerdo): aviso a Vinzer y confirmación a la familia.
+    Al aviso se responde directo a la familia (Reply-To = su correo)."""
+    rows = [
+        ("Mascota", data.nombre_mascota), ("Especie", data.especie), ("Raza", data.raza),
+        ("Nacimiento", data.fecha_nacimiento[:10]), ("Partida", data.fecha_fallecimiento[:10]),
+        ("Familia", data.nombre_cliente), ("Correo", data.email), ("Teléfono", data.telefono),
+        ("Mensaje", data.mensaje),
+    ]
+    digits = "".join(ch for ch in (data.telefono or "") if ch.isdigit())
+    if len(digits) == 9 and digits.startswith("9"):
+        digits = "56" + digits
     try:
-        await fm.send_message(message)
-        print(f"✅ Email enviado para solicitud de {data.nombre_cliente}")
-    except Exception as e:
-        print(f"❌ Error enviando email: {e}")
+        await send_action_email(
+            notification_recipients(), f"Memorial gratuito: {data.nombre_mascota} ({data.nombre_cliente})",
+            "Nueva solicitud de memorial",
+            [f"{data.nombre_cliente} pidió un memorial gratuito para {data.nombre_mascota}. Queda pendiente de revisión en el admin (Memoriales)."],
+            "Responder por WhatsApp" if len(digits) >= 10 else None,
+            f"https://wa.me/{digits}" if len(digits) >= 10 else None,
+            "Si respondes este correo, la respuesta le llega directo a la familia.",
+            kicker="Plan Recuerdo", reply_to=data.email or None, rows=rows, image_url=photo_url,
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"❌ Error enviando el aviso de memorial: {e}")
+    if data.email:
+        try:
+            await send_action_email(
+                data.email, f"Recibimos tu solicitud para {data.nombre_mascota}", f"Recibimos tu solicitud",
+                [f"Hola {data.nombre_cliente.split(' ')[0]}:",
+                 f"Gracias por confiarnos el recuerdo de {data.nombre_mascota}. Nuestro equipo revisará la información y te avisaremos cuando su memorial esté listo.",
+                 "Si quieres agregar algo o tienes una duda, responde este correo."],
+                kicker="Memorial", image_url=photo_url,
+            )
+        except Exception as e:  # noqa: BLE001
+            print(f"❌ Error enviando la confirmación a la familia: {e}")
 
 
 class DemoLeadData(BaseModel):
@@ -141,57 +115,22 @@ class DemoLeadData(BaseModel):
     origen: Optional[str] = None
 
 
-async def send_demo_lead_email(data: DemoLeadData):
-    """
-    Notifica un nuevo lead del formulario "Solicitar Demostración Guiada".
-    Destinatario: notification_recipients() (Datos del SaaS o MAIL_FROM).
-    """
-    whatsapp_digits = "".join(ch for ch in (data.telefono or "") if ch.isdigit())
-    whatsapp_link = f"https://wa.me/{whatsapp_digits}" if whatsapp_digits else ""
-
-    html_body = f"""
-    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fafafa; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0;">
-        <div style="background: linear-gradient(135deg, #0b0a24, #19B5FE); padding: 32px 24px; text-align: center;">
-            <h1 style="color: #ffffff; font-size: 22px; margin: 0 0 8px 0; font-weight: 700;">Nueva solicitud de demostracion</h1>
-            <p style="color: #bfe8ff; font-size: 13px; margin: 0;">Landing Vinzer &middot; Formulario express</p>
-        </div>
-
-        <div style="padding: 28px 24px;">
-            <div style="background: #ffffff; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0;">
-                <p style="margin: 0 0 14px 0; font-size: 14px; color: #0f172a;">
-                    <strong style="display:block; font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#64748b;">Nombre</strong>
-                    {data.nombre}
-                </p>
-                <p style="margin: 0 0 14px 0; font-size: 14px; color: #0f172a;">
-                    <strong style="display:block; font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#64748b;">Crematorio / Empresa</strong>
-                    {data.empresa}
-                </p>
-                <p style="margin: 0; font-size: 14px; color: #0f172a;">
-                    <strong style="display:block; font-size:11px; text-transform:uppercase; letter-spacing:1px; color:#64748b;">Telefono / WhatsApp</strong>
-                    {data.telefono}
-                </p>
-            </div>
-
-            {f'<div style="text-align:center; margin-top:20px;"><a href="{whatsapp_link}" style="display:inline-block; background:#25D366; color:#052e16; text-decoration:none; padding:12px 24px; border-radius:10px; font-weight:700; font-size:13px;">Responder por WhatsApp</a></div>' if whatsapp_link else ''}
-
-            <p style="text-align: center; color: #94a3b8; font-size: 11px; margin-top: 24px;">
-                Origen: {data.origen or 'landing'}
-            </p>
-        </div>
-    </div>
-    """
-
-    message = MessageSchema(
-        subject=f"Demo Vinzer — {data.empresa} ({data.nombre})",
-        recipients=notification_recipients(),
-        body=html_body,
-        subtype=MessageType.html,
-    )
-
+async def send_demo_lead_email(data: DemoLeadData) -> None:
+    """Lead del formulario «Demostración guiada» de la landing (nombre, empresa, teléfono)."""
+    digits = "".join(ch for ch in (data.telefono or "") if ch.isdigit())
+    if len(digits) == 9 and digits.startswith("9"):
+        digits = "56" + digits
+    wa = f"https://wa.me/{digits}?text=" + quote(f"Hola {data.nombre.split(' ')[0]}, te escribo de Vinzer por la demostración que pediste para {data.empresa}.") if len(digits) >= 10 else None
     try:
-        await fm.send_message(message)
-        print(f"[OK] Email enviado para lead de demo: {data.empresa}")
-    except Exception as e:
+        await send_action_email(
+            notification_recipients(), f"Demo Vinzer: {data.empresa} ({data.nombre})", "Nueva solicitud de demostración",
+            [f"{data.nombre} de {data.empresa} pidió una demostración guiada de Vinzer."],
+            "Responder por WhatsApp" if wa else None, wa,
+            "Escríbele pronto: los leads se enfrían rápido.",
+            kicker="Nuevo lead", rows=[("Nombre", data.nombre), ("Crematorio / empresa", data.empresa),
+                                       ("Teléfono / WhatsApp", data.telefono), ("Origen", data.origen or "landing")],
+        )
+    except Exception as e:  # noqa: BLE001
         print(f"[ERROR] Error enviando email de lead: {e}")
 
 
@@ -205,30 +144,196 @@ async def send_vet_password_reset_email(to_email: str, vet_name: str, reset_url:
 
 async def send_password_reset_email(to_email: str, user_name: str, reset_url: str, *, portal: str, subject: str) -> None:
     """Enlace para restablecer la contraseña (vence en 30 min, uso único)."""
+    greeting = f"Hola {user_name}:" if user_name else "Hola:"
+    await send_action_email(
+        to_email, subject, "Restablecer contraseña",
+        [greeting,
+         f"Recibimos una solicitud para restablecer la contraseña de tu cuenta ({portal}). "
+         "Usa el botón; el enlace vence en 30 minutos y sirve una sola vez."],
+        "Crear nueva contraseña", reset_url,
+        "Si no solicitaste este cambio, ignora este correo: tu contraseña actual sigue funcionando.",
+        kicker=portal,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Plantilla de marca de Vinzer para los correos transaccionales
+# ---------------------------------------------------------------------------
+# Encabezado con el logo y el nombre; eslogan y canales de contacto en el pie.
+# Todo sale de Configuración Global → Datos del SaaS (sys_saas_config). HTML con
+# tablas y estilos en línea: es lo que respetan Gmail, Outlook y Apple Mail.
+
+def _brand() -> dict:
+    """Nombre, logo, eslogan y canales de contacto de Vinzer (con valores por defecto)."""
+    from app.core.config import settings
+    data = {"name": "Vinzer", "logo": None, "eslogan": None, "whatsapp": None, "correo": None, "redes": [],
+            "web": settings.FRONTEND_URL.rstrip("/")}
+    try:
+        from app.database import SessionLocal
+        from app import models
+        db = SessionLocal()
+        try:
+            cfg = db.query(models.SaaSConfig).first()
+        finally:
+            db.close()
+        if cfg:
+            data.update(name=cfg.name or "Vinzer", logo=cfg.logo, eslogan=cfg.eslogan,
+                        whatsapp=cfg.whatsapp, correo=cfg.correo,
+                        redes=[r for r in (cfg.redes_sociales or []) if isinstance(r, dict) and r.get("link")])
+    except Exception as e:  # sin base: el correo sale igual, con lo mínimo
+        print(f"⚠️ No se pudieron leer los datos de Vinzer para el correo: {e}")
+    return data
+
+
+def _social_url(name: str, link: str) -> str:
+    link = (link or "").strip()
+    if link.startswith(("http://", "https://")):
+        return link
+    handle = link.lstrip("@")
+    bases = {"instagram": "https://instagram.com/", "facebook": "https://facebook.com/",
+             "tiktok": "https://tiktok.com/@", "linkedin": "https://linkedin.com/in/", "youtube": "https://youtube.com/@"}
+    base = bases.get((name or "").strip().lower())
+    if base and "/" not in handle and "." not in handle:
+        return base + handle
+    return "https://" + handle
+
+
+def render_vinzer_email(
+    title: str,
+    paragraphs: list[str],
+    button_label: str | None = None,
+    button_url: str | None = None,
+    footer: str | None = None,
+    kicker: str | None = None,
+    brand: dict | None = None,
+    rows: list[tuple[str, str]] | None = None,
+    image_url: str | None = None,
+) -> str:
+    """HTML del correo. Los textos son planos (se escapan).
+
+    Por defecto con la marca de Vinzer; con `brand` (mismas claves que _brand()
+    + "powered_by": True) sale con la marca de un crematorio, p. ej. los avisos
+    a las familias (services/family_notices.py)."""
     import html as _html
-    name = _html.escape(user_name or "")
-    url = _html.escape(reset_url, quote=True)
-    portal_label = _html.escape(portal)
-    html_body = f"""
-    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 560px; margin: 0 auto; background: #fafafa; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0;">
-        <div style="background: linear-gradient(135deg, #0f172a, #14b8a6); padding: 28px 24px; text-align: center;">
-            <h1 style="color: #ffffff; font-size: 20px; margin: 0;">Restablecer contraseña</h1>
-            <p style="color: #ccfbf1; font-size: 13px; margin: 6px 0 0 0;">{portal_label}</p>
-        </div>
-        <div style="padding: 28px 24px; color: #0f172a; font-size: 14px; line-height: 1.6;">
-            <p style="margin: 0 0 16px 0;">Hola {name},</p>
-            <p style="margin: 0 0 20px 0;">Recibimos una solicitud para restablecer la contraseña de tu portal. Usa el siguiente botón; el enlace vence en <strong>30 minutos</strong> y sirve una sola vez.</p>
-            <p style="text-align: center; margin: 0 0 24px 0;">
-                <a href="{url}" style="display: inline-block; background: #14b8a6; color: #0f172a; text-decoration: none; font-weight: 700; padding: 12px 28px; border-radius: 10px;">Crear nueva contraseña</a>
-            </p>
-            <p style="margin: 0; font-size: 12px; color: #64748b;">Si no solicitaste este cambio, ignora este correo: tu contraseña actual sigue funcionando.</p>
-        </div>
-    </div>
-    """
-    message = MessageSchema(
+    from datetime import date
+    esc = _html.escape
+    b = {**_brand(), **brand} if brand else _brand()
+    name = esc(b["name"])
+
+    logo = (f'<img src="{esc(b["logo"], quote=True)}" alt="{name}" height="36" '
+            f'style="height: 36px; width: auto; vertical-align: middle; border: 0; margin-right: 10px;">'
+            if b["logo"] else "")
+    body = "".join(f'<p style="margin: 0 0 14px 0;">{esc(p)}</p>' for p in paragraphs if p)
+    if image_url:
+        body += (f'<p style="margin: 0 0 16px 0; text-align: center;"><img src="{esc(image_url, quote=True)}" alt="" width="220" '
+                 f'style="max-width: 220px; width: 100%; height: auto; border-radius: 14px; border: 0;"></p>')
+    if rows:
+        cells = "".join(
+            f'<tr><td style="padding: 8px 12px 8px 0; color: #64748b; font-size: 13px; vertical-align: top; white-space: nowrap;">{esc(k)}</td>'
+            f'<td style="padding: 8px 0; color: #0f172a; font-size: 14px; white-space: pre-wrap;">{esc(v or "—")}</td></tr>'
+            for k, v in rows)
+        body += (f'<table role="presentation" cellpadding="0" cellspacing="0" width="100%" '
+                 f'style="margin: 4px 0 16px 0; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">{cells}</table>')
+    button = ""
+    if button_label and button_url:
+        url = esc(button_url, quote=True)
+        button = (
+            '<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 24px auto;"><tr>'
+            '<td style="border-radius: 12px; background: #14b8a6;">'
+            f'<a href="{url}" style="display: inline-block; padding: 13px 30px; font-weight: 700; '
+            f'font-size: 15px; color: #06201c; text-decoration: none;">{esc(button_label)}</a>'
+            '</td></tr></table>'
+            '<p style="margin: 0 0 14px 0; font-size: 12px; color: #64748b; word-break: break-all;">'
+            '¿No funciona el botón? Copia este enlace en tu navegador:<br>'
+            f'<a href="{url}" style="color: #0e7490;">{esc(button_url)}</a></p>'
+        )
+    note = (f'<p style="margin: 18px 0 0 0; padding-top: 16px; border-top: 1px solid #e2e8f0; '
+            f'font-size: 12px; color: #64748b;">{esc(footer)}</p>' if footer else "")
+    kicker_html = (f'<p style="margin: 0 0 6px 0; font-size: 11px; font-weight: 700; letter-spacing: 2px; '
+                   f'text-transform: uppercase; color: #0e7490;">{esc(kicker)}</p>' if kicker else "")
+
+    # Canales de contacto del pie
+    link_style = "color: #5eead4; text-decoration: none;"
+    links = []
+    if b["whatsapp"]:
+        digits = "".join(ch for ch in b["whatsapp"] if ch.isdigit())
+        links.append(f'<a href="https://wa.me/{digits}" style="{link_style}">WhatsApp {esc(b["whatsapp"])}</a>')
+    if b["correo"]:
+        links.append(f'<a href="mailto:{esc(b["correo"], quote=True)}" style="{link_style}">{esc(b["correo"])}</a>')
+    if b["web"]:
+        host = b["web"].split("://", 1)[-1]
+        links.append(f'<a href="{esc(b["web"], quote=True)}" style="{link_style}">{esc(host)}</a>')
+    redes = " &nbsp;·&nbsp; ".join(
+        f'<a href="{esc(_social_url(r.get("name"), r["link"]), quote=True)}" style="color: #94a3b8; text-decoration: none;">'
+        f'{esc(r.get("name") or r["link"])}</a>'
+        for r in b["redes"]
+    )
+    eslogan = (f'<p style="margin: 0 0 12px 0; font-size: 14px; font-style: italic; color: #e2e8f0;">'
+               f'«{esc(b["eslogan"])}»</p>' if b["eslogan"] else "")
+    redes_html = f'<p style="margin: 0 0 8px 0;">{redes}</p>' if redes else ""
+    links_html = " &nbsp;·&nbsp; ".join(links)
+    if brand:  # correo de un crematorio a sus familias
+        legal = f"Este es un correo automático de {name}: si tienes dudas, responde este correo o escríbenos."
+        if b.get("powered_by"):
+            legal += '<br>Con tecnología de <a href="https://vinzer.cl" style="color: #94a3b8;">Vinzer</a>'
+    else:
+        legal = (f"© {date.today().year} {name} · Software para crematorios de mascotas.<br>"
+                 "Este es un correo automático: si necesitas ayuda, escríbenos por WhatsApp o al correo de arriba.")
+
+    return f"""<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body style="margin: 0; padding: 0; background: #eef2f6;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background: #eef2f6; padding: 24px 12px;">
+<tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width: 580px; font-family: 'Segoe UI', Arial, sans-serif; background: #ffffff; border-radius: 18px; overflow: hidden; border: 1px solid #e2e8f0;">
+  <tr><td style="background: #0A192F; padding: 22px 28px;">
+    {logo}<span style="font-size: 22px; font-weight: 800; color: #ffffff; vertical-align: middle;">{name}</span>
+  </td></tr>
+  <tr><td style="height: 4px; background-color: #14b8a6; line-height: 4px; font-size: 0;">&nbsp;</td></tr>
+  <tr><td style="padding: 30px 28px 26px 28px; color: #0f172a; font-size: 15px; line-height: 1.65;">
+    {kicker_html}
+    <h1 style="margin: 0 0 18px 0; font-size: 22px; line-height: 1.3; color: #0A192F;">{esc(title)}</h1>
+    {body}{button}{note}
+  </td></tr>
+  <tr><td style="background: #0A192F; padding: 24px 28px; text-align: center; font-size: 13px; line-height: 1.7; color: #94a3b8;">
+    {eslogan}
+    <p style="margin: 0 0 8px 0;">{links_html}</p>
+    {redes_html}
+    <p style="margin: 10px 0 0 0; font-size: 11px; color: #64748b;">{legal}</p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>"""
+
+
+async def send_action_email(
+    to: list[str] | str,
+    subject: str,
+    title: str,
+    paragraphs: list[str],
+    button_label: str | None = None,
+    button_url: str | None = None,
+    footer: str | None = None,
+    kicker: str | None = None,
+    brand: dict | None = None,
+    reply_to: str | None = None,
+    rows: list[tuple[str, str]] | None = None,
+    image_url: str | None = None,
+) -> None:
+    """Correo transaccional: título, párrafos (texto plano) y un botón opcional.
+    Con `brand` sale con la marca de un crematorio («Crematorio X vía Vinzer»);
+    `reply_to` = a quién llegan las respuestas. La cuenta que envía es no-reply,
+    así que sin `reply_to` las respuestas van al correo de Vinzer (Datos del SaaS)."""
+    html_body = render_vinzer_email(title, paragraphs, button_label, button_url, footer, kicker, brand, rows, image_url)
+    if not reply_to:
+        reply_to = _brand().get("correo") or None
+    await fm.send_message(MessageSchema(
         subject=subject,
-        recipients=[to_email],
+        recipients=[to] if isinstance(to, str) else to,
         body=html_body,
         subtype=MessageType.html,
-    )
-    await fm.send_message(message)
+        reply_to=[reply_to] if reply_to else [],
+        # Remitente: «Vinzer» o, con marca de crematorio, «Crematorio X vía Vinzer» (misma cuenta).
+        from_name=f"{brand['name']} vía {MAIL_FROM_NAME}"[:70] if brand and brand.get("name") else None,
+    ))

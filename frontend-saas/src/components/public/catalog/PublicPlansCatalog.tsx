@@ -1,5 +1,6 @@
 "use client";
 
+import { vinzerPromoUrl } from '@/lib/publicUrls';
 import React, { useMemo, useState } from 'react';
 import localFont from 'next/font/local';
 import { DEFAULT_CATALOG_INTRO } from '@/lib/catalogDefaults';
@@ -67,6 +68,8 @@ interface Props {
     weightTiers?: WeightTier[];
     /** Mensaje del crematorio en este enlace (se muestra en negrita antes de los planes) */
     message?: string | null;
+    /** «Potenciado por vinzer.cl» en el pie (false = plan con marca blanca) */
+    showVinzerBrand?: boolean;
 }
 
 // Paleta cálida y luminosa, igual para todos los tenants: el catálogo lo abren
@@ -141,7 +144,7 @@ interface PlanView {
 }
 
 /** Catálogo público de planes: diseño sobrio y cálido; los datos son los de cada tenant. */
-export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare, copiedLink, weightTiers = [], message }: Props) {
+export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare, copiedLink, weightTiers = [], message, showVinzerBrand = true }: Props) {
     const [searchTerm, setSearchTerm] = useState('');
     const sizes = useMemo(
         () => (weightTiers.length > 0 ? tierSizes(weightTiers) : PET_SIZES.map(s => ({ ...s, display: s.label }))),
@@ -392,14 +395,16 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                         )}
                     </ul>
                 </div>
-                <div className="border-t border-[var(--cat-line)]">
-                    <p className="max-w-6xl mx-auto px-4 sm:px-6 py-4 text-center text-[12px] text-[var(--cat-muted)]">
-                        Crematorio potenciado por{' '}
-                        <a href="https://vinzer.cl" target="_blank" rel="noopener" className="font-semibold text-[var(--cat-gold-deep)] hover:underline">
-                            vinzer.cl
-                        </a>
-                    </p>
-                </div>
+                {showVinzerBrand && (
+                    <div className="border-t border-[var(--cat-line)]">
+                        <p className="max-w-6xl mx-auto px-4 sm:px-6 py-4 text-center text-[12px] text-[var(--cat-muted)]">
+                            Crematorio potenciado por{' '}
+                            <a href={vinzerPromoUrl('catalogo_planes')} target="_blank" rel="noopener" className="font-semibold text-[var(--cat-gold-deep)] hover:underline">
+                                vinzer.cl
+                            </a>
+                        </p>
+                    </div>
+                )}
             </footer>
         </div>
     );

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from app.services.plan_features import PLAN_EXEMPT_MODULES
 from sqlalchemy.orm import Session
 import shutil
 import os
@@ -573,8 +574,16 @@ async def create_tenant(
         if existing_user:
             raise HTTPException(status_code=400, detail="El correo electrónico ya está registrado en el sistema.")
 
-    # Create tenant
-    new_tenant = Tenant(
+    # Tenant + admin + módulos + permisos + facturación: mismo camino que el
+    # registro autoservicio (services/tenant_provisioning.py).
+    from app.services.tenant_provisioning import provision_tenant
+    plan = None
+    if tenant_data.subscription_plan_id:
+        plan = db.query(models.SubscriptionPlan).filter(models.SubscriptionPlan.id == tenant_data.subscription_plan_id).first()
+    new_tenant, _admin = provision_tenant(
+        db,
+        subscription_plan=plan,
+        admin_password_hash=get_password_hash(tenant_data.admin_password or "admin123") if tenant_data.email else None,
         name=tenant_data.name,
         slug=tenant_data.slug,
         rut=tenant_data.rut,
@@ -583,80 +592,16 @@ async def create_tenant(
         address=tenant_data.address,
         region=tenant_data.region,
         city=tenant_data.city,
-        country=tenant_data.country or "Chile",
+        country=tenant_data.country,
         logo_url=tenant_data.logo_url,
         plan=tenant_data.plan,
         subscription_plan_id=tenant_data.subscription_plan_id,
-        status="active",
-        pending_reason=tenant_data.pending_reason
+        pending_reason=tenant_data.pending_reason,
     )
-    
-    db.add(new_tenant)
     db.commit()
     db.refresh(new_tenant)
+    billing_info = new_tenant.billing_info
 
-    # Create Initial Admin User (email uniqueness already validated above)
-    if tenant_data.email:
-        admin_password = tenant_data.admin_password or "admin123"
-        hashed_password = get_password_hash(admin_password)
-        
-        new_admin = models.User(
-            tenant_id=new_tenant.id,
-            email=tenant_data.email,
-            password_hash=hashed_password,
-            role=models.UserRole.admin,
-            name=f"Administrador {new_tenant.name}",
-            is_active=True
-        )
-        db.add(new_admin)
-    
-    # Create default billing info
-    plan_price = 0.0
-    allowed_modules = ["dashboard", "perfil", "configuracion"] # Módulos base siempre activos
-
-    if tenant_data.subscription_plan_id:
-        plan = db.query(models.SubscriptionPlan).filter(models.SubscriptionPlan.id == tenant_data.subscription_plan_id).first()
-        if plan:
-            plan_price = plan.price
-            if plan.allowed_modules:
-                allowed_modules.extend(plan.allowed_modules)
-
-    # 1. Inicializar TenantModuleConfig para el rol admin
-    all_modules = db.query(models.Module).all()
-    for m in all_modules:
-        is_active = m.key in allowed_modules
-        
-        new_cfg = models.TenantModuleConfig(
-            tenant_id=new_tenant.id,
-            role=models.UserRole.admin,
-            module_key=m.key,
-            is_active=is_active
-        )
-        db.add(new_cfg)
-
-    # 2. Inicializar UserModulePermission para el nuevo admin
-    if tenant_data.email: # Si se creó el usuario
-        for m_key in allowed_modules:
-            # Mapeo de compatibilidad similar al de bootstrap
-            key = m_key
-            if key == "pets": key = "mascotas"
-            if key == "customers": key = "clientes"
-            
-            new_perm = models.UserModulePermission(
-                user_id=new_admin.id,
-                module_key=key,
-                is_active=True,
-                actions={"view": True, "create": True, "edit": True, "delete": True}
-            )
-            db.add(new_perm)
-
-    billing_info = models.TenantBillingInfo(
-        tenant_id=new_tenant.id,
-        monthly_price=plan_price
-    )
-    db.add(billing_info)
-    db.commit()
-    
     return TenantResponse(
         id=new_tenant.id,
         name=new_tenant.name,
@@ -1037,7 +982,7 @@ async def update_tenant(
                 allowed_modules = tenant.subscription_plan.allowed_modules or []
             
             # Módulos base que siempre están permitidos
-            base_modules = {"dashboard", "perfil"}
+            base_modules = PLAN_EXEMPT_MODULES
             all_allowed = set(allowed_modules) | base_modules
             
             # 2. Sincronizar TenantModuleConfig (Configuración por Rol del Tenant)
@@ -1402,7 +1347,7 @@ async def update_plan(
     # Propagation Logic: Symmetrically synchronize modules for all tenants on this plan
     # Modules added: Activate them for existing configs
     # Modules removed: Deactivate them and clean up user overrides
-    base_modules = {"dashboard", "perfil"}
+    base_modules = PLAN_EXEMPT_MODULES
     all_allowed = new_modules | base_modules
     
     tenants = db.query(models.Tenant).filter(models.Tenant.subscription_plan_id == plan_id).all()

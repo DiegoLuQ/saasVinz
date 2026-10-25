@@ -7,7 +7,8 @@ from app.api.internal.auth.models import (
     RefreshToken
 )
 from app.api.internal.admin.models import (
-    Tenant, TenantStatus, TenantBillingInfo, SubscriptionPlan, AuditLog, TemporaryFormToken, TableConfiguration, SaaSConfig
+    Tenant, TenantStatus, TenantBillingInfo, SubscriptionPlan, AuditLog, TemporaryFormToken, TableConfiguration, SaaSConfig,
+    TenantEvent,
 )
 from app.api.internal.admin.image_templates.models import ImageTemplate, AiGeneration, TemplateExport
 from app.api.internal.creator.ai_providers.models import AiProvider
@@ -32,7 +33,7 @@ from app.api.internal.operations.models import (
     CremationOC, Cremation, OrderStatus, 
     CremationTechnical, CremationLogistics, CremationFinancial, CremationDetails, CremationScheduling,
     ServicioOC, PlanOC, ProductoOC,
-    WorkflowStep, OrderEvidence,
+    WorkflowStep, OrderEvidence, FamilyNotice, ServiceFeedback,
     Document, Certificate, CertificateTemplate, LogisticsTask
 )
 

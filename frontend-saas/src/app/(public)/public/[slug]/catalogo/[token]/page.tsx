@@ -26,7 +26,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import PublicPlansCatalog, { type PublicPlan } from '@/components/public/catalog/PublicPlansCatalog';
 import type { WeightTier } from '@/lib/publicFormConfig';
-import { getMainRootUrl } from '@/lib/publicUrls';
+import { vinzerPromoUrl } from '@/lib/publicUrls';
 
 interface ProductItem {
     id: number;
@@ -44,6 +44,8 @@ interface ProductItem {
 
 interface PublicCatalogData {
     catalog_type?: 'products' | 'plans';
+    /** «Potenciado por Vinzer» en el pie (false = plan con marca blanca) */
+    show_vinzer_brand?: boolean;
     is_expired: boolean;
     tenant_name: string;
     tenant_slug: string;
@@ -326,6 +328,7 @@ export default function PublicCatalogPage() {
                     intro: data.catalog_intro,
                     whatsapp: data.whatsapp,
                 }}
+                showVinzerBrand={data.show_vinzer_brand !== false}
                 plans={data.plans ?? []}
                 weightTiers={data.weight_tiers ?? []}
                 message={data.catalog_message}
@@ -800,14 +803,16 @@ export default function PublicCatalogPage() {
                         </div>
                     </div>
 
-                    <a
-                        href={getMainRootUrl()}
-                        target="_blank"
-                        rel="noopener"
-                        className="text-[11px] text-slate-500 dark:text-neutral-500 font-mono hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
-                    >
-                        Powered by <strong className="text-slate-700 dark:text-neutral-300">Vinzer SaaS</strong>
-                    </a>
+                    {data.show_vinzer_brand !== false && (
+                        <a
+                            href={vinzerPromoUrl('catalogo')}
+                            target="_blank"
+                            rel="noopener"
+                            className="text-[11px] text-slate-500 dark:text-neutral-500 font-mono hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                        >
+                            Catálogo creado con <strong className="text-slate-700 dark:text-neutral-300">Vinzer</strong>
+                        </a>
+                    )}
                 </div>
             </footer>
         </div>

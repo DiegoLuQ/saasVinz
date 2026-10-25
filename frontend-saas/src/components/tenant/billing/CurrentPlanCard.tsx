@@ -133,9 +133,9 @@ export function CurrentPlanCard({
                         <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
                             <Activity className="h-4 w-4" /> Consumo de Recursos
                         </h4>
-                        <ResourceProgress label="Mascotas (Mensual)" usage={limits.pets.usage} max={limits.pets.max} />
-                        <ResourceProgress label="Base de Clientes" usage={limits.customers.usage} max={limits.customers.max} />
-                        <ResourceProgress label="Cremaciones (Mensual)" usage={limits.orders.usage} max={limits.orders.max} />
+                        {/* Solo los límites que se aplican: órdenes al mes y usuarios (mascotas y
+                            clientes no tienen tope; ver backend app/utils/limit_checker.py). */}
+                        <ResourceProgress label="Órdenes este mes" usage={limits.orders.usage} max={limits.orders.max} />
                         <ResourceProgress label="Usuarios" usage={limits.users.usage} max={limits.users.max} />
                     </div>
                 </div>

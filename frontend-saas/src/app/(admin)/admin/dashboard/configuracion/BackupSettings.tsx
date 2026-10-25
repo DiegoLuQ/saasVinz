@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '@/lib/admin/api';
 import { authHeader } from '@/lib/auth/token';
-import { Database, Clock, Calendar, Play, CheckCircle, AlertTriangle, Loader2, Save, Download } from 'lucide-react';
+import { Database, Clock, Calendar, Play, CheckCircle, AlertTriangle, Loader2, Save, Download, ShieldCheck } from 'lucide-react';
 
 interface BackupConfig {
     backup_enabled: boolean;
@@ -12,7 +12,15 @@ interface BackupConfig {
 interface BackupStatus {
     last_backup_at: string | null;
     last_backup_status: string | null;
+    // Prueba mensual de restauración (backend services/backup_restore_check.py)
+    restore_check_at?: string | null;
+    restore_check_status?: string | null;
+    restore_check_detail?: { backup: string; size_mb: number; seconds: number; alembic: string; counts: Record<string, number> } | null;
 }
+
+const COUNT_LABELS: Record<string, string> = {
+    sys_tenants: 'crematorios', sys_users: 'usuarios', crm_customers: 'clientes', crm_pets: 'mascotas', oc_cremations: 'órdenes',
+};
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
@@ -27,6 +35,7 @@ export default function BackupSettings() {
     const [saving, setSaving] = useState(false);
     const [triggering, setTriggering] = useState(false);
     const [downloading, setDownloading] = useState(false);
+    const [checking, setChecking] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     useEffect(() => {
@@ -117,6 +126,26 @@ export default function BackupSettings() {
             setMessage({ type: 'error', text: e.message || 'Error al descargar el respaldo' });
         } finally {
             setDownloading(false);
+        }
+    };
+
+    const handleRestoreCheck = async () => {
+        setChecking(true);
+        setMessage(null);
+        try {
+            await apiRequest('/api/internal/maintenance/backups/restore-check', { method: 'POST' });
+            setStatus(prev => prev ? { ...prev, restore_check_status: 'in_progress' } : prev);
+            // Restaurar toma de segundos a pocos minutos: se consulta hasta que termine.
+            for (let i = 0; i < 40; i++) {
+                await new Promise(r => setTimeout(r, 5000));
+                const st: BackupStatus = await apiRequest('/api/internal/maintenance/backups/status');
+                setStatus(st);
+                if (st.restore_check_status !== 'in_progress') break;
+            }
+        } catch (e: unknown) {
+            setMessage({ type: 'error', text: e instanceof Error ? e.message : 'No se pudo iniciar la prueba' });
+        } finally {
+            setChecking(false);
         }
     };
 
@@ -232,6 +261,39 @@ export default function BackupSettings() {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Prueba de restauración: el último respaldo se restaura en una base temporal */}
+                        {(() => {
+                            const rs = status?.restore_check_status;
+                            const ok = rs === 'success';
+                            const running = rs === 'in_progress' || checking;
+                            const d = status?.restore_check_detail;
+                            return (
+                                <div className={`p-6 rounded-2xl border ${ok ? 'border-emerald-500/20 bg-emerald-500/5' : rs?.startsWith('error') ? 'border-red-500/25 bg-red-500/5' : 'border-white/10 bg-[#0a192f]'}`}>
+                                    <h4 className="text-sm font-bold text-white/60 mb-3 flex items-center gap-2"><ShieldCheck size={16} /> Prueba de restauración</h4>
+                                    {running ? (
+                                        <p className="text-sm text-blue-300 flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> Restaurando el último respaldo en una base temporal…</p>
+                                    ) : ok && d ? (
+                                        <>
+                                            <p className="text-sm font-bold text-emerald-300">Restaurado correctamente · {status?.restore_check_at ? new Date(status.restore_check_at).toLocaleString() : ''}</p>
+                                            <p className="text-xs text-white/60 mt-1">
+                                                {Object.entries(COUNT_LABELS).map(([k, label]) => `${d.counts?.[k] ?? 0} ${label}`).join(' · ')}
+                                            </p>
+                                            <p className="text-[11px] text-white/40 mt-1 break-all">{d.backup} · {d.size_mb} MB · {d.seconds} s</p>
+                                        </>
+                                    ) : rs?.startsWith('error') ? (
+                                        <p className="text-sm text-red-300 break-words">{rs}</p>
+                                    ) : (
+                                        <p className="text-sm text-white/50">Aún no se ha probado restaurar un respaldo.</p>
+                                    )}
+                                    <p className="text-[11px] text-white/40 mt-3">Se hace sola una vez al mes con los respaldos automáticos activos; si falla, llega un correo.</p>
+                                    <button onClick={handleRestoreCheck} disabled={running}
+                                        className="mt-3 w-full bg-white/10 hover:bg-white/20 text-white p-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50">
+                                        {running ? <Loader2 className="animate-spin" size={16} /> : <ShieldCheck size={16} />} Probar ahora
+                                    </button>
+                                </div>
+                            );
+                        })()}
 
                         <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-2xl p-6">
                             <h4 className="font-bold text-primary mb-2">Acciones Manuales</h4>

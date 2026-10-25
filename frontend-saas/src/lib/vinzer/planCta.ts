@@ -1,11 +1,10 @@
 // Botón de acción de cada plan en la web pública (tarjetas de la landing y
 // /comparar-planes). Un solo lugar para el texto y el destino.
 //
-// Autoservicio (FREE, Track, NORMAL, PRO): hoy no existe registro ni checkout
-// público (el alta de FREE se valida por WhatsApp y el checkout de Polar exige un
-// crematorio con sesión). Si se define NEXT_PUBLIC_SIGNUP_URL, estos planes van
-// ahí con ?plan=<nombre>; si no, a WhatsApp con un mensaje para ese plan.
-// ULTRA siempre es atención de ventas.
+// FREE va al registro autoservicio (/crear-cuenta). Los pagados (Track, NORMAL,
+// PRO) aún no tienen checkout público (el de Polar exige un crematorio con
+// sesión): si se define NEXT_PUBLIC_SIGNUP_URL van ahí con ?plan=<nombre>; si no,
+// a WhatsApp con un mensaje para ese plan. ULTRA siempre es atención de ventas.
 
 export const VINZER_WHATSAPP = 'https://wa.me/56982395940?text=';
 
@@ -32,7 +31,7 @@ export function planCta(planName: string, price: number): PlanCta {
         return { label: 'Contactar ventas', kind: 'sales', external: true, href: wa('Hola, quiero hablar con ventas sobre el Plan ULTRA de Vinzer, incluido el sitio web institucional.') };
     }
     if (price <= 0 || name === 'FREE') {
-        return selfServe('Comenzar gratis', 'free', 'Hola, quiero comenzar gratis con el Plan FREE de Vinzer.');
+        return { label: 'Comenzar gratis', kind: 'free', external: false, href: '/crear-cuenta' };
     }
     if (name === 'PRO') {
         return selfServe('Elegir plan Pro', 'recommended', 'Hola, quiero contratar el Plan PRO de Vinzer.');

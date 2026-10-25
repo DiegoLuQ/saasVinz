@@ -44,6 +44,12 @@ from app.core.sentry import init_sentry, capture_exception as sentry_capture
 # Antes de crear la app: así la integración de Sentry instrumenta FastAPI.
 init_sentry()
 
+# Listeners de la sesión: historial de planes/estado de los crematorios y aviso
+# de límite de órdenes (services/tenant_events.py, services/limit_alerts.py).
+from app.services import tenant_events, limit_alerts  # noqa: E402
+tenant_events.register()
+limit_alerts.register()
+
 app = FastAPI(
     title="SaaS Crematorio API",
     version="1.0.0",
@@ -175,6 +181,8 @@ from app.api.internal.operations.operations.router import router as operations_r
 app.include_router(cremations_router, prefix="/api/internal/cremations", tags=["Operaciones - Cremaciones"])
 app.include_router(documents_router, prefix="/api/internal/ops-records", tags=["Operaciones - Documentos"])
 app.include_router(operations_router, prefix="/api/internal/operations", tags=["Operaciones"])
+from app.api.internal.operations.family.router import router as family_notices_router
+app.include_router(family_notices_router, prefix="/api/internal/operations", tags=["Operaciones - Avisos a la familia"])
 
 # Catalog Module
 from app.api.internal.catalog.services.router import router as services_router
@@ -221,6 +229,8 @@ from app.api.internal.creator.farewell.router import router as creator_farewell_
 from app.api.internal.admin.image_templates.router import router as creator_image_templates_router
 app.include_router(creator_dashboard_router, prefix="/api/internal/creator", tags=["Creator - Dashboard"])
 app.include_router(creator_announcements_router, prefix="/api/internal/creator/announcements", tags=["Creator - Anuncios"])
+from app.api.internal.creator.business.router import router as creator_business_router
+app.include_router(creator_business_router, prefix="/api/internal/creator/business", tags=["Creator - Métricas del negocio"])
 app.include_router(creator_plans_router, prefix="/api/internal/creator/subscription-plans", tags=["Creator - Planes"])
 app.include_router(creator_subscriptions_router, prefix="/api/internal/creator", tags=["Creator - Subscriptions"])
 app.include_router(creator_notifications_router, prefix="/api/internal/creator/notifications", tags=["Creator - Notificaciones"])
@@ -300,6 +310,7 @@ from app.api.public.partners.router import router as public_partners_router
 from app.api.public.contact.router import router as public_contact_router
 from app.api.public.plans.router import router as public_plans_router
 from app.api.public.leads.router import router as public_leads_router
+from app.api.public.signup.router import router as public_signup_router
 app.include_router(public_forms_router, prefix="/api/public", tags=["Público - Formularios"])
 app.include_router(public_tenants_router, prefix="/api/public", tags=["Público - Tenants"])
 app.include_router(qr_router, prefix="/api/public", tags=["Público - QR"])
@@ -308,6 +319,7 @@ app.include_router(landing_router, prefix="/api/public", tags=["Público - Landi
 app.include_router(public_contact_router, prefix="/api/public", tags=["Público - Contacto"])
 app.include_router(public_plans_router, prefix="/api/public", tags=["Público - Planes"])
 app.include_router(public_leads_router, prefix="/api/public", tags=["Público - Leads"])
+app.include_router(public_signup_router, prefix="/api/public", tags=["Público - Registro"])
 
 from app.api.public.widget.router import router as public_widget_router
 app.include_router(public_widget_router, prefix="/api/public/widget", tags=["Público - Widget"])

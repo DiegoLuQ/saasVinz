@@ -19,9 +19,37 @@ class WorkflowStep(Base):
     name = Column(String, nullable=False)
     order_index = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
+    # Al entrar la orden a esta fase se avisa a la familia por correo (services/family_notices.py).
+    notify_family = Column(Boolean, nullable=False, default=False, server_default='false')
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
 
     tenant = relationship("Tenant")
+
+
+class FamilyNotice(Base):
+    """Aviso enviado a la familia (correo o WhatsApp), para no repetirlo y mostrarlo en la orden."""
+    __tablename__ = "ops_family_notices"
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("sys_tenants.id"), nullable=False, index=True)
+    cremation_id = Column(Integer, ForeignKey("oc_cremations.id", ondelete="CASCADE"), nullable=False, index=True)
+    step_id = Column(Integer, ForeignKey("ops_workflow_steps.id", ondelete="SET NULL"), nullable=True)
+    kind = Column(String(20), nullable=False)      # 'step' | 'finish'
+    channel = Column(String(20), nullable=False)   # 'email' | 'whatsapp'
+    sent_to = Column(String(255), nullable=True)
+    created_by = Column(Integer, ForeignKey("sys_users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=tz.get_now)
+
+
+class ServiceFeedback(Base):
+    """Encuesta de la familia al terminar el servicio (una por orden)."""
+    __tablename__ = "ops_service_feedback"
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("sys_tenants.id"), nullable=False, index=True)
+    cremation_id = Column(Integer, ForeignKey("oc_cremations.id", ondelete="CASCADE"), nullable=False, unique=True)
+    rating = Column(Integer, nullable=False)
+    comment = Column(String(500), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=tz.get_now)
+
 
 class OrderEvidence(Base):
     __tablename__ = "ops_order_evidence"

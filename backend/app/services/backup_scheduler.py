@@ -15,7 +15,9 @@ Diseño:
 """
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+
+from app.utils import tz
 
 from sqlalchemy import text
 
@@ -25,6 +27,7 @@ CHECK_INTERVAL_SECONDS = 300
 
 # Identificador arbitrario y fijo del advisory lock de backups (único en la app).
 BACKUP_ADVISORY_LOCK_ID = 815001
+STALE_IN_PROGRESS_HOURS = 3
 
 
 def _check_and_run_backup() -> None:
@@ -50,6 +53,14 @@ def _check_and_run_backup() -> None:
             if not (config and config.backup_enabled):
                 return
 
+            # Prueba mensual de restauración del último respaldo (si ya hay uno subido).
+            from app.services.backup_restore_check import restore_check_due, run_restore_check
+            if restore_check_due(config) and config.last_backup_status == "success":
+                logger.info("Iniciando prueba mensual de restauración del respaldo")
+                run_restore_check()
+                db.expire_all()
+                config = db.query(models.SaaSConfig).first()
+
             now = datetime.now()
             if now.weekday() != config.backup_day:
                 return
@@ -59,8 +70,18 @@ def _check_and_run_backup() -> None:
             last_backup = config.last_backup_at
             if last_backup and last_backup.date() == now.date():
                 return
+            # Un respaldo en curso bloquea otro, salvo que lleve más de
+            # STALE_IN_PROGRESS_HOURS (se cortó a medias, p. ej. un reinicio).
             if config.last_backup_status == "in_progress":
-                return
+                started = config.updated_at
+                if started is not None and started.tzinfo is None:
+                    started = started.replace(tzinfo=tz.get_now().tzinfo)
+                if started is None or tz.get_now() - started < timedelta(hours=STALE_IN_PROGRESS_HOURS):
+                    return
+                logger.warning("Respaldo marcado 'in_progress' desde %s: se considera cortado y se reintenta", started)
+
+            config.last_backup_status = "in_progress"
+            db.commit()
 
             logger.info("Iniciando backup automático programado (%s)", now)
             run_db_backup(db)

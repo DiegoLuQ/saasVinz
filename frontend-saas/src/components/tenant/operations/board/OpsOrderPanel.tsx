@@ -26,6 +26,7 @@ import ImageCropper from '@/components/tenant/ImageCropper';
 import EditDateModal from '@/components/tenant/EditDateModal';
 import EditWeightModal from '@/components/tenant/EditWeightModal';
 import OpsOrderDetailModal from './OpsOrderDetailModal';
+import FamilyNoticesBox from '../FamilyNoticesBox';
 import { isFinished, isNotStarted, useOpsOrderActions, type OpsOrder, type OrderEvidence } from '@/hooks/useOperations';
 import { elapsedLabel, type OpsStep } from './OpsOrderCard';
 
@@ -357,6 +358,13 @@ export default function OpsOrderPanel({
                             </div>
                         );
                     })}
+
+                    {/* Avisos a la familia (WhatsApp / correo) */}
+                    {!notStarted && (
+                        <div className="pt-2">
+                            <FamilyNoticesBox orderId={order.id} stepId={order.current_step_id} finished={finished} compact />
+                        </div>
+                    )}
                 </div>
 
                 {/* Acción principal */}

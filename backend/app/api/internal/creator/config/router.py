@@ -135,3 +135,30 @@ async def upload_saas_logo(
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+
+
+@router.post("/test-email")
+async def send_test_email(
+    payload: dict,
+    current_creator: models.User = Depends(auth.get_current_creator)
+):
+    """Envía un correo de prueba con la cuenta SMTP configurada (MAIL_* del .env).
+    Sin `to`, va al «Correo para recibir mensajes». Si falla, devuelve el motivo."""
+    import re
+    from app.services.email import send_action_email, notification_recipients, MAIL_FROM_NAME
+
+    to = str((payload or {}).get("to") or "").strip()
+    recipients = [to] if to else [r for r in notification_recipients() if r]
+    if not recipients or any(not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", r) for r in recipients):
+        raise HTTPException(status_code=422, detail="Indica un correo válido de destino")
+    sender = os.getenv("MAIL_FROM") or os.getenv("MAIL_USERNAME") or ""
+    try:
+        await send_action_email(
+            recipients, "Correo de prueba de Vinzer", "Correo de prueba",
+            ["Si estás leyendo esto, Vinzer ya puede enviar correos: confirmaciones de cuenta, recuperación de contraseña, avisos a las familias y alertas.",
+             f"Enviado desde {sender} ({os.getenv('MAIL_SERVER', '')}:{os.getenv('MAIL_PORT', '')})."],
+            kicker="Configuración",
+        )
+    except Exception as e:  # noqa: BLE001 - se informa el motivo (sin credenciales)
+        raise HTTPException(status_code=502, detail=f"No se pudo enviar: {str(e)[:300]}")
+    return {"sent_to": recipients, "from": f"{MAIL_FROM_NAME} <{sender}>"}

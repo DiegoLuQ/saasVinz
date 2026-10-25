@@ -11,6 +11,7 @@ import BackupSettings from './BackupSettings';
 import AiProvidersSettings from './AiProvidersSettings';
 import PaymentSettings from './PaymentSettings';
 import DashboardBannerSettings from './DashboardBannerSettings';
+import TestEmailButton from './TestEmailButton';
 import HeroAssetSelector from '@/components/admin/landing/HeroAssetSelector';
 import MediaSelector from '@/components/admin/media/MediaSelector';
 
@@ -1051,6 +1052,7 @@ export default function LandingConfigPage() {
                                             <p className="text-[11px] text-white/40 mt-1">
                                                 Aquí llegan las solicitudes de «Demostración guiada» y de memorial de la web. Puedes poner varios separados por coma (máx. 5). Vacío: se usa el correo del sistema (MAIL_FROM).
                                             </p>
+                                            <TestEmailButton />
                                         </div>
                                         <div>
                                             <label className="text-xs uppercase font-bold text-white/40 mb-1 block">WhatsApp Corporativo</label>

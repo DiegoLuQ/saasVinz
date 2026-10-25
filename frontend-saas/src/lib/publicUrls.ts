@@ -27,6 +27,17 @@ export function getMainRootUrl(): string {
     return `${currentProtocol()}//${rootFromHost()}`;
 }
 
+/** Enlace a la web de Vinzer desde las páginas de las familias (plan FREE: publicidad
+ *  gratis). `origen` queda en utm_source para saber de dónde llegan los crematorios. */
+export function vinzerPromoUrl(origen: string): string {
+    return `https://vinzer.cl/?utm_source=${encodeURIComponent(origen)}&utm_medium=marca_free`;
+}
+
+/** Panel de los crematorios (app.), ej. para «Iniciar sesión» desde la web pública. */
+export function getAppUrl(): string {
+    return `${currentProtocol()}//app.${rootFromHost()}`;
+}
+
 /**
  * Enlace de derivación de una veterinaria aliada (/registro/{slug_publico}).
  * Va al dominio principal: en el subdominio del portal (veterinary.) la ruta

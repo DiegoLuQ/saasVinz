@@ -2,6 +2,7 @@
 Endpoint público de contacto para el Plan Recuerdo (memorial gratuito).
 Valida reCAPTCHA v3 y envía notificación por email de forma asíncrona.
 """
+from app.core.config import settings  # reCAPTCHA: solo se omite fuera de producción
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
@@ -52,7 +53,7 @@ async def submit_contact_form(
     is_valid = await verify_recaptcha(payload.recaptcha_token)
     
     # Bypass for development/local testing if it fails
-    if not is_valid and os.getenv("ENV") != "production":
+    if not is_valid and not settings.IS_PRODUCTION:
         print("⚠️ reCAPTCHA failed but allowing execution (Local/Dev Mode)")
         is_valid = True
 
@@ -185,7 +186,7 @@ async def submit_contact_form(
     )
 
     # Step 4: Send email
-    background_tasks.add_task(send_contact_email, email_data)
+    background_tasks.add_task(send_contact_email, email_data, pet.image_url or None)
 
     # Step 5: Generate direct memorial link
     from app.core.config import settings

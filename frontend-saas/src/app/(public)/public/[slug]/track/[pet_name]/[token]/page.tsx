@@ -31,6 +31,8 @@ import {
     Check,
 } from 'lucide-react';
 import EvidenceModal from '@/components/public/EvidenceModal';
+import FeedbackSurvey from '@/components/public/FeedbackSurvey';
+import { vinzerPromoUrl } from '@/lib/publicUrls';
 import html2canvas from 'html2canvas';
 import FarewellPreview from '@/app/(tenant)/tenant/dashboard/documentos/disenos/components/FarewellPreview';
 
@@ -302,6 +304,10 @@ export default function TrackingPage() {
     const isUltraDelivered = Boolean(data?.is_ultra_plan && isDelivered);
     // Enlace de reseñas de Google del crematorio (solo https de Google; lo valida el backend al guardarlo)
     const reviewUrl: string | undefined = (data?.tenant_social_media as { google_review?: string } | undefined)?.google_review || undefined;
+    // Encuesta (si el crematorio tiene los avisos a la familia): primero la encuesta; la
+    // invitación a Google se muestra después, y solo si la calificación fue 4 o 5.
+    const surveyOn = Boolean(isDelivered && data?.feedback_enabled);
+    const showReview = Boolean(isDelivered && reviewUrl && (!surveyOn || (data?.feedback?.rating ?? 0) >= 4));
 
     return (
         <div className={`min-h-screen font-sans transition-colors duration-500 selection:bg-emerald-500/30 relative overflow-hidden ${theme.bg} ${theme.text}`}>
@@ -1229,7 +1235,15 @@ export default function TrackingPage() {
                 <div className="mt-20 text-center space-y-5">
                     {/* Invitación a reseña en Google: solo con el servicio concluido y el enlace
                         configurado por el crematorio. Tono suave: es un momento de duelo. */}
-                    {isDelivered && reviewUrl && (
+                    {surveyOn && (
+                        <FeedbackSurvey
+                            slug={slug} petName={pet_name} token={token} tenantName={data.tenant_name} isDark={isDarkMode}
+                            initial={data.feedback ?? null}
+                            onDone={(feedback) => setData((d: any) => ({ ...d, feedback }))}
+                        />
+                    )}
+
+                    {showReview && (
                         <div className={`mx-auto max-w-md rounded-3xl border px-6 py-5 text-center transition-colors duration-500 ${isDarkMode ? 'bg-white/[0.03] border-white/10' : 'bg-white/80 border-gray-200 shadow-sm'}`}>
                             <div className="flex justify-center gap-0.5 mb-2" aria-hidden="true">
                                 {[0, 1, 2, 3, 4].map((i) => <Star key={i} size={14} className="text-amber-400 fill-amber-400" />)}
@@ -1261,9 +1275,13 @@ export default function TrackingPage() {
                         <p className={`text-[10px] uppercase font-bold tracking-[0.25em] transition-colors duration-500 ${isDarkMode ? 'text-neutral-600' : 'text-gray-400'}`}>
                             © {new Date().getFullYear()} {data.tenant_name}
                         </p>
-                        <a href="https://vinzer.cl" target="_blank" rel="noopener noreferrer" className={`text-[9px] uppercase font-semibold tracking-wider hover:text-emerald-500 transition-colors duration-300 flex items-center gap-1 ${isDarkMode ? 'text-neutral-700' : 'text-gray-300'}`}>
-                            Tecnología por <span className="font-black">Vinzer.cl</span>
-                        </a>
+                        {/* Marca Vinzer: solo en planes sin marca blanca (por defecto FREE). */}
+                        {data.show_vinzer_brand !== false && (
+                            <a href={vinzerPromoUrl('seguimiento')} target="_blank" rel="noopener noreferrer"
+                                className={`mt-1 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-semibold transition-colors duration-300 ${isDarkMode ? 'border-neutral-800 text-neutral-400 hover:text-emerald-400' : 'border-gray-200 text-gray-500 hover:text-emerald-600'}`}>
+                                Seguimiento creado con <span className="font-black">Vinzer</span> · software para crematorios
+                            </a>
+                        )}
                     </div>
                 </div>
 

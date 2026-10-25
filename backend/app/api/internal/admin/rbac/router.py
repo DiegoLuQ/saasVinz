@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from app.services.plan_features import PLAN_EXEMPT_MODULES
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app import models, auth, schemas
@@ -139,7 +140,7 @@ def get_tenant_config(
 
     # 5. Capa de ROL: si el rol tiene blueprint definido es autoritativo
     #    (admin/creator exentos: mantienen lo permitido por el plan).
-    base_modules = ["dashboard", "perfil"]  # exentos del techo del plan
+    base_modules = list(PLAN_EXEMPT_MODULES)  # exentos del techo del plan
     role_is_privileged = role in (models.UserRole.admin, models.UserRole.creator)
     role_allowed_keys = None
     if blueprint and not role_is_privileged:
@@ -261,7 +262,7 @@ def get_my_modules(
     if tenant and tenant.subscription_plan_id:
         plan = db.query(models.SubscriptionPlan).filter(models.SubscriptionPlan.id == tenant.subscription_plan_id).first()
         if plan:
-            base_modules = {"dashboard", "perfil"}
+            base_modules = PLAN_EXEMPT_MODULES
             allowed_set = set(plan.allowed_modules) | base_modules
             active_keys = {k for k in active_keys if k in allowed_set}
     
@@ -314,7 +315,7 @@ def get_my_granular_permissions(
 
     # 4. Aplicar Overrides de Plan (CAPA BASE - Se puede sobreescribir por granular)
     result = []
-    base_modules = {"dashboard", "perfil"}
+    base_modules = PLAN_EXEMPT_MODULES
     
     # Identificar cuáles perms son explícitos de DB (no generados dinámicamente para admin)
     explicit_perms_keys = {p.module_key for p in user_perms}
@@ -444,7 +445,7 @@ def check_permission(module_key: str, action: str):
         tenant = db.query(models.Tenant).filter(models.Tenant.id == current_user.tenant_id).first()
         plan = tenant.effective_plan if tenant else None
         if plan:
-            base_modules = {"dashboard", "perfil"}
+            base_modules = PLAN_EXEMPT_MODULES
             if module_key not in (plan.allowed_modules or []) and module_key not in base_modules:
                 raise HTTPException(status_code=403, detail=f"El módulo {module_key} no está incluido en tu plan actual ({plan.name})")
 

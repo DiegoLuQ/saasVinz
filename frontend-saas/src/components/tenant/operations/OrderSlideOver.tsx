@@ -18,6 +18,7 @@ import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import FarewellCardSection from './expediente/FarewellCardSection';
 import GeneratedImagesSection from './expediente/GeneratedImagesSection';
 import DedicationSection from './expediente/DedicationSection';
+import FamilyNoticesBox from './FamilyNoticesBox';
 import StageTimeline, { type Stage } from './expediente/StageTimeline';
 import RevertOrderModal, { canRevertStatus } from './RevertOrderModal';
 import CertificateTextsModal, { DATE_LABELS, ISSUE_TEMPLATE_QUERY_KEY, issueDateFields, issueTextFields, loadIssueTemplate, missingPetDates, usePetDates, type CertOverrides } from './CertificateTextsModal';
@@ -399,6 +400,9 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                         {exp.timeline.length > 0 && (
                             <Section title="Etapas del servicio" icon={<CircleDot size={14} />}>
                                 <StageTimeline stages={exp.timeline} />
+                                {exp.order.status_group !== 'pendiente' && exp.order.status_group !== 'cancelado' && (
+                                    <FamilyNoticesBox orderId={exp.order.id} finished={exp.order.status_group === 'entregado'} />
+                                )}
                             </Section>
                         )}
 

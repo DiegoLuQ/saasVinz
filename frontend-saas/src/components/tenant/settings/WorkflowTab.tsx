@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Activity } from 'lucide-react';
+import { Plus, Activity, Mail, Lock, Star } from 'lucide-react';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { apiRequest } from '@/lib/tenant/api';
 import { FormInput } from './FormField';
@@ -8,6 +8,29 @@ export function WorkflowTab() {
     const { showToast } = useToast();
     const [workflowSteps, setWorkflowSteps] = useState<any[]>([]);
     const [newStep, setNewStep] = useState({ name: '', order_index: 0 });
+    // Avisos a la familia (services/family_notices.py): enabled = el plan los incluye.
+    const [notices, setNotices] = useState<{ on_finish: boolean; enabled: boolean } | null>(null);
+
+    const fetchNotices = async () => {
+        try {
+            setNotices(await apiRequest('/api/internal/operations/family-notices/config'));
+        } catch {
+            setNotices(null);
+        }
+    };
+
+    const toggleOnFinish = async () => {
+        if (!notices) return;
+        try {
+            setNotices(await apiRequest('/api/internal/operations/family-notices/config', {
+                method: 'PUT',
+                body: { on_finish: !notices.on_finish },
+            }));
+            showToast('Avisos actualizados', 'success');
+        } catch (err: unknown) {
+            showToast(err instanceof Error ? err.message : 'No se pudo guardar', 'error');
+        }
+    };
 
     const fetchWorkflowSteps = async () => {
         try {
@@ -53,6 +76,7 @@ export function WorkflowTab() {
 
     useEffect(() => {
         fetchWorkflowSteps();
+        fetchNotices();
     }, []);
 
     return (
@@ -61,6 +85,36 @@ export function WorkflowTab() {
                 <h3 className="text-xl font-bold">Flujo Operativo</h3>
                 <p className="text-sm text-muted-foreground mt-1">Define los pasos secuenciales del proceso de cremación.</p>
             </div>
+
+            {/* Avisos a la familia */}
+            {notices && (
+                <div className="glass-card p-6 rounded-3xl border border-sky-500/20 space-y-4">
+                    <div className="flex items-start gap-3">
+                        <span className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-300 flex items-center justify-center shrink-0"><Mail size={18} /></span>
+                        <div>
+                            <h4 className="font-bold">Avisos a la familia</h4>
+                            <p className="text-sm text-muted-foreground mt-0.5">
+                                Marca en cada paso «Avisar a la familia»: cuando la orden entra a ese paso, la familia recibe un correo con tu logo y
+                                el enlace de seguimiento. Desde el Panel de Trabajo también puedes avisar por WhatsApp.
+                            </p>
+                        </div>
+                    </div>
+                    {notices.enabled ? (
+                        <label className="flex items-center justify-between gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 cursor-pointer">
+                            <span className="flex items-start gap-3">
+                                <Star size={18} className="text-amber-500 mt-0.5 shrink-0" />
+                                <span>
+                                    <span className="block text-sm font-bold">Al concluir: agradecimiento y encuesta</span>
+                                    <span className="block text-xs text-muted-foreground">La familia recibe un correo de agradecimiento con una encuesta de 1 a 5 estrellas. El promedio aparece en tu Dashboard.</span>
+                                </span>
+                            </span>
+                            <input type="checkbox" checked={notices.on_finish} onChange={toggleOnFinish} className="w-5 h-5 accent-sky-500 shrink-0" />
+                        </label>
+                    ) : (
+                        <p className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400"><Lock size={15} /> Los avisos a la familia no están incluidos en tu plan.</p>
+                    )}
+                </div>
+            )}
 
             {/* Add Step Form */}
             <div className="glass-card p-6 rounded-3xl border border-primary/20">
@@ -114,10 +168,22 @@ export function WorkflowTab() {
                                         <p className="font-bold text-lg">{step.name}</p>
                                         <p className="text-xs text-muted-foreground">
                                             {step.is_active ? 'Activo' : 'Inactivo'}
+                                            {step.notify_family && notices?.enabled && <span className="ml-2 text-sky-600 dark:text-sky-300 font-semibold">· Avisa a la familia</span>}
                                         </p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
+                                    {notices?.enabled && (
+                                        <button
+                                            onClick={() => handleUpdateStep(step.id, { notify_family: !step.notify_family })}
+                                            title={step.notify_family ? 'Dejar de avisar a la familia en este paso' : 'Enviar un correo a la familia cuando la orden entre a este paso'}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${step.notify_family
+                                                ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300 hover:bg-sky-500/25'
+                                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-white/5 dark:text-white/50 dark:hover:bg-white/10'}`}
+                                        >
+                                            <Mail size={13} /> {step.notify_family ? 'Avisa a la familia' : 'Avisar a la familia'}
+                                        </button>
+                                    )}
                                     <button
                                         onClick={() => handleUpdateStep(step.id, { is_active: !step.is_active })}
                                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${step.is_active

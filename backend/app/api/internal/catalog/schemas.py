@@ -259,6 +259,7 @@ class PublicCatalogPlan(BaseModel):
 
 class PublicCatalogResponse(BaseModel):
     catalog_type: CatalogType = "products"
+    show_vinzer_brand: bool = True  # «Potenciado por vinzer.cl» en el pie (marca blanca = False)
     is_expired: bool = False
     tenant_name: str
     tenant_slug: str

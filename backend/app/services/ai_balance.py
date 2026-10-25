@@ -17,7 +17,6 @@ cuenta tenga saldo.
 from __future__ import annotations
 
 import asyncio
-import html
 import logging
 from datetime import timedelta
 
@@ -124,17 +123,13 @@ def _alert_text(item: dict, status: str) -> tuple[str, str]:
 
 
 async def _send_email(title: str, message: str) -> None:
-    from fastapi_mail import MessageSchema, MessageType
-    from app.services.email import fm, notification_recipients
-    body = f"""
-    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 560px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden;">
-        <div style="background: #b45309; padding: 20px 24px;"><h1 style="color: #fff; font-size: 18px; margin: 0;">{html.escape(title)}</h1></div>
-        <div style="padding: 22px 24px; color: #0f172a; font-size: 14px; line-height: 1.6;">
-            <p style="margin: 0 0 14px 0;">{html.escape(message)}</p>
-            <p style="margin: 0; font-size: 12px; color: #64748b;">Aviso automático de Vinzer · Créditos IA → Resumen muestra el saldo en vivo.</p>
-        </div>
-    </div>"""
-    await fm.send_message(MessageSchema(subject=title, recipients=notification_recipients(), body=body, subtype=MessageType.html))
+    from app.services.email import send_action_email, notification_recipients
+    await send_action_email(
+        notification_recipients(), title, title, [message],
+        None, None,
+        "Aviso automático: se revisa cada 6 horas y se avisa una sola vez por cada cruce del umbral.",
+        kicker="Créditos IA",
+    )
 
 
 async def check_balances_and_alert(db: Session) -> list[dict]:

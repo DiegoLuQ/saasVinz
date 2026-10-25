@@ -130,6 +130,9 @@ class Settings(BaseSettings):
     # URL del panel de los crematorios (enlaces de los correos). Vacío = se deriva
     # de FRONTEND_URL anteponiendo el subdominio "app.".
     TENANT_APP_URL: str = ""
+    # Base del seguimiento público (links de los avisos a la familia). Vacío = se
+    # deriva de FRONTEND_URL anteponiendo "track.".
+    TRACKING_BASE_URL: str = ""
 
     # Monitoreo de errores (Sentry). Vacío = desactivado. Ver app/core/sentry.py.
     SENTRY_DSN: str = ""

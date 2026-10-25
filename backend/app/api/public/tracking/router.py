@@ -6,6 +6,7 @@ from app import models
 from app import schemas
 from app.core.rate_limiter import limiter
 from datetime import datetime
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from app.api.public.tenants.router import resolve_farewell_template
 
@@ -14,6 +15,11 @@ router = APIRouter()
 # Mensaje único para cualquier fallo de resolución: no revelar si el código
 # existe, si el formato es válido, ni a qué tenant pertenece.
 _RESOLVE_NOT_FOUND = "No encontramos un seguimiento con ese código"
+
+
+def _show_brand(tenant) -> bool:
+    from app.services.plan_features import show_vinzer_brand
+    return show_vinzer_brand(tenant)
 
 
 def _names_match(url_name: str, db_name: str) -> bool:
@@ -179,7 +185,8 @@ def get_tracking_info(
             pet_dedication=pet_data.get("dedication"),
             farewell_template_config=farewell_tpl.config if farewell_tpl else None,
             is_ultra_plan="ULTRA" in ((getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper()),
-            tenant_plan=(getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper()
+            tenant_plan=(getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper(),
+            show_vinzer_brand=_show_brand(tenant),
         )
 
     # 3. Validar Nombre de Mascota (Seguridad Adicional + UX)
@@ -259,6 +266,11 @@ def get_tracking_info(
     if isinstance(tenant.social_media, dict):
         tenant_website = tenant.social_media.get("website") or tenant.social_media.get("instagram")
 
+    # Encuesta de satisfacción: al entregar, si el plan incluye los avisos a la familia.
+    from app.services.family_notices import feature_on
+    delivered = cremation.status in ("entregado", "completado")
+    fb = db.query(models.ServiceFeedback).filter(models.ServiceFeedback.cremation_id == cremation.id).first() if delivered else None
+
     return schemas.PublicTrackingResponse(
         verification_code=cremation.verification_code,
         pet_name=pet.name,
@@ -277,8 +289,59 @@ def get_tracking_info(
         pet_dedication=((cremation.details.dedication if cremation.details else None) or None),
         farewell_template_config=farewell_tpl.config if farewell_tpl else None,
         is_ultra_plan="ULTRA" in ((getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper()),
-        tenant_plan=(getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper()
+        tenant_plan=(getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper(),
+        show_vinzer_brand=_show_brand(tenant),
+        feedback_enabled=delivered and feature_on(tenant),
+        feedback={"rating": fb.rating, "comment": fb.comment} if fb else None,
     )
+
+
+class FeedbackIn(BaseModel):
+    rating: int = Field(..., ge=1, le=5)
+    comment: Optional[str] = Field(default=None, max_length=500)
+
+
+@router.post("/{slug}/{pet_name}/{token}/feedback")
+@limiter.limit("5/minute")
+def submit_feedback(
+    request: Request,
+    slug: str,
+    pet_name: str,
+    token: str,
+    data: FeedbackIn,
+    db: Session = Depends(get_db),
+):
+    """Encuesta de la familia (1–5 estrellas + comentario), una por orden entregada.
+    Mismo acceso que el seguimiento: slug + nombre de la mascota + token."""
+    from app.core.tenant_context import apply_tenant_rls
+    from app.services.family_notices import feature_on
+
+    not_found = HTTPException(status_code=404, detail="Información de seguimiento no encontrada")
+    tenant = db.query(models.Tenant).filter(models.Tenant.slug == slug).first()
+    if not tenant:
+        raise not_found
+    apply_tenant_rls(db, tenant.id)
+    cremation = db.query(models.Cremation).outerjoin(
+        models.CremationDetails, models.Cremation.id == models.CremationDetails.cremation_id
+    ).filter(
+        models.Cremation.tenant_id == tenant.id,
+        or_(models.CremationDetails.tracking_token == token, models.Cremation.verification_code == token),
+    ).first()
+    pet = db.query(models.Pet).filter(models.Pet.id == cremation.pet_id).first() if cremation else None
+    if not cremation or not pet or not _names_match(pet_name, pet.name):
+        raise not_found
+    if cremation.status not in ("entregado", "completado") or not feature_on(tenant):
+        raise HTTPException(status_code=400, detail="La encuesta se habilita al concluir el servicio")
+    if db.query(models.ServiceFeedback.id).filter(models.ServiceFeedback.cremation_id == cremation.id).first():
+        raise HTTPException(status_code=409, detail="Ya recibimos tu respuesta. ¡Gracias!")
+
+    comment = " ".join((data.comment or "").split())[:500] or None
+    db.add(models.ServiceFeedback(tenant_id=tenant.id, cremation_id=cremation.id, rating=data.rating, comment=comment))
+    db.commit()
+    # Con 4 o 5 estrellas se invita a dejar la reseña en Google, si el crematorio la tiene.
+    sm = tenant.social_media if isinstance(tenant.social_media, dict) else {}
+    review = (sm.get("google_review") or "").strip() if data.rating >= 4 else ""
+    return {"ok": True, "google_review": review or None}
 
 
 # ---------------------------------------------------------------------------

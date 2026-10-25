@@ -24,6 +24,23 @@ from fastapi.security import OAuth2PasswordRequestForm
 from app.core.rate_limiter import limiter
 from app.core.config import settings
 
+LAST_SEEN_EVERY = timedelta(minutes=10)
+
+
+def touch_last_seen(db: Session, user, force: bool = False) -> None:
+    """Marca el último uso del panel (como mucho cada 10 min, para no escribir en
+    cada carga). Lo usan las métricas del SuperAdmin («En riesgo»)."""
+    now = tz.get_now()
+    last = user.last_seen_at
+    if not force and last is not None and now - (last if last.tzinfo else last.replace(tzinfo=now.tzinfo)) < LAST_SEEN_EVERY:
+        return
+    try:
+        user.last_seen_at = now
+        db.commit()
+    except Exception:  # noqa: BLE001 - nunca debe impedir entrar al panel
+        db.rollback()
+
+
 @router.post("/login", response_model=schemas.Token)
 @limiter.limit(settings.RATE_LIMIT_LOGIN)
 def login_for_access_token(
@@ -55,6 +72,7 @@ def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    touch_last_seen(db, user, force=True)
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     token_data = {
         "sub": str(user.id),
@@ -96,6 +114,7 @@ def refresh_session(
             detail="Sesión expirada o token inválido.",
         )
     user, new_refresh = auth.rotate_refresh_token(db, raw_refresh, request)
+    touch_last_seen(db, user)
 
     access_token = auth.create_access_token(
         data={
@@ -319,6 +338,7 @@ def get_bootstrap(
             status_code=404,
             detail=f"Usuario (ID: {current_user.id}) no encontrado en la base de datos actual."
         )
+    touch_last_seen(db, user)
 
     if not user.tenant:
         raise HTTPException(
@@ -501,7 +521,8 @@ def get_bootstrap(
     # --- Dynamic Plan-to-Permission Sync (capa de plan + capa de rol/blueprint) ---
     # 1. Universo de módulos del plan efectivo (techo del tenant)
     allowed_plan_modules = user.tenant.effective_plan.allowed_modules if user.tenant.effective_plan else []
-    base_required = ["dashboard", "perfil"]
+    from app.services.plan_features import PLAN_EXEMPT_MODULES
+    base_required = list(PLAN_EXEMPT_MODULES)
     master_keys = list(set(allowed_plan_modules + base_required))
 
     # 2. Capa de ROL (blueprint global). Si el rol TIENE blueprint definido es

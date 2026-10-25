@@ -5,7 +5,9 @@ from starlette.background import BackgroundTask
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app import models, schemas
-from app.auth import get_current_admin
+# Solo el SuperAdmin: un respaldo trae los datos de TODOS los crematorios (antes bastaba
+# con ser admin de cualquier crematorio para descargar el dump completo).
+from app.auth import get_current_creator
 from app.services.backup_service import run_db_backup, create_db_dump
 from typing import Dict
 
@@ -14,7 +16,7 @@ router = APIRouter()
 @router.get("/config", response_model=schemas.BackupScheduleBase)
 def get_backup_config(
     db: Session = Depends(get_db),
-    admin: models.User = Depends(get_current_admin)
+    admin: models.User = Depends(get_current_creator)
 ):
     """Retrieve the current database backup schedule."""
     config = db.query(models.SaaSConfig).first()
@@ -32,7 +34,7 @@ def get_backup_config(
 def update_backup_config(
     config_in: schemas.BackupScheduleUpdate,
     db: Session = Depends(get_db),
-    admin: models.User = Depends(get_current_admin)
+    admin: models.User = Depends(get_current_creator)
 ):
     """Update the database backup schedule."""
     config = db.query(models.SaaSConfig).first()
@@ -59,7 +61,7 @@ def update_backup_config(
 @router.get("/status", response_model=schemas.BackupStatus)
 def get_backup_status(
     db: Session = Depends(get_db),
-    admin: models.User = Depends(get_current_admin)
+    admin: models.User = Depends(get_current_creator)
 ):
     """Get the status and timestamp of the last database backup."""
     config = db.query(models.SaaSConfig).first()
@@ -68,14 +70,33 @@ def get_backup_status(
     
     return schemas.BackupStatus(
         last_backup_at=config.last_backup_at,
-        last_backup_status=config.last_backup_status
+        last_backup_status=config.last_backup_status,
+        restore_check_at=config.restore_check_at,
+        restore_check_status=config.restore_check_status,
+        restore_check_detail=config.restore_check_detail,
     )
+
+
+@router.post("/restore-check")
+def trigger_restore_check(
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    admin: models.User = Depends(get_current_creator)
+):
+    """Prueba ahora la restauración del último respaldo de R2 (en segundo plano).
+    Ver services/backup_restore_check.py; el resultado aparece en /status."""
+    config = db.query(models.SaaSConfig).first()
+    if config and config.restore_check_status == "in_progress":
+        return {"status": "in_progress"}
+    from app.services.backup_restore_check import run_restore_check
+    background_tasks.add_task(run_restore_check)
+    return {"status": "in_progress"}
 
 @router.post("/trigger")
 def trigger_manual_backup(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    admin: models.User = Depends(get_current_admin)
+    admin: models.User = Depends(get_current_creator)
 ):
     """Manually trigger a database backup as a background task."""
     # update status to "in progress"
@@ -92,7 +113,7 @@ def trigger_manual_backup(
 
 @router.get("/download")
 def download_db_backup(
-    admin: models.User = Depends(get_current_admin)
+    admin: models.User = Depends(get_current_creator)
 ):
     """Genera un dump de la BD on-demand y lo descarga directamente.
 

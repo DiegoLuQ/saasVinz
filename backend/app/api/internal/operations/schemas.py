@@ -352,12 +352,17 @@ class PublicTrackingResponse(BaseModel):
     farewell_template_config: Optional[dict] = None
     is_ultra_plan: Optional[bool] = False
     tenant_plan: Optional[str] = None
+    # Encuesta de satisfacción: se muestra al entregar si el crematorio la tiene activa.
+    feedback_enabled: Optional[bool] = False
+    feedback: Optional[dict] = None  # {rating, comment} si la familia ya respondió
+    show_vinzer_brand: Optional[bool] = True  # «Tecnología por Vinzer» en el pie (marca blanca = False)
 
 # Workflow Steps
 class WorkflowStepBase(BaseModel):
     name: str
     order_index: int = 0
     is_active: bool = True
+    notify_family: bool = False
 
 class WorkflowStepCreate(WorkflowStepBase):
     pass
@@ -366,6 +371,7 @@ class WorkflowStepUpdate(BaseModel):
     name: Optional[str] = None
     order_index: Optional[int] = None
     is_active: Optional[bool] = None
+    notify_family: Optional[bool] = None
 
 class WorkflowStepInDB(WorkflowStepBase):
     id: int

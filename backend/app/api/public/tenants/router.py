@@ -23,6 +23,8 @@ class TenantPublicInfo(BaseModel):
     # (el precio del tramo solo viaja si el crematorio lo habilitó).
     form_config: dict | None = None
     weight_tiers: list[dict] = []
+    # «Con tecnología de Vinzer» en el pie (services/plan_features.show_vinzer_brand)
+    show_vinzer_brand: bool = True
 
     class Config:
         from_attributes = True
@@ -41,6 +43,8 @@ def get_tenant_by_slug(slug: str, db: Session = Depends(get_db)):
     if not tenant_can_use_form_video(tenant):
         strip_videos(form_config)  # el video de bienvenida es solo PRO/ULTRA
     info = TenantPublicInfo.model_validate(tenant)
+    from app.services.plan_features import show_vinzer_brand
+    info.show_vinzer_brand = show_vinzer_brand(tenant)
     info.form_config = form_config
     info.weight_tiers = public_weight_tiers(db, tenant.id, include_price=form_config["show_weight_prices"])
     return info
