@@ -80,6 +80,17 @@ def tenant_brand(tenant) -> dict:
     }
 
 
+def _no_reply_note(tenant) -> str:
+    """Pie de los avisos automáticos: no se responden; se indica cómo contactar al crematorio."""
+    ways = []
+    if (tenant.phone or "").strip():
+        ways.append(f"por WhatsApp o teléfono al {tenant.phone.strip()}")
+    if (tenant.email or "").strip():
+        ways.append(f"al correo {tenant.email.strip()}")
+    contact = f"contacta a {tenant.name} " + " o ".join(ways) if ways else f"contacta directamente a {tenant.name}"
+    return f"Este es un mensaje automático, por favor no lo respondas. Si tienes dudas, {contact}."
+
+
 def _customer(cremation):
     return cremation.pet.customer if cremation.pet and cremation.pet.customer else None
 
@@ -151,7 +162,7 @@ async def send_step_email(db: Session, cremation_id: int, step_id: int, user_id:
          f"Te contamos que el servicio de {pet} avanzó a la etapa «{step.name}».",
          "En el enlace de seguimiento puedes ver cada paso del proceso, con sus horarios y, cuando corresponda, fotos y notas de nuestro equipo."],
         "Ver el seguimiento", url,
-        f"Recibes este correo porque {tenant.name} atiende el servicio de {pet}. Si tienes dudas, responde este correo.",
+        f"Recibes este correo porque {tenant.name} atiende el servicio de {pet}. {_no_reply_note(tenant)}",
     )
     _record(db, cremation, "step", "email", customer.email, step.id, user_id)
     return {"sent": True, "to": customer.email}
@@ -183,7 +194,7 @@ async def send_finish_email(db: Session, cremation_id: int, user_id: int | None 
          f"Hemos concluido el servicio de {pet}. Sabemos que es un momento difícil y agradecemos que nos hayas permitido acompañarte.",
          "Nos ayudaría mucho saber cómo fue tu experiencia: es una sola pregunta y toma menos de un minuto."],
         "Contar mi experiencia", f"{url}?encuesta=1" if url else None,
-        f"Recibes este correo porque {tenant.name} atendió el servicio de {pet}. Si tienes dudas, responde este correo.",
+        f"Recibes este correo porque {tenant.name} atendió el servicio de {pet}. {_no_reply_note(tenant)}",
     )
     _record(db, cremation, "finish", "email", customer.email, None, user_id)
     return {"sent": True, "to": customer.email}

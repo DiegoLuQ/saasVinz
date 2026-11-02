@@ -16,7 +16,8 @@ class ProductoOCBase(BaseModel):
     cantidad: int = Field(..., alias="quantity")
     precio_costo: float = 0.0
     precio_venta: float = Field(..., alias="unit_price")
-    
+    plan_id: Optional[int] = None  # incluido en ese plan de la orden
+
     # Permitir tanto el alias como el nombre original
     model_config = {"populate_by_name": True}
 
@@ -106,6 +107,10 @@ class CremationFinancialInDB(BaseModel):
     discount: Optional[float] = 0.0
     weight_price: Optional[float] = 0.0
     commission: Optional[float] = 0.0
+    agreement_id: Optional[int] = None
+    agreement_name: Optional[str] = None
+    agreement_discount: Optional[float] = 0.0
+    agreement_terms: Optional[dict] = None
     model_config = {"from_attributes": True}
 
 class CremationDetailsInDB(BaseModel):
@@ -155,6 +160,7 @@ class CremationOCBase(BaseModel):
     tracking_token: Optional[str] = None
     partner_id: Optional[int] = None # Legacy: mapped to partner_link_id
     partner_link_id: Optional[int] = None
+    agreement_id: Optional[int] = None  # Convenio con empresa (crm_agreements)
 
 class CremationOCCreate(CremationOCBase):
     pass
@@ -185,6 +191,7 @@ class CremationOCUpdate(BaseModel):
     weight_price: Optional[float] = None
     partner_id: Optional[int] = None
     partner_link_id: Optional[int] = None
+    agreement_id: Optional[int] = None  # null = quitar convenio
 
 class CremationOCInDB(CremationOCBase):
     id: int
@@ -223,6 +230,9 @@ class CremationOCInDB(CremationOCBase):
     discount: Optional[float] = None
     weight_price: Optional[float] = None
     commission: Optional[float] = None
+    agreement_name: Optional[str] = None
+    agreement_discount: Optional[float] = None
+    agreement_terms: Optional[dict] = None
     images: Optional[List[str]] = None
     notes: Optional[str] = None
     tracking_token: Optional[str] = None
@@ -263,6 +273,10 @@ class CremationOCInDB(CremationOCBase):
             if self.discount is None: self.discount = self.financial.discount
             if self.weight_price is None: self.weight_price = self.financial.weight_price
             if self.commission is None: self.commission = self.financial.commission
+            if self.agreement_id is None: self.agreement_id = self.financial.agreement_id
+            if self.agreement_name is None: self.agreement_name = self.financial.agreement_name
+            if self.agreement_discount is None: self.agreement_discount = self.financial.agreement_discount
+            if self.agreement_terms is None: self.agreement_terms = self.financial.agreement_terms
         if self.details:
             if not self.images: self.images = self.details.images
             if not self.notes: self.notes = self.details.notes

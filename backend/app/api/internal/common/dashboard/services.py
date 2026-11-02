@@ -173,6 +173,9 @@ def build_dashboard_summary(
     usage = {name: LimitChecker.get_usage(db, tenant_id, name) for name in LimitChecker.RESOURCE_CONFIG}
 
     def limit(name: str) -> schemas.DashboardLimitItem:
+        # Mascotas y clientes no son límite de los planes: max 0 = sin límite.
+        if name in ("pets", "customers"):
+            return schemas.DashboardLimitItem(usage=usage[name], max=0)
         field = LimitChecker.RESOURCE_CONFIG[name]["limit_field"]
         return schemas.DashboardLimitItem(usage=usage[name], max=(getattr(plan, field, 0) or 0) if plan else 0)
 

@@ -14,6 +14,9 @@ from app.api.internal.common.media_service import MediaService
 from app.utils.time import get_tenant_now
 from app.utils.generators import generate_unique_code
 from app.api.internal.partners.models import PartnerLinkV2 as PartnerLink, PartnerCommission, PartnerCommissionStatus
+from app.api.internal.agreements.models import Agreement
+from app.services import agreements as agreement_rules
+from app.services import stock as stock_rules
 
 class CremationService:
     def __init__(self, db: Session):
@@ -296,27 +299,25 @@ class CremationService:
 
         for prod_item in productos_in:
             p_dict = prod_item if isinstance(prod_item, dict) else prod_item.model_dump()
-            db_product = self.db.query(models.Product).filter(
-                models.Product.id == p_dict['product_id'], 
-                models.Product.tenant_id == tenant_id
-            ).first()
-            
+            # Valida y descuenta (409 si no alcanza); incluye el ánfora del plan.
+            db_product = stock_rules.take(self.db, tenant_id, p_dict['product_id'], p_dict['cantidad'])
+
             if db_product:
-                db_product.stock -= p_dict['cantidad']
-                if db_product.stock <= 0:
-                    db_product.availability_status = "Agotado"
-                
                 db_assoc = models.ProductoOC(
                     tenant_id=tenant_id,
                     cremation_id=db_cremation.id,
                     product_id=p_dict['product_id'],
                     cantidad=p_dict['cantidad'],
                     precio_costo=p_dict.get('precio_costo') if p_dict.get('precio_costo') and p_dict.get('precio_costo') > 0 else (db_product.cost_price or 0.0),
-                    precio_venta=p_dict.get('precio_venta')
+                    precio_venta=p_dict.get('precio_venta'),
+                    plan_id=p_dict.get('plan_id'),
                 )
                 self.db.add(db_assoc)
         
         self.db.flush()
+        if cremation_in.agreement_id:
+            self._set_agreement(tenant_id, db_cremation, cremation_in.agreement_id)
+        self._recompute_agreement_discount(db_cremation)
         self._sync_cremation_type(db_cremation)
         self.db.commit()
         self.db.refresh(db_cremation)
@@ -339,6 +340,8 @@ class CremationService:
         patch_service_id = update_data.pop("service_id", None)
         patch_plan_id = update_data.pop("plan_id", None)
         patch_additional = update_data.pop("additional_services", None)
+        agreement_change = "agreement_id" in update_data
+        new_agreement_id = update_data.pop("agreement_id", None)
 
         if (servicios_in is not None or planes_in is not None or productos_in is not None or 
             patch_service_id is not None or patch_plan_id is not None or patch_additional is not None):
@@ -375,18 +378,18 @@ class CremationService:
             # Productos (Stock management)
             if productos_in is not None:
                 old_products = self.db.query(models.ProductoOC).filter(models.ProductoOC.cremation_id == cremation_id).all()
+                # Lo que la orden ya tenía vuelve al stock y se puede volver a tomar
+                # aunque el stock haya quedado negativo por movimientos antiguos.
+                allowance: dict = {}
                 for old_p in old_products:
-                    p_obj = self.db.query(models.Product).filter(models.Product.id == old_p.product_id).first()
-                    if p_obj: p_obj.stock += old_p.cantidad
-                
+                    stock_rules.give_back(self.db, tenant_id, old_p.product_id, old_p.cantidad)
+                    allowance[old_p.product_id] = allowance.get(old_p.product_id, 0) + (old_p.cantidad or 0)
+
                 self.db.query(models.ProductoOC).filter(models.ProductoOC.cremation_id == cremation_id).delete()
                 for prod_item in productos_in:
                     p_dict = prod_item if isinstance(prod_item, dict) else prod_item.model_dump()
-                    p_obj = self.db.query(models.Product).filter(models.Product.id == p_dict["product_id"]).first()
+                    p_obj = stock_rules.take(self.db, tenant_id, p_dict["product_id"], p_dict["cantidad"], allowance)
                     if p_obj:
-                        p_obj.stock -= p_dict["cantidad"]
-                        p_obj.availability_status = "Disponible" if p_obj.stock > 0 else "Agotado"
-                        
                         if not p_dict.get("precio_costo") or p_dict.get("precio_costo") == 0:
                             p_dict["precio_costo"] = p_obj.cost_price or 0.0
                             
@@ -412,14 +415,9 @@ class CremationService:
                     prod.stock += p_assoc.cantidad
                     prod.availability_status = "Disponible"
             
-            if db_obj.images:
-                for img_url in db_obj.images:
-                    try:
-                        if img_url.startswith("/static/"):
-                            disk_path = os.path.join(os.getcwd(), "app", img_url.lstrip("/"))
-                            if os.path.exists(disk_path): os.remove(disk_path)
-                    except Exception as e: print(f"Error deleting OC image {img_url}: {e}")
-
+            # Las fotos de la orden y de la mascota NO se tocan al cancelar (igual
+            # que al eliminar solo la orden). Antes este bloque leía db_obj.images,
+            # que no existe, y la cancelación respondía 500.
             if db_obj.details: db_obj.details.additional_services = []
             if db_obj.financial:
                 db_obj.financial.total_price = 0.0
@@ -432,19 +430,8 @@ class CremationService:
             self.db.query(models.ServicioOC).filter(models.ServicioOC.cremation_id == cremation_id).delete()
             self.db.query(models.PlanOC).filter(models.PlanOC.cremation_id == cremation_id).delete()
             self.db.query(models.ProductoOC).filter(models.ProductoOC.cremation_id == cremation_id).delete()
-
-            pet = self.db.query(models.Pet).filter(models.Pet.id == db_obj.pet_id).first()
-            if pet and pet.image_url:
-                try:
-                    if pet.image_url.startswith("/static/"):
-                        disk_path = os.path.join(os.getcwd(), "app", pet.image_url.lstrip("/"))
-                        if os.path.exists(disk_path): os.remove(disk_path)
-                    pet.image_url = None
-                    pet.images = []
-                except Exception as e: print(f"Error deleting pet image: {e}")
-            
-            db_obj.images = []
-            if "images" in update_data: update_data["images"] = []
+            # El total que manda el formulario en el mismo guardado no debe pisar el 0.
+            update_data.pop("total_price", None)
 
         core_fields_keys = {"pet_id", "oc_number", "cremation_type", "status", "weight", "partner_link_id"}
         partition_fields = {
@@ -534,7 +521,9 @@ class CremationService:
                         amount_porcentaje=comm_percent,
                         status=PartnerCommissionStatus.pendiente
                     ))
-        elif not db_obj.partner_link_id:
+        else:
+            # Sin veterinaria, o la orden quedó cancelada / borrador / cotización:
+            # no corresponde comisión. Solo se borra la pendiente; la ya pagada queda.
             if db_obj.financial:
                 db_obj.financial.commission = 0.0
             self.db.query(PartnerCommission).filter(
@@ -543,10 +532,56 @@ class CremationService:
             ).delete()
 
         self.db.flush()
+        if agreement_change:
+            self._set_agreement(tenant_id, db_obj, new_agreement_id)
+        self._recompute_agreement_discount(db_obj)
         self._sync_cremation_type(db_obj)
         self.db.commit()
         self.db.refresh(db_obj)
         return db_obj
+
+    # --- Convenios con empresas (app/services/agreements.py) ---
+    def _set_agreement(self, tenant_id: int, db_obj, agreement_id: Optional[int]) -> None:
+        """Asigna/quita el convenio. Reasignar el mismo conserva la copia original."""
+        fin = db_obj.financial
+        if fin is None:
+            fin = self.db.query(models.CremationFinancial).filter(
+                models.CremationFinancial.cremation_id == db_obj.id).first()
+        if fin is None:
+            return
+        if not agreement_id:
+            fin.agreement_id = None
+            fin.agreement_name = None
+            fin.agreement_terms = None
+            fin.agreement_discount = 0.0
+            return
+        if fin.agreement_id == agreement_id and fin.agreement_terms:
+            return
+        if not agreement_rules.enabled_for(self.db, tenant_id):
+            raise HTTPException(status_code=403, detail="Tu plan no incluye convenios con empresas")
+        ag = self.db.query(Agreement).filter(
+            Agreement.id == agreement_id, Agreement.tenant_id == tenant_id).first()
+        if not ag or not ag.is_active:
+            raise HTTPException(status_code=400, detail="El convenio no existe o está inactivo")
+        fin.agreement_id = ag.id
+        fin.agreement_name = ag.name
+        fin.agreement_terms = agreement_rules.terms_from(ag)
+
+    def _recompute_agreement_discount(self, db_obj) -> None:
+        fin = self.db.query(models.CremationFinancial).filter(
+            models.CremationFinancial.cremation_id == db_obj.id).first()
+        if fin is None:
+            return
+        if not fin.agreement_terms:
+            fin.agreement_discount = 0.0
+            return
+        cid = db_obj.id
+        fin.agreement_discount = agreement_rules.compute_discount(
+            fin.agreement_terms,
+            self.db.query(models.ServicioOC).filter(models.ServicioOC.cremation_id == cid).all(),
+            self.db.query(models.PlanOC).filter(models.PlanOC.cremation_id == cid).all(),
+            self.db.query(models.ProductoOC).filter(models.ProductoOC.cremation_id == cid).all(),
+        )
 
     def delete(self, tenant_id: int, cremation_id: int) -> dict:
         db_cremation = self.db.query(models.CremationOC).filter(

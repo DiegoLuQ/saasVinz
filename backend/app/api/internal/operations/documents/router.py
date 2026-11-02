@@ -8,6 +8,7 @@ from app.api.deps import get_tenant_id
 from app.api.internal.admin.rbac.router import check_permission
 from app.api.deps_features import check_feature
 from typing import List, Optional
+from pydantic import BaseModel
 import shutil
 import os
 import re
@@ -576,8 +577,11 @@ def generar_recibo(
 
         # 5. Servicios Adicionales
         additional_services_ids = cremation.details.additional_services if cremation.details else []
+        listed_ids = {s.service_id for s in cremation.servicios}
         if additional_services_ids:
             for s_id in additional_services_ids:
+                if s_id in listed_ids:
+                    continue
                 asvc = db.query(models.Service).filter(models.Service.id == s_id).first()
                 if asvc:
                     additional_list.append({"name": asvc.name, "price": asvc.price})
@@ -590,7 +594,7 @@ def generar_recibo(
                 prod = db.query(models.Product).filter(models.Product.id == cp.product_id).first()
             
             products_list.append({
-                "name": prod.name if prod else "Producto",
+                "name": (prod.name if prod else "Producto") + (" (incluida en el plan)" if cp.plan_id else ""),
                 "quantity": cp.cantidad,
                 "unit_price": cp.precio_venta
             })
@@ -621,6 +625,8 @@ def generar_recibo(
             discount_percent=cremation.financial.discount if cremation.financial else 0.0,
             total_price=cremation.financial.total_price if cremation.financial else 0.0,
             weight_price=(cremation.financial.weight_price or 0.0) if cremation.financial else 0.0,
+            agreement_name=cremation.financial.agreement_name if cremation.financial else None,
+            agreement_discount=(cremation.financial.agreement_discount or 0.0) if cremation.financial else 0.0,
             scheduled_at=cremation.scheduling.scheduled_at if cremation.scheduling else None,
             issue_date=now,
             receipt_number=f"REC-{(cremation.oc_number or cremation.id):04d}",
@@ -655,6 +661,122 @@ def generar_recibo(
         import traceback
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
+
+class ReceiptPreviewItem(BaseModel):
+    id: int
+    price: float = 0.0
+    quantity: int = 1
+    plan_id: Optional[int] = None  # producto incluido en ese plan
+
+
+class ReceiptPreviewRequest(BaseModel):
+    """Datos del formulario de la orden (aunque no estén guardados)."""
+    cremation_id: Optional[int] = None
+    pet_id: Optional[int] = None
+    services: List[ReceiptPreviewItem] = []
+    plans: List[ReceiptPreviewItem] = []
+    products: List[ReceiptPreviewItem] = []
+    weight: Optional[float] = None
+    weight_price: float = 0.0
+    discount: float = 0.0
+    agreement_id: Optional[int] = None
+    scheduled_at: Optional[datetime] = None
+    address: Optional[str] = None
+
+
+@router.post("/receipt/preview")
+def previsualizar_recibo(
+    req: ReceiptPreviewRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    _perm: bool = Depends(check_permission("ordenes", "view")),
+):
+    """Vista previa del recibo con lo que hay en Editar Orden; no guarda nada.
+
+    Misma plantilla y mismo cálculo que el recibo real: convenio por ítem
+    (app/services/agreements.py), luego el descuento especial %.
+    """
+    from app.utils.certificates import generate_receipt_html
+    from app.api.internal.agreements.models import Agreement
+    from app.services import agreements as agreement_rules
+
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    pet = db.query(models.Pet).filter(models.Pet.id == req.pet_id, models.Pet.tenant_id == tenant_id).first() if req.pet_id else None
+    customer = db.query(models.Customer).filter(models.Customer.id == pet.customer_id).first() if pet else None
+    saved = None
+    if req.cremation_id:
+        saved = db.query(models.Cremation).options(joinedload(models.Cremation.financial)).filter(
+            models.Cremation.id == req.cremation_id, models.Cremation.tenant_id == tenant_id).first()
+
+    def names(model, ids):
+        ids = list({i for i in ids})
+        if not ids:
+            return {}
+        rows = db.query(model).filter(model.id.in_(ids), model.tenant_id == tenant_id).all()
+        return {r.id: r.name for r in rows}
+
+    svc_names = names(models.Service, [s.id for s in req.services])
+    plan_names = names(models.Plan, [p.id for p in req.plans])
+    prod_names = names(models.Product, [p.id for p in req.products])
+
+    lines = [(f"Plan: {plan_names.get(p.id, 'Plan')}", p.price * p.quantity) for p in req.plans] + \
+            [(svc_names.get(s.id, "Servicio"), s.price * s.quantity) for s in req.services]
+    service_name, service_price = lines[0] if lines else ("Servicio de Cremación", 0.0)
+    additional_list = [{"name": n, "price": pr} for n, pr in lines[1:]]
+    products_list = [{"name": prod_names.get(p.id, "Producto") + (" (incluida en el plan)" if p.plan_id else ""), "quantity": p.quantity, "unit_price": p.price} for p in req.products]
+
+    # Convenio: la orden guardada conserva su copia; uno recién elegido usa las condiciones vigentes.
+    terms, agreement_name = None, None
+    if req.agreement_id:
+        fin = saved.financial if saved else None
+        if fin and fin.agreement_id == req.agreement_id and fin.agreement_terms:
+            terms, agreement_name = fin.agreement_terms, fin.agreement_name
+        else:
+            ag = db.query(Agreement).filter(Agreement.id == req.agreement_id, Agreement.tenant_id == tenant_id).first()
+            if ag:
+                terms, agreement_name = agreement_rules.terms_from(ag), ag.name
+    agreement_discount = agreement_rules.compute_discount(
+        terms,
+        [{"service_id": s.id, "precio_venta": s.price, "cantidad": s.quantity} for s in req.services],
+        [{"precio_venta": p.price, "cantidad": p.quantity} for p in req.plans],
+        [{"precio_venta": p.price, "cantidad": p.quantity} for p in req.products],
+    )
+
+    pct = max(0.0, min(100.0, req.discount or 0.0))
+    subtotal = sum(pr for _, pr in lines) + sum(p.price * p.quantity for p in req.products) + (req.weight_price or 0.0)
+    net = subtotal - agreement_discount
+    total = net - net * pct / 100
+
+    number = f"REC-{(saved.oc_number or saved.id):04d}" if saved else "REC-BORRADOR"
+    html_content = generate_receipt_html(
+        tenant_name=tenant.name,
+        tenant_rut=tenant.rut or "N/A",
+        tenant_logo=tenant.logo_url,
+        client_name=customer.name if customer else "N/A",
+        client_rut=(customer.rut or "N/A") if customer else "N/A",
+        client_phone=(customer.phone or "N/A") if customer else "N/A",
+        client_address=req.address or (customer.address if customer else None) or "N/A",
+        pet_name=pet.name if pet else "N/A",
+        pet_species=pet.species if pet else "N/A",
+        pet_breed=(pet.breed or "N/A") if pet else "N/A",
+        pet_weight=req.weight,
+        service_name=service_name,
+        service_price=service_price,
+        additional_services=additional_list,
+        products=products_list,
+        discount_percent=pct,
+        total_price=total,
+        weight_price=req.weight_price or 0.0,
+        scheduled_at=req.scheduled_at,
+        issue_date=datetime.now(),
+        receipt_number=number,
+        base_url=str(request.base_url).rstrip('/'),
+        agreement_name=agreement_name,
+        agreement_discount=agreement_discount,
+    )
+    return {"html_content": html_content, "number": number, "total": total, "agreement_discount": agreement_discount}
+
 
 @router.get("/templates/{template_id}/preview")
 def preview_plantilla(

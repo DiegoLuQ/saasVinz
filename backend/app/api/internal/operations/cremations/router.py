@@ -268,8 +268,11 @@ def obtener_expediente(
     # peso, menos el descuento %. El total_price guardado puede venir sin el recargo.
     fin = oc.financial
     discount_pct = (fin.discount or 0) if fin else 0
+    agreement_discount = (fin.agreement_discount or 0) if fin else 0
     subtotal = sum(i["precio"] * i["cantidad"] for i in items)
-    total = subtotal - subtotal * discount_pct / 100
+    # Convenio primero (por ítem), luego el descuento % manual (app/services/agreements.py)
+    net = subtotal - agreement_discount
+    total = net - net * discount_pct / 100
     log = oc.logistics
     sched = oc.scheduling
     notes_txt = ((oc.details.notes or "").strip() or None) if oc.details else None
@@ -313,6 +316,10 @@ def obtener_expediente(
             "subtotal": subtotal,
             "total": total,
             "discount": discount_pct,
+            "agreement": {
+                "id": fin.agreement_id, "name": fin.agreement_name,
+                "discount": agreement_discount, "terms": fin.agreement_terms,
+            } if fin and (fin.agreement_id or fin.agreement_name) else None,
         },
         "timeline": timeline,
         "partner": partner,

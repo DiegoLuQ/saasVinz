@@ -107,6 +107,10 @@ export function mapCremationToFormState(
         pickup_address: cremationData.pickup_address || '',
         partner_id: cremationData.partner_link_id || cremationData.partner_id || undefined,
         partner_link_id: cremationData.partner_link_id || cremationData.partner_id || undefined,
+        agreement_id: cremationData.agreement_id ?? null,
+        agreement_name: cremationData.agreement_name ?? null,
+        agreement_discount: cremationData.agreement_discount || 0,
+        agreement_terms: cremationData.agreement_terms ?? null,
         images:
             cremationData.images && cremationData.images.length > 0
                 ? cremationData.images
@@ -119,11 +123,16 @@ export function mapCremationToFormState(
  */
 export function mapCremationProducts(
     productos: any[],
-    allProducts: Product[]
+    allProducts: Product[],
+    allPlans: Plan[] = []
 ): SelectedProduct[] {
     return productos.map((p: any) => {
         const original = allProducts.find((prod) => prod.id === p.product_id);
+        const plan = p.plan_id ? allPlans.find((pl) => pl.id === p.plan_id) : undefined;
+        const inPlan = plan?.products?.find((x) => x.id === p.product_id) ?? plan?.products?.[0];
         return {
+            plan_id: p.plan_id ?? null,
+            included_price: inPlan ? (inPlan.sale_price ?? inPlan.unit_price ?? 0) : undefined,
             id: p.product_id,
             product_id: p.product_id,
             quantity: p.quantity ?? p.cantidad ?? 1,

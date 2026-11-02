@@ -50,7 +50,10 @@ interface Expediente {
         address?: string | null; city?: string | null; region?: string | null;
     };
     items: { tipo: 'servicio' | 'plan' | 'producto' | 'peso'; nombre: string; cantidad: number; precio: number; incluye?: string[] }[];
-    financial: { subtotal?: number; total: number; discount?: number };
+    financial: {
+        subtotal?: number; total: number; discount?: number;
+        agreement?: { id: number | null; name: string | null; discount: number } | null;
+    };
     timeline: (Stage & { photo_url?: string | null; comments: string[]; at?: string | null })[];
     partner: { name: string; commission: { amount: number; status: string; paid_at?: string | null } | null } | null;
     deliverables: {
@@ -352,7 +355,7 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                 </div>
                                 <Link
                                     href={`/dashboard/recepcion-pedidos/registro?id=${cremation.id}`}
-                                    className="shrink-0 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 dark:bg-white/5 dark:hover:bg-white/10 dark:text-white dark:border-white/10 text-xs font-bold transition flex items-center gap-1.5"
+                                    className="shrink-0 px-3.5 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white border border-orange-400/60 shadow-md shadow-orange-500/30 hover:shadow-lg hover:shadow-orange-500/40 dark:from-orange-500 dark:to-amber-400 dark:hover:from-orange-400 dark:hover:to-amber-300 dark:text-slate-950 dark:border-amber-300/40 dark:shadow-amber-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background text-xs font-black transition-all flex items-center gap-1.5"
                                 >
                                     <Edit size={14} /> Editar orden
                                 </Link>
@@ -797,10 +800,16 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                                 )}
                                             </div>
                                         ))}
+                                        {!!exp.financial.agreement?.discount && (
+                                            <div className="flex justify-between text-sky-700 dark:text-sky-400 font-medium">
+                                                <span>Convenio {exp.financial.agreement.name}</span>
+                                                <span className="tabular-nums">−{clp.format(exp.financial.agreement.discount)}</span>
+                                            </div>
+                                        )}
                                         {!!exp.financial.discount && (
                                             <div className="flex justify-between text-amber-700 dark:text-amber-400 font-medium">
                                                 <span>Descuento ({exp.financial.discount}%)</span>
-                                                <span className="tabular-nums">−{clp.format((exp.financial.subtotal || 0) - exp.financial.total)}</span>
+                                                <span className="tabular-nums">−{clp.format((exp.financial.subtotal || 0) - (exp.financial.agreement?.discount || 0) - exp.financial.total)}</span>
                                             </div>
                                         )}
                                         <div className="pt-2.5 border-t border-slate-200 dark:border-white/10 flex justify-between font-extrabold text-sm">

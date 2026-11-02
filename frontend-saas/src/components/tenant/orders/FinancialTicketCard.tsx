@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Plus, Trash2, ChevronUp, ChevronDown, Loader2, Receipt, Package, Sparkles, Layers, Building2, Percent, Handshake } from 'lucide-react';
+import { Plus, Trash2, ChevronUp, ChevronDown, Loader2, Receipt, Package, Sparkles, Layers, Building2, Percent, Handshake, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import SalesCatalogDrawer from '@/components/tenant/orders/SalesCatalogDrawer';
+import ReceiptPreviewModal from '@/components/tenant/orders/ReceiptPreviewModal';
 import { API_URL } from '@/lib/tenant/api';
 import type { Cremation, Service, Plan, Product, SelectedProduct, SelectedService, SelectedPlan } from '@/lib/tenant/orders/types';
+import { describeTerms, type AgreementOption, type AgreementTerms, type AgreementBreakdown } from '@/lib/tenant/orders/agreements';
 
 interface FinancialTicketCardProps {
     // Catalog
@@ -14,6 +16,11 @@ interface FinancialTicketCardProps {
     products: Product[];
     partners?: any[];
     onNewPartnerClick?: () => void;
+    // Convenios con empresas (descuento al cliente; distinto de la veterinaria)
+    agreements?: AgreementOption[];
+    agreementTerms?: AgreementTerms | null;
+    agreementBreakdown?: AgreementBreakdown;
+    showAgreements?: boolean;
 
     // Selection state
     selectedPlans: SelectedPlan[];
@@ -36,7 +43,9 @@ interface FinancialTicketCardProps {
     onAddPlan: (planId: number) => void;
     onAddService: (serviceId: number) => void;
     onAddProduct: (productId: string) => void;
-    onUpdateProduct: (index: number, field: keyof SelectedProduct, value: number) => void;
+    /** Cambia el ánfora incluida en el plan (línea `index`) por otro producto. */
+    onSwapProduct?: (index: number, productId: number) => void;
+    onUpdateProduct:(index: number, field: keyof SelectedProduct, value: number) => void;
     onRemoveProduct: (index: number) => void;
     onUpdatePlanPrice: (index: number, price: number) => void;
     onRemovePlan: (index: number) => void;
@@ -71,6 +80,10 @@ export default function FinancialTicketCard({
     products,
     partners = [],
     onNewPartnerClick,
+    agreements = [],
+    agreementTerms = null,
+    agreementBreakdown,
+    showAgreements = true,
     selectedPlans,
     selectedServices,
     selectedProducts,
@@ -83,6 +96,7 @@ export default function FinancialTicketCard({
     onAddPlan,
     onAddService,
     onAddProduct,
+    onSwapProduct,
     onUpdateProduct,
     onRemoveProduct,
     onUpdatePlanPrice,
@@ -94,6 +108,9 @@ export default function FinancialTicketCard({
     onBack,
 }: FinancialTicketCardProps) {
     const [drawerType, setDrawerType] = useState<'plan' | 'service' | 'product' | null>(null);
+    // Línea del ánfora del plan que se está cambiando (el catálogo de productos elige la nueva).
+    const [swapIndex, setSwapIndex] = useState<number | null>(null);
+    const [showReceipt, setShowReceipt] = useState(false);
     const productsSubtotal = selectedProducts.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
     const hasItems = selectedPlans.length > 0 || selectedServices.length > 0 || selectedProducts.length > 0;
     const discountValue = currentCremation?.discount || 0;
@@ -227,7 +244,7 @@ export default function FinancialTicketCard({
                                                 {s.name} <span className="text-primary/40 ml-1">(incluido)</span>
                                             </div>
                                         ))}
-                                        {plans.find(pl => pl.id === p.plan_id)?.products?.map((prod, pIdx) => (
+                                        {!selectedProducts.some(sp => sp.plan_id === p.plan_id) && plans.find(pl => pl.id === p.plan_id)?.products?.map((prod, pIdx) => (
                                             <div key={`iprod-${pIdx}`} className="text-[9px] text-muted-foreground/70 uppercase tracking-wider flex items-center gap-1.5">
                                                 <span className="w-1 h-1 rounded-full bg-orange-400/40" aria-hidden="true" />
                                                 {prod.name} <span className="text-orange-400/40 ml-1">(incluido)</span>
@@ -304,6 +321,14 @@ export default function FinancialTicketCard({
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-[11px] font-black text-white truncate uppercase tracking-tight">{product.name}</p>
+                                                    {product.plan_id ? (
+                                                        <IncludedProductTools
+                                                            product={product}
+                                                            listPrice={products.find(pr => pr.id === product.product_id)?.unit_price ?? 0}
+                                                            onSwap={onSwapProduct ? () => { setSwapIndex(index); setDrawerType('product'); } : undefined}
+                                                            onCharge={(amount) => onUpdateProduct(index, 'unit_price', amount)}
+                                                        />
+                                                    ) : null}
                                                     <div className="flex items-center gap-1.5 mt-1">
                                                         <div className="flex items-center gap-1 bg-black/30 rounded px-1.5 py-0.5 border border-white/[0.05]">
                                                             <button
@@ -388,12 +413,46 @@ export default function FinancialTicketCard({
                         </div>
                     )}
 
-                    {/* === Partner / Convenio Veterinario === */}
-                    <div className="pt-3 border-t border-border/40 space-y-2">
+                    {/* === Ajustes comerciales: bloques diferenciados === */}
+                    <div className="pt-3 border-t border-border/40 space-y-3">
+                    {/* === Bloque 1: Descuento especial (%) manual === */}
+                    <div className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.04] p-3.5 flex justify-between items-center gap-3">
+                        <div>
+                            <label htmlFor="input-discount" className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.18em] flex items-center gap-1.5">
+                                <Percent size={13} className="text-amber-500" />
+                                Descuento especial (%)
+                            </label>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">Se aplica sobre el total, después del convenio.</p>
+                        </div>
+                        <input
+                            id="input-discount"
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={discountValue}
+                            onChange={(e) => setCurrentCremation(prev => ({ ...prev, discount: Number(e.target.value) }))}
+                            className="w-16 h-9 bg-background border border-border rounded-lg px-2.5 text-right text-xs font-black text-foreground focus:ring-2 focus:ring-primary focus:border-primary outline-none font-mono shadow-sm"
+                            aria-label="Porcentaje de descuento especial"
+                        />
+                    </div>
+
+                    {/* === Bloque 2: Convenio con empresa (descuento al cliente) === */}
+                    {(showAgreements || currentCremation?.agreement_id) && (
+                        <AgreementSection
+                            agreements={agreements}
+                            currentCremation={currentCremation}
+                            setCurrentCremation={setCurrentCremation}
+                            terms={agreementTerms}
+                            breakdown={agreementBreakdown}
+                        />
+                    )}
+
+                    {/* === Bloque 3: Veterinaria derivadora (comisión) === */}
+                    <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.04] p-3.5 space-y-2">
                         <div className="flex items-center justify-between">
                             <label htmlFor="select-partner" className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.18em] flex items-center gap-1.5">
                                 <Handshake size={13} className="text-emerald-500" />
-                                Convenio / Partner
+                                Veterinaria derivadora
                             </label>
                             <div className="flex items-center gap-2">
                                 {onNewPartnerClick && (
@@ -428,7 +487,7 @@ export default function FinancialTicketCard({
                             }}
                             className="w-full h-10 bg-background border border-border rounded-xl px-3 text-xs font-semibold text-foreground focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all shadow-sm"
                         >
-                            <option value="">Sin Convenio (Directo / Particular)</option>
+                            <option value="">Sin veterinaria (directo / particular)</option>
                             {partners.map((p: any) => (
                                 <option key={p.id || p.id_partner} value={p.id || p.id_partner}>
                                     {p.name || p.nombre || p.nombre_clinica} ({p.porcentaje_comision || 0}%)
@@ -447,28 +506,24 @@ export default function FinancialTicketCard({
                             </div>
                         )}
                     </div>
-
-                    <div className="flex justify-between items-center pt-2">
-                        <label htmlFor="input-discount" className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.18em]">
-                            Descuento (%)
-                        </label>
-                        <input
-                            id="input-discount"
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={discountValue}
-                            onChange={(e) => setCurrentCremation(prev => ({ ...prev, discount: Number(e.target.value) }))}
-                            className="w-16 h-9 bg-background border border-border rounded-lg px-2.5 text-right text-xs font-black text-foreground focus:ring-2 focus:ring-primary focus:border-primary outline-none font-mono shadow-sm"
-                            aria-label="Porcentaje de descuento"
-                        />
                     </div>
 
-                    <div className="pt-4 border-t-2 border-border/80 flex flex-col items-end gap-1">
-                        <p className="text-[9px] font-black text-primary uppercase tracking-[0.22em]">Total a Pagar</p>
-                        <p className="text-3xl lg:text-4xl font-black text-foreground tracking-tight font-mono">
-                            {CLP.format(grandTotal)}
-                        </p>
+                    <div className="pt-4 border-t-2 border-border/80 flex items-end justify-between gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setShowReceipt(true)}
+                            disabled={!hasItems}
+                            title={hasItems ? undefined : 'Agrega un plan, servicio o producto'}
+                            className="h-10 px-3.5 rounded-xl border border-border bg-background hover:bg-muted text-[10px] font-black uppercase tracking-[0.14em] text-foreground/80 flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            <Receipt size={14} /> Vista previa del recibo
+                        </button>
+                        <div className="flex flex-col items-end gap-1">
+                            <p className="text-[9px] font-black text-primary uppercase tracking-[0.22em]">Total a Pagar</p>
+                            <p className="text-3xl lg:text-4xl font-black text-foreground tracking-tight font-mono">
+                                {CLP.format(grandTotal)}
+                            </p>
+                        </div>
                     </div>
                 </section>
 
@@ -507,17 +562,35 @@ export default function FinancialTicketCard({
                 </footer>
             </article>
 
+            <ReceiptPreviewModal
+                isOpen={showReceipt}
+                onClose={() => setShowReceipt(false)}
+                editId={editId}
+                currentCremation={currentCremation}
+                selectedServices={selectedServices}
+                selectedPlans={selectedPlans}
+                selectedProducts={selectedProducts}
+            />
+
             {/* Catalog Drawer */}
             <SalesCatalogDrawer
                 isOpen={drawerType !== null}
-                onClose={() => setDrawerType(null)}
+                onClose={() => { setDrawerType(null); setSwapIndex(null); }}
                 type={drawerType || 'plan'}
                 plans={plans}
                 services={services}
                 products={products}
                 onSelectPlan={onAddPlan}
                 onSelectService={onAddService}
-                onSelectProduct={onAddProduct}
+                onSelectProduct={(id) => {
+                    if (swapIndex !== null && onSwapProduct) {
+                        onSwapProduct(swapIndex, Number(id));
+                        setSwapIndex(null);
+                        setDrawerType(null);
+                        return;
+                    }
+                    onAddProduct(id);
+                }}
                 selectedPlanIds={selectedPlans.map(p => p.plan_id)}
                 selectedServiceIds={selectedServices.map(s => s.service_id)}
                 selectedProductIds={selectedProducts.map(p => Number(p.product_id))}
@@ -525,3 +598,139 @@ export default function FinancialTicketCard({
         </div>
     );
 }
+
+function AgreementSection({
+    agreements,
+    currentCremation,
+    setCurrentCremation,
+    terms,
+    breakdown,
+}: {
+    agreements: AgreementOption[];
+    currentCremation: Partial<Cremation>;
+    setCurrentCremation: React.Dispatch<React.SetStateAction<Partial<Cremation>>>;
+    terms: AgreementTerms | null;
+    breakdown?: AgreementBreakdown;
+}) {
+    const currentId = currentCremation?.agreement_id || null;
+    // La orden puede tener un convenio ya desactivado: se muestra igual con su nombre guardado.
+    const missing = !!currentId && !agreements.some(a => a.id === currentId);
+    const lines: { label: string; pct: number; amount: number }[] = breakdown && terms
+        ? [
+            { label: 'Planes', pct: terms.plans_pct, amount: breakdown.plans },
+            { label: 'Ánforas y productos', pct: terms.products_pct, amount: breakdown.products },
+            { label: terms.special_service_name || 'Servicio especial', pct: terms.special_service_pct, amount: breakdown.special },
+        ].filter(l => l.amount > 0)
+        : [];
+
+    return (
+        <div className="rounded-2xl border border-sky-500/25 bg-sky-500/[0.04] p-3.5 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+                <label htmlFor="select-agreement" className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.18em] flex items-center gap-1.5">
+                    <Building2 size={13} className="text-sky-500" />
+                    Convenio empresa
+                </label>
+                <a
+                    href="/dashboard/convenios"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] font-bold text-sky-500 hover:underline tracking-wider"
+                >
+                    Gestionar convenios
+                </a>
+            </div>
+            <select
+                id="select-agreement"
+                value={currentId ?? ''}
+                onChange={(e) => {
+                    const val = e.target.value ? Number(e.target.value) : null;
+                    setCurrentCremation(prev => ({ ...prev, agreement_id: val }));
+                }}
+                className="w-full h-10 bg-background border border-border rounded-xl px-3 text-xs font-semibold text-foreground focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all shadow-sm"
+            >
+                <option value="">Sin convenio</option>
+                {missing && (
+                    <option value={currentId!}>{currentCremation.agreement_name || 'Convenio'} (inactivo)</option>
+                )}
+                {agreements.map(a => (
+                    <option key={a.id} value={a.id}>
+                        {a.name}{a.rut ? ` · ${a.rut}` : ''}
+                    </option>
+                ))}
+            </select>
+
+            {currentId && terms && (
+                <div className="px-3 py-2 bg-sky-500/10 border border-sky-500/20 rounded-xl text-xs space-y-1">
+                    <p className="text-[11px] text-sky-600 dark:text-sky-300 font-medium">{describeTerms(terms)}</p>
+                    {lines.map(l => (
+                        <div key={l.label} className="flex justify-between items-center text-[11px]">
+                            <span className="text-muted-foreground">{l.label} ({l.pct} %)</span>
+                            <span className="font-mono font-bold text-sky-600 dark:text-sky-300">−{CLP.format(l.amount)}</span>
+                        </div>
+                    ))}
+                    {breakdown && breakdown.total > 0 ? (
+                        <div className="flex justify-between items-center pt-1 border-t border-sky-500/20">
+                            <span className="text-[11px] font-bold text-sky-700 dark:text-sky-200 flex items-center gap-1">
+                                <Percent size={12} /> Descuento convenio
+                            </span>
+                            <span className="font-mono font-black text-sky-700 dark:text-sky-200">−{CLP.format(breakdown.total)}</span>
+                        </div>
+                    ) : (
+                        <p className="text-[11px] text-muted-foreground">Ningún ítem de la orden tiene descuento con este convenio.</p>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+/** Ánfora incluida en el plan: etiqueta, «Cambiar» y sugerencia de cobrar la diferencia. */
+function IncludedProductTools({
+    product,
+    listPrice,
+    onSwap,
+    onCharge,
+}: {
+    product: SelectedProduct;
+    listPrice: number;
+    onSwap?: () => void;
+    onCharge: (amount: number) => void;
+}) {
+    const diff = Math.max(0, Math.round(listPrice - (product.included_price ?? listPrice)));
+    return (
+        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+            <span className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full border text-primary bg-primary/10 border-primary/20">
+                Incluida en el plan
+            </span>
+            {onSwap && (
+                <button
+                    type="button"
+                    onClick={onSwap}
+                    className="inline-flex items-center gap-1 text-[9px] font-bold text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded border border-border hover:bg-muted transition-colors"
+                >
+                    <RefreshCw size={9} aria-hidden="true" /> Cambiar
+                </button>
+            )}
+            {diff > 0 && product.unit_price !== diff && (
+                <button
+                    type="button"
+                    onClick={() => onCharge(diff)}
+                    title="La familia eligió un ánfora de mayor precio que la del plan"
+                    className="text-[9px] font-bold text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+                >
+                    Cobrar diferencia +{CLP.format(diff)}
+                </button>
+            )}
+            {product.unit_price > 0 && (
+                <button
+                    type="button"
+                    onClick={() => onCharge(0)}
+                    className="text-[9px] font-bold text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+                >
+                    Sin cargo
+                </button>
+            )}
+        </div>
+    );
+}
+

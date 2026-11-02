@@ -179,17 +179,11 @@ export default function BillingPage() {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
-                            {/* Pets Limit */}
+                            {/* Mascotas y clientes no tienen límite por plan: solo el total */}
                             <div className="space-y-3">
                                 <div className="flex justify-between text-sm font-bold">
                                     <span className="text-white/60">Mascotas Registradas</span>
-                                    <span>{stats?.pets_total || 0} / {limits.max_pets || '∞'}</span>
-                                </div>
-                                <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full bg-primary transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(var(--primary-rgb),0.5)]"
-                                        style={{ width: `${getPercentage(stats?.pets_total || 0, limits.max_pets)}%` }}
-                                    />
+                                    <span>{stats?.pets_total || 0} · sin límite</span>
                                 </div>
                             </div>
 

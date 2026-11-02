@@ -6,6 +6,8 @@ import { AlertTriangle, Loader2, Trash2, FileX, Dog, Users, Lock } from 'lucide-
 import Modal from '@/components/tenant/Modal';
 import { apiRequest } from '@/lib/tenant/api';
 import { useDeleteCremation } from '@/hooks/useCremations';
+import OrderSummaryView from '@/components/tenant/orders/OrderSummaryView';
+import type { OrderSummary } from '@/lib/tenant/orders/summary';
 
 // GET /api/internal/cremations/{id}/delete-preview
 interface DeletePreview {
@@ -39,10 +41,12 @@ interface Props {
     orderId: number;
     onClose: () => void;
     onDeleted: () => void;
+    /** Datos guardados de la orden (cliente, ítems, total, convenio, veterinaria). */
+    summary?: OrderSummary | null;
 }
 
 // Montar solo mientras está abierto (así la confirmación parte desmarcada).
-export default function DeleteOrderModal({ isOpen, orderId, onClose, onDeleted }: Props) {
+export default function DeleteOrderModal({ isOpen, orderId, onClose, onDeleted, summary }: Props) {
     const [confirmed, setConfirmed] = useState(false);
     const [scope, setScope] = useState<Scope>('order');
     const deleteMutation = useDeleteCremation();
@@ -132,6 +136,12 @@ export default function DeleteOrderModal({ isOpen, orderId, onClose, onDeleted }
                     </p>
                 ) : preview && (
                     <>
+                        {summary && (
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-muted-foreground mb-2">Datos de la orden</p>
+                                <OrderSummaryView s={summary} />
+                            </div>
+                        )}
                         <div>
                             <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-muted-foreground mb-2">¿Qué quieres eliminar?</p>
                             <div className="space-y-2" role="radiogroup">

@@ -8,6 +8,7 @@ from app.utils.time import format_tenant_datetime
 from pydantic import BaseModel
 from datetime import datetime
 import json
+from app.services import stock as stock_rules
 import os
 import shutil
 from pathlib import Path
@@ -513,7 +514,8 @@ def create_services_from_submission(
                                 "id": p.id,
                                 "price": p.price or 0.0,
                                 "cost": p.cost or 0.0,
-                                "items": [] # Legacy doesn't have snapshot items
+                                # Sin foto del plan: sus ánforas/insumos actuales
+                                "items": [{"type": "product", "id": pr.id, "quantity": 1} for pr in (p.products or [])],
                             })
                             plan_name = p.name
                             total_price += (p.price or 0.0)
@@ -683,27 +685,28 @@ def create_services_from_submission(
             )
             db.add(db_plan_oc)
             
-            # Process nested items for stock deduction
-            # The snapshot contains "items" list with all services and products included
+            # Ánforas/insumos incluidos en el plan: quedan como línea de la orden
+            # (plan_id, precio 0) para que cancelar o eliminar la orden devuelva el
+            # stock por el mismo camino que cualquier producto (services/stock.py).
             if "items" in p and isinstance(p["items"], list):
-                for sub in p["items"]:
-                    if sub.get("type") == "product":
-                        # Find product to deduct stock
-                        sub_orig_id = sub.get("origin_id") or sub.get("id")
-                        if sub_orig_id:
-                            prod_db = db.query(models.Product).filter(
-                                models.Product.id == sub_orig_id, 
-                                models.Product.tenant_id == tenant_id
-                            ).first()
-                            
-                            if prod_db:
-                                qty_sub = int(sub.get("quantity") or 1)
-                                prod_db.stock -= qty_sub
-                                if prod_db.stock <= 0:
-                                    prod_db.availability_status = "Agotado"
-                                # Note: We don't create ProductoOC for these nested items as they are part of the PlanOC package
-                                # unless the business logic changes to require exploded BOM in the table.
-                                # Current instruction is just "descuento de stock".
+                for sub_item in p["items"]:
+                    if sub_item.get("type") != "product":
+                        continue
+                    sub_orig_id = sub_item.get("origin_id") or sub_item.get("id")
+                    if not sub_orig_id:
+                        continue
+                    qty_sub = int(sub_item.get("quantity") or 1)
+                    prod_db = stock_rules.take(db, tenant_id, int(sub_orig_id), qty_sub)
+                    if prod_db:
+                        db.add(models.ProductoOC(
+                            tenant_id=tenant_id,
+                            cremation_id=db_cremation.id,
+                            product_id=prod_db.id,
+                            cantidad=qty_sub,
+                            precio_costo=prod_db.cost_price or 0.0,
+                            precio_venta=0.0,
+                            plan_id=p["id"],
+                        ))
 
         # 2. Procesar Servicios
         for s in resolved_services:
@@ -728,10 +731,7 @@ def create_services_from_submission(
             p_cost = p["cost"] # Use snapshot cost by default
             
             if db_product:
-                # Deduct stock
-                db_product.stock -= p["qty"]
-                if db_product.stock <= 0:
-                    db_product.availability_status = "Agotado"
+                stock_rules.take(db, tenant_id, db_product.id, p["qty"])
                 
                 # If snapshot cost was 0, maybe try to fetch current? Or stick to 0?
                 # User said: "todos estos con el precio costo y venta... ya que se cobra por plan"

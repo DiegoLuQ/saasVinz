@@ -1,3 +1,4 @@
+import html as html_lib
 import json
 from datetime import datetime
 
@@ -650,10 +651,16 @@ def generate_receipt_html(
     issue_date: datetime = None,
     receipt_number: str = "REC-001",
     base_url: str = "http://localhost:8000",
-    weight_price: float = 0.0
+    weight_price: float = 0.0,
+    agreement_name: str = None,
+    agreement_discount: float = 0.0,
 ) -> str:
     if not issue_date:
         issue_date = datetime.now()
+    # Convenio (por ítem) primero, luego el descuento % manual sobre lo que queda.
+    agreement_discount = agreement_discount or 0.0
+    before_manual = total_price / (1 - discount_percent/100) if discount_percent < 100 else total_price
+    gross_total = before_manual + agreement_discount
 
     def format_currency(value):
         return f"${int(value):,}".replace(",", ".")
@@ -824,12 +831,18 @@ def generate_receipt_html(
                 <div class="totals-box">
                     <div class="total-row">
                         <span>Resumen:</span>
-                        <span>{format_currency(total_price / (1 - discount_percent/100) if discount_percent < 100 else total_price)}</span>
+                        <span>{format_currency(gross_total)}</span>
                     </div>
                     {f"""
                     <div class="total-row" style="color: #c0392b;">
+                        <span>Convenio {html_lib.escape(agreement_name or '')}:</span>
+                        <span>-{format_currency(agreement_discount)}</span>
+                    </div>
+                    """ if agreement_discount > 0 else ""}
+                    {f"""
+                    <div class="total-row" style="color: #c0392b;">
                         <span>Descuento ({discount_percent}%):</span>
-                        <span>-{format_currency((total_price / (1 - discount_percent/100) if discount_percent < 100 else total_price) - total_price)}</span>
+                        <span>-{format_currency(before_manual - total_price)}</span>
                     </div>
                     """ if discount_percent > 0 else ""}
                     <div class="total-row grand-total">

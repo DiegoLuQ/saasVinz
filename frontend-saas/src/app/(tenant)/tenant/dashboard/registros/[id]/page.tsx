@@ -79,8 +79,6 @@ export default function SubmissionDetailPage() {
 
     const limits = dashboardData?.limits;
 
-    const isCustomerLimitReached = limits?.customers ? (limits.customers.max > 0 && limits.customers.usage >= limits.customers.max) : false;
-    const isPetLimitReached = limits?.pets ? (limits.pets.max > 0 && limits.pets.usage >= limits.pets.max) : false;
     const isOrderLimitReached = limits?.orders ? (limits.orders.max > 0 && limits.orders.usage >= limits.orders.max) : false;
 
     const handleCopyTracking = (trackingUrl: string) => {
@@ -170,8 +168,6 @@ export default function SubmissionDetailPage() {
             setShowLimitModal(true);
             throw new Error(msg);
         };
-        if (!ids.customer_id && isCustomerLimitReached) limitHit('Clientes', 'Alcanzaste el límite de clientes de tu plan');
-        if (!ids.pet_id && isPetLimitReached) limitHit('Mascotas', 'Alcanzaste el límite de mascotas de tu plan');
         if (!ids.cremation_id && isOrderLimitReached) limitHit('Recursos', 'Alcanzaste el límite de órdenes de tu plan');
 
         let current: 'cliente' | 'mascota' | 'orden' = 'cliente';

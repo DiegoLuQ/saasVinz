@@ -31,7 +31,8 @@ export function calculateGrandTotal(
     plans: SelectedPlan[],
     products: SelectedProduct[],
     weightPrice: number,
-    discount: number
+    discount: number,
+    agreementDiscount = 0
 ): number {
     let serviceTotal = 0;
 
@@ -50,7 +51,8 @@ export function calculateGrandTotal(
         0
     );
 
-    const subtotal = serviceTotal + prodTotal;
+    // Convenio (por ítem, ver agreements.ts) primero; el descuento % manual va sobre lo que queda.
+    const subtotal = serviceTotal + prodTotal - agreementDiscount;
     const discountAmount = subtotal * (discount / 100);
     return subtotal - discountAmount;
 }

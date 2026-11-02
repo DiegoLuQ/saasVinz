@@ -30,7 +30,8 @@ import {
     Lock,
     CreditCard as CreditCardIcon,
     HelpCircle,
-    Sparkles
+    Sparkles,
+    Building2
 } from 'lucide-react';
 import { getSubscriptionInfo, isModuleAllowedWhenLocked } from '@/lib/tenant/subscription';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -73,6 +74,7 @@ const navItems: NavItem[] = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, moduleKey: 'dashboard', group: 'principal' },
     { name: 'Clientes', href: '/dashboard/clientes', icon: Users, moduleKey: 'clientes', group: 'clientes' },
     { name: 'Mascotas', href: '/dashboard/mascotas', icon: Dog, moduleKey: 'mascotas', group: 'clientes' },
+    { name: 'Convenios', href: '/dashboard/convenios', icon: Building2, moduleKey: 'clientes', featureKey: 'clientes:convenios', group: 'clientes' },
     { name: 'Catálogo de Servicios', href: '/dashboard/gestion-servicios', icon: Palette, moduleKey: 'servicios', group: 'catalogo' },
     { name: 'Recepción y Pedidos', href: '/dashboard/recepcion-pedidos', icon: Flame, moduleKey: 'ordenes', group: 'operacion' },
     {

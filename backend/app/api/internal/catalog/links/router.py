@@ -8,6 +8,7 @@ from app.database import get_db
 from app import schemas, models
 from app.api.deps import get_tenant_id, get_current_user
 from app.api.internal.admin.rbac.router import check_permission
+from app.api.deps_features import check_feature
 from app.api.internal.catalog.models import CatalogShareToken
 from app.api.internal.catalog.schemas import CatalogType, CatalogShareTokenBulkUpdate
 
@@ -89,6 +90,9 @@ def create_catalog_share_link(
 ):
     """Genera un nuevo token de catálogo para compartir con clientes."""
     _authorize(db, current_user, tenant_id, data.catalog_type, "create")
+    if data.catalog_type != "plans":
+        # Catálogo público de productos: función del plan (antes solo se ocultaba en el frontend)
+        check_feature("inventario:productos:catalogo", default=True)(current_user=current_user)
 
     now = tz.get_now()
     expires_at = None

@@ -56,6 +56,12 @@ export const FEATURES_REGISTRY: Record<string, ModuleDef> = {
                     { key: 'clientes:eliminar', label: 'Eliminar Clientes' },
                 ],
             },
+            {
+                label: 'Comercial',
+                features: [
+                    { key: 'clientes:convenios', label: 'Convenios con empresas', description: 'Descuentos por convenio en planes, ánforas y servicios especiales, aplicados en la orden' },
+                ],
+            },
         ],
     },
     mascotas: {

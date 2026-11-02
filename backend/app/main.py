@@ -305,6 +305,10 @@ app.include_router(announcements_router, prefix="/api/internal/announcements", t
 from app.api.internal.partners.router import router as partners_router
 app.include_router(partners_router)
 
+# Convenios con empresas (descuentos para sus clientes; distinto de veterinarias)
+from app.api.internal.agreements.router import router as agreements_router
+app.include_router(agreements_router)
+
 # Integrations Module (Widget embebible / API keys públicas) — gestionado por SuperAdmin
 from app.api.internal.creator.widgets.router import router as creator_widgets_router
 app.include_router(creator_widgets_router, prefix="/api/internal/creator/widgets", tags=["Creator - Widgets"])

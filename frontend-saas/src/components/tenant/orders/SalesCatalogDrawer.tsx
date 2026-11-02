@@ -87,7 +87,7 @@ export default function SalesCatalogDrawer({
             width="max-w-md"
         >
             {/* Search Bar */}
-            <div className="px-5 py-4 border-b border-white/[0.06] bg-black/20 sticky top-0 z-10">
+            <div className="px-5 py-4 border-b border-border bg-card sticky top-0 z-10">
                 <div className="relative">
                     <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" />
                     <input
@@ -96,7 +96,7 @@ export default function SalesCatalogDrawer({
                         placeholder="Buscar por nombre..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl py-2.5 pl-10 pr-4 text-sm text-white outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all placeholder:text-muted-foreground/40"
+                        className="w-full bg-background border border-border rounded-xl py-2.5 pl-10 pr-4 text-sm text-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all placeholder:text-muted-foreground/40"
                     />
                 </div>
             </div>
@@ -137,21 +137,21 @@ function PlanList({ plans, search, selectedIds, onSelect }: { plans: Plan[]; sea
                             w-full text-left p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden backdrop-blur-md
                             ${isSelected
                                 ? 'border-primary/40 bg-gradient-to-br from-primary/[0.08] to-primary/[0.01] shadow-[0_4px_20px_-4px_rgba(16,185,129,0.15)]'
-                                : 'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/[0.12] hover:shadow-xl hover:shadow-black/20'
+                                : 'border-border bg-card hover:bg-muted/60 hover:border-primary/30 hover:shadow-lg'
                             }
                         `}
                     >
                         <div className="flex items-start gap-4">
-                            <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-colors ${isSelected ? 'bg-primary/20 text-primary' : 'bg-white/[0.06] text-muted-foreground/60'}`}>
+                            <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-colors ${isSelected ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}`}>
                                 <Layers size={18} />
                             </div>
                             <div className="flex-1 min-w-0">
                                 {/* Header with title and badge aligned cleanly to prevent overlaps */}
                                 <div className="flex items-start justify-between gap-3">
-                                    <h3 className="text-sm font-black text-white uppercase tracking-tight leading-snug">{plan.name}</h3>
+                                    <h3 className="text-sm font-black text-foreground uppercase tracking-tight leading-snug">{plan.name}</h3>
                                     {isSelected && (
                                         <div className="flex items-center gap-1.5 shrink-0">
-                                            <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded-full border border-emerald-400/20">
+                                            <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded-full border border-emerald-400/20">
                                                 ★ Principal
                                             </span>
                                             <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center shrink-0 shadow-sm shadow-primary/20">
@@ -165,16 +165,16 @@ function PlanList({ plans, search, selectedIds, onSelect }: { plans: Plan[]; sea
 
                                 {/* Included items */}
                                 {(plan.services?.length > 0 || plan.products?.length > 0) && (
-                                    <div className="mt-3.5 pt-3 border-t border-white/[0.06] space-y-1.5">
+                                    <div className="mt-3.5 pt-3 border-t border-border space-y-1.5">
                                         {plan.services?.map((s, i) => (
-                                            <div key={`s-${i}`} className="flex items-center gap-2 text-[10px] text-muted-foreground/75 uppercase tracking-wider">
+                                            <div key={`s-${i}`} className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase tracking-wider">
                                                 <span className="w-1.5 h-1.5 rounded-full bg-primary/40 shrink-0" />
                                                 <span className="truncate">{s.name}</span> 
                                                 <span className="text-primary/50 font-medium shrink-0 ml-auto">(incluido)</span>
                                             </div>
                                         ))}
                                         {plan.products?.map((p, i) => (
-                                            <div key={`p-${i}`} className="flex items-center gap-2 text-[10px] text-muted-foreground/75 uppercase tracking-wider">
+                                            <div key={`p-${i}`} className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase tracking-wider">
                                                 <span className="w-1.5 h-1.5 rounded-full bg-orange-400/40 shrink-0" />
                                                 <span className="truncate">{p.name}</span>
                                                 <span className="text-orange-400/50 font-medium shrink-0 ml-auto">(incluido)</span>
@@ -217,22 +217,22 @@ function ServiceList({ services, search, selectedIds, onSelect }: { services: Se
                             w-full text-left flex items-center gap-4 p-4 rounded-xl border transition-all duration-300 group backdrop-blur-md
                             ${isSelected
                                 ? 'border-blue-400/30 bg-gradient-to-br from-blue-400/[0.08] to-blue-400/[0.01] shadow-[0_4px_15px_-4px_rgba(96,165,250,0.15)]'
-                                : 'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/[0.12]'
+                                : 'border-border bg-card hover:bg-muted/60 hover:border-primary/30'
                             }
                         `}
                     >
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${isSelected ? 'bg-blue-400/20 text-blue-400' : 'bg-white/[0.06] text-muted-foreground/60 group-hover:text-blue-400 group-hover:bg-blue-400/10'}`}>
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${isSelected ? 'bg-blue-400/20 text-blue-400' : 'bg-muted text-muted-foreground group-hover:text-blue-400 group-hover:bg-blue-400/10'}`}>
                             {isSelected ? <Check size={16} /> : <Sparkles size={16} />}
                         </div>
                         <div className="flex-1 min-w-0">
-                            <p className="text-xs font-black text-white uppercase tracking-tight truncate">{service.name}</p>
+                            <p className="text-xs font-black text-foreground uppercase tracking-tight truncate">{service.name}</p>
                             {isSelected && (
-                                <span className="inline-flex items-center gap-1 mt-1 text-[9px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded-full border border-emerald-400/20">
+                                <span className="inline-flex items-center gap-1 mt-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded-full border border-emerald-400/20">
                                     ★ Principal
                                 </span>
                             )}
                         </div>
-                        <span className="text-sm font-black text-blue-400 font-mono shrink-0">
+                        <span className="text-sm font-black text-blue-600 dark:text-blue-400 font-mono shrink-0">
                             {CLP.format(service.price)}
                         </span>
                     </motion.button>
@@ -271,15 +271,15 @@ function ProductList({ products, search, selectedIds, onSelect }: { products: Pr
                         className={`
                             w-full text-left flex items-center gap-4 p-3.5 rounded-xl border transition-all duration-300 group relative backdrop-blur-md
                             ${noStock
-                                ? 'border-white/[0.04] opacity-35 cursor-not-allowed bg-black/10'
+                                ? 'border-border opacity-40 cursor-not-allowed bg-muted/40'
                                 : isSelected
                                     ? 'border-orange-400/30 bg-gradient-to-br from-orange-400/[0.08] to-orange-400/[0.01] shadow-[0_4px_15px_-4px_rgba(251,146,60,0.15)]'
-                                    : 'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/[0.12]'
+                                    : 'border-border bg-card hover:bg-muted/60 hover:border-primary/30'
                             }
                         `}
                     >
                         {/* Image */}
-                        <div className="w-16 h-16 rounded-xl bg-black/35 overflow-hidden shrink-0 border border-white/[0.06] relative shadow-inner">
+                        <div className="w-16 h-16 rounded-xl bg-muted overflow-hidden shrink-0 border border-border relative shadow-inner">
                             {product.image_url ? (
                                 <img
                                     src={product.image_url.startsWith('http') ? product.image_url : `${API_URL}${product.image_url}`}
@@ -302,17 +302,17 @@ function ProductList({ products, search, selectedIds, onSelect }: { products: Pr
 
                         {/* Info details */}
                         <div className="flex-1 min-w-0">
-                            <p className="text-xs font-black text-white uppercase tracking-tight truncate leading-snug">{product.name}</p>
+                            <p className="text-xs font-black text-foreground uppercase tracking-tight truncate leading-snug">{product.name}</p>
                             
                             {/* Stock status indicator */}
                             <div className="flex items-center gap-1.5 mt-2">
                                 <span className={`
                                     px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider
                                     ${noStock 
-                                        ? 'bg-red-500/10 text-red-400 border border-red-500/15' 
+                                        ? 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/15' 
                                         : lowStock 
-                                            ? 'bg-orange-500/10 text-orange-400 border border-orange-500/15' 
-                                            : 'bg-black/30 text-muted-foreground/75 border border-white/[0.05]'
+                                            ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/15' 
+                                            : 'bg-muted text-muted-foreground border border-border'
                                     }
                                 `}>
                                     {noStock ? 'Agotado' : `Stock: ${product.stock}`}
@@ -322,11 +322,11 @@ function ProductList({ products, search, selectedIds, onSelect }: { products: Pr
 
                         {/* Price details */}
                         <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
-                            <span className="text-xs font-black text-orange-400 font-mono">
+                            <span className="text-xs font-black text-orange-600 dark:text-orange-400 font-mono">
                                 {CLP.format(product.unit_price)}
                             </span>
                             {isSelected && (
-                                <span className="text-[8px] font-black text-orange-400 uppercase tracking-widest bg-orange-400/10 px-1.5 py-0.5 rounded-full border border-orange-400/20 shadow-sm">
+                                <span className="text-[8px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-widest bg-orange-400/10 px-1.5 py-0.5 rounded-full border border-orange-400/20 shadow-sm">
                                     Listo
                                 </span>
                             )}
@@ -342,7 +342,7 @@ function ProductList({ products, search, selectedIds, onSelect }: { products: Pr
 function EmptyState() {
     return (
         <div className="py-16 flex flex-col items-center justify-center text-center">
-            <div className="w-14 h-14 rounded-2xl bg-white/[0.04] flex items-center justify-center mb-3 text-muted-foreground/30">
+            <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-3 text-muted-foreground/30">
                 <AlertCircle size={24} />
             </div>
             <p className="text-[11px] font-bold text-muted-foreground/60 uppercase tracking-wider">

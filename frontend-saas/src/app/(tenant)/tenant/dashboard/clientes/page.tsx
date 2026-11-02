@@ -31,7 +31,6 @@ import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import Modal from '@/components/tenant/Modal';
 import DeleteConfirmationModal from '@/components/tenant/DeleteConfirmationModal';
 import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
-import { PlanLimitModal } from '@/components/tenant/PlanLimitModal';
 import QuickPetModal from '@/components/tenant/crm/QuickPetModal';
 
 const COUNTRY_CODES = [
@@ -114,29 +113,9 @@ export default function CustomersPage() {
     const [countryCode, setCountryCode] = useState('+56');
     const [localPhone, setLocalPhone] = useState('');
 
-    const [showLimitModal, setShowLimitModal] = useState(false);
-
-    const maxCustomers = tenantData?.subscription_plan?.max_customers || 0;
-
-    // La cuota se aplica POR MES (se reinicia el día 1); el backend cuenta solo
-    // los registros del mes actual (ver limit_checker.py, type "monthly"). Por eso
-    // el indicador y el bloqueo deben usar el uso mensual, no el total histórico.
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-    const monthlyUsage = (customers as any[]).filter(
-        (c) => c.created_at && new Date(c.created_at) >= startOfMonth
-    ).length;
-
-    const isLimitReached = maxCustomers > 0 && maxCustomers < 999999 && monthlyUsage >= maxCustomers;
 
 
     const handleOpenModal = (customer?: Customer) => {
-        if (!customer && isLimitReached) {
-            setShowLimitModal(true);
-            return;
-        }
-
         const initialData = customer || { rut: '', name: '', email: '', phone: '', address: '', country: 'Chile' };
 
         // Parse phone
@@ -819,12 +798,6 @@ export default function CustomersPage() {
                 onConfirm={handleConfirmDeleteCustomer}
                 title="¿Eliminar Cliente y sus Registros?"
                 description={`Estás a punto de eliminar al cliente "${customerToDelete?.name}". Si el cliente tiene mascotas registradas u órdenes de cremación asociadas, TODO SE ELIMINARÁ PERMANENTEMENTE. Esta acción no se puede deshacer.`}
-            />
-            {/* Modal de Límite */}
-            <PlanLimitModal
-                isOpen={showLimitModal}
-                onClose={() => setShowLimitModal(false)}
-                resourceName="Clientes"
             />
             {/* Quick Pet Modal */}
             <QuickPetModal

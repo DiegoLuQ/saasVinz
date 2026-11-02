@@ -9,6 +9,7 @@
 
 const ROUTE_MODULES: { prefix: string; module: string }[] = [
     { prefix: '/dashboard/clientes', module: 'clientes' },
+    { prefix: '/dashboard/convenios', module: 'clientes' },
     { prefix: '/dashboard/mascotas', module: 'mascotas' },
     { prefix: '/dashboard/gestion-servicios', module: 'servicios' },
     { prefix: '/dashboard/recepcion-pedidos', module: 'ordenes' },
@@ -44,6 +45,7 @@ const ROUTE_FEATURES: { prefix: string; feature: string; exact?: boolean }[] = [
     { prefix: '/dashboard/partners/comisiones', feature: 'veterinarios:comisiones:ver' },
     { prefix: '/dashboard/partners', feature: 'veterinarios:gestionar' },
     { prefix: '/dashboard/roles-modulos', feature: 'configuracion:roles' },
+    { prefix: '/dashboard/convenios', feature: 'clientes:convenios' },
 ];
 
 /** Característica del plan que exige una ruta, o null. */

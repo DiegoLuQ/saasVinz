@@ -38,7 +38,6 @@ import Cropper from 'react-easy-crop';
 import getCroppedImg from '@/lib/tenant/imageUtils';
 import { usePermissions } from '@/app/(tenant)/tenant/context/PermissionContext';
 import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
-import { PlanLimitModal } from '@/components/tenant/PlanLimitModal';
 import QuickCustomerModal from '@/components/tenant/crm/QuickCustomerModal';
 
 interface Pet {
@@ -124,7 +123,6 @@ export default function PetsPage() {
     const [isMemorialModalOpen, setIsMemorialModalOpen] = useState(false);
     const [isQuickCustomerModalOpen, setIsQuickCustomerModalOpen] = useState(false);
     const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
-    const [showLimitModal, setShowLimitModal] = useState(false);
 
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -133,14 +131,6 @@ export default function PetsPage() {
 
     const [nextStepPet, setNextStepPet] = useState<Pet | null>(null);
 
-    const maxPets = tenantData?.subscription_plan?.max_pets || 0;
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-    const monthlyUsage = pets.filter(
-        (p) => p.created_at && new Date(p.created_at) >= startOfMonth
-    ).length;
-    const isLimitReached = maxPets > 0 && maxPets < 999999 && monthlyUsage >= maxPets;
 
     const allowCreatePet = canCreate('mascotas');
 
@@ -155,10 +145,6 @@ export default function PetsPage() {
     }, [autoOpenParam, customerIdParam, allowCreatePet]);
 
     const handleOpenModal = (pet?: Pet) => {
-        if (!pet && isLimitReached) {
-            setShowLimitModal(true);
-            return;
-        }
         setCurrentPet(pet || { name: '', species: 'canino', breed: '', customer_id: Number(customerIdParam) || 0, status: 'received' });
         setSelectedImages([]);
         setImagePreviews(pet?.images || []);
@@ -1144,12 +1130,6 @@ export default function PetsPage() {
                 onClose={() => setPetToDelete(null)}
                 onConfirm={handleConfirmDeletePet}
                 isDeleting={deletePetMutation.isPending}
-            />
-            {/* Modal de Límite */}
-            <PlanLimitModal
-                isOpen={showLimitModal}
-                onClose={() => setShowLimitModal(false)}
-                resourceName="Mascotas"
             />
             {/* Memorial Setup Modal */}
             <MemorialSetupModal

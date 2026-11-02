@@ -20,6 +20,10 @@ export interface SelectedProduct {
     unit_cost: number;
     name: string;
     image_url?: string;
+    /** Ánfora/insumo incluido en ese plan de la orden (precio 0 salvo diferencia cobrada). */
+    plan_id?: number | null;
+    /** Precio de lista del producto que trae el plan (para sugerir la diferencia al cambiarlo). */
+    included_price?: number;
 }
 
 export interface SelectedService {
@@ -64,6 +68,11 @@ export interface Cremation {
     partner_link_id?: number;
     partner_name?: string;
     partner_link?: any;
+    // Convenio con empresa (crm_agreements): copia de condiciones + monto (lib/tenant/orders/agreements.ts)
+    agreement_id?: number | null;
+    agreement_name?: string | null;
+    agreement_discount?: number;
+    agreement_terms?: import('./agreements').AgreementTerms | null;
     partner?: {
         id: number;
         nombre_clinica: string;

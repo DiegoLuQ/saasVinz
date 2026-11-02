@@ -37,6 +37,8 @@ import type {
     SelectedPlan,
 } from '@/lib/tenant/orders/types';
 import { resolveTimeZone, nowZonedInputValue, zonedInputToUtcISO } from '@/lib/zonedTime';
+import { computeAgreementDiscount, termsFromOption } from '@/lib/tenant/orders/agreements';
+import type { AgreementOption, AgreementTerms } from '@/lib/tenant/orders/agreements';
 import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
 
 export interface UseOrderFormOptions {
@@ -54,6 +56,11 @@ export interface UseOrderFormOptions {
     autoRestoreDraft?: boolean;
     /** Callback tras un guardado exitoso, recibe la orden creada/actualizada (incluye verification_code). */
     onSaveSuccess?: (result: any) => void;
+}
+
+/** Unidades de un producto en todas las líneas de la orden (manuales + incluidas en el plan). */
+function usedQty(lines: SelectedProduct[], productId: number): number {
+    return lines.filter(l => l.product_id === productId).reduce((sum, l) => sum + (l.quantity || 0), 0);
 }
 
 export function useOrderForm(options: UseOrderFormOptions = {}) {
@@ -86,6 +93,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
     const [plans, setPlans] = useState<Plan[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
     const [partners, setPartners] = useState<Partner[]>([]);
+    const [agreements, setAgreements] = useState<AgreementOption[]>([]);
     const [weightPricingRules, setWeightPricingRules] = useState<WeightPricingRule[]>([]);
 
     // ==========================================
@@ -145,6 +153,10 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
     } | null>(null);
     const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
     const [originalCremation, setOriginalCremation] = useState<Partial<Cremation> | null>(null);
+    // Ítems tal como estaban guardados (para el resumen de cambios antes de actualizar).
+    const [originalItems, setOriginalItems] = useState<{
+        services: SelectedService[]; plans: SelectedPlan[]; products: SelectedProduct[];
+    } | null>(null);
     const [draftPrompt, setDraftPrompt] = useState<{ savedAt: string } | null>(null);
     const formRef = useRef<HTMLFormElement | null>(null);
 
@@ -184,6 +196,25 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
     );
 
     // ==========================================
+    // Convenio con empresa: la orden ya guardada conserva su copia de condiciones
+    // (si se mantiene el mismo convenio); uno recién elegido usa las vigentes.
+    // ==========================================
+    const agreementTerms = useMemo<AgreementTerms | null>(() => {
+        const id = currentCremation.agreement_id;
+        if (!id) return null;
+        if (originalCremation?.agreement_id === id && originalCremation.agreement_terms) {
+            return originalCremation.agreement_terms;
+        }
+        const opt = agreements.find(a => a.id === id);
+        return opt ? termsFromOption(opt) : null;
+    }, [currentCremation.agreement_id, originalCremation, agreements]);
+
+    const agreementBreakdown = useMemo(
+        () => computeAgreementDiscount(agreementTerms, selectedServices, selectedPlans, selectedProducts),
+        [agreementTerms, selectedServices, selectedPlans, selectedProducts]
+    );
+
+    // ==========================================
     // Computed totals
     // ==========================================
     const grandTotal = useMemo(
@@ -193,9 +224,10 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
                 selectedPlans,
                 selectedProducts,
                 currentCremation.weight_price || 0,
-                currentCremation.discount || 0
+                currentCremation.discount || 0,
+                agreementBreakdown.total
             ),
-        [selectedServices, selectedPlans, selectedProducts, currentCremation.weight_price, currentCremation.discount]
+        [selectedServices, selectedPlans, selectedProducts, currentCremation.weight_price, currentCremation.discount, agreementBreakdown.total]
     );
 
     const grandTotalCost = useMemo(
@@ -341,6 +373,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
                 apiRequest('/api/internal/maintenance/weight-pricing'),
                 apiRequest('/api/internal/products/'),
                 apiRequest('/api/internal/partners/active-options'),
+                apiRequest('/api/internal/agreements/active-options'),
             ]);
             const settled = (i: number): any[] =>
                 results[i].status === 'fulfilled' ? (results[i] as PromiseFulfilledResult<any>).value ?? [] : [];
@@ -351,6 +384,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
             const weightRules = settled(4);
             const productsData = settled(5);
             const partnersData = settled(6);
+            setAgreements(settled(7));
 
             const normalizedServices = normalizeServices(servicesData);
             const normalizedPlans = normalizePlans(plansData);
@@ -371,8 +405,17 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
             if (editId) {
                 const cremationData = await apiRequest(`/api/internal/cremations/${editId}`);
                 const formState = mapCremationToFormState(cremationData, petsData, timeZone);
+                // Con kg, el recargo sale de los tramos vigentes. Se aplica aquí y no
+                // solo en el efecto de abajo: fetchData corre dos veces (al resolverse
+                // el tenant) y la orden llega después de los tramos, pisando el valor
+                // calculado con el weight_price guardado (0) sin que cambie el peso.
+                if (formState.weight && Array.isArray(weightRules) && weightRules.length > 0) {
+                    formState.weight_price = calculateWeightPrice(formState.weight, weightRules);
+                }
                 setCurrentCremation(formState);
-                setOriginalCremation({ ...formState }); // Snapshot for diff tracking
+                // Snapshot de lo GUARDADO (diff y confirmación): el recargo recalculado arriba
+                // cuenta como cambio si difiere del valor almacenado.
+                setOriginalCremation({ ...formState, weight_price: cremationData.weight_price || 0 });
 
                 // Auto-fix address if it looks like an email
                 if (cremationData.address && cremationData.address.includes('@')) {
@@ -390,15 +433,13 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
                 }
 
                 // Load associations
-                if (cremationData.productos && Array.isArray(cremationData.productos)) {
-                    setSelectedProducts(mapCremationProducts(cremationData.productos, productsData));
-                }
-                if (cremationData.servicios && Array.isArray(cremationData.servicios)) {
-                    setSelectedServices(mapCremationServices(cremationData.servicios, servicesData));
-                }
-                if (cremationData.planes && Array.isArray(cremationData.planes)) {
-                    setSelectedPlans(mapCremationPlans(cremationData.planes, plansData));
-                }
+                const origProducts = Array.isArray(cremationData.productos) ? mapCremationProducts(cremationData.productos, productsData, plansData): [];
+                const origServices = Array.isArray(cremationData.servicios) ? mapCremationServices(cremationData.servicios, servicesData) : [];
+                const origPlans = Array.isArray(cremationData.planes) ? mapCremationPlans(cremationData.planes, plansData) : [];
+                if (Array.isArray(cremationData.productos)) setSelectedProducts(origProducts);
+                if (Array.isArray(cremationData.servicios)) setSelectedServices(origServices);
+                if (Array.isArray(cremationData.planes)) setSelectedPlans(origPlans);
+                setOriginalItems({ services: origServices, plans: origPlans, products: origProducts });
             } else {
                 const petParam = searchParams.get('pet_id');
                 if (petParam && Number(petParam)) {
@@ -644,24 +685,43 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
     // ==========================================
     // Handlers: Products
     // ==========================================
+    // Stock que puede usar esta orden: lo disponible + lo que ya tenía guardado
+    // (al editar, el backend lo devuelve antes de volver a descontarlo).
+    const stockAvailable = useCallback((productId: number) => {
+        const product = products.find(p => p.id === productId);
+        if (!product) return Number.POSITIVE_INFINITY;
+        const saved = (originalItems?.products || [])
+            .filter(p => p.product_id === productId)
+            .reduce((sum, p) => sum + (p.quantity || 0), 0);
+        return Math.max((product.stock || 0) + saved, saved);
+    }, [products, originalItems]);
+
     const handleAddProduct = useCallback((productId: string) => {
         const product = products.find(p => p.id === Number(productId));
         if (!product) return;
 
-        if (product.stock <= 0) {
-            showToast('Producto sin stock', 'error');
+        const available = stockAvailable(product.id);
+        if (usedQty(selectedProducts, product.id) + 1 > available) {
+            showToast(`Stock insuficiente para "${product.name}". Disponible: ${Math.max(available, 0)}`, 'error');
             return;
         }
 
-        const existing = selectedProducts.find(p => p.id === product.id);
-        if (existing) {
-            if (existing.quantity + 1 > product.stock) {
-                showToast(`Stock insuficiente para "${product.name}". Disponible: ${product.stock}`, 'error');
-                return;
-            }
+        const newLine: SelectedProduct = {
+                id: product.id,
+                product_id: product.id,
+                name: product.name,
+                quantity: 1,
+                unit_price: product.unit_price,
+                unit_cost: product.cost_price,
+                image_url: product.image_url,
+            };
+        // Solo los productos vendidos aparte; las ánforas del plan se cambian con «Cambiar».
+        const manual = selectedProducts.filter(p => !p.plan_id);
+
+        if (manual.some(p => p.product_id === product.id)) {
             setSelectedProducts(prev =>
                 prev.map(item =>
-                    item.id === product.id
+                    !item.plan_id && item.product_id === product.id
                         ? { ...item, quantity: item.quantity + 1 }
                         : item
                 )
@@ -671,15 +731,16 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
 
         const activePlan = selectedPlans[0];
         const planDetails = activePlan ? plans.find(p => p.id === activePlan.plan_id) : null;
-        const isIncludedInPlan = planDetails?.products?.some(p => p.id === product.id || p.name.toLowerCase() === product.name.toLowerCase());
+        const isIncludedInPlan = selectedProducts.some(p => p.plan_id && p.product_id === product.id)
+            || planDetails?.products?.some(p => p.id === product.id || p.name.toLowerCase() === product.name.toLowerCase());
 
-        if (isIncludedInPlan) {
+        if (isIncludedInPlan && activePlan) {
             setReplacementPending({
                 type: 'product',
-                currentName: `${activePlan!.name} (Incluido)`,
+                currentName: `${activePlan.name} (Incluido)`,
                 newName: product.name,
                 isConflict: true,
-                conflictMessage: `Esta urna/producto ya está incluida de forma gratuita en el plan "${activePlan!.name}". Al confirmarlo, se agregará como un elemento de cargo adicional extra.`,
+                conflictMessage: `Esta urna/producto ya está incluida de forma gratuita en el plan "${activePlan.name}". Al confirmarlo, se agregará como un elemento de cargo adicional extra.`,
                 customLabels: {
                     title: 'Producto Incluido en Plan',
                     currentHeader: 'Incluido en Plan',
@@ -688,18 +749,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
                     newAction: 'Cargo Extra',
                 },
                 onConfirm: () => {
-                    setSelectedProducts(prev => [
-                        ...prev,
-                        {
-                            id: product.id,
-                            product_id: product.id,
-                            name: product.name,
-                            quantity: 1,
-                            unit_price: product.unit_price,
-                            unit_cost: product.cost_price,
-                            image_url: product.image_url,
-                        },
-                    ]);
+                    setSelectedProducts(prev => [...prev, newLine]);
                     setReplacementPending(null);
                     showToast('Producto agregado con cargo extra', 'success');
                 },
@@ -707,25 +757,14 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
             return;
         }
 
-        // Intercept if there's already a different product selected
-        if (selectedProducts.length > 0) {
-            const currentProduct = selectedProducts[0];
+        // Ya hay otro producto vendido aparte: se reemplaza (las ánforas del plan se mantienen)
+        if (manual.length > 0) {
             setReplacementPending({
                 type: 'product',
-                currentName: currentProduct.name,
+                currentName: manual[0].name,
                 newName: product.name,
                 onConfirm: () => {
-                    setSelectedProducts([
-                        {
-                            id: product.id,
-                            product_id: product.id,
-                            name: product.name,
-                            quantity: 1,
-                            unit_price: product.unit_price,
-                            unit_cost: product.cost_price,
-                            image_url: product.image_url,
-                        },
-                    ]);
+                    setSelectedProducts(prev => [...prev.filter(p => p.plan_id), newLine]);
                     setReplacementPending(null);
                     showToast('Producto reemplazado con éxito', 'success');
                 },
@@ -733,19 +772,32 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
             return;
         }
 
-        setSelectedProducts(prev => [
-            ...prev,
-            {
-                id: product.id,
-                product_id: product.id,
-                name: product.name,
-                quantity: 1,
-                unit_price: product.unit_price,
-                unit_cost: product.cost_price,
-                image_url: product.image_url,
-            },
-        ]);
-    }, [products, selectedProducts, selectedPlans, plans, showToast]);
+        setSelectedProducts(prev => [...prev, newLine]);
+    }, [products, selectedProducts, selectedPlans, plans, showToast, stockAvailable]);
+
+    // La familia cambia el ánfora incluida en el plan por otra: la línea sigue
+    // siendo del plan (precio 0); el crematorio decide si cobra la diferencia.
+    const handleSwapIncludedProduct = useCallback((index: number, productId: number) => {
+        const product = products.find(p => p.id === productId);
+        const line = selectedProducts[index];
+        if (!product || !line || line.product_id === product.id) return;
+        const others = selectedProducts.filter((_, i) => i !== index);
+        const available = stockAvailable(product.id);
+        if (usedQty(others, product.id) + line.quantity > available) {
+            showToast(`Stock insuficiente para "${product.name}". Disponible: ${Math.max(available, 0)}`, 'error');
+            return;
+        }
+        setSelectedProducts(prev => prev.map((item, i) => i !== index ? item : {
+            ...item,
+            id: product.id,
+            product_id: product.id,
+            name: product.name,
+            image_url: product.image_url,
+            unit_cost: product.cost_price,
+            unit_price: 0,
+        }));
+        showToast(`Ánfora del plan cambiada por "${product.name}"`, 'success');
+    }, [products, selectedProducts, showToast, stockAvailable]);
 
     const handleRemoveProduct = useCallback((index: number) => {
         setSelectedProducts(prev => prev.filter((_, i) => i !== index));
@@ -754,16 +806,17 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
     const handleUpdateProduct = useCallback((index: number, field: keyof SelectedProduct, value: number) => {
         if (field === 'quantity') {
             const item = selectedProducts[index];
-            const product = products.find(p => p.id === item.product_id);
-            if (product && value > product.stock) {
-                showToast(`Stock insuficiente para "${item.name}". Disponible: ${product.stock}`, 'error');
+            const others = selectedProducts.filter((_, i) => i !== index);
+            const available = stockAvailable(item.product_id);
+            if (value > item.quantity && usedQty(others, item.product_id) + value > available) {
+                showToast(`Stock insuficiente para "${item.name}". Disponible: ${Math.max(available, 0)}`, 'error');
                 return;
             }
         }
         setSelectedProducts(prev =>
             prev.map((item, i) => (i !== index ? item : { ...item, [field]: value }))
         );
-    }, [selectedProducts, products, showToast]);
+    }, [selectedProducts, showToast, stockAvailable]);
 
     // ==========================================
     // Handlers: Services
@@ -887,48 +940,30 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
                 },
             ]);
 
-            // Add included products if any
-            if (original.products && original.products.length > 0) {
-                let insufficientStock = false;
-                original.products.forEach(p => {
-                    const availableProduct = products.find(prod => prod.id === p.id);
-                    const currentQty = selectedProducts.find(item => item.product_id === p.id)?.quantity || 0;
-                    if (availableProduct && currentQty + 1 > availableProduct.stock) {
-                        showToast(
-                            `Stock insuficiente para "${p.name}" incluido en el plan. Disponible: ${availableProduct.stock}`,
-                            'error'
-                        );
-                        insufficientStock = true;
-                    }
-                });
-
-                if (insufficientStock) return;
-
-                setSelectedProducts(prev => {
-                    let next = [...prev];
-                    original.products.forEach(p => {
-                        const alreadyExists = next.find(item => item.product_id === p.id);
-                        if (alreadyExists) {
-                            next = next.map(item =>
-                                item.product_id === p.id
-                                    ? { ...item, quantity: item.quantity + 1 }
-                                    : item
-                            );
-                        } else {
-                            next.push({
-                                id: p.id,
-                                product_id: p.id,
-                                name: p.name,
-                                unit_price: p.unit_price ?? p.sale_price ?? 0,
-                                unit_cost: p.unit_cost ?? p.cost_price ?? 0,
-                                quantity: 1,
-                                image_url: p.image_url,
-                            });
-                        }
-                    });
-                    return next;
-                });
-            }
+            // Ánforas/insumos del plan: líneas propias de la orden (plan_id, precio 0) para
+            // que el stock se descuente y se devuelva con la orden. Reemplazan las del plan anterior.
+            const included: SelectedProduct[] = (original.products || []).map((p) => ({
+                id: p.id,
+                product_id: p.id,
+                name: p.name,
+                unit_price: 0,
+                included_price: p.sale_price ?? p.unit_price ?? 0,
+                unit_cost: p.cost_price ?? p.unit_cost ?? 0,
+                quantity: 1,
+                image_url: p.image_url,
+                plan_id: planId,
+            }));
+            const nextProducts = [...selectedProducts.filter(item => !item.plan_id), ...included];
+            setSelectedProducts(nextProducts);
+            included.forEach(line => {
+                const available = stockAvailable(line.product_id);
+                if (usedQty(nextProducts, line.product_id) > available) {
+                    showToast(
+                        `Sin stock de "${line.name}" incluida en el plan (disponible: ${Math.max(available, 0)}). Cámbiala por otra antes de guardar.`,
+                        'error'
+                    );
+                }
+            });
 
             setIsPlanServicesOpen(true);
         };
@@ -949,9 +984,11 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
         }
 
         executeAddPlan();
-    }, [plans, products, selectedProducts, selectedPlans, showToast]);
+    }, [plans, selectedProducts, selectedPlans, showToast, stockAvailable]);
 
     const handleRemovePlanItem = useCallback((index: number) => {
+        const removed = selectedPlans[index];
+        if (removed) setSelectedProducts(prev => prev.filter(item => item.plan_id !== removed.plan_id));
         setSelectedPlans(prev => {
             const next = prev.filter((_, i) => i !== index);
             if (prev[index]?.es_principal && next.length > 0) {
@@ -959,9 +996,9 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
             }
             return next;
         });
-    }, []);
+    }, [selectedPlans]);
 
-    const handleSetPrincipalPlan = useCallback((index: number) => {
+    const handleSetPrincipalPlan= useCallback((index: number) => {
         setSelectedPlans(prev => prev.map((p, i) => ({ ...p, es_principal: i === index })));
     }, []);
 
@@ -1021,11 +1058,12 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
             return;
         }
 
-        // Final stock validation
-        for (const item of selectedProducts) {
-            const product = products.find(p => p.id === item.product_id);
-            if (product && item.quantity > product.stock) {
-                showToast('No tenemos stock de este producto', 'error');
+        // Validación final de stock (sumando líneas del mismo producto)
+        for (const pid of new Set(selectedProducts.map(p => p.product_id))) {
+            const available = stockAvailable(pid);
+            if (usedQty(selectedProducts, pid) > available) {
+                const name = selectedProducts.find(p => p.product_id === pid)?.name || 'producto';
+                showToast(`Stock insuficiente para "${name}". Disponible: ${Math.max(available, 0)}`, 'error');
                 return;
             }
         }
@@ -1084,11 +1122,13 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
                     quantity: p.quantity,
                     unit_price: p.unit_price,
                     precio_costo: p.unit_cost,
+                    plan_id: p.plan_id ?? null,
                 })),
                 total_price: grandTotal,
                 total_cost: grandTotalCost,
                 partner_id: currentCremation.partner_link_id || currentCremation.partner_id || null,
                 partner_link_id: currentCremation.partner_link_id || currentCremation.partner_id || null,
+                agreement_id: currentCremation.agreement_id || null,
             };
 
             const result = await apiRequest(endpoint, {
@@ -1268,6 +1308,9 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
         plans,
         products,
         partners,
+        agreements,
+        agreementTerms,
+        agreementBreakdown,
         weightPricingRules,
         refreshData: fetchData,
         refreshServices,
@@ -1319,6 +1362,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
 
         // Phase 4: Diff tracking
         originalCremation,
+        originalItems,
 
         // Computed
         grandTotal,
@@ -1336,6 +1380,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
         handleRemoveLocalImage,
         handleRemoveRemoteImage,
         handleAddProduct,
+        handleSwapIncludedProduct,
         handleRemoveProduct,
         handleUpdateProduct,
         handleAddService,

@@ -6,6 +6,8 @@ import CancellationModal from '@/components/tenant/CancellationModal';
 import ImageCropper from '@/components/tenant/ImageCropper';
 import ReplacementConfirmationModal from '@/components/tenant/orders/ReplacementConfirmationModal';
 import DeleteOrderModal from '@/components/tenant/orders/DeleteOrderModal';
+import OrderSaveConfirmModal from '@/components/tenant/orders/OrderSaveConfirmModal';
+import { buildOrderSummary } from '@/lib/tenant/orders/summary';
 import RevertOrderModal, { canRevertStatus } from '@/components/tenant/operations/RevertOrderModal';
 import OrderFormSkeleton from '@/components/tenant/orders/OrderFormSkeleton';
 import ProfileCard from '@/components/tenant/orders/ProfileCard';
@@ -25,6 +27,7 @@ import { copyToClipboard } from '@/lib/clipboard';
 import { buildTrackingUrl } from '@/lib/publicUrls';
 import { useCurrentTenant, useIsOwner } from '@/hooks/useSessionBootstrap';
 import { usePermissions } from '@/app/(tenant)/tenant/context/PermissionContext';
+import { useFeatures } from '@/hooks/useFeatures';
 
 type TabId = 'angelito' | 'logistica' | 'evidencia' | 'comercial';
 
@@ -43,6 +46,7 @@ export default function RegisterServicePage() {
     // ==========================================
     const { showToast } = useToast();
     const currentTenant = useCurrentTenant();
+    const { hasFeature } = useFeatures();
     const [savedOrderInfo, setSavedOrderInfo] = useState<{
         id: number;
         verification_code?: string;
@@ -52,6 +56,9 @@ export default function RegisterServicePage() {
     } | null>(null);
 
     const {
+        pets,
+        customers,
+        originalItems,
         setPets,
         pendingPetPhoto,
         setPendingPetPhoto,
@@ -68,6 +75,9 @@ export default function RegisterServicePage() {
         plans,
         products,
         partners,
+        agreements,
+        agreementTerms,
+        agreementBreakdown,
         refreshData,
 
         // Memoized lookups
@@ -123,6 +133,7 @@ export default function RegisterServicePage() {
         handleRemoveLocalImage,
         handleRemoveRemoteImage,
         handleAddProduct,
+        handleSwapIncludedProduct,
         handleRemoveProduct,
         handleUpdateProduct,
         handleAddService,
@@ -172,6 +183,58 @@ export default function RegisterServicePage() {
     const changedFields = editId && originalCremation
         ? getChangedFields(originalCremation, currentCremation)
         : [];
+
+    // ==========================================
+    // Confirmación antes de guardar (y resumen para eliminar)
+    // ==========================================
+    const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+
+    const currentSummary = React.useMemo(() => buildOrderSummary({
+        cremation: currentCremation,
+        services: selectedServices,
+        plans: selectedPlans,
+        products: selectedProducts,
+        agreementTerms,
+        agreementName: agreements.find(a => a.id === currentCremation.agreement_id)?.name,
+        partners,
+        petName: selectedPet?.name,
+        customerName: relatedCustomer?.name,
+    }), [currentCremation, selectedServices, selectedPlans, selectedProducts, agreementTerms, agreements, partners, selectedPet, relatedCustomer]);
+
+    const originalSummary = React.useMemo(() => {
+        if (!editId || !originalCremation || !originalItems) return null;
+        const pet = pets.find(x => x.id === originalCremation.pet_id);
+        return buildOrderSummary({
+            cremation: originalCremation,
+            services: originalItems.services,
+            plans: originalItems.plans,
+            products: originalItems.products,
+            agreementTerms: originalCremation.agreement_terms ?? null,
+            agreementName: originalCremation.agreement_name,
+            partners,
+            petName: pet?.name,
+            customerName: pet ? customers.find(c => c.id === pet.customer_id)?.name : null,
+        });
+    }, [editId, originalCremation, originalItems, partners, pets, customers]);
+
+    // El formulario (botones y Ctrl+S) abre la confirmación; el guardado real va después.
+    const handleRequestSave = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!currentCremation?.pet_id) {
+            showToast('Debe seleccionar una mascota', 'error');
+            return;
+        }
+        if (selectedServices.length === 0 && selectedPlans.length === 0) {
+            showToast('Selecciona al menos un servicio o un plan', 'error');
+            return;
+        }
+        setShowSaveConfirm(true);
+    };
+
+    const handleConfirmSave = async () => {
+        await handleSave({ preventDefault() {} } as React.FormEvent);
+        setShowSaveConfirm(false);
+    };
 
     // ==========================================
     // Ctrl+S hint (shown briefly on first load)
@@ -290,7 +353,7 @@ export default function RegisterServicePage() {
             {/* ======================================== */}
             {/* MAIN LAYOUT: Sidebar Tabs + Content      */}
             {/* ======================================== */}
-            <form ref={formRef} onSubmit={handleSave} className="flex flex-col lg:flex-row gap-6">
+            <form ref={formRef} onSubmit={handleRequestSave} className="flex flex-col lg:flex-row gap-6">
                 {/* ---- LEFT SIDEBAR: Tabs + Mini Summary ---- */}
                 <aside className="lg:w-64 shrink-0">
                     <div className="lg:sticky lg:top-6 space-y-4">
@@ -535,6 +598,10 @@ export default function RegisterServicePage() {
                                     products={products}
                                     partners={partners}
                                     onNewPartnerClick={() => setIsQuickPartnerModalOpen(true)}
+                                    agreements={agreements}
+                                    agreementTerms={agreementTerms}
+                                    agreementBreakdown={agreementBreakdown}
+                                    showAgreements={hasFeature('clientes:convenios', true)}
                                     selectedPlans={selectedPlans}
                                     selectedServices={selectedServices}
                                     selectedProducts={selectedProducts}
@@ -547,6 +614,7 @@ export default function RegisterServicePage() {
                                     onAddPlan={handleAddPlan}
                                     onAddService={handleAddService}
                                     onAddProduct={handleAddProduct}
+                                    onSwapProduct={handleSwapIncludedProduct}
                                     onUpdateProduct={handleUpdateProduct}
                                     onRemoveProduct={handleRemoveProduct}
                                     onUpdatePlanPrice={handleUpdatePlanPrice}
@@ -562,6 +630,17 @@ export default function RegisterServicePage() {
                     </div>
                 </main>
             </form>
+
+            <OrderSaveConfirmModal
+                isOpen={showSaveConfirm}
+                onClose={() => setShowSaveConfirm(false)}
+                onConfirm={handleConfirmSave}
+                isSaving={isSaving}
+                isEdit={!!editId}
+                ocNumber={currentCremation.oc_number}
+                summary={currentSummary}
+                original={originalSummary}
+            />
 
             {/* Quick Pet Modal */}
             <QuickPetModal
@@ -595,6 +674,7 @@ export default function RegisterServicePage() {
                 <DeleteOrderModal
                     isOpen={showDeleteModal}
                     orderId={Number(editId)}
+                    summary={originalSummary}
                     onClose={() => setShowDeleteModal(false)}
                     onDeleted={() => router.push('/dashboard/recepcion-pedidos')}
                 />

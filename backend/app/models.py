@@ -55,6 +55,9 @@ from app.api.internal.memorials.models import (
     Memorial, Dedication, MemorialStatus, DedicationStatus, MemorialPlan
 )
 
+# 7b. Convenios con empresas
+from app.api.internal.agreements.models import Agreement
+
 # 8. Integrations (Widget embebible / API keys públicas)
 from app.api.internal.integrations.models import (
     TenantApiKey

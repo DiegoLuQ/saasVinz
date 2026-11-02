@@ -196,7 +196,7 @@ export function PaymentReportModal({ isOpen, onClose, onSuccess, amountToPay }: 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+                    className="fixed inset-0 bg-slate-900/50 dark:bg-black/70 backdrop-blur-sm"
                     onClick={onClose}
                 />
 
@@ -204,22 +204,22 @@ export function PaymentReportModal({ isOpen, onClose, onSuccess, amountToPay }: 
                     initial={{ opacity: 0, scale: 0.95, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                    className="relative w-full max-w-xl bg-[#1a1f2e] border border-white/10 rounded-3xl shadow-2xl z-[70] flex flex-col max-h-[90vh]"
+                    className="relative w-full max-w-xl bg-white dark:bg-[#151a27] border border-slate-200 dark:border-white/10 rounded-3xl shadow-2xl z-[70] flex flex-col max-h-[90vh] text-slate-900 dark:text-white"
                 >
                     {/* Header */}
-                    <div className="px-8 py-6 border-b border-white/5 flex items-center justify-between shrink-0">
+                    <div className="px-8 py-6 border-b border-slate-200 dark:border-white/10 flex items-center justify-between shrink-0">
                         <div>
-                            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                            <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                 Reportar Pago
-                                <span className="text-xs bg-white/10 px-2 py-0.5 rounded text-white/50">Paso {step}/3</span>
+                                <span className="text-xs font-bold bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-md">Paso {step}/3</span>
                             </h2>
-                            <p className="text-sm text-white/40 mt-1">
+                            <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
                                 {step === 1 && "Ingresa los detalles de la transferencia."}
                                 {step === 2 && "Sube y ajusta tu comprobante."}
                                 {step === 3 && "Revisa y confirma el envío."}
                             </p>
                         </div>
-                        <button onClick={onClose} className="p-2 rounded-full hover:bg-white/5 text-white/40 hover:text-white transition-colors">
+                        <button onClick={onClose} className="p-2 rounded-full text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-white/60 dark:hover:text-white dark:hover:bg-white/10 transition-colors" aria-label="Cerrar">
                             <X size={20} />
                         </button>
                     </div>
@@ -232,32 +232,32 @@ export function PaymentReportModal({ isOpen, onClose, onSuccess, amountToPay }: 
                             <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
                                 <div className="grid grid-cols-2 gap-6">
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold uppercase tracking-wider text-white/40">Monto ($)</label>
+                                        <label className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Monto ($)</label>
                                         <input
                                             type="number"
                                             value={amount}
                                             onChange={(e) => setAmount(e.target.value)}
-                                            className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors text-lg font-bold"
+                                            className="w-full bg-slate-50 dark:bg-black/30 border border-slate-300 dark:border-white/15 rounded-xl px-4 py-3 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/35 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 transition-colors [color-scheme:light] dark:[color-scheme:dark] text-lg font-bold"
                                             placeholder="Ej: 50000"
                                             autoFocus
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold uppercase tracking-wider text-white/40">Fecha</label>
+                                        <label className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Fecha</label>
                                         <input
                                             type="date"
                                             value={date}
                                             onChange={(e) => setDate(e.target.value)}
-                                            className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors"
+                                            className="w-full bg-slate-50 dark:bg-black/30 border border-slate-300 dark:border-white/15 rounded-xl px-4 py-3 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/35 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 transition-colors [color-scheme:light] dark:[color-scheme:dark]"
                                         />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-xs font-bold uppercase tracking-wider text-white/40">Observaciones</label>
+                                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Observaciones</label>
                                     <textarea
                                         value={notes}
                                         onChange={(e) => setNotes(e.target.value)}
-                                        className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors min-h-[100px] text-sm"
+                                        className="w-full bg-slate-50 dark:bg-black/30 border border-slate-300 dark:border-white/15 rounded-xl px-4 py-3 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-white/35 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 transition-colors [color-scheme:light] dark:[color-scheme:dark] min-h-[100px] text-sm"
                                         placeholder="Nro de operación, banco origen, etc..."
                                     />
                                 </div>
@@ -270,20 +270,20 @@ export function PaymentReportModal({ isOpen, onClose, onSuccess, amountToPay }: 
                                 {!imageSrc ? (
                                     <div
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="border-2 border-dashed border-white/10 hover:border-primary/50 hover:bg-white/5 rounded-2xl p-12 cursor-pointer transition-all flex flex-col items-center justify-center gap-4 text-center h-64"
+                                        className="border-2 border-dashed border-slate-300 dark:border-white/20 bg-slate-50 dark:bg-white/[0.03] hover:border-primary hover:bg-primary/5 rounded-2xl p-12 cursor-pointer transition-all flex flex-col items-center justify-center gap-4 text-center h-64"
                                     >
                                         <input ref={fileInputRef} type="file" className="hidden" accept="image/jpeg,image/png" onChange={handleFileChange} />
-                                        <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-white/30">
+                                        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary">
                                             <Upload size={32} />
                                         </div>
                                         <div>
-                                            <p className="font-bold text-lg text-white">Sube tu comprobante</p>
-                                            <p className="text-sm text-white/40">Imagen JPG o PNG</p>
+                                            <p className="font-bold text-lg text-slate-900 dark:text-white">Sube tu comprobante</p>
+                                            <p className="text-sm text-slate-600 dark:text-slate-300">Imagen JPG o PNG</p>
                                         </div>
                                     </div>
                                 ) : (
                                     <div className="flex flex-col h-full gap-4">
-                                        <div className="relative w-full h-80 bg-black/50 rounded-2xl overflow-hidden border border-white/10">
+                                        <div className="relative w-full h-80 bg-slate-900 rounded-2xl overflow-hidden border border-slate-300 dark:border-white/10">
                                             <Cropper
                                                 image={imageSrc}
                                                 crop={crop}
@@ -297,7 +297,7 @@ export function PaymentReportModal({ isOpen, onClose, onSuccess, amountToPay }: 
 
                                         {/* Controls */}
                                         <div className="space-y-4">
-                                            <label className="text-xs font-bold uppercase tracking-wider text-white/40">Zoom</label>
+                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">Zoom</label>
                                             <input
                                                 type="range"
                                                 value={zoom}
@@ -306,7 +306,7 @@ export function PaymentReportModal({ isOpen, onClose, onSuccess, amountToPay }: 
                                                 step={0.1}
                                                 aria-labelledby="Zoom"
                                                 onChange={(e) => setZoom(Number(e.target.value))}
-                                                className="w-full accent-primary h-2 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                                                className="w-full accent-primary h-2 bg-slate-200 dark:bg-white/10 rounded-lg appearance-none cursor-pointer"
                                             />
 
                                             <div className="flex gap-2 justify-center">
@@ -315,8 +315,8 @@ export function PaymentReportModal({ isOpen, onClose, onSuccess, amountToPay }: 
                                                         key={ratio.l}
                                                         onClick={() => setAspect(ratio.v)}
                                                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border ${Math.abs(aspect - ratio.v) < 0.01
-                                                            ? 'bg-primary text-white dark:text-black border-primary'
-                                                            : 'bg-white/5 text-white/60 border-white/5 hover:bg-white/10'
+                                                            ? 'bg-primary text-primary-foreground border-primary'
+                                                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100 dark:bg-white/5 dark:text-white/80 dark:border-white/15 dark:hover:bg-white/10'
                                                             }`}
                                                     >
                                                         {ratio.l}
@@ -333,30 +333,30 @@ export function PaymentReportModal({ isOpen, onClose, onSuccess, amountToPay }: 
                         {step === 3 && (
                             <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
                                 {croppedPreview && (
-                                    <div className="relative w-full h-48 bg-black/30 rounded-2xl overflow-hidden border border-white/10 flex items-center justify-center">
+                                    <div className="relative w-full h-48 bg-slate-100 dark:bg-black/30 rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10 flex items-center justify-center">
                                         <img src={croppedPreview} alt="Comprobante" className="h-full object-contain" />
                                         <button
                                             onClick={() => { setStep(2); setImageSrc(null); setFile(null); }}
-                                            className="absolute top-2 right-2 bg-black/60 text-white p-2 rounded-full hover:bg-red-500/80 transition-colors"
+                                            className="absolute top-2 right-2 bg-slate-900/70 text-white p-2 rounded-full hover:bg-red-500/80 transition-colors"
                                         >
                                             <X size={16} />
                                         </button>
                                     </div>
                                 )}
 
-                                <div className="bg-white/5 rounded-2xl p-6 space-y-4 border border-white/5">
+                                <div className="bg-slate-50 dark:bg-white/5 rounded-2xl p-6 space-y-4 border border-slate-200 dark:border-white/10">
                                     <div className="flex justify-between items-center text-sm">
-                                        <span className="text-white/40">Monto:</span>
-                                        <span className="font-bold text-white text-lg">${parseInt(amount).toLocaleString()}</span>
+                                        <span className="text-slate-600 dark:text-slate-300">Monto:</span>
+                                        <span className="font-bold text-slate-900 dark:text-white text-lg">${parseInt(amount).toLocaleString()}</span>
                                     </div>
                                     <div className="flex justify-between items-center text-sm">
-                                        <span className="text-white/40">Fecha:</span>
-                                        <span className="text-white">{new Date(date).toLocaleDateString()}</span>
+                                        <span className="text-slate-600 dark:text-slate-300">Fecha:</span>
+                                        <span className="font-semibold text-slate-900 dark:text-white">{new Date(date).toLocaleDateString()}</span>
                                     </div>
                                     {notes && (
-                                        <div className="pt-4 border-t border-white/5">
-                                            <span className="text-white/40 text-xs block mb-1">Observaciones:</span>
-                                            <p className="text-white text-sm">{notes}</p>
+                                        <div className="pt-4 border-t border-slate-200 dark:border-white/10">
+                                            <span className="text-slate-600 dark:text-slate-300 text-xs font-bold uppercase tracking-wider block mb-1">Observaciones:</span>
+                                            <p className="text-slate-900 dark:text-white text-sm whitespace-pre-wrap">{notes}</p>
                                         </div>
                                     )}
                                 </div>
@@ -365,11 +365,11 @@ export function PaymentReportModal({ isOpen, onClose, onSuccess, amountToPay }: 
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="p-6 border-t border-white/5 bg-black/20 flex gap-4 shrink-0">
+                    <div className="p-6 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/20 rounded-b-3xl flex gap-4 shrink-0">
                         {step > 1 && (
                             <button
                                 onClick={() => setStep(s => s - 1)}
-                                className="px-6 py-3 rounded-xl font-bold bg-white/5 hover:bg-white/10 text-white transition-colors border border-white/5"
+                                className="px-6 py-3 rounded-xl font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 dark:bg-white/5 dark:hover:bg-white/10 dark:text-white dark:border-white/15 transition-colors" aria-label="Volver"
                                 disabled={loading}
                             >
                                 <ArrowLeft size={18} />
@@ -379,7 +379,7 @@ export function PaymentReportModal({ isOpen, onClose, onSuccess, amountToPay }: 
                         {step === 1 && (
                             <button
                                 onClick={() => { if (amount && date) setStep(2); else showToast('Completa monto y fecha', 'error'); }}
-                                className="flex-1 py-3 rounded-xl font-bold bg-primary hover:bg-primary-dark text-white dark:text-black transition-colors flex items-center justify-center gap-2"
+                                className="flex-1 py-3 rounded-xl font-bold bg-primary hover:opacity-90 text-primary-foreground shadow-md shadow-primary/20 transition-all flex items-center justify-center gap-2"
                             >
                                 Siguiente <ArrowRight size={18} />
                             </button>
@@ -388,7 +388,7 @@ export function PaymentReportModal({ isOpen, onClose, onSuccess, amountToPay }: 
                         {step === 2 && (
                             <button
                                 onClick={processCrop}
-                                className="flex-1 py-3 rounded-xl font-bold bg-primary hover:bg-primary-dark text-white dark:text-black transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex-1 py-3 rounded-xl font-bold bg-primary hover:opacity-90 text-primary-foreground shadow-md shadow-primary/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 disabled={!imageSrc && !file} // If PDF, file is set, imageSrc null
                             >
                                 {imageSrc ? 'Recortar y Continuar' : 'Continuar'} <ArrowRight size={18} />
@@ -398,7 +398,7 @@ export function PaymentReportModal({ isOpen, onClose, onSuccess, amountToPay }: 
                         {step === 3 && (
                             <button
                                 onClick={handleSubmit}
-                                className="flex-1 py-3 rounded-xl font-bold bg-green-500 hover:bg-green-600 text-white transition-colors flex items-center justify-center gap-2"
+                                className="flex-1 py-3 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
                                 disabled={loading}
                             >
                                 {loading && <Loader2 size={18} className="animate-spin" />}

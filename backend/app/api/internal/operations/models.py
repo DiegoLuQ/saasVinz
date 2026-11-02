@@ -101,8 +101,11 @@ class ProductoOC(Base):
     cantidad = Column(Integer, default=1)
     precio_costo = Column(Float, default=0.0)
     precio_venta = Column(Float, default=0.0)
+    # Ánfora/insumo incluido en este plan de la orden (precio 0 salvo diferencia
+    # que cobre el crematorio al cambiarla). NULL = producto vendido aparte.
+    plan_id = Column(Integer, ForeignKey("srv_plans.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
-    
+
     product = relationship("Product")
 
 class CremationOC(Base):
@@ -212,6 +215,12 @@ class CremationFinancial(Base):
     discount = Column(Float, default=0.0)
     weight_price = Column(Float, default=0.0)
     commission = Column(Float, default=0.0)
+    # Convenio con empresa (crm_agreements): copia de condiciones + monto descontado
+    # (app/services/agreements.py). agreement_name se conserva si se borra el convenio.
+    agreement_id = Column(Integer, ForeignKey("crm_agreements.id", ondelete="SET NULL"), nullable=True, index=True)
+    agreement_name = Column(String(120), nullable=True)
+    agreement_discount = Column(Float, nullable=False, default=0.0, server_default="0")
+    agreement_terms = Column(JSON, nullable=True)
 
     cremation = relationship("CremationOC", back_populates="financial")
 

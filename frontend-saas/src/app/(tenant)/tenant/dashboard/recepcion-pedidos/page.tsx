@@ -10,6 +10,8 @@ import {
     LayoutGrid,
     List as ListIcon,
     ArrowRight,
+    ChevronLeft,
+    ChevronRight,
     CheckCircle2,
     Clock,
     PlayCircle,
@@ -219,9 +221,15 @@ export default function CremationsPage() {
         return cols;
     }, [filteredCremations]);
 
-    // Máximo 7 en la columna de Entregados para no saturar la vista
-    const displayedCompletados = useMemo(() => kanbanColumns.completado.slice(0, 7), [kanbanColumns.completado]);
-    const extraCompletadosCount = kanbanColumns.completado.length - displayedCompletados.length;
+    // Columna Entregados del kanban: paginada de a 5 para no saturar la vista
+    const COMPLETADOS_PAGE_SIZE = 5;
+    const [completadosPage, setCompletadosPage] = useState(0);
+    const completadosPages = Math.max(1, Math.ceil(kanbanColumns.completado.length / COMPLETADOS_PAGE_SIZE));
+    const safeCompletadosPage = Math.min(completadosPage, completadosPages - 1);
+    const displayedCompletados = useMemo(
+        () => kanbanColumns.completado.slice(safeCompletadosPage * COMPLETADOS_PAGE_SIZE, (safeCompletadosPage + 1) * COMPLETADOS_PAGE_SIZE),
+        [kanbanColumns.completado, safeCompletadosPage]
+    );
 
     // ==========================================
     // Handlers
@@ -686,7 +694,7 @@ export default function CremationsPage() {
                                         </div>
                                     </div>
 
-                                {/* Columna Entregados (Tope máximo de 7) */}
+                                {/* Columna Entregados (paginada de a 5) */}
                                     <div className={`${columnVisibility('completado')} bg-white/[0.01] border border-white/5 rounded-3xl p-4 flex-col gap-4`}>
                                         <div className="flex items-center justify-between px-2">
                                             <h3 className="font-bold text-white flex items-center gap-2">
@@ -712,11 +720,32 @@ export default function CremationsPage() {
                                             {kanbanColumns.completado.length === 0 && (
                                                 <div className="flex-1 border-2 border-dashed border-white/5 rounded-2xl flex items-center justify-center p-6 text-muted-foreground/30 text-sm font-medium">Sin entregas pendientes</div>
                                             )}
-                                            {extraCompletadosCount > 0 && (
-                                                <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/[0.06] text-center space-y-1.5 mt-1">
-                                                    <p className="text-[11px] text-muted-foreground font-medium">
-                                                        Mostrando las 7 más recientes de {kanbanColumns.completado.length} entregadas
-                                                    </p>
+                                            {completadosPages > 1 && (
+                                                <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.06] text-center space-y-2 mt-1">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setCompletadosPage(Math.max(0, safeCompletadosPage - 1))}
+                                                            disabled={safeCompletadosPage === 0}
+                                                            className="p-1.5 rounded-lg border border-white/10 text-muted-foreground hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                                                            aria-label="Entregados: página anterior"
+                                                        >
+                                                            <ChevronLeft size={14} />
+                                                        </button>
+                                                        <p className="text-[11px] text-muted-foreground font-medium">
+                                                            {safeCompletadosPage * COMPLETADOS_PAGE_SIZE + 1}–{Math.min((safeCompletadosPage + 1) * COMPLETADOS_PAGE_SIZE, kanbanColumns.completado.length)} de {kanbanColumns.completado.length}
+                                                            <span className="text-muted-foreground/50"> · pág. {safeCompletadosPage + 1}/{completadosPages}</span>
+                                                        </p>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setCompletadosPage(Math.min(completadosPages - 1, safeCompletadosPage + 1))}
+                                                            disabled={safeCompletadosPage >= completadosPages - 1}
+                                                            className="p-1.5 rounded-lg border border-white/10 text-muted-foreground hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                                                            aria-label="Entregados: página siguiente"
+                                                        >
+                                                            <ChevronRight size={14} />
+                                                        </button>
+                                                    </div>
                                                     <button
                                                         type="button"
                                                         onClick={() => {
@@ -725,7 +754,7 @@ export default function CremationsPage() {
                                                         }}
                                                         className="text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors inline-flex items-center gap-1.5"
                                                     >
-                                                        Ver historial completo en Lista (+{extraCompletadosCount})
+                                                        Ver historial completo en Lista
                                                         <ArrowRight size={12} />
                                                     </button>
                                                 </div>
