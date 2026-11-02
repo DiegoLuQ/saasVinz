@@ -107,3 +107,18 @@ export function buildPartnerPortalUrl(tenantSlug: string, token: string): string
     return `${getPartnerBaseUrl()}/${cleanTenant}/portal-veterinaria/${token}`;
 }
 
+/** Enlace público al formulario principal del tenant con parámetros opcionales (ej. plan_id, weight_tier, token). */
+export function buildPublicFormUrl(tenantSlug: string, queryParams?: Record<string, string | number | undefined | null>): string {
+    const cleanTenant = (tenantSlug || 'crematorio').toLowerCase().trim().replace(/\s+/g, '-');
+    const base = `${getMainRootUrl()}/${cleanTenant}/form`;
+    if (!queryParams) return base;
+    const params = new URLSearchParams();
+    Object.entries(queryParams).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== '') {
+            params.set(k, String(v));
+        }
+    });
+    const qs = params.toString();
+    return qs ? `${base}?${qs}` : base;
+}
+

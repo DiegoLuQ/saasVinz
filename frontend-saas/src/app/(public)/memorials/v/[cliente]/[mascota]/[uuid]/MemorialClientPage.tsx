@@ -24,7 +24,8 @@ import {
     Flame,
     PawPrint,
     Cloud as CloudIcon,
-    Star
+    Star,
+    MessageSquareHeart
 } from 'lucide-react';
 import { getTranslations, type Locale } from '@/lib/translations';
 import { HuellasFooter } from '@/components/public/HuellasFooter';
@@ -33,21 +34,29 @@ import DedicationModal from '@/components/memorial/DedicationModal';
 import Snowflakes from '@/components/memorial/Snowflakes';
 import TwinklingStars from '@/components/memorial/TwinklingStars';
 import { ExpirationModal } from '@/components/memorial/ExpirationModal';
+import MemorialMusicButton from '@/components/memorial/MemorialMusicButton';
 import RitualSummary from '@/components/memorial/RitualSummary';
 import FloatingPetals from '@/components/memorial/FloatingPetals';
 import type { RitualKind, RitualState } from '@/lib/memorialRituals';
 import { publicApiRequest } from '@/lib/api/public';
 import CelestialBackground from '@/components/memorial/CelestialBackground';
-import { normalizeMemorialBg, getMemorialEpitaph, pageBackgroundHex } from '@/lib/memorialDesign';
+import MemorialEntranceEffect from '@/components/memorial/MemorialEntranceEffect';
+import {
+    normalizeMemorialBg,
+    getMemorialEpitaph,
+    pageBackgroundHex,
+    MAX_MEMORIAL_COMMENTS,
+    normalizeScenarioId,
+} from '@/lib/memorialDesign';
 
-const NormalLayout = dynamic(() => import('@/components/memorial/layouts/NormalLayout'), { loading: () => <Loader2 className="animate-spin" /> });
-const AltarLayout = dynamic(() => import('@/components/memorial/layouts/AltarLayout'), { loading: () => <Loader2 className="animate-spin" /> });
-const EditorialLayout = dynamic(() => import('@/components/memorial/layouts/EditorialLayout'), { loading: () => <Loader2 className="animate-spin" /> });
-const CartaLayout = dynamic(() => import('@/components/memorial/layouts/CartaLayout'), { loading: () => <Loader2 className="animate-spin" /> });
-const CieloLayout = dynamic(() => import('@/components/memorial/layouts/CieloLayout'), { loading: () => <Loader2 className="animate-spin" /> });
-const CinematicoLayout = dynamic(() => import('@/components/memorial/layouts/CinematicoLayout'), { loading: () => <Loader2 className="animate-spin" /> });
-const ConstelacionLayout = dynamic(() => import('@/components/memorial/layouts/ConstelacionLayout'), { loading: () => <Loader2 className="animate-spin" /> });
-const GaleriaLayout = dynamic(() => import('@/components/memorial/layouts/GaleriaLayout'), { loading: () => <Loader2 className="animate-spin" /> });
+const NormalLayout = dynamic(() => import('@/components/memorial/layouts/NormalLayout'), { loading: () => <div className="min-h-[60vh] opacity-0" /> });
+const AltarLayout = dynamic(() => import('@/components/memorial/layouts/AltarLayout'), { loading: () => <div className="min-h-[60vh] opacity-0" /> });
+const EditorialLayout = dynamic(() => import('@/components/memorial/layouts/EditorialLayout'), { loading: () => <div className="min-h-[60vh] opacity-0" /> });
+const CartaLayout = dynamic(() => import('@/components/memorial/layouts/CartaLayout'), { loading: () => <div className="min-h-[60vh] opacity-0" /> });
+const CieloLayout = dynamic(() => import('@/components/memorial/layouts/CieloLayout'), { loading: () => <div className="min-h-[60vh] opacity-0" /> });
+const CinematicoLayout = dynamic(() => import('@/components/memorial/layouts/CinematicoLayout'), { loading: () => <div className="min-h-[60vh] opacity-0" /> });
+const ConstelacionLayout = dynamic(() => import('@/components/memorial/layouts/ConstelacionLayout'), { loading: () => <div className="min-h-[60vh] opacity-0" /> });
+const GaleriaLayout = dynamic(() => import('@/components/memorial/layouts/GaleriaLayout'), { loading: () => <div className="min-h-[60vh] opacity-0" /> });
 
 export default function MemorialClientPage({ initialData }: { initialData?: any }) {
     const params = useParams();
@@ -164,7 +173,6 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
 
             if (!isAdminPreview && (isExpired || isPending || isArchived || isValidityPast)) {
                 let finalStatus = status;
-                // If validity is past but status is technically 'active', treat as expired for modal
                 if (isValidityPast && status === 'active') {
                     finalStatus = 'expired';
                 }
@@ -184,6 +192,17 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
         counts: memorial?.ritual_counts || {},
         stars: memorial?.lit_stars || [],
     };
+
+    // Gestos que este visitante ya hizo (p. ej. la vela encendida): se recuerdan
+    // en su navegador para que la vela siga prendida al volver o recargar.
+    const ritualDidKey = `memorial_rituals_did_${uuid}`;
+    const [ritualDid, setRitualDid] = useState<Partial<Record<RitualKind, boolean>>>({});
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem(ritualDidKey);
+            if (raw) setRitualDid(JSON.parse(raw));
+        } catch { /* almacenamiento no disponible */ }
+    }, [ritualDidKey]);
 
     const handleSubmitDedication = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -228,7 +247,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
             const g = parseInt(color.substring(2, 4), 16);
             const b = parseInt(color.substring(4, 6), 16);
             const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-            return brightness < 128; // Standard threshold
+            return brightness < 128;
         } catch (e) {
             return false;
         }
@@ -245,15 +264,14 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
 
     // Configuración centralizada de temas
     const themeConfig = useMemo(() => {
-        const hasCustomBg = !!computedMemorial?.diseno?.portada_url;
         const customTheme = computedMemorial?.diseno?.theme_config;
         
         const configs: Record<string, any> = {
             claro: {
                 bg: 'bg-[#FDFBF7]',
                 text: 'text-slate-900',
-                card: 'bg-white border-slate-300 shadow-md', // Stronger border and shadow for light mode
-                accent: 'text-slate-700', // Darker accent
+                card: 'bg-white border-slate-300 shadow-md',
+                accent: 'text-slate-700',
                 accentHover: 'hover:text-slate-800',
                 particle: '#64748b',
                 footerBorder: 'border-slate-200',
@@ -274,6 +292,58 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 input: 'border-white/10 text-white placeholder:text-white/30',
                 button: 'bg-[#c3b091] text-[#0a192f] hover:opacity-90',
                 dark: true
+            },
+            cielo: {
+                bg: 'bg-[#eff8ff]',
+                text: 'text-slate-900',
+                card: 'bg-white/90 border-sky-200 shadow-md',
+                accent: 'text-sky-700',
+                accentHover: 'hover:text-sky-900',
+                particle: '#38bdf8',
+                footerBorder: 'border-sky-200',
+                vinzer: 'bg-sky-50 border-sky-200 text-sky-900',
+                input: 'border-sky-300 text-slate-900 placeholder:text-slate-400',
+                button: 'bg-sky-700 text-white hover:bg-sky-800',
+                dark: false
+            },
+            nocturno: {
+                bg: 'bg-[#070b1d]',
+                text: 'text-white',
+                card: 'bg-white/5 border-white/10',
+                accent: 'text-amber-300',
+                accentHover: 'hover:text-amber-100',
+                particle: '#fde68a',
+                footerBorder: 'border-white/10',
+                vinzer: 'bg-white/5 border-white/10 text-white',
+                input: 'border-white/15 text-white placeholder:text-white/35',
+                button: 'bg-amber-400 text-slate-950 hover:bg-amber-300',
+                dark: true
+            },
+            otono: {
+                bg: 'bg-[#FDF8F2]',
+                text: 'text-amber-950',
+                card: 'bg-white border-amber-200 shadow-md',
+                accent: 'text-amber-700',
+                accentHover: 'hover:text-amber-900',
+                particle: '#d97706',
+                footerBorder: 'border-amber-200',
+                vinzer: 'bg-amber-50 border-amber-200 text-amber-900',
+                input: 'border-amber-300 text-amber-950 placeholder:text-amber-400',
+                button: 'bg-amber-800 text-white hover:bg-amber-900',
+                dark: false
+            },
+            jardin: {
+                bg: 'bg-[#F4FAF6]',
+                text: 'text-emerald-950',
+                card: 'bg-white border-emerald-200 shadow-md',
+                accent: 'text-emerald-700',
+                accentHover: 'hover:text-emerald-900',
+                particle: '#10b981',
+                footerBorder: 'border-emerald-200',
+                vinzer: 'bg-emerald-50 border-emerald-200 text-emerald-900',
+                input: 'border-emerald-300 text-emerald-950 placeholder:text-emerald-400',
+                button: 'bg-emerald-800 text-white hover:bg-emerald-900',
+                dark: false
             },
             esmeralda: {
                 bg: 'bg-[#064e3b]',
@@ -363,23 +433,22 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
     }, [temaActual, computedMemorial?.diseno?.theme_config]);
 
     const particles = useMemo(() => {
-        if (!computedMemorial?.diseno?.particulas || !themeConfig) return null;
+        const p = computedMemorial?.diseno?.particulas;
+        if (!p || p === 'ninguna' || !themeConfig) return null;
         return (
             <>
-                {computedMemorial.diseno.particulas === 'nieve' && <Snowflakes color={themeConfig.particle} />}
-                {computedMemorial.diseno.particulas === 'estrellas' && <TwinklingStars color={themeConfig.particle} />}
-                {computedMemorial.diseno.particulas === 'flores' && <FloatingPetals />}
+                {(p === 'nieve' || p === 'plumas') && <Snowflakes color={themeConfig.particle} />}
+                {(p === 'estrellas' || p === 'corazones' || p === 'burbujas') && <TwinklingStars color={themeConfig.particle} />}
+                {(p === 'flores' || p === 'petalos') && <FloatingPetals />}
             </>
         );
     }, [computedMemorial?.diseno?.particulas, themeConfig?.particle]);
 
     const { mascota, tenant_info, tenant_status, diseno, branding, lista_imagenes } = computedMemorial || {};
-    const planName = computedMemorial?.plan?.toUpperCase() || tenant_info?.subscription_plan?.name?.toUpperCase() || 'FREE';
-    const isUltra = planName === 'ULTRA' || planName === 'PARAISO';
-    const useBrandingVinzer = branding?.vinzer_logo || tenant_status !== 'active';
+    const planName = computedMemorial?.plan?.toUpperCase() || tenant_info?.subscription_plan?.name?.toUpperCase() || 'PRO';
+    const isUltra = planName.includes('ULTRA') || planName.includes('PARAISO');
 
     // Prioritize listed images from memorial, fallback to pet's general images
-    // Cap at the plan's photo limit (img_limit from rec_plans), filter out broken/empty URLs
     const galleryImages = useMemo(() => {
         if (!memorial) return [];
         const raw = (lista_imagenes && lista_imagenes.length > 0)
@@ -390,11 +459,13 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
             .slice(0, memorial?.img_limit || 5);
     }, [memorial, lista_imagenes, mascota?.images]);
 
-    // Randomly select a main image from gallery on each page load
+    // Prioritize explicit cover portrait (main_image_url) if set, otherwise fallback to gallery/pet image
     const randomMainImage = useMemo(() => {
+        if (memorial?.main_image_url && String(memorial.main_image_url).startsWith('http')) {
+            return memorial.main_image_url;
+        }
         if (galleryImages.length > 0) {
-            const randomIndex = Math.floor(Math.random() * galleryImages.length);
-            return galleryImages[randomIndex];
+            return galleryImages[0];
         }
         return memorial?.main_image_url || mascota?.image_url || null;
     }, [galleryImages, memorial?.main_image_url, mascota?.image_url]);
@@ -415,7 +486,6 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
     };
 
     // Interleave photos and dedications for a better rhythm
-    // Estos altares ya exhiben la galería: el feed inferior no repite las fotos
     const layoutShowsGallery = ['galeria', 'cinematico', 'constelacion', 'carta']
         .includes(computedMemorial?.diseno?.tipo_diseno || 'normal');
 
@@ -424,13 +494,11 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
         const dedics = [...dedicatorias];
         const imgs = layoutShowsGallery ? [] : [...galleryImages];
 
-        // Interleave: 1 image every 2 dedications (if available)
         while (dedics.length > 0 || imgs.length > 0) {
             if (dedics.length > 0) result.push({ type: 'dedication', data: dedics.shift() });
             if (dedics.length > 0) result.push({ type: 'dedication', data: dedics.shift() });
             if (imgs.length > 0) result.push({ type: 'image', data: imgs.shift() });
 
-            // If no more dedications but still images, push them
             if (dedics.length === 0 && imgs.length > 0) {
                 while (imgs.length > 0) result.push({ type: 'image', data: imgs.shift() });
             }
@@ -441,18 +509,13 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
     const formRef = useRef<HTMLDivElement>(null);
     const scrollToForm = () => formRef.current?.scrollIntoView({ behavior: 'smooth' });
 
-    const dedicationLimit = memorial?.dedication_limit !== undefined
-        ? memorial.dedication_limit
-        : (isUltra
-            ? 33
-            : (['PRO', 'PRO+', 'VINCULO'].includes(planName)
-                ? 21
-                : (['NORMAL', 'HUELLA'].includes(planName) ? 9 : 0)));
+    const dedicationLimit = Math.min(
+        memorial?.dedication_limit !== undefined ? memorial.dedication_limit : MAX_MEMORIAL_COMMENTS,
+        MAX_MEMORIAL_COMMENTS
+    );
 
     const canAddMore = dedicatorias.length < dedicationLimit;
 
-    // Modo de la página (tema, color propio o paleta de la portada): decide los
-    // colores de la sección de dedicatorias, que antes era siempre clara.
     const isDarkMode = !!themeConfig?.dark;
 
     // Nunca mostrar texto de relleno ni publicidad como epitafio
@@ -466,18 +529,28 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center space-y-4">
-                <Loader2 className="animate-spin text-primary" size={60} />
-                <p className="text-muted-foreground font-serif text-xl animate-pulse">
-                    {locale === 'es' ? 'Cargando recuerdos...' : 'Loading memories...'}
-                </p>
+            <div suppressHydrationWarning className="min-h-screen bg-[#020617] flex flex-col items-center justify-center space-y-6 relative overflow-hidden">
+                <div className="absolute w-[500px] h-[500px] rounded-full bg-amber-400/10 blur-[120px] pointer-events-none animate-pulse" />
+                <div className="relative z-10 flex flex-col items-center gap-4">
+                    <div className="relative w-16 h-16 rounded-full flex items-center justify-center bg-amber-400/10 border border-amber-400/30 shadow-[0_0_35px_rgba(245,158,11,0.35)]">
+                        <span className="text-2xl animate-pulse">🕊️</span>
+                    </div>
+                    <div className="space-y-1 text-center">
+                        <p className="text-amber-100 font-serif text-lg tracking-[0.2em] uppercase font-light">
+                            {locale === 'es' ? 'Un Recuerdo Eterno' : 'An Eternal Memory'}
+                        </p>
+                        <p className="text-amber-200/50 text-xs tracking-widest uppercase font-mono animate-pulse">
+                            {locale === 'es' ? 'Encendiendo su luz...' : 'Igniting their light...'}
+                        </p>
+                    </div>
+                </div>
             </div>
         );
     }
 
     if (error?.status === 403) {
         return (
-            <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-6 text-center">
+            <div suppressHydrationWarning className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-6 text-center">
                 <Lock size={64} className="text-amber-500/20 mb-6" />
                 <h1 className="text-4xl font-serif text-white mb-4">Memorial Privado</h1>
                 <p className="text-muted-foreground max-w-md mb-8">Este memorial está protegido. Solo la familia tiene acceso con su PIN.</p>
@@ -493,7 +566,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
 
     if (error || !memorial) {
         return (
-            <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-6 text-center">
+            <div suppressHydrationWarning className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-6 text-center">
                 <Heart size={64} className="text-red-500/20 mb-6" />
                 <h1 className="text-4xl font-serif text-white mb-4">Memorial no encontrado</h1>
                 <p className="text-muted-foreground max-w-md">{error?.message || "El enlace es incorrecto o el memorial ha sido retirado."}</p>
@@ -518,14 +591,17 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
         }
     };
 
-    // Registro optimista: el +1 se ve al instante y luego se reconcilia con el
-    // backend. En la vista previa del admin no se registra nada.
     const sendRitual = async (kind: RitualKind, name?: string) => {
         const base = ritualOverride || ritualView;
         setRitualOverride({
             counts: { ...base.counts, [kind]: (base.counts[kind] || 0) + 1 },
             stars: kind === 'estrella' ? [{ id: -Date.now(), name: name || null }, ...base.stars] : base.stars,
         });
+        if (kind === 'vela') {
+            const nextDid = { ...ritualDid, vela: true };
+            setRitualDid(nextDid);
+            try { localStorage.setItem(ritualDidKey, JSON.stringify(nextDid)); } catch { /* sin almacenamiento */ }
+        }
         if (searchParams.has('preview_layout')) return;
         try {
             const res = await publicApiRequest(`/api/internal/memorials/${uuid}/rituals`, {
@@ -540,10 +616,8 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
 
     const handleSendKiss = (e: React.MouseEvent) => {
         sendRitual('beso');
-        // Create floating effect (Heart/Star)
-        const btn = e.currentTarget as HTMLButtonElement;
         const particle = document.createElement('div');
-        particle.innerHTML = "✨"; // Or ❤️
+        particle.innerHTML = "✨";
         particle.style.position = "fixed";
         particle.style.left = "50%";
         particle.style.top = "50%";
@@ -558,21 +632,13 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
             particle.style.opacity = "0";
         });
 
-        // Feedback
-        const originalText = btn.innerHTML;
-        // Using translation key or default
-        const successText = t.mem_kiss_received || 'Recibido';
-        // We need to be careful with innerHTML if we want to restore icon.
-        // But for now, let's just change text or ignore button text change if complex.
-        // Actually, let's keep it simple: just the particle effect.
-
         setTimeout(() => {
             particle.remove();
         }, 2000);
     };
 
     const renderLayout = () => {
-        const tipo = computedMemorial?.diseno?.tipo_diseno || 'normal';
+        const rawTipo = computedMemorial?.diseno?.tipo_diseno || 'normal';
 
         const commonProps = {
             memorial: memorialView,
@@ -603,15 +669,12 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
             locale,
             onShare: handleShare,
             onSendKiss: handleSendKiss,
-            // Pass themeConfig if needed (NormalLayout uses it)
             themeConfig,
-            isUltra, // Pass isUltra flag
-            rituals: { counts: ritualView.counts, stars: ritualView.stars, send: sendRitual },
+            isUltra,
+            rituals: { counts: ritualView.counts || {}, stars: ritualView.stars || [], send: sendRitual, did: ritualDid },
         };
 
-
-
-        switch (tipo) {
+        switch (rawTipo) {
             case 'editorial':
                 return <EditorialLayout {...commonProps} />;
             case 'carta':
@@ -623,35 +686,38 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
             case 'galeria':
                 return <GaleriaLayout {...commonProps} />;
             case 'altar':
+            case 'minimalista':
                 return <AltarLayout {...commonProps} />;
             case 'cielo':
+            case 'arcoiris':
+            case 'jardin':
                 return <CieloLayout {...commonProps} />;
             default:
                 return <NormalLayout {...commonProps} />;
         }
     };
 
+    const approvedOrPendingCount = memorial?.dedications_count !== undefined
+        ? memorial.dedications_count
+        : ((memorial?.dedicatorias || memorial?.dedications)?.filter((d: any) => d.estado === 'aprobado' || d.estado === 'pendiente').length || dedicatorias.length);
+
     return (
-        // Respeta "reducir movimiento" del sistema en todas las animaciones del altar
         <MotionConfig reducedMotion="user">
         <div
+            suppressHydrationWarning
             className={`min-h-screen relative flex flex-col font-sans transition-colors duration-1000 overflow-hidden ${computedMemorial?.diseno?.color_fondo ? '' : themeConfig.bg} ${themeConfig.text}`}
             style={computedMemorial?.diseno?.color_fondo ? { backgroundColor: computedMemorial.diseno.color_fondo } : {}}>
             {themeConfig.isCustom && (
                 <style dangerouslySetInnerHTML={{ __html: `
-                    /* Sobrescribir colores de títulos del memorial */
                     h1, h2, .memorial-title {
                         color: ${themeConfig.titleColor} !important;
                     }
-                    /* Sobrescribir colores de subtítulos, fechas y pequeños textos */
                     .memorial-subtitle, .memorial-date, .text-muted-foreground, .text-slate-400, [class*="tracking-widest"] {
                         color: ${themeConfig.subtitleColor} !important;
                     }
-                    /* Sobrescribir colores de textos y párrafos */
                     .msg-despedida, p {
                         color: ${themeConfig.textColor} !important;
                     }
-                    /* Sobrescribir botones o acentos */
                     button.bg-primary, button.bg-\\[\\#c3b091\\], button.bg-slate-900, .memorial-button {
                         background-color: ${themeConfig.accentColor} !important;
                         color: ${isColorDark(themeConfig.accentColor) ? '#ffffff' : '#0f172a'} !important;
@@ -662,7 +728,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                     }
                 ` }} />
             )}
-            <CelestialBackground isDark={temaActual === 'oscuro' || temaActual === 'esmeralda' || temaActual === 'dorado'} />
+            <CelestialBackground isDark={temaActual === 'oscuro' || temaActual === 'nocturno' || temaActual === 'esmeralda' || temaActual === 'dorado'} />
             <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lato:wght@300;400;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=Pinyon+Script&family=Marcellus&family=Cinzel:wght@500;700&family=Quicksand:wght@300;500&display=swap" rel="stylesheet" />
             {/* Background Texture & Gradient Layers */}
             <div className="fixed inset-0 pointer-events-none z-0">
@@ -680,8 +746,6 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 />
                 {particles}
             </div>
-
-
 
             {/* Share Modal (Backdrop) */}
             <AnimatePresence>
@@ -739,7 +803,6 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                                             if (navigator.clipboard && window.isSecureContext) {
                                                 await navigator.clipboard.writeText(url);
                                             } else {
-                                                // Fallback for HTTP / insecure contexts
                                                 const ta = document.createElement('textarea');
                                                 ta.value = url;
                                                 ta.style.position = 'fixed';
@@ -753,7 +816,6 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                                             setCopiedLink(true);
                                             setTimeout(() => setCopiedLink(false), 2000);
                                         } catch {
-                                            // Last resort fallback
                                             const ta = document.createElement('textarea');
                                             ta.value = url;
                                             ta.style.position = 'fixed';
@@ -789,9 +851,23 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 )}
             </AnimatePresence>
 
-            {renderLayout()}
+            <MemorialEntranceEffect
+                scenario={computedMemorial?.diseno?.tipo_diseno || 'normal'}
+                petName={mascota?.name}
+            >
+                {renderLayout()}
+            </MemorialEntranceEffect>
 
-            {/* Transición suave altar → dedicatorias (antes era un corte horizontal duro) */}
+            {/* Melodía elegida por el crematorio (solo llega si está activa) */}
+            {memorial?.melody?.url && (
+                <MemorialMusicButton
+                    url={memorial.melody.url}
+                    name={memorial.melody.name}
+                    locale={locale === 'en' ? 'en' : 'es'}
+                />
+            )}
+
+            {/* Transición suave altar → dedicatorias */}
             <div
                 aria-hidden
                 className="relative z-10 -mt-20 -mb-px h-20 pointer-events-none"
@@ -802,17 +878,17 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 }}
             />
 
-            {/* --- UNIVERSAL DEDICATIONS SECTION --- */}
-            <div className={`relative w-full py-24 z-10 overflow-hidden ${isDarkMode
+            {/* --- UNIVERSAL DEDICATIONS & CONDOLENCE WALL SECTION (MAX 20 COMMENTS) --- */}
+            <div className={`relative w-full py-20 sm:py-24 z-10 overflow-hidden ${isDarkMode
                 ? 'bg-gradient-to-b from-transparent via-black/15 to-black/30'
                 : 'bg-gradient-to-b from-[#FDFBF7] via-[#F2F5F8] to-[#E1E7EE] text-slate-900'}`}>
-                {/* Partículas de destellos de luz con opacidad reducida (máx 15%) */}
+                {/* Partículas de destellos de luz con opacidad reducida */}
                 <div className="absolute inset-0 pointer-events-none opacity-[0.15] z-0">
                     {particles}
                 </div>
 
                 <div className="relative w-full max-w-6xl mx-auto px-4 sm:px-6 md:px-8 flex flex-col items-center z-10">
-                    {/* 1. Prueba social: gestos de cariño de los visitantes */}
+                    {/* 1. Prueba social: gestos de cariño de los visitantes (velas, estrellas, besos, flores) */}
                     <RitualSummary
                         rituals={ritualView}
                         petName={mascota?.name || ''}
@@ -820,269 +896,332 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                         isDarkMode={isDarkMode}
                     />
 
-                    {/* 2. Dedications Feed (Shared) */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 items-stretch w-full">
-                    <AnimatePresence mode="popLayout">
-                        {mixedItems.map((item: any, idx: number) => (
-                            <motion.div
-                                key={`${item.type}-${item.data.id || item.data._id || idx}`}
-                                initial={{ opacity: 0, y: 30 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{ once: true }}
-                                transition={{ delay: (idx % 3) * 0.1 }}
-                                className="w-full h-full"
+                    {/* Encabezado Conmemorativo de Comentarios y Gestión Familiar */}
+                    <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-4 mb-10 pb-6 border-b border-current/10">
+                        <div className="text-center sm:text-left">
+                            <span className="text-[11px] uppercase tracking-[0.3em] font-bold opacity-60 block mb-1">
+                                {locale === 'en' ? 'Tributes & Condolences' : 'Homenajes y Condolencias'}
+                            </span>
+                            <h2 className="text-2xl sm:text-3xl font-serif font-medium flex items-center justify-center sm:justify-start gap-3">
+                                <span>{locale === 'en' ? `Messages for ${mascota?.name}` : `Mensajes para ${mascota?.name}`}</span>
+                                <span className={`text-xs font-sans font-bold px-3 py-1 rounded-full border ${
+                                    isDarkMode
+                                        ? 'bg-white/10 border-white/15 text-amber-200'
+                                        : 'bg-amber-500/10 border-amber-500/25 text-amber-800'
+                                }`}>
+                                    {dedicatorias.length} / {MAX_MEMORIAL_COMMENTS}
+                                </span>
+                            </h2>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-center gap-2.5">
+                            {approvedOrPendingCount < MAX_MEMORIAL_COMMENTS && (
+                                <button
+                                    type="button"
+                                    onClick={scrollToForm}
+                                    className={`px-4 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all shadow-sm ${
+                                        isDarkMode
+                                            ? 'bg-amber-400 text-slate-950 hover:bg-amber-300'
+                                            : 'bg-slate-900 text-white hover:bg-slate-800'
+                                    }`}
+                                >
+                                    <MessageSquareHeart size={14} />
+                                    {locale === 'en' ? 'Leave a Message' : 'Dejar Mensaje'}
+                                </button>
+                            )}
+
+                            <button
+                                type="button"
+                                onClick={() => router.push(`/memorials/m/${uuid}/login`)}
+                                className={`px-4 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2 border transition-all ${
+                                    isDarkMode
+                                        ? 'bg-white/5 hover:bg-white/10 border-white/15 text-white/80'
+                                        : 'bg-white/80 hover:bg-white border-slate-300 text-slate-700'
+                                }`}
                             >
-                                {item.type === 'dedication' ? (
-                                    <div
-                                        onClick={() => {
-                                            setSelectedDedication(item.data);
-                                            setIsDedicationModalOpen(true);
-                                        }}
-                                        className={`group cursor-pointer p-6 sm:p-8 rounded-3xl border shadow-sm hover:shadow-md transition-all duration-300 h-full flex flex-col justify-between min-h-[260px] ${
-                                            !isDarkMode
-                                                ? 'bg-white/90 border-slate-100 hover:border-slate-200 shadow-slate-100/50'
-                                                : 'bg-white/5 border-white/10 hover:border-white/20'
-                                        } backdrop-blur-md`}
+                                <ShieldCheck size={14} className="text-amber-500" />
+                                {locale === 'en' ? 'Family Comment Management' : 'Gestionar Comentarios (Familia)'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* 2. Dedications Feed (Shared) */}
+                    {mixedItems.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 items-stretch w-full">
+                            <AnimatePresence mode="popLayout">
+                                {mixedItems.map((item: any, idx: number) => (
+                                    <motion.div
+                                        key={`${item.type}-${item.data.id || item.data._id || idx}`}
+                                        initial={{ opacity: 0, y: 30 }}
+                                        whileInView={{ opacity: 1, y: 0 }}
+                                        viewport={{ once: true }}
+                                        transition={{ delay: (idx % 3) * 0.1 }}
+                                        className="w-full h-full"
                                     >
-                                        <div className="space-y-5">
-                                            <div className="flex items-center justify-between">
-                                                <div className={`w-10 h-10 ${!isDarkMode ? 'bg-slate-50 text-slate-400 border border-slate-100' : 'bg-white/5 border border-white/10'} rounded-full flex items-center justify-center`}>
-                                                    <Quote size={16} fill="currentColor" className="opacity-40" />
+                                        {item.type === 'dedication' ? (
+                                            <div
+                                                onClick={() => {
+                                                    setSelectedDedication(item.data);
+                                                    setIsDedicationModalOpen(true);
+                                                }}
+                                                className={`group cursor-pointer p-6 sm:p-8 rounded-3xl border shadow-sm hover:shadow-md transition-all duration-300 h-full flex flex-col justify-between min-h-[260px] ${
+                                                    !isDarkMode
+                                                        ? 'bg-white/90 border-slate-100 hover:border-slate-200 shadow-slate-100/50'
+                                                        : 'bg-white/5 border-white/10 hover:border-white/20'
+                                                } backdrop-blur-md`}
+                                            >
+                                                <div className="space-y-5">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className={`w-10 h-10 ${!isDarkMode ? 'bg-slate-50 text-slate-400 border border-slate-100' : 'bg-white/5 border border-white/10'} rounded-full flex items-center justify-center`}>
+                                                            <Quote size={16} fill="currentColor" className="opacity-40" />
+                                                        </div>
+                                                        <span className={`text-[10px] font-bold uppercase tracking-widest opacity-50 ${!isDarkMode ? 'bg-slate-50 text-slate-600 border border-slate-100' : 'bg-white/5 border border-white/10'} px-3 py-1 rounded-full`}>
+                                                            {new Date(item.data.fecha).toLocaleDateString()}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-base sm:text-lg leading-relaxed italic line-clamp-4 font-normal" style={{ fontFamily: 'Quicksand, sans-serif' }}>
+                                                        "{item.data.mensaje}"
+                                                    </p>
                                                 </div>
-                                                <span className={`text-[10px] font-bold uppercase tracking-widest opacity-50 ${!isDarkMode ? 'bg-slate-50 text-slate-600 border border-slate-100' : 'bg-white/5 border border-white/10'} px-3 py-1 rounded-full`}>
-                                                    {new Date(item.data.fecha).toLocaleDateString()}
-                                                </span>
-                                            </div>
-                                            <p className="text-base sm:text-lg leading-relaxed italic line-clamp-4 font-normal" style={{ fontFamily: 'Quicksand, sans-serif' }}>
-                                                "{item.data.mensaje}"
-                                            </p>
-                                        </div>
-                                        <div className="mt-8 pt-6 border-t border-current/5 flex items-center justify-between group/footer">
-                                            <div className="flex items-center gap-3">
-                                                <div
-                                                    className="relative cursor-pointer transition-transform duration-500 group-hover:scale-105"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        const heart = e.currentTarget.querySelector('svg');
-                                                        if (heart) {
-                                                            heart.style.transform = "scale(1.3)";
-                                                            setTimeout(() => heart.style.transform = "scale(1)", 200);
-                                                        }
-                                                    }}
-                                                >
-                                                    <div className="absolute inset-0 bg-red-500/10 rounded-full blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                                                    <Heart
-                                                        size={20}
-                                                        className="text-red-500/40 group-hover:text-red-500 group-hover:fill-red-500 transition-all duration-500"
-                                                    />
+                                                <div className="mt-8 pt-6 border-t border-current/5 flex items-center justify-between group/footer">
+                                                    <div className="flex items-center gap-3">
+                                                        <div
+                                                            className="relative cursor-pointer transition-transform duration-500 group-hover:scale-105"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const heart = e.currentTarget.querySelector('svg');
+                                                                if (heart) {
+                                                                    heart.style.transform = "scale(1.3)";
+                                                                    setTimeout(() => heart.style.transform = "scale(1)", 200);
+                                                                }
+                                                            }}
+                                                        >
+                                                            <div className="absolute inset-0 bg-red-500/10 rounded-full blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                                                            <Heart
+                                                                size={20}
+                                                                className="text-red-500/40 group-hover:text-red-500 group-hover:fill-red-500 transition-all duration-500"
+                                                            />
+                                                        </div>
+                                                        <span className="font-bold text-xs uppercase tracking-widest opacity-60 group-hover:opacity-90 transition-opacity duration-500">{item.data.mensajero}</span>
+                                                    </div>
+
+                                                    {/* Realistic Candle Icon */}
+                                                    <div className="text-amber-500/40 group-hover:text-amber-500 transition-colors">
+                                                        <Flame size={20} strokeWidth={2} />
+                                                    </div>
                                                 </div>
-                                                <span className="font-bold text-xs uppercase tracking-widest opacity-60 group-hover:opacity-90 transition-opacity duration-500">{item.data.mensajero}</span>
                                             </div>
-
-                                            {/* Realistic Candle Icon */}
-                                            <div className="text-amber-500/40 group-hover:text-amber-500 transition-colors">
-                                                <Flame size={20} strokeWidth={2} />
+                                        ) : (
+                                            <div className="group relative rounded-3xl overflow-hidden aspect-[4/5] border border-white/10 shadow-sm hover:shadow-md transition-all duration-500 h-full">
+                                                <img
+                                                    src={item.data}
+                                                    alt={`Memory ${idx}`}
+                                                    className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+                                                />
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                                <div className="absolute bottom-6 left-6 text-white/80 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
+                                                    <Heart size={20} fill="currentColor" />
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+                        </div>
+                    ) : (
+                        <div className={`w-full max-w-xl mx-auto p-8 rounded-3xl border text-center ${
+                            isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white/80 border-slate-200'
+                        }`}>
+                            <Flame size={28} className="mx-auto mb-3 text-amber-500 opacity-80" />
+                            <p className="font-serif italic text-lg opacity-80">
+                                {locale === 'en'
+                                    ? `Be the first to light a candle and leave a message for ${mascota?.name}.`
+                                    : `Sé el primero en encender una vela y dejar un mensaje de cariño para ${mascota?.name}.`}
+                            </p>
+                        </div>
+                    )}
+
+                    {/* 3. Dedication Form (Shared - Max 20 comments) */}
+                    {(() => {
+                        const maxDedications = Math.min(
+                            memorial?.dedication_limit !== undefined ? memorial.dedication_limit : MAX_MEMORIAL_COMMENTS,
+                            MAX_MEMORIAL_COMMENTS
+                        );
+
+                        const approvedCount = memorial.dedications_count !== undefined
+                            ? memorial.dedications_count
+                            : ((memorial.dedicatorias || memorial.dedications)?.filter((d: any) => d.estado === 'aprobado' || d.estado === 'pendiente').length || 0);
+                        const canSubmitMore = approvedCount < maxDedications;
+
+                        if (!canSubmitMore) {
+                            return (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    whileInView={{ opacity: 1, y: 0 }}
+                                    viewport={{ once: true }}
+                                    className="mt-20 text-center max-w-xl mx-auto px-6"
+                                >
+                                    <div className={`p-8 rounded-2xl backdrop-blur-sm border ${isDarkMode ? 'bg-black/30 border-white/10' : 'bg-white/80 border-slate-200'}`}>
+                                        <h3 className="text-xl font-serif italic opacity-90 mb-2">
+                                            {t.mem_limit_full || `Se ha alcanzado el máximo de ${MAX_MEMORIAL_COMMENTS} comentarios conmemorativos`}
+                                        </h3>
+                                        <p className="text-sm opacity-60 uppercase tracking-widest mb-4">{t.mem_limit_reached}</p>
+                                        <button
+                                            type="button"
+                                            onClick={() => router.push(`/memorials/m/${uuid}/login`)}
+                                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest bg-amber-500/20 text-amber-500 border border-amber-500/30 hover:bg-amber-500/30 transition-all"
+                                        >
+                                            <ShieldCheck size={14} /> Gestionar Comentarios (Familia)
+                                        </button>
                                     </div>
-                                ) : (
-                                    <div className="group relative rounded-3xl overflow-hidden aspect-[4/5] border border-white/10 shadow-sm hover:shadow-md transition-all duration-500 h-full">
-                                        <img
-                                            src={item.data}
-                                            alt={`Memory ${idx}`}
-                                            className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
-                                        />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                                        <div className="absolute bottom-6 left-6 text-white/80 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
-                                            <Heart size={20} fill="currentColor" />
-                                        </div>
-                                    </div>
-                                )}
-                            </motion.div>
-                        ))}
-                    </AnimatePresence>
-                </div>
+                                </motion.div>
+                            );
+                        }
 
-                {/* 3. Dedication Form (Shared - Hidden if limit reached) */}
-                {(() => {
-                    // Logic to determine if we can add more dedications
-                    const planName = (memorial.plan || (memorial.tenant?.subscription_plan?.name || "FREE")).toUpperCase();
-                    const maxDedications = memorial?.dedication_limit !== undefined
-                        ? memorial.dedication_limit
-                        : (planName.includes("ULTRA") || planName.includes("PARAISO") ? 33
-                            : (planName.includes("PRO") || planName.includes("VINCULO") ? 21
-                                : (planName.includes("NORMAL") || planName.includes("HUELLA") ? 9
-                                    : (planName.includes("FREE") || planName.includes("RECUERDO") ? 0 : 21))));
-
-                    const approvedCount = memorial.dedications_count !== undefined
-                        ? memorial.dedications_count
-                        : ((memorial.dedicatorias || memorial.dedications)?.filter((d: any) => d.estado === 'aprobado' || d.estado === 'pendiente').length || 0);
-                    const canAddMore = approvedCount < maxDedications;
-
-                    if (!canAddMore) {
                         return (
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 whileInView={{ opacity: 1, y: 0 }}
                                 viewport={{ once: true }}
-                                className="mt-24 text-center max-w-xl mx-auto px-6"
+                                transition={{ duration: 0.8 }}
+                                ref={formRef}
+                                className="mt-16 sm:mt-24 max-w-2xl w-full px-2 sm:px-0"
                             >
-                                <div className={`p-8 rounded-2xl backdrop-blur-sm border ${isDarkMode ? 'bg-black/30 border-white/10' : 'bg-white/80 border-slate-200'}`}>
-                                    <h3 className="text-xl font-serif italic opacity-90 mb-2">{t.mem_limit_full}</h3>
-                                    <p className="text-sm opacity-60 uppercase tracking-widest">{t.mem_limit_reached}</p>
+                                <div className={`p-5 sm:p-8 md:p-12 rounded-3xl sm:rounded-[2rem] backdrop-blur-md border shadow-2xl relative overflow-hidden ${isDarkMode ? themeConfig.card : 'bg-white border-slate-300 shadow-md'}`}>
+                                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber-400/40 to-transparent opacity-70" />
+
+                                    <div className="relative z-10 space-y-6 sm:space-y-8">
+                                        <div className="text-center space-y-3">
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/20">
+                                                <MessageSquareHeart size={12} /> {approvedCount} de {maxDedications} mensajes disponibles
+                                            </span>
+                                            <h2 className={`text-2xl sm:text-3xl md:text-5xl font-bold tracking-wider ${isDarkMode ? 'drop-shadow-sm' : ''}`} style={{ fontFamily: "'Cinzel', serif" }}>
+                                                {t.mem_leave_message}
+                                            </h2>
+                                            <p className="font-serif text-base sm:text-lg opacity-80 italic tracking-wide">
+                                                {t.mem_dedication_info}
+                                            </p>
+                                            <div className="w-16 h-px bg-current opacity-30 mx-auto mt-4" />
+                                        </div>
+
+                                        <form onSubmit={handleSubmitDedication} className="space-y-5 sm:space-y-6 pt-2">
+                                            <div className="space-y-1">
+                                                <label className="text-xs uppercase tracking-[0.2em] opacity-60 ml-4 font-bold">Tu Nombre</label>
+                                                <input
+                                                    type="text"
+                                                    value={newDedication.nombre}
+                                                    onChange={e => setNewDedication({ ...newDedication, nombre: e.target.value })}
+                                                    placeholder={t.form_name_placeholder}
+                                                    className={`w-full px-5 sm:px-6 py-4 min-h-[52px] rounded-xl border-b-2 border-transparent bg-black/10 focus:bg-black/20 focus:border-current/30 transition-all outline-none font-serif text-base sm:text-lg ${isDarkMode ? (themeConfig.input || '') : 'border-slate-300 text-slate-900 placeholder:text-slate-400'}`}
+                                                    required
+                                                />
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <div className="flex justify-between items-center mr-4">
+                                                    <label className="text-xs uppercase tracking-[0.2em] opacity-60 ml-4 font-bold">Tu Mensaje</label>
+                                                    <span className={`text-[10px] uppercase tracking-widest font-bold ${newDedication.mensaje.length >= 300 ? 'text-red-500' : (newDedication.mensaje.length >= 250 ? 'text-amber-500' : 'opacity-40')}`}>
+                                                        {newDedication.mensaje.length}/300
+                                                    </span>
+                                                </div>
+                                                <textarea
+                                                    value={newDedication.mensaje}
+                                                    onChange={e => setNewDedication({ ...newDedication, mensaje: e.target.value })}
+                                                    placeholder={t.form_msg_placeholder}
+                                                    rows={5}
+                                                    maxLength={300}
+                                                    className={`w-full px-5 sm:px-6 py-4 rounded-xl border-b-2 border-transparent bg-black/10 focus:bg-black/20 focus:border-current/30 transition-all outline-none font-serif text-base sm:text-lg resize-none ${isDarkMode ? (themeConfig.input || '') : 'border-slate-300 text-slate-900 placeholder:text-slate-400'}`}
+                                                    required
+                                                />
+                                            </div>
+
+                                            <div className="pt-4">
+                                                <button
+                                                    type="submit"
+                                                    disabled={isSubmitting}
+                                                    className={`w-full min-h-[52px] py-5 rounded-xl font-bold uppercase tracking-[0.25em] text-xs shadow-xl hover:scale-[1.01] hover:shadow-2xl transition-all disabled:opacity-50 relative overflow-hidden group ${isDarkMode ? (themeConfig.button || 'bg-slate-900 text-white') : 'bg-slate-900 text-white hover:bg-slate-800'}`}
+                                                >
+                                                    <span className="relative z-10 flex items-center justify-center gap-3">
+                                                        {isSubmitting ? (
+                                                            <Loader2 className="animate-spin w-5 h-5" />
+                                                        ) : (
+                                                            <>{t.form_submit}</>
+                                                        )}
+                                                    </span>
+                                                </button>
+                                                <p className="text-center text-[10px] uppercase tracking-widest opacity-50 mt-4">
+                                                    {t.mem_moderated_by_family} · Máximo {MAX_MEMORIAL_COMMENTS} comentarios
+                                                </p>
+                                            </div>
+                                        </form>
+                                    </div>
                                 </div>
                             </motion.div>
                         );
-                    }
+                    })()}
 
-                    return (
-                        <motion.div
+                    {/* Tenant Attribution Section (Only for active tenants) */}
+                    {tenant_status === 'active' && (
+                        <div className="flex flex-col items-center py-16 text-center relative z-10">
+                            <div className={`h-px ${!isDarkMode ? 'bg-slate-200' : 'bg-white/10'} w-24 mb-10`} />
 
-                            initial={{ opacity: 0, y: 20 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ duration: 0.8 }}
-                            ref={formRef}
-                            className="mt-16 sm:mt-24 md:mt-32 max-w-2xl w-full px-2 sm:px-0"
-                        >
-                            <div className={`p-5 sm:p-8 md:p-12 rounded-3xl sm:rounded-[2rem] backdrop-blur-md border shadow-2xl relative overflow-hidden ${isDarkMode ? themeConfig.card : 'bg-white border-slate-300 shadow-md'}`}>
+                            <span className={`text-[11px] md:text-[13px] uppercase tracking-[0.5em] ${!isDarkMode ? 'text-slate-500' : 'text-white/50'} font-light italic mb-6`}
+                                style={!isDarkMode ? {} : { textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
+                                {t.footer_courtesy_of}
+                            </span>
 
-                                {/* Decorative Elements */}
-                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-50" />
-
-                                <div className="relative z-10 space-y-6 sm:space-y-8">
-                                    <div className="text-center space-y-3">
-                                        <h2 className={`text-2xl sm:text-3xl md:text-5xl font-bold tracking-wider ${isDarkMode ? 'drop-shadow-sm' : ''}`} style={{ fontFamily: "'Cinzel', serif" }}>
-                                            {t.mem_leave_message}
-                                        </h2>
-                                        <p className="font-serif text-base sm:text-lg opacity-80 italic tracking-wide">
-                                            {t.mem_dedication_info}
-                                        </p>
-                                        <div className="w-16 h-px bg-current opacity-30 mx-auto mt-4" />
+                            <div className="flex flex-col items-center group">
+                                {tenant_info?.logo && (
+                                    <div className="w-24 h-24 md:w-32 md:h-32 mb-8 transition-transform duration-700 group-hover:scale-105 flex items-center justify-center relative">
+                                        <div className={`absolute inset-0 ${!isDarkMode ? 'bg-black/5' : 'bg-white/5'} rounded-full blur-2xl opacity-50 group-hover:opacity-80 transition-opacity`} />
+                                        <img
+                                            src={tenant_info.logo}
+                                            alt={tenant_info.name}
+                                            className={`w-full h-full object-contain ${!isDarkMode ? 'opacity-90' : 'grayscale opacity-60'} group-hover:grayscale-0 group-hover:opacity-100 transition-all rounded-full border ${!isDarkMode ? 'border-slate-200' : 'border-white/20'} shadow-2xl p-4 relative z-10`}
+                                        />
                                     </div>
+                                )}
 
-                                    <form onSubmit={handleSubmitDedication} className="space-y-5 sm:space-y-6 pt-4">
-                                        <div className="space-y-1">
-                                            <label className="text-xs uppercase tracking-[0.2em] opacity-60 ml-4 font-bold">Tu Nombre</label>
-                                            <input
-                                                type="text"
-                                                value={newDedication.nombre}
-                                                onChange={e => setNewDedication({ ...newDedication, nombre: e.target.value })}
-                                                placeholder={t.form_name_placeholder}
-                                                className={`w-full px-5 sm:px-6 py-4 min-h-[52px] rounded-xl border-b-2 border-transparent bg-black/10 focus:bg-black/20 focus:border-current/30 transition-all outline-none font-serif text-base sm:text-lg ${isDarkMode ? (themeConfig.input || '') : 'border-slate-300 text-slate-900 placeholder:text-slate-400'}`}
-                                                required
-                                            />
-                                        </div>
+                                <h3 className={`text-3xl md:text-5xl font-serif tracking-widest font-medium transition-colors duration-700 ${isDarkMode ? themeConfig.text : 'text-slate-900'}`}
+                                    style={!isDarkMode ? {} : { textShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
+                                    {tenant_info?.name}
+                                </h3>
 
-                                        <div className="space-y-1">
-                                            <div className="flex justify-between items-center mr-4">
-                                                <label className="text-xs uppercase tracking-[0.2em] opacity-60 ml-4 font-bold">Tu Mensaje</label>
-                                                <span className={`text-[10px] uppercase tracking-widest font-bold ${newDedication.mensaje.length >= 300 ? 'text-red-500' : (newDedication.mensaje.length >= 250 ? 'text-amber-500' : 'opacity-40')}`}>
-                                                    {newDedication.mensaje.length}/300
-                                                </span>
-                                            </div>
-                                            <textarea
-                                                value={newDedication.mensaje}
-                                                onChange={e => setNewDedication({ ...newDedication, mensaje: e.target.value })}
-                                                placeholder={t.form_msg_placeholder}
-                                                rows={5}
-                                                maxLength={300}
-                                                className={`w-full px-5 sm:px-6 py-4 rounded-xl border-b-2 border-transparent bg-black/10 focus:bg-black/20 focus:border-current/30 transition-all outline-none font-serif text-base sm:text-lg resize-none ${isDarkMode ? (themeConfig.input || '') : 'border-slate-300 text-slate-900 placeholder:text-slate-400'}`}
-                                                required
-                                            />
-                                        </div>
-
-                                        <div className="pt-4">
-                                            <button
-                                                type="submit"
-                                                disabled={isSubmitting}
-                                                className={`w-full min-h-[52px] py-5 rounded-xl font-bold uppercase tracking-[0.25em] text-xs shadow-xl hover:scale-[1.01] hover:shadow-2xl transition-all disabled:opacity-50 relative overflow-hidden group ${isDarkMode ? (themeConfig.button || 'bg-slate-900 text-white') : 'bg-slate-900 text-white hover:bg-slate-800'}`}
-                                            >
-                                                <span className="relative z-10 flex items-center justify-center gap-3">
-                                                    {isSubmitting ? (
-                                                        <Loader2 className="animate-spin w-5 h-5" />
-                                                    ) : (
-                                                        <>
-                                                            {t.form_submit}
-                                                        </>
-                                                    )}
-                                                </span>
-                                            </button>
-                                            <p className="text-center text-[10px] uppercase tracking-widest opacity-40 mt-4">
-                                                {t.mem_moderated_by_family}
-                                            </p>
-                                        </div>
-                                    </form>
+                                <div className="flex items-center gap-8 mt-8">
+                                    {tenant_info?.social_instagram && (
+                                        <a
+                                            href={formatInstagramUrl(tenant_info.social_instagram)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className={`flex items-center gap-2 text-[10px] md:text-xs uppercase tracking-[0.3em] ${!isDarkMode ? 'text-slate-500 hover:text-slate-900' : 'text-white/40 hover:text-white/100'} transition-all group/link`}
+                                        >
+                                            <Instagram size={14} className="transition-transform group-hover/link:-translate-y-0.5" /> Instagram
+                                        </a>
+                                    )}
+                                    {tenant_info?.website && (
+                                        <a
+                                            href={ensureAbsoluteUrl(tenant_info.website)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className={`flex items-center gap-2 text-[10px] md:text-xs uppercase tracking-[0.3em] ${!isDarkMode ? 'text-slate-500 hover:text-slate-900' : 'text-white/40 hover:text-white/100'} transition-all group/link`}
+                                        >
+                                            <Globe size={14} className="transition-transform group-hover/link:-translate-y-0.5" /> {locale === 'es' ? 'Sitio Web' : 'Website'}
+                                        </a>
+                                    )}
                                 </div>
                             </div>
-                        </motion.div>
-                    );
-                })()}
 
-                {/* Tenant Attribution Section (Only for active tenants) */}
-                {tenant_status === 'active' && (
-                    <div className="flex flex-col items-center py-16 text-center relative z-10">
-                        <div className={`h-px ${!isDarkMode ? 'bg-slate-200' : 'bg-white/10'} w-24 mb-10`} />
+                            <button
+                                onClick={() => router.push(`/memorials/m/${uuid}/login`)}
+                                className={`mt-12 text-[10px] uppercase font-bold tracking-[0.5em] ${!isDarkMode ? 'text-slate-500 hover:text-slate-900 border-slate-300 hover:border-slate-500 bg-slate-100/50' : 'text-white/40 hover:text-white/90 border-white/10 hover:border-white/20 bg-white/[0.03]'} transition-all flex items-center gap-3 py-3 px-8 rounded-full border backdrop-blur-md shadow-xl hover:-translate-y-1`}
+                            >
+                                <ShieldCheck size={14} /> {t.footer_management}
+                            </button>
 
-                        <span className={`text-[11px] md:text-[13px] uppercase tracking-[0.5em] ${!isDarkMode ? 'text-slate-500' : 'text-white/50'} font-light italic mb-6`}
-                            style={!isDarkMode ? {} : { textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
-                            {t.footer_courtesy_of}
-                        </span>
-
-                        <div className="flex flex-col items-center group">
-                            {tenant_info?.logo && (
-                                <div className="w-24 h-24 md:w-32 md:h-32 mb-8 transition-transform duration-700 group-hover:scale-105 flex items-center justify-center relative">
-                                    <div className={`absolute inset-0 ${!isDarkMode ? 'bg-black/5' : 'bg-white/5'} rounded-full blur-2xl opacity-50 group-hover:opacity-80 transition-opacity`} />
-                                    <img
-                                        src={tenant_info.logo}
-                                        alt={tenant_info.name}
-                                        className={`w-full h-full object-contain ${!isDarkMode ? 'opacity-90' : 'grayscale opacity-60'} group-hover:grayscale-0 group-hover:opacity-100 transition-all rounded-full border ${!isDarkMode ? 'border-slate-200' : 'border-white/20'} shadow-2xl p-4 relative z-10`}
-                                    />
-                                </div>
-                            )}
-
-                            <h3 className={`text-3xl md:text-5xl font-serif tracking-widest font-medium transition-colors duration-700 ${isDarkMode ? themeConfig.text : 'text-slate-900'}`}
-                                style={!isDarkMode ? {} : { textShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
-                                {tenant_info?.name}
-                            </h3>
-
-                            {/* Tenant Links: Instagram & Website */}
-                            <div className="flex items-center gap-8 mt-8">
-                                {tenant_info?.social_instagram && (
-                                    <a
-                                        href={formatInstagramUrl(tenant_info.social_instagram)}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className={`flex items-center gap-2 text-[10px] md:text-xs uppercase tracking-[0.3em] ${!isDarkMode ? 'text-slate-500 hover:text-slate-900' : 'text-white/40 hover:text-white/100'} transition-all group/link`}
-                                    >
-                                        <Instagram size={14} className="transition-transform group-hover/link:-translate-y-0.5" /> Instagram
-                                    </a>
-                                )}
-                                {tenant_info?.website && (
-                                    <a
-                                        href={ensureAbsoluteUrl(tenant_info.website)}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className={`flex items-center gap-2 text-[10px] md:text-xs uppercase tracking-[0.3em] ${!isDarkMode ? 'text-slate-500 hover:text-slate-900' : 'text-white/40 hover:text-white/100'} transition-all group/link`}
-                                    >
-                                        <Globe size={14} className="transition-transform group-hover/link:-translate-y-0.5" /> {locale === 'es' ? 'Sitio Web' : 'Website'}
-                                    </a>
-                                )}
-                            </div>
+                            <div className="h-px bg-white/5 w-16 mt-16 opacity-20" />
                         </div>
-
-                        <button
-                            onClick={() => router.push(`/memorials/m/${uuid}/login`)}
-                            className={`mt-12 text-[10px] uppercase font-bold tracking-[0.5em] ${!isDarkMode ? 'text-slate-500 hover:text-slate-900 border-slate-300 hover:border-slate-500 bg-slate-100/50' : 'text-white/40 hover:text-white/90 border-white/10 hover:border-white/20 bg-white/[0.03]'} transition-all flex items-center gap-3 py-3 px-8 rounded-full border backdrop-blur-md shadow-xl hover:-translate-y-1`}
-                        >
-                            <ShieldCheck size={14} /> {t.footer_management}
-                        </button>
-
-                        <div className="h-px bg-white/5 w-16 mt-16 opacity-20" />
-                    </div>
-                )}
-
-            </div>
+                    )}
+                </div>
             </div>
             <HuellasFooter locale={locale} t={t} />
 
@@ -1093,7 +1232,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 memorialId={uuid}
                 locale={locale}
                 status={expirationStatus}
-                onClose={() => setShowExpirationModal(false)} // Allow close for now so they can see content if they want, or remove to force
+                onClose={() => setShowExpirationModal(false)}
             />
 
             {/* Success Modal */}
@@ -1140,8 +1279,8 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
             <LimitReachedModal
                 isOpen={showLimitModal}
                 onClose={() => setShowLimitModal(false)}
-                limit={memorial?.dedication_limit || 0}
-                planName={(memorial?.plan || memorial?.tenant?.subscription_plan?.name || 'Free').toUpperCase()}
+                limit={Math.min(memorial?.dedication_limit || MAX_MEMORIAL_COMMENTS, MAX_MEMORIAL_COMMENTS)}
+                planName={(memorial?.plan || memorial?.tenant?.subscription_plan?.name || 'PRO').toUpperCase()}
             />
 
             <DedicationModal

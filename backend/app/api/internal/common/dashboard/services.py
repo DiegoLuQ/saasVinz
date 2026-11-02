@@ -120,6 +120,7 @@ def _format_orders(orders: Sequence[models.CremationOC], today) -> List[schemas.
         formatted.append(schemas.DashboardRecentActivity(
             id=c.id,
             pet=pet.name if pet else "Desconocida",
+            pet_species=pet.species if pet else None,
             pet_image=(pet.images[0] if pet.images else None) if pet else None,
             client=customer.name if customer else "Desconocido",
             service_name=main_service_name,

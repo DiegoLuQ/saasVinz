@@ -129,6 +129,18 @@ class Memorial(Base):
         return self.tenant.status if self.tenant else "active"
 
     @property
+    def customer_email(self):
+        return self.pet.customer.email if self.pet and self.pet.customer else None
+
+    @property
+    def customer_name(self):
+        return self.pet.customer.name if self.pet and self.pet.customer else None
+
+    @property
+    def customer_phone(self):
+        return self.pet.customer.phone if self.pet and self.pet.customer else None
+
+    @property
     def mascota(self):
         p = self.pet
         if not p: return None

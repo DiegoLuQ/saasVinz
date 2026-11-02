@@ -96,8 +96,8 @@ export default function RevertOrderModal({ isOpen, orderId, onClose, onReverted 
                 <div className="space-y-4">
                     {fromDelivered && (
                         <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                            <AlertTriangle size={18} className="text-amber-400 shrink-0 mt-0.5" />
-                            <p className="text-xs text-amber-200">
+                            <AlertTriangle size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                            <p className="text-xs text-amber-900 dark:text-amber-200">
                                 {exp.pet.name ? <><strong>{exp.pet.name}</strong> ya figura como </> : 'Esta orden ya figura como '}
                                 <strong>entregada</strong>. ¿Seguro que quieres reabrirla?
                             </p>
@@ -105,9 +105,9 @@ export default function RevertOrderModal({ isOpen, orderId, onClose, onReverted 
                     )}
                     <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs">
                         <span className="text-muted-foreground">Estado actual</span>
-                        <span className="text-white font-semibold">{from}</span>
+                        <span className="text-slate-900 dark:text-white font-semibold">{from}</span>
                         <span className="text-muted-foreground">Quedará en</span>
-                        <span className="text-white font-semibold">{to}</span>
+                        <span className="text-slate-900 dark:text-white font-semibold">{to}</span>
                     </div>
                     <p className="text-xs text-muted-foreground">
                         {detail} Las fotos y notas de evidencia se conservan.
@@ -117,7 +117,7 @@ export default function RevertOrderModal({ isOpen, orderId, onClose, onReverted 
                             type="button"
                             onClick={onClose}
                             disabled={saving}
-                            className="h-10 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08] text-muted-foreground hover:text-white text-xs font-bold transition disabled:opacity-50"
+                            className="h-10 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 dark:bg-white/[0.04] dark:border-white/[0.08] dark:text-muted-foreground dark:hover:text-white text-xs font-bold transition disabled:opacity-50"
                         >
                             Cancelar
                         </button>

@@ -43,6 +43,7 @@ export function VinzerFooter({ theme = 'dark' }: VinzerFooterProps) {
                             <li><a href="/#como-funciona" className="hover:text-[#0284C7] transition-colors">Cómo Funciona</a></li>
                             <li><a href="/#planes" className="hover:text-[#0284C7] transition-colors">Planes y Precios</a></li>
                             <li><Link href="/comparar-planes" className="hover:text-[#0284C7] transition-colors">Comparar Planes</Link></li>
+                            <li><Link href="/diagnostico" className="hover:text-[#0284C7] transition-colors">Diagnóstico gratuito para crematorios</Link></li>
                         </ul>
                     </div>
 

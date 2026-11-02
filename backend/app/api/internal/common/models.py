@@ -161,7 +161,10 @@ class FormSubmission(Base):
     images = Column(JSON, default=[]) # List of saved paths
     
     # partner_id = Column(Integer, ForeignKey("ptn_partners.id_partner"), nullable=True, index=True)
-    
+
+    # Enlace de catálogo de planes desde el que llegó (embudo del catálogo)
+    catalog_token_id = Column(Integer, ForeignKey("inv_catalog_tokens.id", ondelete="SET NULL"), nullable=True, index=True)
+
     # Processing tracking
     customer_id = Column(Integer, ForeignKey("crm_customers.id"), nullable=True)
     pet_id = Column(Integer, ForeignKey("crm_pets.id"), nullable=True)

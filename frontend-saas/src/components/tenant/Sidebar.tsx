@@ -95,22 +95,19 @@ const navItems: NavItem[] = [
         moduleKey: 'certificados',
         children: [
             { name: 'Emitir Certificado', href: '/dashboard/documentos', icon: Stamp, featureKey: 'certificados:generar_pdf' },
-            { name: 'Repositorio', href: '/dashboard/documentos/repositorio', icon: FileText, featureKey: 'certificados:repositorio' },
-            { name: 'Tarjetas de Homenaje', href: '/dashboard/documentos/disenos', icon: Palette, featureKey: 'certificados:diseno' },
-            { name: 'Diseños para Redes', href: '/dashboard/documentos/redes', icon: Sparkles, featureKey: 'certificados:redes' },
+            { name: 'Historial Certificados', href: '/dashboard/documentos/repositorio', icon: FileText, featureKey: 'certificados:repositorio' },
+            { name: 'Plantillas Homenaje', href: '/dashboard/documentos/disenos', icon: Palette, featureKey: 'certificados:diseno' },
+            { name: 'Estudio Redes (IA)', href: '/dashboard/documentos/redes', icon: Sparkles, featureKey: 'certificados:redes' },
         ]
     },
     {
-        name: 'Operaciones',
-        href: '#',
+        name: 'Panel de Trabajo',
+        href: '/dashboard/operaciones/lista',
         group: 'operacion',
-        icon: Briefcase,
+        icon: Activity,
+        allowedRoles: ['admin', 'operator', 'driver', 'operador_cremacion'],
         moduleKey: 'operaciones',
-        children: [
-            { name: 'Panel de Trabajo', href: '/dashboard/operaciones/lista', icon: Activity, allowedRoles: ['admin', 'operator', 'driver', 'operador_cremacion'], moduleKey: 'operaciones', featureKey: 'operaciones:panel' },
-            // 'Iniciar Nuevo Tracking' (/dashboard/operaciones/crear-seguimiento) oculto del menú: la ruta sigue
-            // activa porque homeRouteFor la usa como inicio de roles con operaciones y sin dashboard.
-        ]
+        featureKey: 'operaciones:panel',
     },
     { name: 'Historial y Cobros', href: '/dashboard/ordenes-cremacion', icon: CreditCard, moduleKey: 'pagos', featureKey: 'pagos:ver_historial', group: 'operacion' },
     {
@@ -158,6 +155,7 @@ export default function Sidebar() {
     const activeModules = bootstrapData?.rbac.modules
         .filter(m => m.is_active)
         .map(m => m.module_key) || [];
+    const pendingSubmissionsCount = bootstrapData?.metadata?.pending_submissions ?? 0;
 
     // Estado de suscripción: si está en lockdown (post-gracia), todos los módulos
     // excepto los permitidos se muestran con candado.
@@ -168,6 +166,12 @@ export default function Sidebar() {
 
     // Filtrar items según módulos activos, roles y feature flags del plan
     const filteredNavItems = navItems.filter(item => {
+        const userRole = (user?.role || '').toLowerCase();
+        const roleAllowed = !item.allowedRoles
+            || userRole === 'admin'
+            || userRole === 'creator'
+            || item.allowedRoles.some(r => r.toLowerCase() === userRole);
+        if (!roleAllowed) return false;
         if (item.moduleKey && !activeModules.includes(item.moduleKey)) return false;
         if (item.featureKey && !hasFeature(item.featureKey, true)) return false;
         return true;
@@ -386,18 +390,37 @@ export default function Sidebar() {
                                             isActive
                                                 ? "bg-primary text-white font-bold shadow-md shadow-emerald-500/20 dark:bg-emerald-500/15 dark:text-emerald-300 dark:shadow-none"
                                                 : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white font-medium",
-                                            collapsed ? "justify-center" : ""
+                                            collapsed ? "justify-center" : "justify-between"
                                         )}
                                     >
-                                        <item.icon size={19} className={cn("shrink-0 transition-colors", isActive ? "text-white dark:text-emerald-300" : "text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white")} />
-                                        {!collapsed && (
-                                            <motion.span
-                                                initial={{ opacity: 0, x: -6 }}
-                                                animate={{ opacity: 1, x: 0 }}
-                                                className="ml-3 font-semibold whitespace-nowrap"
-                                            >
-                                                {item.name}
-                                            </motion.span>
+                                        <div className="flex items-center min-w-0">
+                                            <item.icon size={19} className={cn("shrink-0 transition-colors", isActive ? "text-white dark:text-emerald-300" : "text-slate-400 group-hover:text-slate-700 dark:group-hover:text-white")} />
+                                            {!collapsed && (
+                                                <motion.span
+                                                    initial={{ opacity: 0, x: -6 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    className="ml-3 font-semibold whitespace-nowrap truncate"
+                                                >
+                                                    {item.name}
+                                                </motion.span>
+                                            )}
+                                        </div>
+                                        {item.href === '/dashboard/recepcion-pedidos' && pendingSubmissionsCount > 0 && (
+                                            collapsed ? (
+                                                <span
+                                                    title={`${pendingSubmissionsCount} solicitud(es) web pendiente(s)`}
+                                                    className="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-slate-950 font-black text-[9px] flex items-center justify-center shadow-xs"
+                                                >
+                                                    {pendingSubmissionsCount > 9 ? '9+' : pendingSubmissionsCount}
+                                                </span>
+                                            ) : (
+                                                <span
+                                                    title={`${pendingSubmissionsCount} solicitud(es) web pendiente(s)`}
+                                                    className="ml-2 shrink-0 px-1.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] leading-none shadow-xs"
+                                                >
+                                                    {pendingSubmissionsCount}
+                                                </span>
+                                            )
                                         )}
                                     </Link>
                                 )}

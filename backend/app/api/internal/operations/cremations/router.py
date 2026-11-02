@@ -121,6 +121,7 @@ def obtener_expediente(
     oc = db.query(C).options(
         joinedload(C.pet).joinedload(models.Pet.customer),
         joinedload(C.details), joinedload(C.financial),
+        joinedload(C.logistics), joinedload(C.scheduling),
         joinedload(C.technical).joinedload(models.CremationTechnical.step),
         joinedload(C.commission), joinedload(C.evidence), joinedload(C.certificates),
         joinedload(C.partner_link),
@@ -269,16 +270,24 @@ def obtener_expediente(
     discount_pct = (fin.discount or 0) if fin else 0
     subtotal = sum(i["precio"] * i["cantidad"] for i in items)
     total = subtotal - subtotal * discount_pct / 100
+    log = oc.logistics
+    sched = oc.scheduling
+    notes_txt = ((oc.details.notes or "").strip() or None) if oc.details else None
     return {
         "order": {
             "id": oc.id, "oc_number": oc.oc_number, "status": oc.status, "status_group": group,
             "cremation_type": oc.cremation_type, "created_at": oc.created_at,
+            "scheduled_at": sched.scheduled_at if sched else None,
+            "completed_at": sched.completed_at if sched else None,
             "verification_code": oc.verification_code,
             "current_step": steps[current_idx].name if current_idx >= 0 else None,
+            "notes": notes_txt,
         },
         "pet": {
             "id": pet.id if pet else None, "name": pet.name if pet else None,
             "species": pet.species if pet else None, "breed": pet.breed if pet else None,
+            "weight": oc.weight,
+            "size": getattr(pet, "size", None) if pet else None,
             # La de la orden manda; la solicitud es solo el respaldo (órdenes antiguas)
             "dedication": ((oc.details.dedication or None) if oc.details and oc.details.dedication is not None
                            else (pet_data.get("dedication") or None)),
@@ -290,6 +299,14 @@ def obtener_expediente(
             "name": customer.name if customer else None,
             "phone": customer.phone if customer else None,
             "email": customer.email if customer else None,
+        },
+        "logistics": {
+            "pickup_address": (log.pickup_address or None) if log else None,
+            "pickup_city": (log.pickup_city or None) if log else None,
+            "pickup_region": (log.pickup_region or None) if log else None,
+            "address": (log.address or None) if log else None,
+            "city": (log.city or None) if log else None,
+            "region": (log.region or None) if log else None,
         },
         "items": items,
         "financial": {
@@ -308,7 +325,12 @@ def obtener_expediente(
                 "enabled": cert_enabled,
                 "issued": [{"id": c.id, "number": c.number, "issued_at": c.issue_date or c.created_at} for c in certs],
             },
-            "memorial": {"uuid": str(memorial.id_recuerdo), "status": str(getattr(memorial.status, "value", memorial.status))} if memorial else None,
+            "memorial": {
+                "uuid": str(memorial.id_recuerdo),
+                "status": str(getattr(memorial.status, "value", memorial.status)),
+                "access_key": memorial.access_key,
+                "scenario": (memorial.diseno or {}).get("tipo_diseno", "normal") if isinstance(memorial.diseno, dict) else "normal",
+            } if memorial else None,
             "farewell_template": {"id": farewell.id, "config": farewell.config} if farewell else None,
         },
         "origin": {

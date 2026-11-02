@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     PawPrint,
     Heart,
+    Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -75,6 +76,7 @@ export default function NormalLayout(props: any) {
     const petName = mascota?.name || '';
     const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale);
     const bio = memorial?.msg_despedida || '';
+    const isDark = Boolean(memorial?.diseno?.portada_url || themeConfig?.dark);
 
     return (
         <div
@@ -173,36 +175,60 @@ export default function NormalLayout(props: any) {
                         initial={{ opacity: 0, y: 30 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 1, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                        className={`max-w-lg w-full text-center space-y-8 ${
+                        className={`max-w-xl w-full text-center space-y-7 ${
                             memorial?.diseno?.portada_url
-                                ? 'bg-black/45 backdrop-blur-md p-8 sm:p-12 rounded-3xl border border-white/10 shadow-2xl text-white'
-                                : ''
+                                ? 'bg-black/55 backdrop-blur-md p-6 sm:p-10 md:p-12 rounded-3xl border border-white/15 shadow-2xl text-white'
+                                : isDark
+                                ? 'bg-slate-900/60 backdrop-blur-md p-6 sm:p-10 md:p-12 rounded-3xl border border-slate-700/60 shadow-xl text-white'
+                                : 'p-4 sm:p-8 text-slate-800'
                         }`}
                     >
-                        {/* Pet Name — Large Serif */}
-                        <div className="space-y-4">
+                        {/* Pet Name — Majestic, Radiant & Unbroken */}
+                        <div className="space-y-3">
+                            <div className={`inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full border text-[10px] sm:text-[11px] font-sans uppercase tracking-[0.22em] backdrop-blur-md shadow-xs ${
+                                isDark
+                                    ? 'border-amber-500/30 bg-amber-500/10 text-amber-300 font-bold'
+                                    : 'border-amber-800/30 bg-amber-800/10 text-amber-950 font-black'
+                            }`}>
+                                <Sparkles size={11} className={isDark ? "text-amber-400" : "text-amber-800"} />
+                                <span>{locale === 'en' ? 'IN ETERNAL MEMORY' : 'EN MEMORIA ETERNA'}</span>
+                            </div>
+
                             <h1
                                 className={`${nameSizeClass(petName, {
-                                    short: 'text-5xl md:text-7xl lg:text-8xl',
-                                    long: 'text-4xl md:text-6xl lg:text-7xl',
-                                    xlong: 'text-3xl md:text-5xl lg:text-6xl',
-                                })} font-light tracking-[0.08em] leading-tight break-words`}
+                                    short: 'text-2xl sm:text-3xl md:text-3xl lg:text-4xl xl:text-[2.75rem]',
+                                    long: 'text-xl sm:text-2xl md:text-2xl lg:text-3xl xl:text-4xl',
+                                    xlong: 'text-lg sm:text-xl md:text-xl lg:text-2xl xl:text-3xl',
+                                })} font-medium tracking-[0.08em] leading-tight select-none uppercase`}
                                 style={{ 
                                     fontFamily: "'Cinzel', serif",
-                                    textShadow: memorial?.diseno?.portada_url
-                                        ? '0 2px 10px rgba(0,0,0,0.8), 0 0 30px rgba(0,0,0,0.4)'
-                                        : 'none'
                                 }}
                             >
-                                {petName.toUpperCase()}
+                                <span
+                                    className={`inline-flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 ${
+                                        isDark || memorial?.diseno?.portada_url
+                                            ? 'bg-gradient-to-b from-white via-amber-50 to-amber-200/90 bg-clip-text text-transparent drop-shadow-[0_2px_18px_rgba(251,191,36,0.35)]'
+                                            : 'text-slate-900 drop-shadow-[0_1px_2px_rgba(0,0,0,0.1)]'
+                                    }`}
+                                >
+                                    {petName.split(/\s+/).map((word: string, idx: number) => (
+                                        <span key={idx} className="inline-block whitespace-nowrap">
+                                            {word}
+                                        </span>
+                                    ))}
+                                </span>
                             </h1>
 
-                            {/* Thin decorative line */}
-                            <div className="w-20 h-px bg-current opacity-20 mx-auto" />
+                            {/* Ornate Thin Decorative Divider */}
+                            <div className="flex items-center justify-center gap-2 text-amber-400/60 my-1">
+                                <div className="w-8 sm:w-14 h-px bg-gradient-to-r from-transparent to-amber-400/50" />
+                                <span className="text-[10px] text-amber-400/80">✦</span>
+                                <div className="w-8 sm:w-14 h-px bg-gradient-to-l from-transparent to-amber-400/50" />
+                            </div>
                         </div>
 
                         {/* Dedication / Bio */}
-                        <p className="text-lg md:text-xl leading-relaxed opacity-80 italic font-light px-4">
+                        <p className="text-base sm:text-lg md:text-xl leading-relaxed opacity-90 italic font-light px-2 sm:px-4">
                             {bio}
                         </p>
 
@@ -271,7 +297,9 @@ export default function NormalLayout(props: any) {
 
                                 {/* Label */}
                                 <span
-                                    className="mt-5 text-[10px] tracking-[0.3em] uppercase opacity-40 group-hover:opacity-70 transition-opacity"
+                                    className={`mt-5 text-[10px] tracking-[0.3em] uppercase transition-opacity ${
+                                        isDark ? 'opacity-50 group-hover:opacity-80 text-white' : 'opacity-80 group-hover:opacity-100 font-bold text-slate-800'
+                                    }`}
                                     style={{ fontFamily: "'Quicksand', sans-serif" }}
                                 >
                                     {lit

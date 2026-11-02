@@ -33,7 +33,7 @@ def _authorize(db: Session, current_user: models.User, tenant_id: int, catalog_t
         apply_tenant_rls(db, tenant_id)
 
 
-def _to_dto(item: CatalogShareToken, now) -> schemas.CatalogShareTokenInDB:
+def _to_dto(item: CatalogShareToken, now, stats: dict | None = None) -> schemas.CatalogShareTokenInDB:
     return schemas.CatalogShareTokenInDB(
         id=item.id,
         tenant_id=item.tenant_id,
@@ -47,6 +47,7 @@ def _to_dto(item: CatalogShareToken, now) -> schemas.CatalogShareTokenInDB:
         last_viewed_at=item.last_viewed_at,
         created_at=item.created_at,
         is_expired=bool(item.expires_at and now > item.expires_at),
+        **(stats or {}),
     )
 
 
@@ -70,8 +71,13 @@ def list_catalog_share_links(
         .all()
     )
 
+    stats = {}
+    if catalog_type == "plans":
+        from app.services.catalog_funnel import link_stats
+        stats = link_stats(db, [t.id for t in tokens])
+
     now = tz.get_now()
-    return [_to_dto(item, now) for item in tokens]
+    return [_to_dto(item, now, stats.get(item.id)) for item in tokens]
 
 
 @router.post("", response_model=schemas.CatalogShareTokenInDB, status_code=status.HTTP_201_CREATED)

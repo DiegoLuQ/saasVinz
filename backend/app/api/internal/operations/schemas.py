@@ -414,6 +414,7 @@ class DashboardLimitsData(BaseModel):
 class DashboardRecentActivity(BaseModel):
     id: int
     pet: str
+    pet_species: Optional[str] = None
     pet_image: Optional[str] = None
     client: str
     service_name: str

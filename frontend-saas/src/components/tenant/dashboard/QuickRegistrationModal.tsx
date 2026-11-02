@@ -24,8 +24,12 @@ import {
     Truck,
     Camera,
     Trash2,
+    MessageCircle,
+    Share2,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/tenant/api';
+import { buildTrackingUrl } from '@/lib/publicUrls';
+import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { regions } from '@/lib/tenant/chile-data';
 import SearchableSelect from '@/components/tenant/SearchableSelect';
@@ -39,6 +43,7 @@ interface QuickRegistrationModalProps {
 
 export default function QuickRegistrationModal({ isOpen, onClose, onSuccess }: QuickRegistrationModalProps) {
     const { showToast } = useToast();
+    const { tenantData } = useTenant();
 
     // Wizard Step State: 1: Cliente, 2: Mascota, 3: Plan/Servicios, 4: Logística, 5: Resultado
     const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
@@ -157,6 +162,7 @@ export default function QuickRegistrationModal({ isOpen, onClose, onSuccess }: Q
         verification_code: string;
         pet_name?: string;
         customer_name?: string;
+        customer_phone?: string;
     } | null>(null);
     const [copiedTracking, setCopiedTracking] = useState(false);
     const [copiedLink, setCopiedLink] = useState(false);
@@ -349,6 +355,7 @@ export default function QuickRegistrationModal({ isOpen, onClose, onSuccess }: Q
         try {
             let finalCustomerId = selectedCustomerId;
             let finalCustomerName = 'Cliente';
+            let finalCustomerPhone = '';
 
             if (createNewCustomer) {
                 if (!newCustomer.full_name.trim() || !newCustomer.phone.trim()) {
@@ -367,9 +374,11 @@ export default function QuickRegistrationModal({ isOpen, onClose, onSuccess }: Q
                 });
                 finalCustomerId = custRes.id;
                 finalCustomerName = custRes.name;
+                finalCustomerPhone = custRes.phone || newCustomer.phone.trim();
                 setCustomers(prev => [custRes, ...prev]);
             } else if (selectedCustomerObj) {
                 finalCustomerName = getCustomerDisplayName(selectedCustomerObj);
+                finalCustomerPhone = selectedCustomerObj.phone || '';
             }
 
             if (!finalCustomerId) {
@@ -525,6 +534,7 @@ export default function QuickRegistrationModal({ isOpen, onClose, onSuccess }: Q
                 verification_code: res.verification_code || 'N/A',
                 pet_name: finalPetName,
                 customer_name: finalCustomerName,
+                customer_phone: finalCustomerPhone,
             });
 
             clearLocalDraft();
@@ -565,11 +575,16 @@ export default function QuickRegistrationModal({ isOpen, onClose, onSuccess }: Q
         }
     };
 
+    const getOfficialTrackingUrl = () => {
+        if (!createdResult?.verification_code) return '';
+        const slug = tenantData?.slug || 'crematorio';
+        return buildTrackingUrl(slug, createdResult.pet_name || 'mascota', createdResult.verification_code);
+    };
+
     const copyTrackingLink = async () => {
-        if (!createdResult?.verification_code) return;
+        const fullUrl = getOfficialTrackingUrl();
+        if (!fullUrl) return;
         try {
-            const baseUrl = window.location.origin;
-            const fullUrl = `${baseUrl}/track?code=${createdResult.verification_code}`;
             await copyToClipboard(fullUrl);
             setCopiedLink(true);
             showToast('Enlace completo de seguimiento copiado', 'success');
@@ -578,6 +593,16 @@ export default function QuickRegistrationModal({ isOpen, onClose, onSuccess }: Q
             console.error('Error copiando enlace:', err);
             showToast('No se pudo copiar el enlace', 'error');
         }
+    };
+
+    const sendTrackingWhatsApp = () => {
+        const fullUrl = getOfficialTrackingUrl();
+        if (!fullUrl || !createdResult) return;
+        const phone = (createdResult.customer_phone || '').replace(/\D/g, '');
+        const text = encodeURIComponent(
+            `Hola ${createdResult.customer_name || ''}, te compartimos el enlace oficial para seguir el proceso de ${createdResult.pet_name || 'tu mascota'}: ${fullUrl}`
+        );
+        window.open(phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`, '_blank');
     };
 
     if (!isOpen) return null;
@@ -1166,14 +1191,22 @@ export default function QuickRegistrationModal({ isOpen, onClose, onSuccess }: Q
                                             </button>
                                         </div>
 
-                                        <div className="pt-2 border-t border-primary/10 flex justify-center">
+                                        <div className="pt-2 border-t border-primary/10 flex flex-col sm:flex-row gap-2 justify-center">
                                             <button
                                                 type="button"
                                                 onClick={copyTrackingLink}
-                                                className="w-full py-2.5 px-4 rounded-xl bg-background/60 hover:bg-background border border-primary/20 text-xs font-bold text-primary hover:text-primary/90 transition-all flex items-center justify-center gap-2 shadow-sm"
+                                                className="flex-1 py-2.5 px-4 rounded-xl bg-background/60 hover:bg-background border border-primary/20 text-xs font-bold text-primary hover:text-primary/90 transition-all flex items-center justify-center gap-2 shadow-sm"
                                             >
-                                                {copiedLink ? <Check size={14} className="text-emerald-400" /> : <ExternalLink size={14} />}
-                                                <span>{copiedLink ? '¡Enlace Completo Copiado!' : 'Copiar Enlace Directo para el Cliente'}</span>
+                                                {copiedLink ? <Check size={14} className="text-emerald-400" /> : <Share2 size={14} />}
+                                                <span>{copiedLink ? '¡Enlace Copiado!' : 'Copiar Link'}</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={sendTrackingWhatsApp}
+                                                className="flex-1 py-2.5 px-4 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/35 text-xs font-bold text-[#128C4B] dark:text-[#25D366] transition-all flex items-center justify-center gap-2 shadow-sm"
+                                            >
+                                                <MessageCircle size={14} />
+                                                <span>Enviar por WhatsApp</span>
                                             </button>
                                         </div>
 

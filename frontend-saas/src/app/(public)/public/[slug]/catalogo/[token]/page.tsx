@@ -318,6 +318,7 @@ export default function PublicCatalogPage() {
             <PublicPlansCatalog
                 tenant={{
                     name: data.tenant_name,
+                    slug: data.tenant_slug || slug,
                     logo: data.tenant_logo,
                     phone: data.tenant_phone,
                     email: data.tenant_email,
@@ -332,6 +333,7 @@ export default function PublicCatalogPage() {
                 plans={data.plans ?? []}
                 weightTiers={data.weight_tiers ?? []}
                 message={data.catalog_message}
+                catalogToken={token}
                 getImageUrl={getImageUrl}
                 onShare={handleShareLink}
                 copiedLink={copiedLink}

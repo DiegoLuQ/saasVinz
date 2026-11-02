@@ -16,7 +16,11 @@ import {
     ChevronRight,
     Filter,
     Flame,
-    X
+    X,
+    MoreVertical,
+    Heart,
+    Link as LinkIcon,
+    ExternalLink
 } from 'lucide-react';
 import SearchableSelect from '@/components/tenant/SearchableSelect';
 import { TableSkeleton, CardSkeleton } from '@/components/tenant/ui/Skeleton';
@@ -25,12 +29,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePets, useSavePet, useDeletePet } from '@/hooks/usePets';
 import { useCustomers } from '@/hooks/useCustomers';
-import {
-    MoreVertical,
-    Heart,
-    Link as LinkIcon
-} from 'lucide-react';
+import { useCremations } from '@/hooks/useCremations';
 import MemorialSetupModal from '@/components/tenant/memorials/MemorialSetupModal';
+import { isProOrUltraCrematoryPlan } from '@/lib/memorialDesign';
 import { useFeatures } from '@/hooks/useFeatures';
 
 import Cropper from 'react-easy-crop';
@@ -71,14 +72,28 @@ export default function PetsPage() {
     const { tenantData, formatLimit } = useTenant();
     const { hasFeature } = useFeatures();
 
-    // Memoriales: característica configurable por plan desde admin -> Planes -> "Configurar Características"
-    const canUseMemorial = hasFeature('mascotas:memorial');
+    // Memoriales: exclusivo para planes de crematorio PRO y ULTRA
+    const crematoryPlanName = tenantData?.subscription_plan?.name || tenantData?.plan || 'PRO';
+    const canUseMemorial = hasFeature('mascotas:memorial') && isProOrUltraCrematoryPlan(crematoryPlanName);
 
     // TanStack Query Hooks
     const { data: pets = [], isLoading: loadingPets } = usePets();
     const { data: customers = [] } = useCustomers();
+    const { data: cremations = [] } = useCremations();
     const savePetMutation = useSavePet();
     const deletePetMutation = useDeletePet();
+
+    const latestOrderByPetId = React.useMemo(() => {
+        const map = new Map<number, any>();
+        const sorted = [...cremations].sort((a, b) => b.id - a.id);
+        for (const order of sorted) {
+            if (!order.pet_id) continue;
+            if (!map.has(order.pet_id) || (map.get(order.pet_id)?.status === 'cancelled' && order.status !== 'cancelled')) {
+                map.set(order.pet_id, order);
+            }
+        }
+        return map;
+    }, [cremations]);
 
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -272,19 +287,15 @@ export default function PetsPage() {
                     setCurrentPet({ ...currentPet, images: newImages, image_url: newMainImage });
                 }
             } else {
-                // Borrar solo del estado local (imágenes nuevas)
-                // Esto ya se maneja al actualizar los arrays, pero aquí centralizamos la lógica
                 const newSelected = selectedImages.filter((_, i) => i !== imageToDelete.index);
                 const newPreviews = imagePreviews.filter((_, i) => i !== imageToDelete.index);
                 setSelectedImages(newSelected);
                 setImagePreviews(newPreviews);
             }
 
-            // Actualizar arrays visuales si era remota (para que desaparezca del modal)
             if (imageToDelete.isRemote) {
                 setImagePreviews(prev => prev.filter(img => img !== imageToDelete.url));
             } else {
-                // Si era local, ya lo hicimos arriba, pero aseguramos consistencia
                 setImagePreviews(prev => prev.filter((_, i) => i !== imageToDelete.index));
                 setSelectedImages(prev => prev.filter((_, i) => i !== imageToDelete.index));
             }
@@ -320,9 +331,9 @@ export default function PetsPage() {
                 return a.name.localeCompare(b.name);
             case 'name_desc':
                 return b.name.localeCompare(a.name);
-            case 'date_desc': // Younger first (assuming birth_date)
+            case 'date_desc':
                 return new Date(b.birth_date).getTime() - new Date(a.birth_date).getTime();
-            case 'date_asc': // Older first
+            case 'date_asc':
                 return new Date(a.birth_date).getTime() - new Date(b.birth_date).getTime();
             case 'created_asc':
                 return a.id - b.id;
@@ -555,8 +566,6 @@ export default function PetsPage() {
                 </div>
             </div>
 
-
-
             {/* Toolbar */}
             <div className="glass-card rounded-3xl p-4 flex flex-col md:flex-row gap-3 sm:gap-4 items-center">
                 <div className="relative flex-1 w-full">
@@ -745,20 +754,60 @@ export default function PetsPage() {
                                         </div>
                                     </div>
 
-                                    {/* Botón directo: Iniciar Servicio / Cremación */}
+                                    {/* Botón directo: Ver Orden existente o Iniciar Servicio */}
                                     <div className="pt-2 border-t border-white/5">
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                router.push(`/dashboard/recepcion-pedidos/registro?pet_id=${pet.id}`);
-                                            }}
-                                            className="w-full py-2.5 px-4 rounded-xl bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground font-black text-xs uppercase tracking-wider border border-primary/20 hover:border-primary transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-lg hover:shadow-primary/20 active:scale-95"
-                                            title="Crear orden de servicio para esta mascota"
-                                        >
-                                            <Flame size={14} className="animate-pulse" />
-                                            <span>Iniciar Servicio</span>
-                                        </button>
+                                        {(() => {
+                                            const petOrder = latestOrderByPetId.get(pet.id);
+                                            if (petOrder && petOrder.status !== 'cancelled') {
+                                                const ocLabel = (petOrder as any).oc_number ? `OC-${(petOrder as any).oc_number}` : `#${petOrder.id}`;
+                                                const isDone = petOrder.status === 'completed' || petOrder.status === 'delivered';
+                                                return (
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                router.push(`/dashboard/recepcion-pedidos?orden=${petOrder.id}`);
+                                                            }}
+                                                            className={`flex-1 py-2.5 px-3 rounded-xl font-black text-xs uppercase tracking-wider border transition-all flex items-center justify-center gap-2 shadow-xs active:scale-95 ${
+                                                                isDone
+                                                                    ? 'bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 dark:text-emerald-400 hover:text-white border-emerald-500/25 hover:border-emerald-500'
+                                                                    : 'bg-sky-500/10 hover:bg-sky-500 text-sky-600 dark:text-sky-400 hover:text-white border-sky-500/25 hover:border-sky-500'
+                                                            }`}
+                                                            title={`Abrir expediente de la orden ${ocLabel}`}
+                                                        >
+                                                            <ExternalLink size={14} />
+                                                            <span>Ver Orden {ocLabel}</span>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                router.push(`/dashboard/recepcion-pedidos/registro?pet_id=${pet.id}`);
+                                                            }}
+                                                            className="p-2.5 rounded-xl bg-slate-100 hover:bg-primary/15 text-slate-600 hover:text-primary border border-slate-200 dark:bg-white/5 dark:border-white/10 dark:text-slate-400 dark:hover:text-primary transition-all"
+                                                            title="Crear nueva orden adicional para esta mascota"
+                                                        >
+                                                            <Plus size={14} />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            }
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        router.push(`/dashboard/recepcion-pedidos/registro?pet_id=${pet.id}`);
+                                                    }}
+                                                    className="w-full py-2.5 px-4 rounded-xl bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground font-black text-xs uppercase tracking-wider border border-primary/20 hover:border-primary transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-lg hover:shadow-primary/20 active:scale-95"
+                                                    title="Crear orden de servicio para esta mascota"
+                                                >
+                                                    <Flame size={14} className="animate-pulse" />
+                                                    <span>Iniciar Servicio</span>
+                                                </button>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             </motion.div>
@@ -899,7 +948,6 @@ export default function PetsPage() {
                                 className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-primary/50"
                             />
                         </div>
-
 
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
@@ -1163,4 +1211,3 @@ export default function PetsPage() {
         </div >
     );
 }
-

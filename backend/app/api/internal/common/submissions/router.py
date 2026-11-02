@@ -17,6 +17,8 @@ from app.api.internal.common.media_service import MediaService
 
 from app.api.internal.admin.rbac.router import check_permission
 
+PROCESSED = "processed"  # ya tiene orden: fuera de la lista, se conserva para el embudo del catálogo
+
 router = APIRouter()
 
 def parse_date(date_str: str | None) -> datetime | None:
@@ -67,7 +69,8 @@ def get_submissions(
     _: bool = Depends(check_permission("ordenes", "view"))
 ):
     submissions = db.query(models.FormSubmission).filter(
-        models.FormSubmission.tenant_id == tenant_id
+        models.FormSubmission.tenant_id == tenant_id,
+        models.FormSubmission.status != PROCESSED,
     ).order_by(models.FormSubmission.created_at.desc()).all()
     
     result = []
@@ -752,8 +755,11 @@ def create_services_from_submission(
         except Exception as e:
             print(f"Error cleaning up submission folder: {e}")
 
-        # Delete the submission record as it's no longer needed
-        db.delete(submission)
+        # El registro se conserva como «procesado» (fuera de la lista): el embudo del
+        # catálogo sigue la orden por su mascota (services/catalog_funnel.py).
+        submission.status = PROCESSED
+        submission.pet_id = pet_id
+        submission.processed_at = datetime.utcnow()
         db.commit()
         
         return {"status": "created", "cremation_id": db_cremation.id}

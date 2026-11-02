@@ -264,13 +264,55 @@ export function useTenantForm(
                     setFarewellTemplate(farewellData);
                 }
 
+                // Preselección desde parámetros URL (ej. proveniente de catálogo online)
+                const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+                const planParam = searchParams?.get('plan_id') || searchParams?.get('plan');
+                const tierParam = searchParams?.get('weight_tier') || searchParams?.get('weight_tier_id') || searchParams?.get('tier');
+
                 // Máximo 1 plan seleccionado (los servicios adicionales se conservan)
                 // y fuera los ítems que ya no se publican.
                 const publishedIds = new Set(servicesData.map(s => s.id));
+
+                let preselectedPlanId: string | null = null;
+                if (planParam) {
+                    const matchedPlan = servicesData.find(s =>
+                        (s.category || '').toLowerCase() === 'plan' && (
+                            String(s.id) === String(planParam) ||
+                            s.id === `plan_${planParam}` ||
+                            s.id.replace('plan_', '') === String(planParam)
+                        )
+                    );
+                    if (matchedPlan) {
+                        preselectedPlanId = matchedPlan.id;
+                    }
+                }
+
                 setSelectedServices(prev => {
-                    const firstPlan = prev.find(id => id.startsWith('plan_'));
-                    return prev.filter(id => publishedIds.has(id) && (!id.startsWith('plan_') || id === firstPlan));
+                    const activePlan = preselectedPlanId || prev.find(id => id.startsWith('plan_'));
+                    const filtered = prev.filter(id => publishedIds.has(id) && !id.startsWith('plan_'));
+                    return activePlan ? [activePlan, ...filtered] : filtered;
                 });
+
+                if (tierParam) {
+                    const tiers = tenantData.weight_tiers || [];
+                    const matchedTier = tiers.find(t =>
+                        String(t.id) === String(tierParam) ||
+                        (t.label && t.label.toLowerCase() === tierParam.toLowerCase())
+                    );
+                    if (matchedTier) {
+                        setPetData(prev => ({
+                            ...prev,
+                            weightTierId: String(matchedTier.id),
+                            weightRange: '',
+                        }));
+                    } else if (['small', 'medium', 'large', 'giant'].includes(tierParam.toLowerCase())) {
+                        setPetData(prev => ({
+                            ...prev,
+                            weightRange: tierParam.toLowerCase() as any,
+                            weightTierId: '',
+                        }));
+                    }
+                }
 
                 if (tokenData?.expired) {
                     setIsExpired(true);

@@ -226,6 +226,20 @@ export function VinzerNavbar({
                             )}
                         </a>
 
+                        {/* Diagnóstico gratuito */}
+                        <Link
+                            href="/diagnostico"
+                            className={`relative text-[11px] font-bold tracking-widest uppercase transition-all duration-300 py-1 ${
+                                pathname === '/diagnostico'
+                                    ? isLight ? 'text-[#0284C7]' : 'text-[#19B5FE]'
+                                    : isLight
+                                        ? 'text-slate-600 hover:text-slate-900'
+                                        : 'text-[#C0C0C0] hover:text-white'
+                            }`}
+                        >
+                            Diagnóstico gratis
+                        </Link>
+
                         {/* DROPDOWN GUÍAS (AL FINAL DEL MENÚ) */}
                         <div
                             ref={dropdownRef}
@@ -457,6 +471,13 @@ export function VinzerNavbar({
                                 >
                                     FAQ
                                 </a>
+                                <Link
+                                    href="/diagnostico"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                    className="text-xl font-bold py-2 border-b border-white/5"
+                                >
+                                    Diagnóstico gratis
+                                </Link>
 
                                 {/* Guías Móvil al final */}
                                 <div className="py-2 border-b border-white/5">

@@ -1,4 +1,7 @@
+from typing import Literal, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
@@ -119,7 +122,7 @@ def get_public_catalog(
             catalog_message=share_token.message,
             weight_tiers=public_weight_tiers(
                 db, tenant.id,
-                include_price=normalize_form_config(tenant.form_config)["show_weight_prices"],
+                include_price=True,
             ),
         )
 
@@ -162,6 +165,51 @@ def get_public_catalog(
         **tenant_info,
         products=product_list,
     )
+
+
+class CatalogEventIn(BaseModel):
+    kind: Literal["view", "size_select", "plan_request", "whatsapp", "form_open"]
+    session_id: str = Field(..., max_length=40)
+    plan_id: Optional[int] = None
+    weight_tier: Optional[str] = Field(default=None, max_length=120)
+
+
+@router.post("/{slug}/{token}/events", status_code=204)
+@limiter.limit("60/minute")
+def track_catalog_event(
+    request: Request,
+    slug: str,
+    token: str,
+    data: CatalogEventIn,
+    db: Session = Depends(get_db),
+):
+    """Embudo del catálogo (services/catalog_funnel.py): una fila por sesión anónima
+    y evento. Responde 204 siempre que el enlace exista, aunque el evento se ignore."""
+    from app.services import catalog_funnel
+
+    apply_bypass_rls(db)
+    share_token = (
+        db.query(CatalogShareToken)
+        .join(models.Tenant, models.Tenant.id == CatalogShareToken.tenant_id)
+        .filter(models.Tenant.slug == slug, CatalogShareToken.token == token)
+        .first()
+    )
+    if not share_token:
+        # El formulario lo llama con cualquier token (temporal, permanente…): solo cuentan los de catálogo
+        return Response(status_code=204)
+    expired = bool(share_token.expires_at and tz.get_now() > share_token.expires_at)
+    if (
+        share_token.catalog_type == "plans"
+        and share_token.is_active
+        and not expired
+        and catalog_funnel.valid_session(data.session_id)
+    ):
+        apply_tenant_rls(db, share_token.tenant_id)
+        catalog_funnel.record_event(
+            db, share_token, data.kind, data.session_id,
+            plan_id=data.plan_id, weight_tier=data.weight_tier,
+        )
+    return Response(status_code=204)
 
 
 def _active_plans(db: Session, tenant_id: int) -> list:

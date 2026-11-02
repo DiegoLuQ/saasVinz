@@ -223,6 +223,13 @@ class CatalogShareTokenInDB(BaseModel):
     created_at: datetime
     is_expired: bool = False
     full_url: Optional[str] = None
+    # Embudo del catálogo de planes (desde que existe; services/catalog_funnel.py)
+    visitors: int = 0
+    plan_requests: int = 0
+    whatsapp_clicks: int = 0
+    forms_submitted: int = 0
+    orders: int = 0
+    delivered: int = 0
 
     model_config = {"from_attributes": True}
 

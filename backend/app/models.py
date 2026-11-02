@@ -12,6 +12,7 @@ from app.api.internal.admin.models import (
 )
 from app.api.internal.admin.image_templates.models import ImageTemplate, AiGeneration, TemplateExport
 from app.api.internal.creator.ai_providers.models import AiProvider
+from app.api.internal.creator.diagnostics.models import DiagnosticCategory, DiagnosticQuestion, Diagnostic
 from app.api.internal.common.ai_credits.models import AiCreditBalance, AiDesignSession, AiCreditLedger, AiCreditPurchase
 from app.api.internal.common.auto_documents.models import DocumentRun, DocumentJob
 from app.api.internal.creator.subscriptions.models import (

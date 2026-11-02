@@ -77,20 +77,20 @@ export default function EditWeightModal({
                         <Scale size={32} />
                     </div>
                     <p className="text-xs font-bold text-muted-foreground uppercase tracking-[0.2em]">Editando Peso para</p>
-                    <h3 className="text-2xl font-black text-white mt-1">{petName}</h3>
+                    <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1">{petName}</h3>
                 </div>
 
                 <div className="relative group">
                     <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent rounded-3xl opacity-0 group-focus-within:opacity-100 transition-opacity duration-500" />
 
-                    <div className="relative bg-black/40 border border-white/10 rounded-3xl p-8 flex items-center justify-center gap-2 shadow-inner transition-all group-focus-within:border-primary/50 group-focus-within:ring-1 group-focus-within:ring-primary/50">
+                    <div className="relative bg-slate-100 dark:bg-black/40 border border-slate-200 dark:border-white/10 rounded-3xl p-8 flex items-center justify-center gap-2 shadow-inner transition-all group-focus-within:border-primary/50 group-focus-within:ring-1 group-focus-within:ring-primary/50">
                         <input
                             type="number"
                             step="0.1"
                             min="0"
                             value={weight}
                             onChange={(e) => setWeight(e.target.value)}
-                            className="bg-transparent outline-none font-mono text-7xl font-bold text-white text-center w-full placeholder:text-white/10"
+                            className="bg-transparent outline-none font-mono text-7xl font-bold text-slate-900 dark:text-white text-center w-full placeholder:text-slate-300 dark:placeholder:text-white/10"
                             placeholder="0.0"
                             autoFocus
                         />
@@ -104,7 +104,7 @@ export default function EditWeightModal({
                 <div className="flex gap-2 pt-2">
                     <button
                         onClick={onClose}
-                        className="flex-1 py-3 px-4 rounded-xl text-sm font-bold text-foreground border border-white/10 bg-white/5 hover:bg-white/10 transition-colors"
+                        className="flex-1 py-3 px-4 rounded-xl text-sm font-bold text-slate-700 dark:text-foreground border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
                         disabled={loading}
                     >
                         Cancelar

@@ -19,7 +19,9 @@ import {
     ChevronRight,
     Inbox,
     Settings2,
-    Plus
+    Plus,
+    Music,
+    Pause
 } from 'lucide-react';
 import { apiRequest, getImageUrl } from '@/lib/admin/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
@@ -34,6 +36,24 @@ import { useQueryClient } from '@tanstack/react-query';
 type MediaItem = MediaInfoItem;
 
 const PAGE_SIZE = 24;
+// Melodías para memoriales: el backend valida y recomprime; aquí se avisa antes de subir.
+const MAX_MELODY_SECONDS = 60;
+
+const isAudioFile = (file?: File | null) => Boolean(file && (file.type.startsWith('audio/') || /\.(mp3|m4a|aac|ogg|oga|opus|wav|flac)$/i.test(file.name)));
+
+const formatDuration = (seconds?: number | null) => {
+    if (!seconds && seconds !== 0) return '';
+    const s = Math.round(seconds);
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+
+const readAudioDuration = (url: string) => new Promise<number>((resolve) => {
+    const audio = new Audio();
+    audio.preload = 'metadata';
+    audio.onloadedmetadata = () => resolve(audio.duration);
+    audio.onerror = () => resolve(NaN);
+    audio.src = url;
+});
 
 interface MediaFacets {
     total: number;
@@ -55,7 +75,10 @@ export default function MediaLibraryAdmin() {
     const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
-    const [activeTab, setActiveTab] = useState<'all' | 'image' | 'video'>('all');
+    const [activeTab, setActiveTab] = useState<'all' | 'image' | 'video' | 'audio'>('all');
+    // Una sola melodía sonando a la vez en la grilla.
+    const [playingId, setPlayingId] = useState<number | null>(null);
+    const playerRef = useRef<HTMLAudioElement | null>(null);
     const [selectedTenant, setSelectedTenant] = useState<string>('all'); // 'all' | 'global' | id
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
@@ -169,22 +192,49 @@ export default function MediaLibraryAdmin() {
         if (clamped !== page) fetchMedia(clamped);
     };
 
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
+            e.target.value = '';
+            const url = URL.createObjectURL(file);
+            if (isAudioFile(file)) {
+                const seconds = await readAudioDuration(url);
+                if (Number.isFinite(seconds) && seconds > MAX_MELODY_SECONDS + 1) {
+                    URL.revokeObjectURL(url);
+                    showToast(`La melodía dura ${formatDuration(seconds)} y el máximo es 1 minuto. Recórtala e inténtalo de nuevo.`, "error");
+                    return;
+                }
+            }
             setSelectedFile(file);
-            setPreviewUrl(URL.createObjectURL(file));
+            setPreviewUrl(url);
             setUploadModalOpen(true);
         }
     };
 
+    const togglePlay = (item: MediaItem) => {
+        const player = playerRef.current;
+        if (!player) return;
+        if (playingId === item.id) {
+            player.pause();
+            setPlayingId(null);
+            return;
+        }
+        player.src = getImageUrl(item.url);
+        player.play().then(() => setPlayingId(item.id)).catch(() => setPlayingId(null));
+    };
+
     const handleUpload = async () => {
         if (!selectedFile) return;
+        const isAudio = isAudioFile(selectedFile);
+        if (isAudio && !uploadForm.description.trim()) {
+            showToast("Escribe el nombre de la melodía (es lo que verán los crematorios).", "error");
+            return;
+        }
 
         setUploading(true);
         const formData = new FormData();
         formData.append('file', selectedFile);
-        formData.append('category', uploadForm.category);
+        formData.append('category', isAudio ? 'melodias' : uploadForm.category);
         formData.append('ratio', uploadForm.ratio);
         formData.append('description', uploadForm.description);
         formData.append('alt_text', uploadForm.alt_text);
@@ -199,7 +249,10 @@ export default function MediaLibraryAdmin() {
                 body: formData
             });
 
-            if (!res.ok) throw new Error('Upload failed');
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(typeof body?.detail === 'string' ? body.detail : 'No se pudo subir el archivo');
+            }
 
             await res.json();
             setUploadModalOpen(false);
@@ -210,9 +263,9 @@ export default function MediaLibraryAdmin() {
             // Recargar facets (contadores) y volver a la primera página
             fetchFacets();
             fetchMedia(1);
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            showToast("No se pudo subir el archivo", "error");
+            showToast(error?.message || "No se pudo subir el archivo", "error");
         } finally {
             setUploading(false);
         }
@@ -372,7 +425,7 @@ export default function MediaLibraryAdmin() {
         cremations: 'Cremaciones', signatures: 'Firmas', logistics: 'Logística',
         technical_evidence: 'Evidencia técnica', workflow_evidence: 'Evidencia de proceso',
         submissions: 'Formularios', template_assets: 'Plantillas', backgrounds: 'Fondos',
-        saas: 'SaaS (global)', disenos: 'Diseños', gallery: 'Galería', receipts: 'Recibos',
+        saas: 'SaaS (global)', disenos: 'Diseños', gallery: 'Galería', receipts: 'Recibos', melodias: 'Melodías',
     };
     // Las categorías gestionables (tabla) tienen prioridad sobre el mapa estático,
     // así los nombres personalizados también se ven en los filtros.
@@ -403,7 +456,7 @@ export default function MediaLibraryAdmin() {
             <div className="flex items-center justify-between">
                 <div>
                     <h2 className="text-2xl font-bold text-white">Biblioteca de Medios</h2>
-                    <p className="text-muted-foreground">Gestiona imágenes y videos de la plataforma.</p>
+                    <p className="text-muted-foreground">Gestiona imágenes, videos y melodías de la plataforma.</p>
                 </div>
                 <div className="flex gap-2">
                     <button
@@ -429,8 +482,9 @@ export default function MediaLibraryAdmin() {
                         ref={fileInputRef}
                         onChange={handleFileSelect}
                         className="hidden"
-                        accept="image/*,video/*"
+                        accept="image/*,video/*,audio/*,.mp3,.m4a,.ogg,.wav"
                     />
+                    <audio ref={playerRef} onEnded={() => setPlayingId(null)} className="hidden" />
                 </div>
             </div>
 
@@ -456,6 +510,13 @@ export default function MediaLibraryAdmin() {
                 >
                     Videos
                     {activeTab === 'video' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-primary rounded-full" />}
+                </button>
+                <button
+                    onClick={() => setActiveTab('audio')}
+                    className={`pb-2 px-1 text-sm font-medium transition-colors relative ${activeTab === 'audio' ? 'text-primary' : 'text-muted-foreground hover:text-white'}`}
+                >
+                    Melodías
+                    {activeTab === 'audio' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-primary rounded-full" />}
                 </button>
             </div>
 
@@ -517,7 +578,22 @@ export default function MediaLibraryAdmin() {
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                     {filteredItems.map((item) => (
                         <div key={item.id} className="group relative aspect-square bg-black/40 rounded-xl overflow-hidden border border-white/5 hover:border-primary/50 transition-all">
-                            {item.media_type === 'image' ? (
+                            {item.media_type === 'audio' ? (
+                                <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-3 text-center bg-gradient-to-br from-indigo-950 via-slate-900 to-amber-950/60">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); togglePlay(item); }}
+                                        className="w-12 h-12 rounded-full bg-primary text-black flex items-center justify-center shadow-lg hover:brightness-110 transition z-10"
+                                        aria-label={playingId === item.id ? 'Pausar melodía' : 'Escuchar melodía'}
+                                    >
+                                        {playingId === item.id ? <Pause size={20} fill="black" /> : <Play size={20} fill="black" className="ml-0.5" />}
+                                    </button>
+                                    <p className="text-xs font-bold text-white line-clamp-2 flex items-center gap-1">
+                                        <Music size={12} className="shrink-0 text-primary" /> {item.description || 'Melodía'}
+                                    </p>
+                                    {item.duration ? <span className="text-[10px] text-white/50">{formatDuration(item.duration)}</span> : null}
+                                </div>
+                            ) : item.media_type === 'image' ? (
                                 <img src={getImageUrl(item.url)} alt={item.alt_text} loading="lazy" className="w-full h-full object-cover" />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center bg-gray-900 relative">
@@ -681,7 +757,14 @@ export default function MediaLibraryAdmin() {
                             )}
 
                             {previewUrl ? (
-                                selectedFile?.type.startsWith('image/') ? (
+                                isAudioFile(selectedFile) ? (
+                                    <div className="w-full flex flex-col items-center gap-4">
+                                        <div className="w-20 h-20 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center">
+                                            <Music size={34} className="text-primary" />
+                                        </div>
+                                        <audio src={previewUrl} controls className="w-full" />
+                                    </div>
+                                ) : selectedFile?.type.startsWith('image/') ? (
                                     <img
                                         src={previewUrl}
                                         alt="Preview"
@@ -710,6 +793,24 @@ export default function MediaLibraryAdmin() {
                                 </button>
                             </div>
 
+                            {isAudioFile(selectedFile) ? (
+                            <div className="space-y-4 flex-1">
+                                <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm text-white/70 space-y-1">
+                                    <p className="font-bold text-white flex items-center gap-2"><Music size={16} className="text-primary" /> Melodía para memoriales</p>
+                                    <p>Máximo 1 minuto. Se convierte a un formato liviano (M4A) y queda disponible para todos los crematorios, en todos los planes.</p>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-white/60 uppercase mb-2">Nombre de la melodía</label>
+                                    <input
+                                        type="text"
+                                        value={uploadForm.description}
+                                        onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value.slice(0, 60) })}
+                                        placeholder="Ej: Piano sereno"
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary/50"
+                                    />
+                                </div>
+                            </div>
+                            ) : (
                             <div className="space-y-4 flex-1">
                                 <div>
                                     <div className="flex items-center justify-between mb-2">
@@ -801,6 +902,7 @@ export default function MediaLibraryAdmin() {
                                     />
                                 </div>
                             </div>
+                            )}
 
                             <div className="mt-8 pt-6 border-t border-white/10 flex justify-end gap-3">
                                 <button

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Check } from 'lucide-react';
 import { DEFAULT_FORM_CONFIG, fieldLabel, fieldSuffix, formatCLP, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
 
 export interface PetData {
@@ -24,6 +25,8 @@ interface Props {
     formConfig?: PublicFormConfig;
     /** Tramos de peso del crematorio; vacío = rangos fijos de respaldo */
     weightTiers?: WeightTier[];
+    /** Indica si el peso vino preseleccionado desde el catálogo */
+    isPreselectedWeight?: boolean;
 }
 
 // Respaldo para crematorios que aún no definieron sus tramos de peso.
@@ -38,7 +41,8 @@ const LABEL = 'block text-[11px] font-semibold text-slate-500 dark:text-slate-40
 const ERROR = 'text-[11px] text-red-500 mt-2 font-semibold uppercase tracking-tight ml-2';
 const errClass = (has?: string) => (has ? 'border-red-500/50 focus:ring-red-500/10' : '');
 
-export default function PetInfoStep({ data, updateData, errors, formConfig = DEFAULT_FORM_CONFIG, weightTiers = [] }: Props) {
+export default function PetInfoStep({ data, updateData, errors, formConfig = DEFAULT_FORM_CONFIG, weightTiers = [], isPreselectedWeight = false }: Props) {
+    const [isEditingPreselectedWeight, setIsEditingPreselectedWeight] = useState<boolean>(false);
     const f = formConfig.fields;
     // Modo del peso: rangos vs número exacto. Inicializa según el dato existente
     // (si vuelves al paso y ya tenías weightKg, abre en modo exacto).
@@ -74,6 +78,8 @@ export default function PetInfoStep({ data, updateData, errors, formConfig = DEF
             select: () => updateData({ weightRange: r.value, weightTierId: '', weightKg: '' }),
         }));
     const gridCols = rangeOptions.length <= 2 ? 'sm:grid-cols-2' : rangeOptions.length === 3 || rangeOptions.length >= 5 ? 'sm:grid-cols-3' : 'sm:grid-cols-4';
+    const selectedOption = rangeOptions.find(o => o.selected);
+    const showConfirmedCard = isPreselectedWeight && selectedOption && !isEditingPreselectedWeight && !useExactWeight;
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -154,16 +160,45 @@ export default function PetInfoStep({ data, updateData, errors, formConfig = DEF
                 <div>
                     <div className="flex items-center justify-between mb-2 px-1">
                         <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{fieldLabel(f.weight, 'Tamaño / Peso')}{fieldSuffix(f.weight)}</label>
-                        <button
-                            type="button"
-                            onClick={toggleExactWeight}
-                            className="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 hover:underline tracking-wide cursor-pointer"
-                        >
-                            {useExactWeight ? '← Volver a rangos' : 'Sé el peso exacto →'}
-                        </button>
+                        {!showConfirmedCard && (
+                            <button
+                                type="button"
+                                onClick={toggleExactWeight}
+                                className="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 hover:underline tracking-wide cursor-pointer"
+                            >
+                                {useExactWeight ? '← Volver a rangos' : 'Sé el peso exacto →'}
+                            </button>
+                        )}
                     </div>
 
-                    {useExactWeight ? (
+                    {showConfirmedCard ? (
+                        <div className="rounded-2xl border border-sky-200 dark:border-sky-800/60 bg-sky-50/70 dark:bg-sky-950/30 p-3.5 sm:p-4 flex items-center justify-between gap-3 shadow-xs transition-all">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-8 h-8 rounded-xl bg-sky-500/15 dark:bg-sky-400/20 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+                                    <Check size={18} strokeWidth={2.5} />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-sky-800 dark:text-sky-300">
+                                        Tamaño elegido en catálogo
+                                    </p>
+                                    <p className="text-sm font-extrabold text-slate-800 dark:text-slate-100 truncate">
+                                        {selectedOption.label}
+                                        {selectedOption.range && selectedOption.range !== selectedOption.label ? ` (${selectedOption.range})` : ''}
+                                        {selectedOption.price != null && (
+                                            <span className="ml-2 font-bold text-sky-600 dark:text-sky-400">· {formatCLP(selectedOption.price)}</span>
+                                        )}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsEditingPreselectedWeight(true)}
+                                className="text-xs font-bold text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 hover:underline shrink-0 px-2 py-1 cursor-pointer"
+                            >
+                                Cambiar tamaño
+                            </button>
+                        </div>
+                    ) : useExactWeight ? (
                         <div className="relative">
                             <input
                                 type="number"
@@ -179,32 +214,45 @@ export default function PetInfoStep({ data, updateData, errors, formConfig = DEF
                             <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 text-sm font-semibold">kg</span>
                         </div>
                     ) : (
-                        <div className={`grid grid-cols-2 ${gridCols} gap-2`}>
-                            {rangeOptions.map(opt => (
-                                <button
-                                    key={opt.key}
-                                    type="button"
-                                    onClick={opt.select}
-                                    className={`p-3 rounded-2xl border-2 transition-all text-center cursor-pointer ${opt.selected
-                                        ? 'border-sky-500 bg-sky-50 shadow-md shadow-sky-500/10 dark:bg-sky-950/20 dark:border-sky-500/30'
-                                        : 'border-slate-200 hover:border-slate-300 bg-white dark:bg-slate-950 dark:border-slate-800 dark:hover:border-slate-700'
-                                        }`}
-                                >
-                                    <div className={`text-xs font-bold uppercase tracking-wider ${opt.selected ? 'text-sky-700 dark:text-sky-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                                        {opt.label}
-                                    </div>
-                                    {opt.range && (
-                                        <div className={`text-[10px] font-medium mt-0.5 ${opt.selected ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'}`}>
-                                            {opt.range}
+                        <div className="space-y-2">
+                            <div className={`grid grid-cols-2 ${gridCols} gap-2`}>
+                                {rangeOptions.map(opt => (
+                                    <button
+                                        key={opt.key}
+                                        type="button"
+                                        onClick={opt.select}
+                                        className={`p-3 rounded-2xl border-2 transition-all text-center cursor-pointer ${opt.selected
+                                            ? 'border-sky-500 bg-sky-50 shadow-md shadow-sky-500/10 dark:bg-sky-950/20 dark:border-sky-500/30'
+                                            : 'border-slate-200 hover:border-slate-300 bg-white dark:bg-slate-950 dark:border-slate-800 dark:hover:border-slate-700'
+                                            }`}
+                                    >
+                                        <div className={`text-xs font-bold uppercase tracking-wider ${opt.selected ? 'text-sky-700 dark:text-sky-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                                            {opt.label}
                                         </div>
-                                    )}
-                                    {opt.price != null && (
-                                        <div className={`text-[11px] font-bold mt-1 ${opt.selected ? 'text-sky-700 dark:text-sky-300' : 'text-slate-600 dark:text-slate-300'}`}>
-                                            {formatCLP(opt.price)}
-                                        </div>
-                                    )}
-                                </button>
-                            ))}
+                                        {opt.range && (
+                                            <div className={`text-[10px] font-medium mt-0.5 ${opt.selected ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                                                {opt.range}
+                                            </div>
+                                        )}
+                                        {opt.price != null && (
+                                            <div className={`text-[11px] font-bold mt-1 ${opt.selected ? 'text-sky-700 dark:text-sky-300' : 'text-slate-600 dark:text-slate-300'}`}>
+                                                {formatCLP(opt.price)}
+                                            </div>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                            {isPreselectedWeight && isEditingPreselectedWeight && (
+                                <div className="text-right">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsEditingPreselectedWeight(false)}
+                                        className="text-[11px] font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                                    >
+                                        Listo, mantener este tamaño
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                     {(errors.weightRange || errors.weightKg) && (

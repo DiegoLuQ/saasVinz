@@ -10,6 +10,7 @@ export interface TrendPoint {
 export interface DashboardOrder {
     id: number;
     pet: string;
+    pet_species?: string | null;
     pet_image: string | null;
     client: string;
     service_name: string;

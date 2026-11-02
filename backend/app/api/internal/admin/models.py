@@ -318,4 +318,7 @@ class SaaSConfig(Base):
     # [{key, label, group, description}] en orden; NULL = lista por defecto.
     landing_features = Column(JSON, nullable=True)
 
+    # --- Diagnóstico 360° (services/diagnostics.py): niveles y reglas del plan sugerido; NULL = por defecto ---
+    diagnostic_config = Column(JSON, nullable=True)
+
     updated_at = Column(DateTime(timezone=True), default=tz.get_now, onupdate=tz.get_now)

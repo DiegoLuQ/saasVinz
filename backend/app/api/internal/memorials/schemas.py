@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, computed_field
 from typing import List, Optional, Any
 from datetime import datetime
 from uuid import UUID
@@ -51,6 +51,8 @@ class MemorialUpdate(BaseModel):
     main_image_url: Optional[str] = None
     es_privado: Optional[bool] = None
     status: Optional[MemorialStatus] = None
+    customer_email: Optional[str] = None
+    death_date: Optional[datetime] = None
 
 class MascotaPublic(BaseModel):
     name: str
@@ -70,6 +72,12 @@ class TenantPublic(BaseModel):
     social_instagram: Optional[str] = None
     social_facebook: Optional[str] = None
     website: Optional[str] = None
+
+class MemorialMelodyUpdate(BaseModel):
+    """Melodía del memorial (solo el crematorio). media_id None = sin melodía."""
+    media_id: Optional[int] = None
+    activa: bool = False
+
 
 class MemorialPublicResponse(BaseModel):
     id_recuerdo: UUID
@@ -94,6 +102,19 @@ class MemorialPublicResponse(BaseModel):
     dedicatorias: List[DedicationResponse] = Field(default_factory=list, validation_alias="dedications", serialization_alias="dedicatorias")
     branding: Optional[dict] = {}
     tenant_status: str
+    owner_dedication: Optional[str] = None
+    # Melodía elegida por el crematorio: {id, name, url, duration, activa}.
+    melody: Optional[dict] = None
+
+    @computed_field
+    @property
+    def is_from_crematorium(self) -> bool:
+        p = (self.plan or "").strip().lower()
+        if p in {"mensual", "anual", "eterno", "free", "landing", "recuerdo"}:
+            return False
+        if self.tenant and getattr(self.tenant, "name", None):
+            return True
+        return False
     
     @field_validator('dedicatorias', mode='before')
     @classmethod
@@ -120,7 +141,23 @@ class MemorialManageResponse(BaseModel):
     status: MemorialStatus
     fecha: datetime
     valid_until: Optional[datetime] = None
-    access_key: str
+    access_key: Optional[str] = None
+    owner_dedication: Optional[str] = None
+
+    @computed_field
+    @property
+    def pin(self) -> str:
+        return self.access_key or ""
+
+    @computed_field
+    @property
+    def is_from_crematorium(self) -> bool:
+        p = (self.plan or "").strip().lower()
+        if p in {"mensual", "anual", "eterno", "free", "landing", "recuerdo"}:
+            return False
+        if self.tenant and getattr(self.tenant, "name", None):
+            return True
+        return False
     
     mascota: MascotaPublic
     tenant: TenantPublic = Field(alias="tenant_info")
@@ -133,6 +170,12 @@ class MemorialManageResponse(BaseModel):
     dedicatorias: List[DedicationResponse] = Field(default_factory=list, validation_alias="dedications", serialization_alias="dedicatorias")
     branding: Optional[dict] = {}
     tenant_status: str
+    owner_dedication: Optional[str] = None
+    # Melodía elegida por el crematorio: {id, name, url, duration, activa}.
+    melody: Optional[dict] = None
+    customer_email: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
     
     class Config:
         from_attributes = True
@@ -154,7 +197,6 @@ class MemorialCardResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
 class PublicCrematoriumResponse(BaseModel):
     """Crematorio con memoriales públicos (landing del memorial)"""
     name: str
@@ -162,3 +204,7 @@ class PublicCrematoriumResponse(BaseModel):
     city: Optional[str] = None
     region: Optional[str] = None
     memorials_count: int
+
+
+class SendCredentialsRequest(BaseModel):
+    email: Optional[str] = None

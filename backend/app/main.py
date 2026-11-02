@@ -134,6 +134,14 @@ async def _start_ai_balance_monitor():
     from app.services.ai_balance import ai_balance_monitor_loop
     asyncio.create_task(ai_balance_monitor_loop())
 
+
+# Recordatorios de aniversario luctuoso de memoriales (ver services/memorial_notifications.py).
+@app.on_event("startup")
+async def _start_memorial_anniversary_scheduler():
+    import asyncio
+    from app.services.memorial_notifications import memorial_anniversary_scheduler_loop
+    asyncio.create_task(memorial_anniversary_scheduler_loop())
+
 # Startup tasks removed. DDL migrations are handled by deployment scripts.
 
 # CORS Configuration - DEBE IR AL FINAL para que se ejecute PRIMERO en el request
@@ -231,6 +239,10 @@ app.include_router(creator_dashboard_router, prefix="/api/internal/creator", tag
 app.include_router(creator_announcements_router, prefix="/api/internal/creator/announcements", tags=["Creator - Anuncios"])
 from app.api.internal.creator.business.router import router as creator_business_router
 app.include_router(creator_business_router, prefix="/api/internal/creator/business", tags=["Creator - Métricas del negocio"])
+from app.api.internal.creator.catalog_funnel.router import router as creator_catalog_funnel_router
+app.include_router(creator_catalog_funnel_router, prefix="/api/internal/creator/catalog-funnel", tags=["Creator - KPIs del catálogo"])
+from app.api.internal.creator.diagnostics.router import router as creator_diagnostics_router
+app.include_router(creator_diagnostics_router, prefix="/api/internal/creator/diagnostics", tags=["Creator - Diagnóstico 360"])
 app.include_router(creator_plans_router, prefix="/api/internal/creator/subscription-plans", tags=["Creator - Planes"])
 app.include_router(creator_subscriptions_router, prefix="/api/internal/creator", tags=["Creator - Subscriptions"])
 app.include_router(creator_notifications_router, prefix="/api/internal/creator/notifications", tags=["Creator - Notificaciones"])
@@ -341,6 +353,8 @@ app.include_router(tracking_router, prefix="/api/public/tracking", tags=["Públi
 
 from app.api.public.catalog.router import router as public_catalog_router
 app.include_router(public_catalog_router, prefix="/api/public/catalog", tags=["Público - Catálogo"])
+from app.api.public.diagnostic.router import router as public_diagnostic_router
+app.include_router(public_diagnostic_router, prefix="/api/public/diagnostic", tags=["Público - Diagnóstico 360"])
 
 @app.get("/")
 def read_root():

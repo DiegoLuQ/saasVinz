@@ -1,0 +1,101 @@
+"""Embudo del catálogo de planes: eventos por sesión anónima, formulario ligado al
+enlace, resumen por enlace (tenant) y reporte del SuperAdmin."""
+import json
+import secrets
+import uuid
+
+import pytest
+
+from app import models
+from app.api.internal.catalog.models import CatalogEvent, CatalogShareToken
+
+
+@pytest.fixture
+def plans_link(db, world):
+    link = CatalogShareToken(tenant_id=world["tenant_a"], token=secrets.token_urlsafe(16),
+                             catalog_type="plans", is_active=True, views_count=0)
+    db.add(link)
+    db.commit()
+    return {"id": link.id, "token": link.token}
+
+
+def _event(client, token, kind, sid, slug="crematorio-a", **extra):
+    return client.post(f"/api/public/catalog/{slug}/{token}/events",
+                       json={"kind": kind, "session_id": sid, **extra})
+
+
+def _events(db, link_id, kind=None):
+    q = db.query(CatalogEvent).filter(CatalogEvent.catalog_token_id == link_id)
+    return q.filter(CatalogEvent.kind == kind).count() if kind else q.count()
+
+
+def test_una_fila_por_sesion_y_evento(client, db, plans_link):
+    sid = uuid.uuid4().hex
+    for _ in range(3):  # recargar no infla
+        assert _event(client, plans_link["token"], "view", sid).status_code == 204
+    _event(client, plans_link["token"], "plan_request", sid, plan_id=1, weight_tier="Pequeño (1 a 10 kg)")
+    _event(client, plans_link["token"], "plan_request", sid, plan_id=2, weight_tier="Pequeño (1 a 10 kg)")
+    _event(client, plans_link["token"], "view", uuid.uuid4().hex)
+    db.expire_all()
+    assert _events(db, plans_link["id"], "view") == 2
+    assert _events(db, plans_link["id"], "plan_request") == 2
+
+
+def test_eventos_invalidos_se_ignoran(client, db, plans_link):
+    assert _event(client, plans_link["token"], "view", "corto").status_code == 204  # sesión inválida
+    assert _event(client, "token-que-no-existe", "view", uuid.uuid4().hex).status_code == 204
+    assert _event(client, plans_link["token"], "view", uuid.uuid4().hex, slug="crematorio-b").status_code == 204
+    assert _event(client, plans_link["token"], "otro", uuid.uuid4().hex).status_code == 422
+    db.expire_all()
+    assert _events(db, plans_link["id"]) == 0
+
+
+def test_formulario_queda_ligado_y_se_resume_por_enlace(client, db, world, plans_link, auth):
+    sid = uuid.uuid4().hex
+    _event(client, plans_link["token"], "view", sid)
+    _event(client, plans_link["token"], "plan_request", sid, plan_id=5)
+    r = client.post("/api/public/submit-form", data={
+        "tenant_id": world["tenant_a"], "token": plans_link["token"], "recaptcha_token": "x",
+        "owner_data": json.dumps({"fullName": "Familia Catálogo", "phone": "+56912345678",
+                                  "veterinary": "Domicilio", "address": "Av. Siempre Viva 742"}),
+        "pet_data": json.dumps({"name": "Nube", "type": "Canino", "species": "Canino", "size": "Pequeño", "age": "5"}),
+    })
+    assert r.status_code == 200, r.text
+    db.expire_all()
+    assert db.query(models.FormSubmission).filter(
+        models.FormSubmission.catalog_token_id == plans_link["id"]).count() == 1
+
+    links = client.get("/api/internal/catalog/links?type=plans", headers=auth("a")).json()
+    mine = next(l for l in links if l["id"] == plans_link["id"])
+    assert (mine["visitors"], mine["plan_requests"], mine["forms_submitted"]) == (1, 1, 1)
+
+    # Procesar el registro hasta la orden: se conserva como «processed» (fuera de la lista) y cuenta la orden
+    sub = db.query(models.FormSubmission).filter(models.FormSubmission.catalog_token_id == plans_link["id"]).one()
+    h = auth("a")
+    cust = client.post(f"/api/internal/submissions/{sub.id}/create-customer", headers=h).json()["customer_id"]
+    pet = client.post(f"/api/internal/submissions/{sub.id}/create-pet?customer_id={cust}", headers=h).json()["pet_id"]
+    r = client.post(f"/api/internal/submissions/{sub.id}/create-services?pet_id={pet}", headers=h)
+    assert r.status_code == 200, r.text
+    db.expire_all()
+    assert db.query(models.FormSubmission).get(sub.id).status == "processed"
+    assert all(s["id"] != sub.id for s in client.get("/api/internal/submissions", headers=h).json())
+    mine = next(l for l in client.get("/api/internal/catalog/links?type=plans", headers=h).json() if l["id"] == plans_link["id"])
+    assert (mine["forms_submitted"], mine["orders"]) == (1, 1)
+    # Reintentar «Procesar» no duplica la orden
+    again = client.post(f"/api/internal/submissions/{sub.id}/create-services?pet_id={pet}", headers=h).json()
+    assert again["status"] == "exists"
+
+    # El otro crematorio no ve los enlaces ni los eventos de A
+    other = client.get("/api/internal/catalog/links?type=plans", headers=auth("b")).json()
+    assert all(l["id"] != plans_link["id"] for l in other)
+
+
+def test_reporte_superadmin(client, plans_link, world, auth):
+    _event(client, plans_link["token"], "view", uuid.uuid4().hex)
+    assert client.get("/api/internal/creator/catalog-funnel", headers=auth("a")).status_code in (401, 403)
+    r = client.get(f"/api/internal/creator/catalog-funnel?tenant_id={world['tenant_a']}", headers=auth("creator"))
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["totals"]["visitors"] >= 1
+    row = next(t for t in data["by_tenant"] if t["tenant_id"] == world["tenant_a"])
+    assert row["links_total"] >= 1

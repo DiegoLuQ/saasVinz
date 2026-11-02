@@ -22,6 +22,7 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCustomers, useSaveCustomer, useDeleteCustomer } from '@/hooks/useCustomers';
 import { usePets } from '@/hooks/usePets';
+import { useCremations } from '@/hooks/useCremations';
 import SearchableSelect from '@/components/tenant/SearchableSelect';
 import { TableSkeleton } from '@/components/tenant/ui/Skeleton';
 import { usePermissions } from '@/app/(tenant)/tenant/context/PermissionContext';
@@ -79,8 +80,21 @@ export default function CustomersPage() {
     // TanStack Query Hooks
     const { data: customers = [], isLoading: loadingCustomers } = useCustomers();
     const { data: pets = [] } = usePets();
+    const { data: cremations = [] } = useCremations();
     const saveCustomerMutation = useSaveCustomer();
     const deleteCustomerMutation = useDeleteCustomer();
+
+    const latestOrderByPetId = React.useMemo(() => {
+        const map = new Map<number, any>();
+        const sorted = [...cremations].sort((a, b) => b.id - a.id);
+        for (const order of sorted) {
+            if (!order.pet_id) continue;
+            if (!map.has(order.pet_id) || (map.get(order.pet_id)?.status === 'cancelled' && order.status !== 'cancelled')) {
+                map.set(order.pet_id, order);
+            }
+        }
+        return map;
+    }, [cremations]);
 
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -448,9 +462,9 @@ export default function CustomersPage() {
                             <thead>
                                 <tr className="bg-white/5 border-b border-white/5">
                                     <th className="w-[22%] px-4 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Nombre / RUT</th>
-                                    <th className="w-[25%] px-4 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Contacto</th>
-                                    <th className="w-[23%] px-4 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Dirección</th>
-                                    <th className="w-[18%] px-4 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Mascotas</th>
+                                    <th className="w-[23%] px-4 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Contacto</th>
+                                    <th className="w-[21%] px-4 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Dirección</th>
+                                    <th className="w-[22%] px-4 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Mascotas y Órdenes</th>
                                     <th className="w-[12%] px-4 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-center">Acciones</th>
                                 </tr>
                             </thead>
@@ -495,10 +509,44 @@ export default function CustomersPage() {
                                             </td>
                                             <td className="px-4 py-4 text-xs">
                                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                                    <span className="text-[11px] font-semibold px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-muted-foreground flex items-center gap-1">
-                                                        <Dog size={11} className="text-primary" />
-                                                        {customerPets.length}
-                                                    </span>
+                                                    {customerPets.length === 0 ? (
+                                                        <span className="text-[11px] font-semibold px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-muted-foreground flex items-center gap-1">
+                                                            <Dog size={11} className="text-slate-400" />
+                                                            Sin mascotas
+                                                        </span>
+                                                    ) : (
+                                                        customerPets.map((pet) => {
+                                                            const petOrder = latestOrderByPetId.get(pet.id);
+                                                            if (petOrder && petOrder.status !== 'cancelled') {
+                                                                const ocLabel = (petOrder as any).oc_number ? `OC-${(petOrder as any).oc_number}` : `#${petOrder.id}`;
+                                                                return (
+                                                                    <button
+                                                                        key={pet.id}
+                                                                        type="button"
+                                                                        onClick={() => router.push(`/dashboard/recepcion-pedidos?orden=${petOrder.id}`)}
+                                                                        className="text-[10px] font-bold px-2 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-300 border border-sky-500/25 flex items-center gap-1 transition-colors"
+                                                                        title={`Abrir expediente ${ocLabel} de ${pet.name}`}
+                                                                    >
+                                                                        <Dog size={10} />
+                                                                        <span className="truncate max-w-[75px]">{pet.name}</span>
+                                                                        <span className="font-mono opacity-80">· {ocLabel}</span>
+                                                                    </button>
+                                                                );
+                                                            }
+                                                            return (
+                                                                <button
+                                                                    key={pet.id}
+                                                                    type="button"
+                                                                    onClick={() => router.push(`/dashboard/recepcion-pedidos/registro?pet_id=${pet.id}`)}
+                                                                    className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-white/5 hover:bg-primary/15 text-muted-foreground hover:text-primary border border-white/10 flex items-center gap-1 transition-colors"
+                                                                    title={`Iniciar servicio para ${pet.name}`}
+                                                                >
+                                                                    <Dog size={10} className="text-primary" />
+                                                                    <span className="truncate max-w-[85px]">{pet.name}</span>
+                                                                </button>
+                                                            );
+                                                        })
+                                                    )}
                                                     {canCreate('mascotas') && (
                                                     <button
                                                         type="button"
@@ -833,4 +881,3 @@ export default function CustomersPage() {
         </div>
     );
 }
-

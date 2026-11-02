@@ -54,16 +54,22 @@ interface MemorialPlanUpgradeProps {
     uuid: string;
     locale: 'es' | 'en';
     isDark: boolean;
+    isFromCrematorium?: boolean;
 }
 
 export default function MemorialPlanUpgrade({
     plan, validUntil, photosUsed, photoLimit, dedicationsUsed, dedicationLimit,
-    gestures, petName, uuid, locale, isDark,
+    gestures, petName, uuid, locale, isDark, isFromCrematorium,
 }: MemorialPlanUpgradeProps) {
     const en = locale === 'en';
     const { plans } = getLandingContent(locale);
     const current = memorialPlanDisplay(plan, locale);
     const name = petName || (en ? 'your companion' : 'tu compañero');
+
+    // Los memoriales provenientes de un crematorio/tenant NO deben mostrar venta/planes de la landing
+    if (isFromCrematorium || current.tier === 'legacy') {
+        return null;
+    }
 
     // ── Vigencia ──
     const expiry = validUntil ? new Date(validUntil) : null;

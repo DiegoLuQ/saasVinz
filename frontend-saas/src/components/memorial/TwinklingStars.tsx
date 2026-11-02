@@ -1,30 +1,50 @@
 "use client";
 
-import React from 'react';
+import React, { useMemo } from 'react';
+import { seededRandom } from '@/lib/memorialDesign';
 
 const TwinklingStars = React.memo(function TwinklingStars({ color = '#ffffff' }: { color?: string }) {
+    const stars = useMemo(() => {
+        const rand = seededRandom(88);
+        return Array.from({ length: 40 }, (_, i) => {
+            const size = (rand() * 3 + 1).toFixed(2);
+            return {
+                id: i,
+                left: `${(rand() * 100).toFixed(3)}%`,
+                top: `${(rand() * 100).toFixed(3)}%`,
+                width: `${size}px`,
+                height: `${size}px`,
+                animationDelay: `${(rand() * 5).toFixed(3)}s`,
+                animationDuration: `${(rand() * 3 + 2).toFixed(3)}s`,
+                opacity: Number((rand() * 0.5 + 0.3).toFixed(3)),
+            };
+        });
+    }, []);
+
     return (
-        <div className="absolute inset-0 overflow-hidden">
-            {[...Array(40)].map((_, i) => (
-                <div key={i} className="absolute rounded-full star-twinkle"
+        <div className="absolute inset-0 overflow-hidden pointer-events-none" suppressHydrationWarning>
+            {stars.map((s) => (
+                <div
+                    key={s.id}
+                    className="absolute rounded-full star-twinkle"
                     style={{
                         backgroundColor: color,
                         boxShadow: `0 0 5px ${color}`,
-                        left: `${Math.random() * 100}%`,
-                        top: `${Math.random() * 100}%`,
-                        width: `${Math.random() * 3 + 1}px`,
-                        height: `${Math.random() * 3 + 1}px`,
-                        animationDelay: `${Math.random() * 5}s`,
-                        animationDuration: `${Math.random() * 3 + 2}s`,
-                        opacity: Math.random() * 0.5 + 0.3
+                        left: s.left,
+                        top: s.top,
+                        width: s.width,
+                        height: s.height,
+                        animationDelay: s.animationDelay,
+                        animationDuration: s.animationDuration,
+                        opacity: s.opacity,
                     }}
                 />
             ))}
-            <style jsx>{`
+            <style>{`
                 .star-twinkle {
-                    animation: twinkle ease-in-out infinite;
+                    animation: memorial-star-twinkle ease-in-out infinite;
                 }
-                @keyframes twinkle {
+                @keyframes memorial-star-twinkle {
                     0%, 100% { transform: scale(1); opacity: 0.3; }
                     50% { transform: scale(1.5); opacity: 1; filter: blur(1px) drop-shadow(0 0 5px white); }
                 }

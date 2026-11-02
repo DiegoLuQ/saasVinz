@@ -447,7 +447,8 @@ def get_bootstrap(
 
     # 7. Get Pending Submissions (Latest 10)
     submissions = db.query(models.FormSubmission).filter(
-        models.FormSubmission.tenant_id == user.tenant_id
+        models.FormSubmission.tenant_id == user.tenant_id,
+        models.FormSubmission.status != "processed",  # ya tienen orden (se conservan para el embudo)
     ).order_by(models.FormSubmission.created_at.desc()).limit(10).all()
 
     formatted_submissions = []

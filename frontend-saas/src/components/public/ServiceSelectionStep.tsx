@@ -76,6 +76,7 @@ export default function ServiceSelectionStep({
     showPrices = false,
 }: ServiceSelectionStepProps) {
     const [viewingPlan, setViewingPlan] = useState<Service | null>(null);
+    const [isChangingPlan, setIsChangingPlan] = useState(false);
 
     const { itemsToShow, isFallback, specials } = useMemo(() => {
         const specials = services.filter(s => s.is_special);
@@ -95,6 +96,25 @@ export default function ServiceSelectionStep({
     }, [specials, includedInPlan, selectedServices, toggleService]);
 
     const planHeroImage = useMemo(() => getPlanThumbnail(viewingPlan), [viewingPlan]);
+
+    const selectedPlan = useMemo(() => {
+        if (isFallback) return null;
+        return itemsToShow.find(s => selectedServices.includes(s.id)) || null;
+    }, [isFallback, itemsToShow, selectedServices]);
+
+    const showOnlySelected = !isFallback && selectedPlan && !isChangingPlan;
+    const itemsToRender = showOnlySelected && selectedPlan ? [selectedPlan] : itemsToShow;
+
+    const handleSelectService = (serviceId: string, isPlan: boolean) => {
+        if (isPlan && selectedServices.includes(serviceId)) {
+            setIsChangingPlan(false);
+            return;
+        }
+        toggleService(serviceId, !isFallback || isPlan);
+        if (!isFallback || isPlan) {
+            setIsChangingPlan(false);
+        }
+    };
 
     if (itemsToShow.length === 0 && specials.length === 0) {
         return (
@@ -120,16 +140,53 @@ export default function ServiceSelectionStep({
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="text-center mb-2">
                 <h2 className="text-3xl font-extrabold uppercase italic tracking-tight text-slate-800 dark:text-slate-100 mb-1.5">
-                    {isFallback ? 'Servicios' : 'Elige tu Plan'}
+                    {isFallback ? 'Servicios' : showOnlySelected ? 'Tu Plan' : 'Elige tu Plan'}
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-normal tracking-wide">
-                    {isFallback ? 'Selecciona los servicios que necesitas' : 'Selecciona el plan que mejor se adapte a tu familia'}
+                    {isFallback
+                        ? 'Selecciona los servicios que necesitas'
+                        : showOnlySelected
+                            ? 'Plan seleccionado para acompañar a tu angelito'
+                            : 'Selecciona el plan que mejor se adapte a tu familia'}
                 </p>
             </div>
 
+            {/* Barra de acción cuando hay plan seleccionado */}
+            {!isFallback && selectedPlan && (
+                <div className="flex items-center justify-between px-1">
+                    {showOnlySelected ? (
+                        <>
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                                <Check size={14} strokeWidth={3} /> Plan seleccionado
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setIsChangingPlan(true)}
+                                className="text-xs font-bold text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 hover:underline cursor-pointer"
+                            >
+                                Cambiar de plan →
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                Selecciona un nuevo plan
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setIsChangingPlan(false)}
+                                className="text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:underline cursor-pointer"
+                            >
+                                Mantener {selectedPlan.name}
+                            </button>
+                        </>
+                    )}
+                </div>
+            )}
+
             {/* Grid 1 columna — cards anchas premium */}
             <div className="space-y-4">
-                {itemsToShow.map(service => {
+                {itemsToRender.map(service => {
                     const isSelected = selectedServices.includes(service.id);
                     const isPlan = (service.category || '').toLowerCase() === 'plan';
                     const itemCount = service.sub_items?.length || 0;
@@ -140,7 +197,7 @@ export default function ServiceSelectionStep({
                             key={service.id}
                             whileTap={{ scale: 0.985 }}
                             transition={{ type: 'spring', stiffness: 500, damping: 28 }}
-                            onClick={() => toggleService(service.id, !isFallback || isPlan)}
+                            onClick={() => handleSelectService(service.id, isPlan)}
                             className={`relative overflow-hidden rounded-3xl border-2 cursor-pointer transition-all duration-300 ${
                                 isSelected
                                     ? 'border-emerald-500 bg-gradient-to-br from-white via-emerald-50/30 to-emerald-50/60 dark:from-slate-900 dark:via-emerald-950/10 dark:to-emerald-950/20 shadow-xl shadow-emerald-500/15'
@@ -148,7 +205,7 @@ export default function ServiceSelectionStep({
                             }`}
                             role="button"
                             tabIndex={0}
-                            onKeyDown={(e) => e.key === 'Enter' && toggleService(service.id, !isFallback || isPlan)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSelectService(service.id, isPlan)}
                         >
                             {/* Brillo decorativo cuando está seleccionado */}
                             {isSelected && (

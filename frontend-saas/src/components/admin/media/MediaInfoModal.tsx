@@ -9,7 +9,7 @@ export interface MediaInfoItem {
     tenant_id?: number | null;
     tenant_name?: string | null;
     url: string;
-    media_type: 'image' | 'video';
+    media_type: 'image' | 'video' | 'audio';
     category: string;
     ratio: string;
     description: string;
@@ -81,11 +81,11 @@ export default function MediaInfoModal({ item, onClose, onShowUsage }: {
         ['Fecha de subida', `${created.toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })} · ${created.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`],
         ['Empresa', item.tenant_id ? (item.tenant_name || `#${item.tenant_id}`) : 'Global (SuperAdmin)'],
         ['Categoría', item.category || '—'],
-        ['Tipo', `${item.media_type === 'video' ? 'Video' : 'Imagen'} · ${ext}`],
+        ['Tipo', `${item.media_type === 'video' ? 'Video' : item.media_type === 'audio' ? 'Melodía' : 'Imagen'} · ${ext}`],
         ['Peso', formatBytes(item.file_size)],
         ['Dimensiones', hasDims ? `${item.width.toLocaleString('es-CL')} × ${item.height.toLocaleString('es-CL')} px (${aspect(item.width, item.height)})` : '—'],
         ...(item.ratio && item.ratio !== 'original' ? [['Recorte', item.ratio] as [string, React.ReactNode]] : []),
-        ...(item.media_type === 'video' && item.duration ? [['Duración', formatDuration(item.duration)] as [string, React.ReactNode]] : []),
+        ...(item.media_type !== 'image' && item.duration ? [['Duración', formatDuration(item.duration)] as [string, React.ReactNode]] : []),
         ['Descripción', item.description || <span key="d" className="text-white/40">Sin descripción</span>],
         ...(item.alt_text ? [['Texto alternativo', item.alt_text] as [string, React.ReactNode]] : []),
         ['ID', `#${item.id}`],

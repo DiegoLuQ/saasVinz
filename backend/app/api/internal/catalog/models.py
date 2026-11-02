@@ -153,3 +153,16 @@ class CatalogShareToken(Base):
     created_by = Column(Integer, ForeignKey("sys_users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
 
+
+class CatalogEvent(Base):
+    """Acción anónima de un visitante en un enlace de catálogo (embudo, services/catalog_funnel.py)."""
+    __tablename__ = "inv_catalog_events"
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("sys_tenants.id"), nullable=False, index=True)
+    catalog_token_id = Column(Integer, ForeignKey("inv_catalog_tokens.id", ondelete="CASCADE"), nullable=False)
+    kind = Column(String(20), nullable=False)  # view | size_select | plan_request | whatsapp | form_open
+    plan_id = Column(Integer, nullable=True)
+    weight_tier = Column(String(40), nullable=True)
+    session_id = Column(String(40), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=tz.get_now)
+

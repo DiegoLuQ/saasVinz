@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app import models
 from app.api.internal.partners.models import PartnerLinkV2 as PartnerLink
+from app.api.internal.catalog.models import CatalogShareToken
 import json
 import os
 import shutil
@@ -43,6 +44,20 @@ def verify_token(token: str, tenant_slug: str, db: Session = Depends(get_db)):
         # Check permanent public token
         if tenant.public_token == token:
             return {"valid": True, "expires_at": None, "expired": False}
+        catalog_token = db.query(CatalogShareToken).filter(
+            CatalogShareToken.token == token,
+            CatalogShareToken.tenant_id == tenant.id,
+            CatalogShareToken.is_active == True
+        ).first()
+        if catalog_token:
+            now = tz.get_now()
+            is_expired = bool(catalog_token.expires_at and now > catalog_token.expires_at)
+            return {
+                "valid": not is_expired,
+                "expired": is_expired,
+                "expires_at": catalog_token.expires_at,
+                "message": "Enlace de catálogo expirado" if is_expired else "Token de catálogo válido"
+            }
         return {"valid": False, "expired": True, "message": "Token inválido"}
         
     now = datetime.utcnow()
@@ -142,6 +157,7 @@ async def submit_public_form(
     # 1.1 Autorización: partner activo, API key del widget, o token
     #     (temporal vigente o permanente del tenant). Sin ninguno -> 403.
     token_valid = False
+    catalog_token_id = None  # enlace de catálogo de planes (embudo, services/catalog_funnel.py)
     
     # Check Partner First (Stronger or Alternate Auth)
     if partner_id:
@@ -195,6 +211,24 @@ async def submit_public_form(
                 # Fallback: Verificar token permanente
                 if tenant.public_token and tenant.public_token == token:
                     token_valid = True
+                else:
+                    # Fallback: Verificar token de catálogo compartido
+                    cat_token = db.query(CatalogShareToken).filter(
+                        CatalogShareToken.token == token,
+                        CatalogShareToken.tenant_id == tenant_id,
+                        CatalogShareToken.is_active == True
+                    ).first()
+                    if cat_token:
+                        now = tz.get_now()
+                        is_expired = bool(cat_token.expires_at and now > cat_token.expires_at)
+                        if not is_expired:
+                            token_valid = True
+                            catalog_token_id = cat_token.id
+                        else:
+                            raise HTTPException(
+                                status_code=status.HTTP_403_FORBIDDEN,
+                                detail="El enlace del catálogo ha expirado."
+                            )
     
     if not token_valid:
         raise HTTPException(
@@ -389,6 +423,7 @@ async def submit_public_form(
         # partner_id=partner_id, # Commented out as per model definition
         status="pending",
         code=generate_unique_code(),
+        catalog_token_id=catalog_token_id,
         images=[] 
     )
     db.add(submission)
@@ -485,6 +520,23 @@ async def submit_public_form(
         db.commit()
     except Exception as e:
         print(f"Error creating notification: {e}")
+
+    # 6. Notificaciones automáticas por correo (Familia y Tenant) en segundo plano
+    try:
+        import asyncio
+        from app.services.form_submission_notifications import send_submission_notifications
+        asyncio.create_task(
+            send_submission_notifications(
+                tenant_id=tenant_id,
+                submission_id=submission_id,
+                submission_code=submission_code,
+                owner_dict=owner_dict,
+                pet_dict=pet_dict,
+                enriched_services=enriched_services,
+            )
+        )
+    except Exception as e:
+        print(f"Error launching submission email notifications: {e}")
 
     return {
         "status": "success",

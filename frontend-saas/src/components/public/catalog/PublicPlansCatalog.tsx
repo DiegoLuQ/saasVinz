@@ -1,12 +1,13 @@
 "use client";
 
-import { vinzerPromoUrl } from '@/lib/publicUrls';
-import React, { useMemo, useState } from 'react';
+import { vinzerPromoUrl, buildPublicFormUrl } from '@/lib/publicUrls';
+import React, { useEffect, useMemo, useState } from 'react';
+import { catalogSessionId, trackCatalogEvent, type CatalogEventKind } from '@/lib/catalogEvents';
 import localFont from 'next/font/local';
 import { DEFAULT_CATALOG_INTRO } from '@/lib/catalogDefaults';
 import type { WeightTier } from '@/lib/publicFormConfig';
 import {
-    Check, ChevronDown, Facebook, Feather, Globe, Info, Instagram, Mail, MapPin, MessageCircle, Phone, Plus, Search, Share2, X,
+    ArrowRight, Check, ChevronDown, Facebook, Feather, Globe, Info, Instagram, Mail, MapPin, MessageCircle, Phone, Plus, Search, Share2, X,
 } from 'lucide-react';
 
 // Fuentes autoalojadas (OFL, variables, subconjunto latino) en src/fonts.
@@ -47,6 +48,7 @@ export interface PublicPlan {
 
 export interface PublicCatalogTenant {
     name: string;
+    slug?: string;
     logo?: string | null;
     phone?: string | null;
     email?: string | null;
@@ -64,6 +66,7 @@ interface Props {
     getImageUrl: (url?: string | null) => string | null;
     onShare: () => void;
     copiedLink: boolean;
+    catalogToken?: string;
     /** Tramos de peso del crematorio; vacío = tamaños genéricos */
     weightTiers?: WeightTier[];
     /** Mensaje del crematorio en este enlace (se muestra en negrita antes de los planes) */
@@ -91,21 +94,27 @@ const COLLAPSED_ITEMS = 5; // ítems visibles antes de "Ver más"
 // Tamaños de mascota para cotizar: el precio de cremación depende del peso.
 // Respaldo si el crematorio no definió sus tramos de peso en Configuración.
 const PET_SIZES = [
-    { key: 'mini', label: 'Aves / Menos de 1 kg' },
-    { key: 'small', label: 'Pequeño (1 a 10 kg)' },
-    { key: 'medium', label: 'Mediano (10 a 25 kg)' },
-    { key: 'large', label: 'Grande (25 a 45 kg)' },
-    { key: 'giant', label: 'Gigante (+45 kg)' },
+    { key: 'mini', label: 'Aves / Menos de 1 kg', price: 0 },
+    { key: 'small', label: 'Pequeño (1 a 10 kg)', price: 0 },
+    { key: 'medium', label: 'Mediano (10 a 25 kg)', price: 0 },
+    { key: 'large', label: 'Grande (25 a 45 kg)', price: 0 },
+    { key: 'giant', label: 'Gigante (+45 kg)', price: 0 },
 ] as const;
 const DEFAULT_SIZE = 'small';
 
-/** Tramos del crematorio como opciones del selector ("Pequeño (Hasta 4 kg) · $10.000"). */
+const formatCLP = (value: number) => `$${Math.round(value).toLocaleString('es-CL')}`;
+
+/** Tramos del crematorio como opciones del selector ("Pequeño (Hasta 4 kg) · +$10.000"). */
 const tierSizes = (tiers: WeightTier[]) => tiers.map(t => {
     const base = t.label ? `${t.label} (${t.range_text})` : t.range_text;
-    return { key: String(t.id), label: base, display: t.price != null ? `${base} · ${formatCLP(t.price)}` : base };
+    const tierPrice = t.price != null ? Number(t.price) : 0;
+    return {
+        key: String(t.id),
+        label: base,
+        display: tierPrice > 0 ? `${base} · +${formatCLP(tierPrice)}` : base,
+        price: tierPrice,
+    };
 });
-
-const formatCLP = (value: number) => `$${Math.round(value).toLocaleString('es-CL')}`;
 
 /** Precio propio del plan (etiqueta del tenant o monto); null si no tiene. Nunca "$0". */
 const priceText = (plan: PublicPlan): { main: string; isAmount: boolean } | null => {
@@ -144,17 +153,35 @@ interface PlanView {
 }
 
 /** Catálogo público de planes: diseño sobrio y cálido; los datos son los de cada tenant. */
-export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare, copiedLink, weightTiers = [], message, showVinzerBrand = true }: Props) {
+export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare, copiedLink, catalogToken, weightTiers = [], message, showVinzerBrand = true }: Props) {
     const [searchTerm, setSearchTerm] = useState('');
     const sizes = useMemo(
-        () => (weightTiers.length > 0 ? tierSizes(weightTiers) : PET_SIZES.map(s => ({ ...s, display: s.label }))),
+        () => (weightTiers.length > 0 ? tierSizes(weightTiers) : PET_SIZES.map(s => ({ ...s, display: s.label, price: 0 }))),
         [weightTiers]
     );
     const [sizeKey, setSizeKey] = useState<string>(
         weightTiers.length > 0 ? String(weightTiers[0].id) : DEFAULT_SIZE
     );
-    // El texto de cotización y de WhatsApp no lleva el precio del tramo.
-    const sizeLabel = (sizes.find(s => s.key === sizeKey) ?? sizes[0])?.label ?? '';
+    const currentSize = useMemo(
+        () => sizes.find(s => s.key === sizeKey) ?? sizes[0],
+        [sizes, sizeKey]
+    );
+    const sizeLabel = currentSize?.label ?? '';
+    const tierPrice = currentSize?.price ?? 0;
+
+    // Embudo del catálogo (lib/catalogEvents.ts): sesión anónima por enlace
+    const [sessionId, setSessionId] = useState('');
+    useEffect(() => {
+        if (!catalogToken) return;
+        const sid = catalogSessionId(catalogToken);
+        setSessionId(sid);
+        trackCatalogEvent({ slug: tenant.slug || '', token: catalogToken, kind: 'view', sessionId: sid });
+    }, [catalogToken, tenant.slug]);
+    const track = (kind: CatalogEventKind, planId?: number, weightTier: string = sizeLabel) => {
+        if (catalogToken && sessionId) {
+            trackCatalogEvent({ slug: tenant.slug || '', token: catalogToken, kind, sessionId, planId, weightTier });
+        }
+    };
 
     const views = useMemo<PlanView[]>(() => plans.map(plan => ({
         plan,
@@ -215,6 +242,7 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                         {generalWhatsApp && (
                             <a
                                 href={generalWhatsApp}
+                                onClick={() => track('whatsapp')}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="h-10 px-3 sm:px-4 rounded-full bg-[var(--cat-ink)] text-white hover:bg-black flex items-center gap-2 text-sm font-medium transition-colors"
@@ -276,6 +304,9 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                         <h2 id="pet-size-title" className="[font-family:var(--cat-serif)] text-2xl font-semibold">
                             ¿Cuál es el tamaño aproximado de tu mascota?
                         </h2>
+                        <p className="mt-1 text-xs text-[var(--cat-muted)]">
+                            Selecciona un rango para calcular automáticamente el valor final estimado en cada plan.
+                        </p>
                         <div role="radiogroup" aria-labelledby="pet-size-title" className="mt-5 flex flex-wrap justify-center gap-2.5">
                             {sizes.map(size => {
                                 const active = size.key === sizeKey;
@@ -285,7 +316,10 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                                         type="button"
                                         role="radio"
                                         aria-checked={active}
-                                        onClick={() => setSizeKey(size.key)}
+                                        onClick={() => {
+                                            setSizeKey(size.key);
+                                            track('size_select', undefined, size.label);
+                                        }}
                                         className={`rounded-full px-3.5 py-2.5 text-[14px] font-medium border transition-all ${
                                             active
                                                 ? 'bg-[var(--cat-gold-deep)] border-[var(--cat-gold-deep)] text-white shadow-[0_6px_16px_-8px_rgba(138,100,40,0.7)]'
@@ -322,15 +356,38 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                 ) : (
                     // flex-wrap centra la última fila incompleta; las tarjetas de una fila quedan de igual altura
                     <div className="flex flex-wrap justify-center gap-6">
-                        {filtered.map(view => (
-                            <PlanCard
-                                key={view.plan.id}
-                                view={view}
-                                cover={getImageUrl(view.plan.image_url)}
-                                sizeLabel={sizeLabel}
-                                waUrl={whatsappUrl(`Hola ${tenant.name}, quisiera consultar por ${planReference(view.plan.name)} para mi mascota de tamaño ${sizeLabel}.`)}
-                            />
-                        ))}
+                        {filtered.map(view => {
+                            const basePrice = view.plan.price || 0;
+                            const totalPrice = basePrice + tierPrice;
+                            const waText = tierPrice > 0 && basePrice > 0
+                                ? `Hola ${tenant.name}, quisiera consultar por ${planReference(view.plan.name)} para mi mascota de tamaño ${sizeLabel}. Total estimado en catálogo: ${formatCLP(totalPrice)} (Plan ${formatCLP(basePrice)} + Peso ${formatCLP(tierPrice)}).`
+                                : basePrice > 0
+                                    ? `Hola ${tenant.name}, quisiera consultar por ${planReference(view.plan.name)} para mi mascota de tamaño ${sizeLabel} (Valor: ${formatCLP(basePrice)}).`
+                                    : `Hola ${tenant.name}, quisiera consultar por ${planReference(view.plan.name)} para mi mascota de tamaño ${sizeLabel}.`;
+
+                            const formUrl = tenant.slug
+                                ? buildPublicFormUrl(tenant.slug, {
+                                      token: catalogToken,
+                                      plan_id: view.plan.id,
+                                      weight_tier: sizeKey,
+                                      cs: sessionId || undefined,
+                                  })
+                                : null;
+
+                            return (
+                                <PlanCard
+                                    key={view.plan.id}
+                                    view={view}
+                                    cover={getImageUrl(view.plan.image_url)}
+                                    sizeLabel={sizeLabel}
+                                    tierPrice={tierPrice}
+                                    waUrl={whatsappUrl(waText)}
+                                    formUrl={formUrl}
+                                    onRequest={() => track('plan_request', view.plan.id)}
+                                    onWhatsApp={() => track('whatsapp', view.plan.id)}
+                                />
+                            );
+                        })}
                     </div>
                 )}
             </main>
@@ -374,7 +431,7 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                         )}
                         {tenant.whatsapp && (
                             <li>
-                                <a href={generalWhatsApp!} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 hover:text-[var(--cat-ink)]">
+                                <a href={generalWhatsApp!} onClick={() => track('whatsapp')} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 hover:text-[var(--cat-ink)]">
                                     <MessageCircle size={16} className="shrink-0 text-[var(--cat-gold)]" /> WhatsApp +{tenant.whatsapp}
                                 </a>
                             </li>
@@ -410,11 +467,14 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
     );
 }
 
-function PlanCard({ view, cover, waUrl, sizeLabel }: { view: PlanView; cover: string | null; waUrl: string | null; sizeLabel: string }) {
+function PlanCard({ view, cover, waUrl, formUrl, sizeLabel, tierPrice = 0, onRequest, onWhatsApp }: { view: PlanView; cover: string | null; waUrl: string | null; formUrl: string | null; sizeLabel: string; tierPrice?: number; onRequest?: () => void; onWhatsApp?: () => void }) {
     const { plan, included, optional } = view;
     // Tarjeta corta por defecto: descripción recortada y primeros ítems; "Ver más" muestra todo.
     const [expanded, setExpanded] = useState(false);
     const price = priceText(plan);
+    const basePrice = plan.price || 0;
+    const isAmount = Boolean(price?.isAmount && basePrice > 0);
+    const totalPrice = isAmount ? basePrice + tierPrice : 0;
     const featured = Boolean(plan.is_featured);
     const longDesc = (plan.description || '').length > 120;
     const hiddenCount = Math.max(0, included.length - COLLAPSED_ITEMS) + optional.length;
@@ -449,15 +509,52 @@ function PlanCard({ view, cover, waUrl, sizeLabel }: { view: PlanView; cover: st
 
             <div className="flex-1 flex flex-col p-6 sm:p-7">
                 <h2 className="[font-family:var(--cat-serif)] text-[28px] leading-tight font-semibold">{plan.name}</h2>
-                {price ? (
-                    <>
-                        <p className={`mt-1 font-semibold ${price.isAmount ? 'text-lg tabular-nums' : 'text-sm uppercase tracking-wider'} text-[var(--cat-gold-deep)]`}>
+                {isAmount ? (
+                    <div className="mt-3 p-3.5 rounded-2xl bg-[var(--cat-sand)]/70 border border-[var(--cat-line)]">
+                        {tierPrice > 0 ? (
+                            <>
+                                <div className="flex items-baseline justify-between gap-2">
+                                    <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--cat-muted)]">
+                                        Total estimado:
+                                    </span>
+                                    <span className="text-2xl font-black tabular-nums text-[var(--cat-gold-deep)]">
+                                        {formatCLP(totalPrice)}
+                                    </span>
+                                </div>
+                                <div className="mt-1.5 pt-1.5 border-t border-[var(--cat-line)]/70 flex items-center justify-between text-[12px] text-[var(--cat-muted)]">
+                                    <span>Plan base: {formatCLP(basePrice)}</span>
+                                    <span className="font-semibold text-[var(--cat-gold-deep)]">
+                                        + {formatCLP(tierPrice)} ({sizeLabel})
+                                    </span>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="flex items-baseline justify-between gap-2">
+                                    <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--cat-muted)]">
+                                        Valor del plan:
+                                    </span>
+                                    <span className="text-2xl font-black tabular-nums text-[var(--cat-gold-deep)]">
+                                        {formatCLP(basePrice)}
+                                    </span>
+                                </div>
+                                <p className="mt-1 text-[12px] text-[var(--cat-muted)]">
+                                    Para tamaño: <span className="font-medium text-[var(--cat-ink)]">{sizeLabel}</span>
+                                </p>
+                            </>
+                        )}
+                    </div>
+                ) : price ? (
+                    <div className="mt-3 p-3 rounded-2xl bg-[var(--cat-sand)]/60 border border-[var(--cat-line)] flex items-center justify-between">
+                        <span className="text-sm font-semibold uppercase tracking-wider text-[var(--cat-gold-deep)]">
                             {price.main}
-                        </p>
-                        <p className="mt-0.5 text-[13px] text-[var(--cat-muted)]">Cotizar para: {sizeLabel}</p>
-                    </>
+                        </span>
+                        <span className="text-xs text-[var(--cat-muted)]">
+                            {sizeLabel}
+                        </span>
+                    </div>
                 ) : (
-                    <p className="mt-1 text-sm font-semibold text-[var(--cat-gold-deep)]">Cotizar para: {sizeLabel}</p>
+                    <p className="mt-2 text-sm font-semibold text-[var(--cat-gold-deep)]">Cotizar para: {sizeLabel}</p>
                 )}
 
                 {plan.important_note && (
@@ -513,23 +610,41 @@ function PlanCard({ view, cover, waUrl, sizeLabel }: { view: PlanView; cover: st
                     </button>
                 )}
 
-                {waUrl && (
-                    <div className="mt-auto pt-6">
+                <div className="mt-auto pt-6 flex flex-col gap-2.5">
+                    {formUrl && (
                         <a
-                            href={waUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`w-full rounded-full py-3.5 flex items-center justify-center gap-2 text-[15px] font-semibold transition-colors ${
+                            href={formUrl}
+                            onClick={onRequest}
+                            className={`w-full rounded-full py-3.5 px-4 flex items-center justify-center gap-2 text-[15px] font-bold transition-all shadow-sm active:scale-[0.98] ${
                                 featured
-                                    ? 'bg-[var(--cat-gold-deep)] text-white hover:bg-[#735220]'
-                                    : 'bg-white text-[var(--cat-gold-deep)] border border-[var(--cat-gold)]/60 hover:bg-[var(--cat-gold-deep)] hover:text-white'
+                                    ? 'bg-[var(--cat-gold-deep)] text-white hover:bg-[#735220] shadow-[0_4px_14px_-3px_rgba(138,100,40,0.4)]'
+                                    : 'bg-[var(--cat-ink)] text-white hover:bg-black'
                             }`}
                         >
-                            <MessageCircle size={17} />
+                            <span>Solicitar este plan</span>
+                            <ArrowRight size={17} />
+                        </a>
+                    )}
+
+                    {waUrl && (
+                        <a
+                            href={waUrl}
+                            onClick={onWhatsApp}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`w-full rounded-full py-2.5 px-4 flex items-center justify-center gap-2 text-[14px] font-medium transition-colors ${
+                                formUrl
+                                    ? 'bg-transparent text-[var(--cat-muted)] hover:text-[var(--cat-ink)] hover:bg-[var(--cat-sand)]/60'
+                                    : featured
+                                        ? 'bg-[var(--cat-gold-deep)] text-white hover:bg-[#735220]'
+                                        : 'bg-white text-[var(--cat-gold-deep)] border border-[var(--cat-gold)]/60 hover:bg-[var(--cat-gold-deep)] hover:text-white'
+                            }`}
+                        >
+                            <MessageCircle size={16} />
                             Consultar por WhatsApp
                         </a>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
         </article>
     );

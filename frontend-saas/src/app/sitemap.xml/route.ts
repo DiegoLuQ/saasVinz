@@ -31,6 +31,7 @@ export function GET(request: Request) {
         { path: '/' },
         { path: '/tour' },
         { path: '/comparar-planes' },
+        { path: '/diagnostico' },
         { path: '/guias' },
         ...GUIAS.map((g) => ({ path: guiaPath(g.slug), lastmod: GUIA_LASTMOD[g.slug] })),
     ];

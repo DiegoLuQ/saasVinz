@@ -16,6 +16,7 @@ import {
     Plus,
     RefreshCw,
     X,
+    CheckCircle2,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
@@ -32,6 +33,13 @@ interface CatalogLink {
     is_active: boolean;
     views_count: number;
     last_viewed_at?: string | null;
+    // Embudo del catálogo de planes (desde que se mide)
+    visitors?: number;
+    plan_requests?: number;
+    whatsapp_clicks?: number;
+    forms_submitted?: number;
+    orders?: number;
+    delivered?: number;
     created_at: string;
     is_expired: boolean;
 }
@@ -478,7 +486,7 @@ export default function ShareCatalogModal({
                                                     </p>
                                                 )}
 
-                                                <div className="flex items-center gap-3 text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                                                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                                                     <span>
                                                         {link.expires_at ? (
                                                             <>Vence: {new Date(link.expires_at).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</>
@@ -487,7 +495,43 @@ export default function ShareCatalogModal({
                                                         )}
                                                     </span>
                                                     <span>·</span>
-                                                    <span>{link.views_count} vista{link.views_count !== 1 ? 's' : ''}</span>
+                                                    {isPlans ? (
+                                                        // Misma métrica que el admin (KPIs del catálogo): personas distintas, no recargas
+                                                        <span title={`${link.views_count} aperturas en total (incluye recargas y visitas antes de medir)`}>
+                                                            {link.visitors ?? 0} visitante{(link.visitors ?? 0) !== 1 ? 's' : ''}
+                                                        </span>
+                                                    ) : (
+                                                        <span>{link.views_count} vista{link.views_count !== 1 ? 's' : ''}</span>
+                                                    )}
+                                                    {isPlans && (
+                                                        <>
+                                                            <span>·</span>
+                                                            <span title="Personas que tocaron «Solicitar este plan»">
+                                                                {link.plan_requests ?? 0} solicitud{(link.plan_requests ?? 0) !== 1 ? 'es' : ''}
+                                                            </span>
+                                                            <span>·</span>
+                                                            <span title="Formularios enviados desde este enlace">
+                                                                {link.forms_submitted ?? 0} formulario{(link.forms_submitted ?? 0) !== 1 ? 's' : ''} enviado{(link.forms_submitted ?? 0) !== 1 ? 's' : ''}
+                                                            </span>
+                                                            {(link.orders ?? 0) > 0 && (
+                                                                <>
+                                                                    <span>·</span>
+                                                                    <span title="Formularios de este enlace que ya tienen una orden de cremación">
+                                                                        {link.orders} con orden
+                                                                    </span>
+                                                                </>
+                                                            )}
+                                                            {(link.delivered ?? 0) > 0 && (
+                                                                <>
+                                                                    <span>·</span>
+                                                                    <span className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400"
+                                                                        title="Servicios completados: la orden llegó a «Entregado»">
+                                                                        <CheckCircle2 size={12} /> {link.delivered} completado{link.delivered !== 1 ? 's' : ''}
+                                                                    </span>
+                                                                </>
+                                                            )}
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
 

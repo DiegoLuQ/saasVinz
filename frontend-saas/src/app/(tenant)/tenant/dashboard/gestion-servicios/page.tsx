@@ -22,18 +22,31 @@ import {
     Star,
     AlertCircle,
     Sparkles,
+    LayoutGrid,
+    List,
+    TrendingUp,
+    DollarSign,
+    Percent,
+    SlidersHorizontal,
+    ArrowUpDown,
+    Check,
+    Eye,
+    EyeOff
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { API_URL } from '@/lib/tenant/api';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const PlansDownloadLink = dynamic(() => import('@/components/tenant/catalog/PDFPlansDownloadButton'), { ssr: false });
 import {
     useCatalogServices,
     useCatalogPlans,
     useSaveService,
+    useSavePlan,
     useDeleteService,
-    useDeletePlan
+    useDeletePlan,
+    type Service,
+    type Plan
 } from '@/hooks/useCatalog';
 import { usePermissions } from '@/app/(tenant)/tenant/context/PermissionContext';
 import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
@@ -44,38 +57,10 @@ import DeleteConfirmationModal from '@/components/tenant/DeleteConfirmationModal
 import SearchableSelect from '@/components/tenant/SearchableSelect';
 import ShareCatalogModal from '@/components/tenant/catalog/ShareCatalogModal';
 
-interface Service {
-    id: number;
-    name: string;
-    description: string;
-    price: number;
-    cost: number;
-    is_active: boolean;
-    /** Servicio especial (eutanasia, exhumación…): adicional en el formulario público */
-    is_special?: boolean;
-    /** Si la familia lo ve en el formulario (Configuración → Formulario y Pesos) */
-    show_in_form?: boolean;
-}
-
-
-interface Plan {
-    id: number;
-    name: string;
-    description: string;
-    price: number;
-    cost: number;
-    image_url?: string | null;
-    is_active: boolean;
-    is_featured?: boolean;
-    important_note?: string | null;
-    services?: Service[];
-    service_ids?: number[];
-    products?: any[];
-    product_ids?: number[];
-}
-
-const cardInitial = { opacity: 0, y: 20 };
+const cardInitial = { opacity: 0, y: 15 };
 const cardAnimate = { opacity: 1, y: 0 };
+
+const formatCLP = (val: number) => `$${Math.round(val || 0).toLocaleString('es-CL')}`;
 
 export default function ServicesPage() {
     const { showToast } = useToast();
@@ -87,21 +72,28 @@ export default function ServicesPage() {
     const { data: plans = [], isLoading: loadingPlans } = useCatalogPlans();
 
     const saveServiceMutation = useSaveService();
+    const savePlanMutation = useSavePlan();
     const deleteServiceMutation = useDeleteService();
     const deletePlanMutation = useDeletePlan();
 
     const [isSaving, setIsSaving] = useState(false);
+    const [togglingId, setTogglingId] = useState<number | null>(null);
     const [activeTab, setActiveTab] = useState<'servicios' | 'planes'>('servicios');
+    const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentService, setCurrentService] = useState<Partial<Service> | null>(null);
     const [itemToDelete, setItemToDelete] = useState<{ type: 'service' | 'plan'; id: number; name: string } | null>(null);
     const [showLimitModal, setShowLimitModal] = useState(false);
     const [modalResource, setModalResource] = useState('Servicios');
 
+    // Filters & Sorting
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+    const [sortBy, setSortBy] = useState<'name' | 'price_desc' | 'price_asc' | 'margin_desc'>('name');
     const [marginInfoId, setMarginInfoId] = useState<number | null>(null);
 
+    // Catalog modal states
     const [showPlansCatalogModal, setShowPlansCatalogModal] = useState(false);
     const [showSharePlansModal, setShowSharePlansModal] = useState(false);
     const [catalogPlansOnlyActive, setCatalogPlansOnlyActive] = useState(false);
@@ -127,21 +119,85 @@ export default function ServicesPage() {
         }
     }, [isPlanesEnabled, activeTab]);
 
-    const filteredServices = useMemo(() => {
-        return services.filter((s: Service) => {
-            const matchSearch = !searchTerm || s.name.toLowerCase().includes(searchTerm.toLowerCase()) || (s.description?.toLowerCase()?.includes(searchTerm.toLowerCase()) ?? false);
-            const matchStatus = statusFilter === 'all' || (statusFilter === 'active' && s.is_active) || (statusFilter === 'inactive' && !s.is_active);
-            return matchSearch && matchStatus;
-        });
-    }, [services, searchTerm, statusFilter]);
+    // Financial & Operational Metrics
+    const stats = useMemo(() => {
+        const totalServices = services.length;
+        const activeServices = services.filter((s: Service) => s.is_active).length;
+        const specialServices = services.filter((s: Service) => s.is_special).length;
 
-    const filteredPlans = useMemo(() => {
-        return plans.filter((p: Plan) => {
-            const matchSearch = !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase()) || (p.description?.toLowerCase()?.includes(searchTerm.toLowerCase()) ?? false);
-            const matchStatus = statusFilter === 'all' || (statusFilter === 'active' && p.is_active) || (statusFilter === 'inactive' && !p.is_active);
+        const pricedServices = services.filter((s: Service) => (s.price || 0) > 0);
+        const avgPrice = pricedServices.length > 0
+            ? Math.round(pricedServices.reduce((acc: number, s: Service) => acc + (s.price || 0), 0) / pricedServices.length)
+            : 0;
+
+        const servicesWithMargin = services.filter((s: Service) => (s.price || 0) > 0 && (s.cost || 0) > 0);
+        const avgMargin = servicesWithMargin.length > 0
+            ? Math.round(servicesWithMargin.reduce((acc: number, s: Service) => {
+                const m = ((s.price - s.cost) / s.price) * 100;
+                return acc + m;
+            }, 0) / servicesWithMargin.length)
+            : 0;
+
+        const totalPlans = plans.length;
+        const activePlans = plans.filter((p: Plan) => p.is_active).length;
+        const featuredPlans = plans.filter((p: Plan) => p.is_featured).length;
+
+        return {
+            totalServices,
+            activeServices,
+            specialServices,
+            avgPrice,
+            avgMargin,
+            totalPlans,
+            activePlans,
+            featuredPlans,
+        };
+    }, [services, plans]);
+
+    // Filter & Sort Services
+    const filteredAndSortedServices = useMemo(() => {
+        const searchLower = searchTerm.trim().toLowerCase();
+        const filtered = services.filter((s: Service) => {
+            const matchSearch = !searchLower ||
+                s.name.toLowerCase().includes(searchLower) ||
+                (s.description?.toLowerCase()?.includes(searchLower) ?? false);
+            const matchStatus = statusFilter === 'all' ||
+                (statusFilter === 'active' && s.is_active) ||
+                (statusFilter === 'inactive' && !s.is_active);
             return matchSearch && matchStatus;
         });
-    }, [plans, searchTerm, statusFilter]);
+
+        return filtered.sort((a, b) => {
+            if (sortBy === 'price_desc') return (b.price || 0) - (a.price || 0);
+            if (sortBy === 'price_asc') return (a.price || 0) - (b.price || 0);
+            if (sortBy === 'margin_desc') {
+                const mA = a.price > 0 && a.cost > 0 ? ((a.price - a.cost) / a.price) * 100 : 0;
+                const mB = b.price > 0 && b.cost > 0 ? ((b.price - b.cost) / b.price) * 100 : 0;
+                return mB - mA;
+            }
+            return (a.name || '').localeCompare(b.name || '');
+        });
+    }, [services, searchTerm, statusFilter, sortBy]);
+
+    // Filter & Sort Plans
+    const filteredAndSortedPlans = useMemo(() => {
+        const searchLower = searchTerm.trim().toLowerCase();
+        const filtered = plans.filter((p: Plan) => {
+            const matchSearch = !searchLower ||
+                p.name.toLowerCase().includes(searchLower) ||
+                (p.description?.toLowerCase()?.includes(searchLower) ?? false);
+            const matchStatus = statusFilter === 'all' ||
+                (statusFilter === 'active' && p.is_active) ||
+                (statusFilter === 'inactive' && !p.is_active);
+            return matchSearch && matchStatus;
+        });
+
+        return filtered.sort((a, b) => {
+            if (sortBy === 'price_desc') return (b.price || 0) - (a.price || 0);
+            if (sortBy === 'price_asc') return (a.price || 0) - (b.price || 0);
+            return (a.name || '').localeCompare(b.name || '');
+        });
+    }, [plans, searchTerm, statusFilter, sortBy]);
 
     const handleOpenServiceModal = (service?: Service) => {
         if (!service && isServiceLimitReached) {
@@ -149,7 +205,15 @@ export default function ServicesPage() {
             setShowLimitModal(true);
             return;
         }
-        setCurrentService(service || { name: '', description: '', price: 0, cost: 0, is_active: true, is_special: false, show_in_form: true });
+        setCurrentService(service || {
+            name: '',
+            description: '',
+            price: 0,
+            cost: 0,
+            is_active: true,
+            is_special: false,
+            show_in_form: true
+        });
         setIsModalOpen(true);
     };
 
@@ -163,9 +227,48 @@ export default function ServicesPage() {
                 service: currentService || {}
             });
             setIsModalOpen(false);
-        } catch (err: any) {
+        } catch {
+            // Toast handled by mutation
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    // 1-Click Status Toggle for Service
+    const handleToggleServiceActive = async (service: Service) => {
+        if (!canEdit('servicios') || togglingId === service.id) return;
+        setTogglingId(service.id);
+        try {
+            await saveServiceMutation.mutateAsync({
+                isEdit: true,
+                service: {
+                    id: service.id,
+                    is_active: !service.is_active
+                }
+            });
+        } catch {
+            // Handled
+        } finally {
+            setTogglingId(null);
+        }
+    };
+
+    // 1-Click Status Toggle for Plan
+    const handleTogglePlanActive = async (plan: Plan) => {
+        if (!canEdit('servicios') || togglingId === plan.id) return;
+        setTogglingId(plan.id);
+        try {
+            await savePlanMutation.mutateAsync({
+                isEdit: true,
+                plan: {
+                    id: plan.id,
+                    is_active: !plan.is_active
+                }
+            });
+        } catch {
+            // Handled
+        } finally {
+            setTogglingId(null);
         }
     };
 
@@ -192,518 +295,1083 @@ export default function ServicesPage() {
         return Math.round(((price - cost) / price) * 100);
     };
 
+    // Modal Live Profit Calculation
+    const modalProfit = useMemo(() => {
+        const p = currentService?.price || 0;
+        const c = currentService?.cost || 0;
+        const profit = p - c;
+        const pct = p > 0 ? Math.round((profit / p) * 100) : 0;
+        return { profit, pct };
+    }, [currentService?.price, currentService?.cost]);
+
     return (
-        <div className="space-y-8">
-            {/* Header decorativo */}
-            <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-amber-900/20 via-primary/5 to-transparent border border-amber-900/10 p-8">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl" />
-                <div className="absolute bottom-0 left-1/4 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl" />
-                <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-5 relative z-10">
-                    <div className="flex items-start gap-4">
-                        <div className="hidden sm:flex w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-600/10 items-center justify-center border border-amber-500/20 shadow-lg shadow-amber-500/5">
-                            <FolderTree className="text-amber-400" size={28} />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Catálogo de Servicios</h1>
-                            <p className="text-muted-foreground mt-1.5 max-w-xl">Diseña los servicios y paquetes que ofrecerás a las familias. Cada servicio puede incluir productos y prestaciones personalizadas.</p>
-                            {tenantData?.subscription_plan && (
-                                <div className="flex flex-wrap items-center gap-3 mt-4">
-                                    <span className="inline-flex items-center gap-1.5 bg-white/5 border border-white/5 px-3 py-1 rounded-xl text-xs text-muted-foreground font-medium">
-                                        Plan: <strong className="text-amber-400 font-bold uppercase">{tenantData.subscription_plan.name}</strong>
-                                    </span>
-                                    <span className="inline-flex items-center gap-1.5 bg-white/5 border border-white/5 px-3 py-1 rounded-xl text-xs text-muted-foreground font-medium">
-                                        Servicios: <strong className="text-white font-bold">{services.length} / {formatLimit(maxServices)}</strong>
-                                    </span>
-                                    <span className="inline-flex items-center gap-1.5 bg-white/5 border border-white/5 px-3 py-1 rounded-xl text-xs text-muted-foreground font-medium">
-                                        Planes Comerciales: <strong className="text-white font-bold">{isPlanesEnabled ? `${plans.length} / ${formatLimit(maxPlans)}` : 'No disponible'}</strong>
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full xl:w-auto xl:shrink-0">
-                        {activeTab === 'planes' && (
+        <div className="space-y-6 sm:space-y-8">
+            {/* Header Modernizado */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2.5">
+                        <FolderTree className="text-primary" size={28} />
+                        <span>Catálogo de Servicios y Planes</span>
+                    </h1>
+                    <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+                        Diseña los servicios individuales y paquetes comerciales para ofrecer a las familias.
+                    </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2.5">
+                    {/* Botones contextuales de Planes */}
+                    {activeTab === 'planes' && (
+                        <>
                             <button
                                 onClick={() => setShowSharePlansModal(true)}
-                                className="flex-1 sm:flex-none whitespace-nowrap border border-white/10 font-bold py-3 px-4 sm:px-6 rounded-2xl flex items-center justify-center transition-all text-sm bg-white/5 text-white hover:bg-white/10 hover:border-amber-500/30 active:scale-95"
-                                title="Generar enlace para compartir el catálogo de planes online"
+                                className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-all"
+                                title="Generar enlace público del catálogo"
                             >
-                                <Share2 className="mr-2" size={18} />
-                                Compartir
+                                <Share2 size={15} className="text-primary" />
+                                <span>Compartir</span>
                             </button>
-                        )}
-                        {activeTab === 'planes' && (
                             <button
                                 onClick={() => setShowPlansCatalogModal(true)}
-                                className="flex-1 sm:flex-none whitespace-nowrap border border-white/10 font-bold py-3 px-4 sm:px-6 rounded-2xl flex items-center justify-center transition-all text-sm bg-white/5 text-white hover:bg-white/10 hover:border-amber-500/30 active:scale-95"
-                                title="Ver Catálogo de Planes"
+                                className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-all"
+                                title="Previsualizar catálogo y descargar PDF"
                             >
-                                <BookOpen className="mr-2" size={18} />
-                                Ver Catálogo
+                                <BookOpen size={15} className="text-primary" />
+                                <span>Ver Catálogo PDF</span>
                             </button>
-                        )}
-                        {canCreate('servicios') && (
-                            <button
-                                onClick={() => activeTab === 'servicios' ? handleOpenServiceModal() : router.push('/dashboard/gestion-servicios/plan/nuevo')}
-                                disabled={activeTab === 'servicios' ? isServiceLimitReached : isPlanLimitReached}
-                                className="w-full sm:w-auto whitespace-nowrap bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold py-3 px-6 sm:px-7 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:-translate-y-0.5 active:scale-95 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-                            >
-                                <Plus className="mr-2" size={18} />
-                                {activeTab === 'servicios' ? 'Nuevo Servicio' : 'Nuevo Plan'}
-                            </button>
-                        )}
+                        </>
+                    )}
+
+                    {/* Botón Principal Crear */}
+                    {canCreate('servicios') && (
+                        <button
+                            onClick={() => activeTab === 'servicios' ? handleOpenServiceModal() : router.push('/dashboard/gestion-servicios/plan/nuevo')}
+                            disabled={activeTab === 'servicios' ? isServiceLimitReached : isPlanLimitReached}
+                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-primary text-primary-foreground text-xs sm:text-sm font-bold shadow-md hover:bg-primary/95 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Plus size={16} />
+                            <span>{activeTab === 'servicios' ? 'Nuevo Servicio' : 'Nuevo Plan'}</span>
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* Fila de KPIs Compactos (Visión Ejecutiva y Rentabilidad) */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                {/* 1. Servicios Activos / Cupo */}
+                <div className="p-4 sm:p-4.5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Servicios Activos</p>
+                        <div className="flex items-baseline gap-1.5 mt-1">
+                            <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
+                                {stats.activeServices}
+                            </span>
+                            <span className="text-xs font-semibold text-muted-foreground">
+                                / {stats.totalServices} total
+                            </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                            Cupo: {formatLimit(maxServices)}
+                        </p>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                        <Tag size={20} />
+                    </div>
+                </div>
+
+                {/* 2. Planes Comerciales */}
+                <div className="p-4 sm:p-4.5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Planes Comerciales</p>
+                        <div className="flex items-baseline gap-1.5 mt-1">
+                            <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
+                                {isPlanesEnabled ? stats.activePlans : 0}
+                            </span>
+                            <span className="text-xs font-semibold text-muted-foreground">
+                                {isPlanesEnabled ? `/ ${stats.totalPlans} total` : 'Bloqueado'}
+                            </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {isPlanesEnabled ? `${stats.featuredPlans} destacados` : 'Requiere plan superior'}
+                        </p>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                        <Layers size={20} />
+                    </div>
+                </div>
+
+                {/* 3. Margen Promedio */}
+                <div className="p-4 sm:p-4.5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Margen Promedio</p>
+                        <div className="flex items-baseline gap-1.5 mt-1">
+                            <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
+                                {stats.avgMargin}%
+                            </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                            Rentabilidad sobre precio
+                        </p>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+                        <Percent size={20} />
+                    </div>
+                </div>
+
+                {/* 4. Ticket Promedio Catálogo */}
+                <div className="p-4 sm:p-4.5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Precio Promedio</p>
+                        <div className="flex items-baseline gap-1.5 mt-1">
+                            <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
+                                {formatCLP(stats.avgPrice)}
+                            </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {stats.specialServices} adicionales especiales
+                        </p>
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                        <TrendingUp size={20} />
                     </div>
                 </div>
             </div>
 
-            {/* Tabs + Filtros */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="relative flex p-1 bg-white/5 rounded-2xl border border-white/5">
-                        <button
-                            onClick={() => { setActiveTab('servicios'); setSearchTerm(''); setStatusFilter('all'); }}
-                            className={`relative flex items-center gap-2 py-2.5 px-5 rounded-xl text-sm font-bold transition-all ${activeTab === 'servicios' ? 'text-white' : 'text-muted-foreground hover:text-foreground'}`}
-                        >
-                            {activeTab === 'servicios' && (
-                                <motion.div layoutId="tab-bg" className="absolute inset-0 bg-primary rounded-xl shadow-md" transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
-                            )}
-                            <Tag size={16} className="relative z-10" />
-                            <span className="relative z-10">Servicios</span>
-                            <span className="relative z-10 text-[10px] bg-white/10 px-1.5 py-0.5 rounded-md">{services.length}</span>
-                        </button>
-                        <button
-                            onClick={() => {
-                                if (!isPlanesEnabled) {
-                                    setModalResource('Planes Comerciales');
-                                    setShowLimitModal(true);
-                                    return;
-                                }
-                                setActiveTab('planes');
-                                setSearchTerm('');
-                                setStatusFilter('all');
-                            }}
-                            className={`relative flex items-center gap-2 py-2.5 px-5 rounded-xl text-sm font-bold transition-all ${
-                                !isPlanesEnabled
-                                    ? 'opacity-60 cursor-not-allowed text-muted-foreground/60 hover:text-muted-foreground'
-                                    : activeTab === 'planes'
-                                        ? 'text-white'
-                                        : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                        >
-                            {activeTab === 'planes' && isPlanesEnabled && (
-                                <motion.div layoutId="tab-bg" className="absolute inset-0 bg-primary rounded-xl shadow-md" transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
-                            )}
-                            {!isPlanesEnabled ? <Lock size={14} className="relative z-10 text-amber-500/85" /> : <Layers size={16} className="relative z-10" />}
-                            <span className="relative z-10">Planes</span>
-                            <span className="relative z-10 text-[10px] bg-white/10 px-1.5 py-0.5 rounded-md">{plans.length}</span>
-                        </button>
-                    </div>
+            {/* Barra de Navegación, Filtros y Switch de Vista */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 p-3 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                {/* Tabs Principales: Servicios vs Planes */}
+                <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-white/5 rounded-xl border border-slate-200/60 dark:border-white/5">
+                    <button
+                        onClick={() => { setActiveTab('servicios'); setSearchTerm(''); setStatusFilter('all'); }}
+                        className={`relative flex items-center gap-2 py-1.5 px-4 rounded-lg text-xs font-bold transition-all ${
+                            activeTab === 'servicios'
+                                ? 'bg-white dark:bg-slate-800 text-primary shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                    >
+                        <Tag size={14} />
+                        <span>Servicios</span>
+                        <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold">
+                            {services.length}
+                        </span>
+                    </button>
+                    <button
+                        onClick={() => {
+                            if (!isPlanesEnabled) {
+                                setModalResource('Planes Comerciales');
+                                setShowLimitModal(true);
+                                return;
+                            }
+                            setActiveTab('planes');
+                            setSearchTerm('');
+                            setStatusFilter('all');
+                        }}
+                        className={`relative flex items-center gap-2 py-1.5 px-4 rounded-lg text-xs font-bold transition-all ${
+                            !isPlanesEnabled
+                                ? 'opacity-60 cursor-not-allowed text-muted-foreground/60'
+                                : activeTab === 'planes'
+                                    ? 'bg-white dark:bg-slate-800 text-primary shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                    >
+                        {!isPlanesEnabled ? <Lock size={13} className="text-amber-500" /> : <Layers size={14} />}
+                        <span>Planes</span>
+                        <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold">
+                            {plans.length}
+                        </span>
+                    </button>
                 </div>
 
-                <div className="flex items-center gap-3 w-full lg:w-auto">
-                    <div className="relative flex-1 lg:w-56">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/50" size={16} />
+                {/* Filtros, Búsqueda y Modos de Vista */}
+                <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+                    {/* Búsqueda */}
+                    <div className="relative flex-1 sm:flex-none sm:w-56">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15} />
                         <input
                             type="text"
                             placeholder={activeTab === 'servicios' ? 'Buscar servicio...' : 'Buscar plan...'}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm outline-none focus:border-amber-500/40 transition-all font-medium"
+                            className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl py-1.5 pl-9 pr-8 text-xs font-medium outline-none focus:border-primary transition-all text-slate-900 dark:text-white"
                         />
                         {searchTerm && (
-                            <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground transition-colors">
-                                <X size={14} />
+                            <button
+                                onClick={() => setSearchTerm('')}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            >
+                                <X size={13} />
                             </button>
                         )}
                     </div>
-                    <div className="flex p-0.5 bg-white/5 rounded-xl border border-white/5">
+
+                    {/* Filtro Estado */}
+                    <div className="flex p-0.5 bg-slate-100 dark:bg-white/5 rounded-xl border border-slate-200/60 dark:border-white/5">
                         {(['all', 'active', 'inactive'] as const).map((f) => (
                             <button
                                 key={f}
                                 onClick={() => setStatusFilter(f)}
-                                className={`px-3.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${statusFilter === f ? 'bg-white/10 text-foreground shadow-sm' : 'text-muted-foreground/60 hover:text-muted-foreground'}`}
+                                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
+                                    statusFilter === f
+                                        ? 'bg-white dark:bg-slate-800 text-foreground shadow-sm'
+                                        : 'text-muted-foreground hover:text-foreground'
+                                }`}
                             >
                                 {f === 'all' ? 'Todos' : f === 'active' ? 'Activos' : 'Inactivos'}
                             </button>
                         ))}
                     </div>
+
+                    {/* Selector de Orden */}
+                    <div className="relative">
+                        <select
+                            value={sortBy}
+                            onChange={(e: any) => setSortBy(e.target.value)}
+                            className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl py-1.5 px-3 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none cursor-pointer"
+                        >
+                            <option value="name">Alfabético (A-Z)</option>
+                            <option value="price_desc">Mayor Precio</option>
+                            <option value="price_asc">Menor Precio</option>
+                            {activeTab === 'servicios' && <option value="margin_desc">Mayor Margen %</option>}
+                        </select>
+                    </div>
+
+                    {/* Switch Cuadrícula ▦ / Tabla ☰ */}
+                    <div className="flex p-0.5 bg-slate-100 dark:bg-white/5 rounded-xl border border-slate-200/60 dark:border-white/5">
+                        <button
+                            onClick={() => setViewMode('grid')}
+                            className={`p-1.5 rounded-lg transition-all ${
+                                viewMode === 'grid'
+                                    ? 'bg-white dark:bg-slate-800 text-primary shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                            title="Vista en tarjetas"
+                        >
+                            <LayoutGrid size={15} />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('table')}
+                            className={`p-1.5 rounded-lg transition-all ${
+                                viewMode === 'table'
+                                    ? 'bg-white dark:bg-slate-800 text-primary shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                            title="Vista en tabla detallada"
+                        >
+                            <List size={15} />
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {/* Content */}
+            {/* Contenido Principal */}
             {loadingServices || loadingPlans ? (
                 <div className="h-64 flex flex-col items-center justify-center space-y-4">
-                    <div className="relative">
-                        <Loader2 className="animate-spin text-amber-500" size={40} />
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent blur-xl" />
-                    </div>
-                    <p className="text-muted-foreground font-medium">Cargando catálogo...</p>
+                    <Loader2 className="animate-spin text-primary" size={36} />
+                    <p className="text-muted-foreground text-sm font-medium">Cargando catálogo...</p>
                 </div>
-            ) : (
-                <div
-                    className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5"
-                >
-                    {activeTab === 'servicios' ? (
-                        filteredServices.length > 0 ? (
-                            filteredServices.map((service) => (
+            ) : activeTab === 'servicios' ? (
+                /* ========================================================
+                   SECCIÓN SERVICIOS (Grid o Table)
+                   ======================================================== */
+                filteredAndSortedServices.length === 0 ? (
+                    <div className="py-20 flex flex-col items-center justify-center text-center rounded-3xl bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 p-8">
+                        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 text-primary">
+                            <Tag size={32} />
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
+                            {searchTerm || statusFilter !== 'all' ? 'Sin resultados para los filtros' : 'Aún no hay servicios registrados'}
+                        </h3>
+                        <p className="text-muted-foreground text-sm max-w-md">
+                            {searchTerm || statusFilter !== 'all'
+                                ? 'Prueba con otros términos de búsqueda o restablece los filtros.'
+                                : 'Comienza creando los servicios principales de tu crematorio.'}
+                        </p>
+                        {!searchTerm && statusFilter === 'all' && canCreate('servicios') && (
+                            <button
+                                onClick={() => handleOpenServiceModal()}
+                                disabled={isServiceLimitReached}
+                                className="mt-5 inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-primary text-primary-foreground text-sm font-bold shadow-md hover:bg-primary/95 transition-all"
+                            >
+                                <Plus size={16} />
+                                Crear Primer Servicio
+                            </button>
+                        )}
+                    </div>
+                ) : viewMode === 'grid' ? (
+                    /* Vista Grid de Servicios */
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
+                        {filteredAndSortedServices.map((service) => {
+                            const isToggling = togglingId === service.id;
+                            const mPct = margin(service.price, service.cost);
+                            const profit = (service.price || 0) - (service.cost || 0);
+
+                            return (
                                 <motion.div
                                     key={service.id}
                                     initial={cardInitial}
                                     animate={cardAnimate}
-                                    className="group relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/[0.06] hover:border-amber-500/25 transition-all duration-500 hover:shadow-xl hover:shadow-amber-500/5 hover:-translate-y-1"
+                                    className="group relative flex flex-col justify-between rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 hover:border-primary/40 dark:hover:border-primary/40 transition-all duration-300 hover:shadow-lg p-5 sm:p-6"
                                 >
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/[0.03] rounded-full blur-2xl group-hover:bg-amber-500/[0.06] transition-all duration-700" />
-                                    <div className="p-7 flex flex-col h-full relative z-10">
-                                        <div className="flex items-start justify-between mb-5">
-                                            <div className="p-3 rounded-xl bg-gradient-to-br from-amber-500/15 to-amber-600/5 border border-amber-500/10 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
-                                                <Tag size={22} className="text-amber-400" />
+                                    <div>
+                                        {/* Cabecera de la Card */}
+                                        <div className="flex items-start justify-between gap-3 mb-4">
+                                            <div className="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/15">
+                                                <Tag size={20} />
                                             </div>
-                                            <div className={`flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border ${service.is_active ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/15' : 'bg-red-500/10 text-red-400 border-red-500/15'}`}>
-                                                {service.is_active ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
-                                                {service.is_active ? 'Activo' : 'Inactivo'}
-                                            </div>
+
+                                            {/* 1-Click Status Toggle */}
+                                            <button
+                                                type="button"
+                                                onClick={() => handleToggleServiceActive(service)}
+                                                disabled={isToggling || !canEdit('servicios')}
+                                                className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full border transition-all ${
+                                                    service.is_active
+                                                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                                                        : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                                                } ${canEdit('servicios') ? 'hover:scale-105 active:scale-95 cursor-pointer' : 'cursor-default'}`}
+                                                title={canEdit('servicios') ? 'Clic para cambiar estado' : undefined}
+                                            >
+                                                {isToggling ? (
+                                                    <Loader2 size={12} className="animate-spin" />
+                                                ) : service.is_active ? (
+                                                    <CheckCircle2 size={12} />
+                                                ) : (
+                                                    <XCircle size={12} />
+                                                )}
+                                                <span>{service.is_active ? 'Activo' : 'Pausado'}</span>
+                                            </button>
                                         </div>
 
-                                        <div className="flex-1 space-y-2.5">
+                                        {/* Badges de atributos */}
+                                        <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
                                             {service.is_special && (
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/15">
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-400 border border-violet-200 dark:border-violet-800">
                                                     <Sparkles size={10} />
-                                                    Especial{service.show_in_form === false ? ' · oculto en formulario' : ''}
+                                                    Especial
                                                 </span>
                                             )}
-                                            <h3 className="text-lg font-bold group-hover:text-amber-400 transition-colors duration-300">{service.name}</h3>
-                                            <p className="text-sm text-muted-foreground/80 leading-relaxed line-clamp-2">{service.description || 'Sin descripción'}</p>
+                                            {service.show_in_form === false && (
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                                    <EyeOff size={10} />
+                                                    Oculto en formulario
+                                                </span>
+                                            )}
                                         </div>
 
-                                        <div className="mt-6 pt-5 border-t border-white/[0.04] flex items-end justify-between">
+                                        {/* Título y Descripción */}
+                                        <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">
+                                            {service.name}
+                                        </h3>
+                                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
+                                            {service.description || 'Sin descripción detallada.'}
+                                        </p>
+                                    </div>
+
+                                    {/* Precios, Margen y Acciones */}
+                                    <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800/80">
+                                        <div className="flex items-end justify-between gap-2">
                                             <div>
-                                                <p className="text-[10px] text-muted-foreground/50 font-medium uppercase tracking-wider mb-1">Precio</p>
-                                                <div className="text-2xl font-black tracking-tight text-white">
-                                                    ${(service.price || 0).toLocaleString()}
+                                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                                    Precio de Venta
+                                                </p>
+                                                <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
+                                                    {formatCLP(service.price)}
                                                 </div>
+
+                                                {/* Barra de Costo y Margen */}
                                                 {service.cost > 0 && (
-                                                    <div className="flex items-center gap-1.5 mt-1.5">
-                                                        <div className="h-1.5 w-16 rounded-full bg-white/5 overflow-hidden">
-                                                            <div
-                                                                className={`h-full rounded-full transition-all ${margin(service.price, service.cost) >= 50 ? 'bg-emerald-500' : margin(service.price, service.cost) >= 25 ? 'bg-amber-500' : 'bg-red-500'}`}
-                                                                style={{ width: `${Math.min(margin(service.price, service.cost), 100)}%` }}
-                                                            />
-                                                        </div>
-                                                        <span className="text-[9px] font-bold text-muted-foreground/50">{margin(service.price, service.cost)}%</span>
-                                                        <div className="relative">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setMarginInfoId(marginInfoId === service.id ? null : service.id)}
-                                                                className="text-muted-foreground/40 hover:text-amber-400 transition-colors"
-                                                            >
-                                                                <Info size={11} />
-                                                            </button>
-                                                            {marginInfoId === service.id && (
-                                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-[10px] text-white/90 rounded-xl p-3 shadow-xl border border-white/10 text-center leading-relaxed z-50 pointer-events-none">
-                                                                    Diferencia entre el precio de venta y el costo del servicio, expresada como porcentaje.
-                                                                    <div className="absolute top-full left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45 border-r border-b border-white/10 -mt-1" />
-                                                                </div>
-                                                            )}
-                                                        </div>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="text-[10px] text-muted-foreground">
+                                                            Costo: {formatCLP(service.cost)}
+                                                        </span>
+                                                        <span className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded ${
+                                                            mPct >= 50
+                                                                ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40'
+                                                                : mPct >= 20
+                                                                    ? 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40'
+                                                                    : 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/40'
+                                                        }`}>
+                                                            {mPct}% margen (+{formatCLP(profit)})
+                                                        </span>
                                                     </div>
                                                 )}
                                             </div>
-                                            <div className="flex gap-1.5">
+
+                                            {/* Botones de Acción */}
+                                            <div className="flex items-center gap-1.5 shrink-0">
                                                 {canEdit('servicios') && (
-                                                <button
-                                                    onClick={() => handleOpenServiceModal(service)}
-                                                    className="p-2.5 rounded-xl border border-white/[0.06] hover:bg-white/[0.06] hover:border-amber-500/25 text-muted-foreground hover:text-amber-400 transition-all"
-                                                    title="Editar"
-                                                >
-                                                    <Edit2 size={15} />
-                                                </button>
+                                                    <button
+                                                        onClick={() => handleOpenServiceModal(service)}
+                                                        className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-primary transition-all"
+                                                        title="Editar servicio"
+                                                    >
+                                                        <Edit2 size={14} />
+                                                    </button>
                                                 )}
                                                 {canDelete('servicios') && (
                                                     <button
                                                         onClick={() => handleDelete('service', service.id, service.name)}
-                                                        className="p-2.5 rounded-xl border border-white/[0.06] hover:bg-red-500/10 hover:border-red-500/25 text-muted-foreground hover:text-red-400 transition-all"
-                                                        title="Eliminar"
+                                                        className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/30 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 transition-all"
+                                                        title="Eliminar servicio"
                                                     >
-                                                        <Trash2 size={15} />
+                                                        <Trash2 size={14} />
                                                     </button>
                                                 )}
                                             </div>
                                         </div>
                                     </div>
                                 </motion.div>
-                            ))
-                        ) : (
-                            <div className="sm:col-span-2 xl:col-span-3 py-20 flex flex-col items-center justify-center text-center">
-                                <div className="w-20 h-20 rounded-[2rem] bg-gradient-to-br from-amber-500/10 to-amber-600/5 border border-amber-500/10 flex items-center justify-center mb-6">
-                                    <Tag size={36} className="text-amber-400/60" />
+                            );
+                        })}
+
+                        {/* Card Agregar Nuevo Servicio */}
+                        {canCreate('servicios') && (
+                            <button
+                                type="button"
+                                onClick={() => handleOpenServiceModal()}
+                                disabled={isServiceLimitReached}
+                                className="min-h-[220px] rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-primary/50 dark:hover:border-primary/50 bg-slate-50/50 dark:bg-slate-900/30 hover:bg-primary/[0.02] flex flex-col items-center justify-center gap-2 p-6 transition-all group disabled:opacity-40 disabled:cursor-not-allowed text-center"
+                            >
+                                <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    <Plus size={24} />
                                 </div>
-                                <h3 className="text-xl font-bold mb-2">{searchTerm || statusFilter !== 'all' ? 'Sin resultados' : 'Aún no hay servicios'}</h3>
-                                <p className="text-muted-foreground max-w-md">
-                                    {searchTerm || statusFilter !== 'all'
-                                        ? 'Intenta con otros términos de búsqueda o cambia el filtro de estado.'
-                                        : 'Crea tu primer servicio para comenzar a armar el catálogo de prestaciones.'}
-                                </p>
-                                {!searchTerm && statusFilter === 'all' && canCreate('servicios') && (
-                                    <button
-                                        onClick={() => handleOpenServiceModal()}
-                                        disabled={isServiceLimitReached}
-                                        className="mt-6 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold py-3 px-7 rounded-2xl shadow-lg shadow-amber-500/20 hover:shadow-amber-500/30 transition-all text-sm"
-                                    >
-                                        <Plus className="inline mr-2" size={16} />
-                                        Crear Servicio
-                                    </button>
-                                )}
-                            </div>
-                        )
-                    ) : (
-                        filteredPlans.length > 0 ? (
-                            filteredPlans.map((plan) => (
+                                <span className="font-bold text-sm text-slate-700 dark:text-slate-300 group-hover:text-primary transition-colors">
+                                    Nuevo Servicio
+                                </span>
+                                <span className="text-[11px] text-muted-foreground">
+                                    Añadir otra prestación al catálogo
+                                </span>
+                            </button>
+                        )}
+                    </div>
+                ) : (
+                    /* Vista Tabla de Servicios */
+                    <div className="overflow-hidden rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                                <thead>
+                                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                        <th className="py-3 px-4">Servicio</th>
+                                        <th className="py-3 px-4">Tipo / Opciones</th>
+                                        <th className="py-3 px-4 text-right">Precio Venta</th>
+                                        <th className="py-3 px-4 text-right">Costo Directo</th>
+                                        <th className="py-3 px-4 text-center">Margen Bruto</th>
+                                        <th className="py-3 px-4 text-center">Estado</th>
+                                        <th className="py-3 px-4 text-right">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+                                    {filteredAndSortedServices.map((service) => {
+                                        const isToggling = togglingId === service.id;
+                                        const mPct = margin(service.price, service.cost);
+                                        const profit = (service.price || 0) - (service.cost || 0);
+
+                                        return (
+                                            <tr key={service.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+                                                <td className="py-3 px-4">
+                                                    <div className="font-bold text-slate-900 dark:text-white text-sm">
+                                                        {service.name}
+                                                    </div>
+                                                    {service.description && (
+                                                        <div className="text-[11px] text-muted-foreground line-clamp-1 max-w-xs">
+                                                            {service.description}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="py-3 px-4">
+                                                    <div className="flex flex-wrap items-center gap-1">
+                                                        {service.is_special ? (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400 border border-violet-200 dark:border-violet-800">
+                                                                <Sparkles size={9} /> Especial
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[10px] text-muted-foreground">Estándar</span>
+                                                        )}
+                                                        {service.show_in_form === false && (
+                                                            <span className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded">
+                                                                Oculto web
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="py-3 px-4 text-right font-bold text-slate-900 dark:text-white text-sm">
+                                                    {formatCLP(service.price)}
+                                                </td>
+                                                <td className="py-3 px-4 text-right text-muted-foreground">
+                                                    {service.cost > 0 ? formatCLP(service.cost) : '—'}
+                                                </td>
+                                                <td className="py-3 px-4 text-center">
+                                                    {service.cost > 0 ? (
+                                                        <span className={`inline-block font-extrabold text-[11px] px-2 py-0.5 rounded-full ${
+                                                            mPct >= 50
+                                                                ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40'
+                                                                : mPct >= 20
+                                                                    ? 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40'
+                                                                    : 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/40'
+                                                        }`}>
+                                                            {mPct}% (+{formatCLP(profit)})
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-muted-foreground text-[10px]">Sin costo reg.</span>
+                                                    )}
+                                                </td>
+                                                <td className="py-3 px-4 text-center">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleToggleServiceActive(service)}
+                                                        disabled={isToggling || !canEdit('servicios')}
+                                                        className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all ${
+                                                            service.is_active
+                                                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                                                                : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                                                        }`}
+                                                    >
+                                                        {isToggling ? <Loader2 size={10} className="animate-spin" /> : null}
+                                                        <span>{service.is_active ? 'Activo' : 'Pausado'}</span>
+                                                    </button>
+                                                </td>
+                                                <td className="py-3 px-4 text-right">
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        {canEdit('servicios') && (
+                                                            <button
+                                                                onClick={() => handleOpenServiceModal(service)}
+                                                                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-primary transition-colors"
+                                                                title="Editar"
+                                                            >
+                                                                <Edit2 size={14} />
+                                                            </button>
+                                                        )}
+                                                        {canDelete('servicios') && (
+                                                            <button
+                                                                onClick={() => handleDelete('service', service.id, service.name)}
+                                                                className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                                                                title="Eliminar"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )
+            ) : (
+                /* ========================================================
+                   SECCIÓN PLANES COMERCIALES (Grid o Table)
+                   ======================================================== */
+                filteredAndSortedPlans.length === 0 ? (
+                    <div className="py-20 flex flex-col items-center justify-center text-center rounded-3xl bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 p-8">
+                        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 text-primary">
+                            <Layers size={32} />
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
+                            {searchTerm || statusFilter !== 'all' ? 'Sin resultados para los filtros' : 'Aún no hay planes comerciales'}
+                        </h3>
+                        <p className="text-muted-foreground text-sm max-w-md">
+                            {searchTerm || statusFilter !== 'all'
+                                ? 'Prueba con otros términos de búsqueda o restablece los filtros.'
+                                : 'Agrupa servicios y productos en paquetes completos para las familias.'}
+                        </p>
+                        {!searchTerm && statusFilter === 'all' && canCreate('servicios') && (
+                            <button
+                                onClick={() => router.push('/dashboard/gestion-servicios/plan/nuevo')}
+                                disabled={isPlanLimitReached}
+                                className="mt-5 inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-primary text-primary-foreground text-sm font-bold shadow-md hover:bg-primary/95 transition-all"
+                            >
+                                <Plus size={16} />
+                                Crear Primer Plan
+                            </button>
+                        )}
+                    </div>
+                ) : viewMode === 'grid' ? (
+                    /* Vista Grid de Planes */
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
+                        {filteredAndSortedPlans.map((plan) => {
+                            const isToggling = togglingId === plan.id;
+                            const totalItemsIncluded = (plan.services?.length || 0) + (plan.products?.length || 0);
+
+                            return (
                                 <motion.div
                                     key={plan.id}
                                     initial={cardInitial}
                                     animate={cardAnimate}
-                                    className="group relative flex flex-col overflow-hidden rounded-[2rem] bg-gradient-to-br from-amber-500/[0.04] via-white/[0.02] to-transparent border border-amber-500/10 hover:border-amber-500/30 transition-all duration-500 hover:shadow-xl hover:shadow-amber-500/10 hover:-translate-y-1"
+                                    className="group relative flex flex-col justify-between overflow-hidden rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 hover:border-primary/40 dark:hover:border-primary/40 transition-all duration-300 hover:shadow-lg"
                                 >
-                                    <div className="pointer-events-none absolute -top-6 -right-6 w-40 h-40 bg-amber-500/[0.04] rounded-full blur-3xl group-hover:bg-amber-500/[0.08] transition-all duration-700" />
+                                    <div>
+                                        {/* Imagen o Banner Superior */}
+                                        {plan.image_url ? (
+                                            <div className="relative w-full h-44 overflow-hidden bg-slate-100 dark:bg-slate-800">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img
+                                                    src={plan.image_url}
+                                                    alt={plan.name}
+                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                                                />
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
-                                    {/* Acciones: siempre visibles arriba a la derecha (sobre imagen o encabezado) */}
-                                    <div className="absolute top-3 right-3 z-20 flex gap-1.5">
-                                        {canEdit('servicios') && (
-                                        <button
-                                            onClick={() => router.push(`/dashboard/gestion-servicios/plan/${plan.id}`)}
-                                            className="w-9 h-9 flex items-center justify-center rounded-xl bg-black/30 backdrop-blur-md border border-white/10 text-white/80 hover:bg-amber-500/20 hover:border-amber-500/40 hover:text-amber-300 transition-all"
-                                            title="Editar"
-                                        >
-                                            <Edit2 size={15} />
-                                        </button>
-                                        )}
-                                        {canDelete('servicios') && (
-                                            <button
-                                                onClick={() => handleDelete('plan', plan.id, plan.name)}
-                                                className="w-9 h-9 flex items-center justify-center rounded-xl bg-black/30 backdrop-blur-md border border-white/10 text-white/80 hover:bg-red-500/20 hover:border-red-500/40 hover:text-red-300 transition-all"
-                                                title="Eliminar"
-                                            >
-                                                <Trash2 size={15} />
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    {/* Media: banner de altura fija si hay imagen; si no, franja con ícono */}
-                                    {plan.image_url ? (
-                                        <div className="relative w-full h-44 overflow-hidden shrink-0">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img src={plan.image_url} alt={plan.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                                            <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0f] via-[#0a0a0f]/10 to-transparent" />
-                                            <div className={`absolute bottom-3 left-3 flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border backdrop-blur-sm ${plan.is_active ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/25' : 'bg-red-500/20 text-red-300 border-red-500/25'}`}>
-                                                {plan.is_active ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
-                                                {plan.is_active ? 'Activo' : 'Inactivo'}
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="relative px-7 pt-7 pb-2 flex items-center gap-3 shrink-0">
-                                            <div className="p-3 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-600/5 border border-amber-500/15 group-hover:scale-110 group-hover:-rotate-3 transition-all duration-500">
-                                                <Diamond size={22} className="text-amber-400" />
-                                            </div>
-                                            <div className={`flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border ${plan.is_active ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/15' : 'bg-red-500/10 text-red-400 border-red-500/15'}`}>
-                                                {plan.is_active ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
-                                                {plan.is_active ? 'Activo' : 'Inactivo'}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="p-7 pt-5 flex flex-col flex-1 relative z-10">
-                                        <div className="flex-1 space-y-3">
-                                            <h3 className="text-lg font-bold leading-tight">{plan.name}</h3>
-                                            {(plan.is_featured || plan.important_note) && (
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    {plan.is_featured && (
-                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/25">
-                                                            <Star size={10} className="fill-amber-400 text-amber-400" /> Más solicitado
-                                                        </span>
-                                                    )}
-                                                    {plan.important_note && (
-                                                        <span
-                                                            className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full bg-sky-500/10 text-sky-300 border border-sky-500/20 max-w-full"
-                                                            title={plan.important_note}
+                                                {/* Acciones flotantes sobre imagen */}
+                                                <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
+                                                    {canEdit('servicios') && (
+                                                        <button
+                                                            onClick={() => router.push(`/dashboard/gestion-servicios/plan/${plan.id}`)}
+                                                            className="w-8 h-8 rounded-xl bg-black/40 backdrop-blur-md border border-white/20 text-white hover:bg-primary transition-all flex items-center justify-center shadow-sm"
+                                                            title="Editar plan"
                                                         >
-                                                            <AlertCircle size={10} className="shrink-0" />
-                                                            <span className="truncate">Importante: {plan.important_note}</span>
-                                                        </span>
+                                                            <Edit2 size={13} />
+                                                        </button>
+                                                    )}
+                                                    {canDelete('servicios') && (
+                                                        <button
+                                                            onClick={() => handleDelete('plan', plan.id, plan.name)}
+                                                            className="w-8 h-8 rounded-xl bg-black/40 backdrop-blur-md border border-white/20 text-white hover:bg-red-600 transition-all flex items-center justify-center shadow-sm"
+                                                            title="Eliminar plan"
+                                                        >
+                                                            <Trash2 size={13} />
+                                                        </button>
                                                     )}
                                                 </div>
-                                            )}
-                                            <p className="text-sm text-muted-foreground/80 leading-relaxed line-clamp-2">{plan.description || 'Sin descripción'}</p>
 
+                                                {/* Toggle Status sobre imagen */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleTogglePlanActive(plan)}
+                                                    disabled={isToggling || !canEdit('servicios')}
+                                                    className={`absolute bottom-3 left-3 inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full backdrop-blur-md border transition-all ${
+                                                        plan.is_active
+                                                            ? 'bg-emerald-500/80 text-white border-emerald-400/40'
+                                                            : 'bg-black/60 text-slate-300 border-white/20'
+                                                    }`}
+                                                >
+                                                    {isToggling ? <Loader2 size={10} className="animate-spin" /> : plan.is_active ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
+                                                    <span>{plan.is_active ? 'Activo' : 'Inactivo'}</span>
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="p-5 pb-0 flex items-start justify-between gap-3">
+                                                <div className="flex items-center gap-2.5">
+                                                    <div className="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/15">
+                                                        <Diamond size={20} />
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleTogglePlanActive(plan)}
+                                                        disabled={isToggling || !canEdit('servicios')}
+                                                        className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all ${
+                                                            plan.is_active
+                                                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                                                                : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                                                        }`}
+                                                    >
+                                                        {isToggling ? <Loader2 size={10} className="animate-spin" /> : plan.is_active ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
+                                                        <span>{plan.is_active ? 'Activo' : 'Inactivo'}</span>
+                                                    </button>
+                                                </div>
+
+                                                <div className="flex items-center gap-1">
+                                                    {canEdit('servicios') && (
+                                                        <button
+                                                            onClick={() => router.push(`/dashboard/gestion-servicios/plan/${plan.id}`)}
+                                                            className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-primary transition-all"
+                                                            title="Editar plan"
+                                                        >
+                                                            <Edit2 size={13} />
+                                                        </button>
+                                                    )}
+                                                    {canDelete('servicios') && (
+                                                        <button
+                                                            onClick={() => handleDelete('plan', plan.id, plan.name)}
+                                                            className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950/30 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 transition-all"
+                                                            title="Eliminar plan"
+                                                        >
+                                                            <Trash2 size={13} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Información del Plan */}
+                                        <div className="p-5 space-y-2.5">
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                {plan.is_featured && (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                                                        <Star size={10} className="fill-amber-500 text-amber-500" />
+                                                        Más solicitado
+                                                    </span>
+                                                )}
+                                                {plan.important_note && (
+                                                    <span
+                                                        className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400 border border-sky-200 dark:border-sky-800 truncate max-w-full"
+                                                        title={plan.important_note}
+                                                    >
+                                                        <AlertCircle size={10} className="shrink-0" />
+                                                        <span className="truncate">{plan.important_note}</span>
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">
+                                                {plan.name}
+                                            </h3>
+                                            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                                                {plan.description || 'Sin descripción detallada.'}
+                                            </p>
+
+                                            {/* Servicios incluidos en el plan */}
                                             {plan.services && plan.services.length > 0 && (
-                                                <div className="space-y-1.5 pt-2">
-                                                    <p className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest">Servicios incluidos</p>
-                                                    <div className="flex flex-wrap gap-1.5">
-                                                        {plan.services.slice(0, 4).map(svc => (
-                                                            <span key={svc.id} className="inline-flex items-center gap-1 bg-white/[0.04] px-2.5 py-1 rounded-lg text-[10px] font-medium text-muted-foreground/70 border border-white/[0.04]">
-                                                                <CheckCircle2 size={8} className="text-emerald-400/60" />
+                                                <div className="pt-2">
+                                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
+                                                        Servicios incluidos ({plan.services.length})
+                                                    </p>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {plan.services.slice(0, 3).map((svc: any) => (
+                                                            <span
+                                                                key={svc.id}
+                                                                className="inline-flex items-center gap-1 text-[10px] font-medium bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md"
+                                                            >
+                                                                <Check size={9} className="text-emerald-500" />
                                                                 {svc.name}
                                                             </span>
                                                         ))}
-                                                        {plan.services.length > 4 && (
-                                                            <span className="inline-flex items-center text-[10px] font-bold text-amber-400/60 px-2">+{plan.services.length - 4} más</span>
+                                                        {plan.services.length > 3 && (
+                                                            <span className="text-[10px] font-bold text-primary px-1.5 py-0.5">
+                                                                +{plan.services.length - 3} más
+                                                            </span>
                                                         )}
                                                     </div>
                                                 </div>
                                             )}
                                         </div>
+                                    </div>
 
-                                        <div className="mt-6 pt-5 border-t border-amber-500/10">
-                                            <p className="text-[10px] text-amber-400/50 font-medium uppercase tracking-wider mb-1">Precio Plan</p>
-                                            <div className="text-2xl font-black tracking-tight text-amber-400">
-                                                ${(plan.price || 0).toLocaleString()}
+                                    {/* Footer con Precio del Plan */}
+                                    <div className="p-5 pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+                                        <div>
+                                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                                Precio del Plan
+                                            </p>
+                                            <div className="text-xl sm:text-2xl font-black text-primary">
+                                                {formatCLP(plan.price)}
                                             </div>
                                             {(plan.cost || 0) > 0 && (
-                                                <div className="text-[9px] text-muted-foreground/40 mt-1">Costo: ${(plan.cost || 0).toLocaleString()}</div>
+                                                <p className="text-[10px] text-muted-foreground mt-0.5">
+                                                    Costo estimado: {formatCLP(plan.cost)}
+                                                </p>
                                             )}
                                         </div>
+
+                                        <button
+                                            onClick={() => router.push(`/dashboard/gestion-servicios/plan/${plan.id}`)}
+                                            className="px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition-all"
+                                        >
+                                            Configurar
+                                        </button>
                                     </div>
                                 </motion.div>
-                            ))
-                        ) : (
-                            <div className="sm:col-span-2 xl:col-span-3 py-20 flex flex-col items-center justify-center text-center">
-                                <div className="w-20 h-20 rounded-[2rem] bg-gradient-to-br from-amber-500/10 to-amber-600/5 border border-amber-500/10 flex items-center justify-center mb-6">
-                                    <Layers size={36} className="text-amber-400/60" />
-                                </div>
-                                <h3 className="text-xl font-bold mb-2">{searchTerm || statusFilter !== 'all' ? 'Sin resultados' : 'Aún no hay planes'}</h3>
-                                <p className="text-muted-foreground max-w-md">
-                                    {searchTerm || statusFilter !== 'all'
-                                        ? 'Intenta con otros términos de búsqueda o cambia el filtro de estado.'
-                                        : 'Agrupa servicios y productos en un plan para ofrecer paquetes completos a las familias.'}
-                                </p>
-                            </div>
-                        )
-                    )}
+                            );
+                        })}
 
-                    {/* Add New Skeleton Card */}
-                    {canCreate('servicios') && (
-                        <motion.div
-                            initial={cardInitial}
-                            animate={cardAnimate}
-                            onClick={() => (activeTab === 'servicios' ? !isServiceLimitReached : !isPlanLimitReached) ? (activeTab === 'servicios' ? handleOpenServiceModal() : router.push('/dashboard/gestion-servicios/plan/nuevo')) : (setModalResource(activeTab === 'servicios' ? 'Servicios' : 'Planes Comerciales'), setShowLimitModal(true))}
-                            className={`relative overflow-hidden rounded-[2rem] border-2 border-dashed border-white/[0.06] bg-transparent hover:bg-white/[0.02] hover:border-amber-500/30 cursor-pointer transition-all min-h-[280px] flex flex-col items-center justify-center group ${(activeTab === 'servicios' ? isServiceLimitReached : isPlanLimitReached) ? 'opacity-40 grayscale cursor-not-allowed' : ''}`}
-                        >
-                            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-500/10 to-amber-600/5 flex items-center justify-center text-amber-400/60 group-hover:scale-110 group-hover:text-amber-400 transition-all duration-500 border border-amber-500/10">
-                                <Plus size={30} />
-                            </div>
-                            <p className="mt-5 font-bold text-muted-foreground/50 group-hover:text-amber-400/80 transition-colors text-base">
-                                {activeTab === 'servicios' ? 'Añadir Servicio' : 'Añadir Plan'}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground/30 mt-1">{activeTab === 'servicios' ? 'Nueva prestación' : 'Nuevo paquete'}</p>
-                        </motion.div>
-                    )}
-                </div>
+                        {/* Card Agregar Nuevo Plan */}
+                        {canCreate('servicios') && (
+                            <button
+                                type="button"
+                                onClick={() => router.push('/dashboard/gestion-servicios/plan/nuevo')}
+                                disabled={isPlanLimitReached}
+                                className="min-h-[220px] rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-primary/50 dark:hover:border-primary/50 bg-slate-50/50 dark:bg-slate-900/30 hover:bg-primary/[0.02] flex flex-col items-center justify-center gap-2 p-6 transition-all group disabled:opacity-40 disabled:cursor-not-allowed text-center"
+                            >
+                                <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    <Plus size={24} />
+                                </div>
+                                <span className="font-bold text-sm text-slate-700 dark:text-slate-300 group-hover:text-primary transition-colors">
+                                    Nuevo Plan Comercial
+                                </span>
+                                <span className="text-[11px] text-muted-foreground">
+                                    Diseña un nuevo paquete integrado
+                                </span>
+                            </button>
+                        )}
+                    </div>
+                ) : (
+                    /* Vista Tabla de Planes */
+                    <div className="overflow-hidden rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                                <thead>
+                                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                        <th className="py-3 px-4">Plan</th>
+                                        <th className="py-3 px-4">Servicios Incluidos</th>
+                                        <th className="py-3 px-4 text-right">Precio Plan</th>
+                                        <th className="py-3 px-4 text-right">Costo Estimado</th>
+                                        <th className="py-3 px-4 text-center">Estado</th>
+                                        <th className="py-3 px-4 text-right">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+                                    {filteredAndSortedPlans.map((plan) => {
+                                        const isToggling = togglingId === plan.id;
+
+                                        return (
+                                            <tr key={plan.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+                                                <td className="py-3 px-4">
+                                                    <div className="flex items-center gap-3">
+                                                        {plan.image_url ? (
+                                                            // eslint-disable-next-line @next/next/no-img-element
+                                                            <img
+                                                                src={plan.image_url}
+                                                                alt={plan.name}
+                                                                className="w-10 h-10 rounded-xl object-cover shrink-0"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                                                                <Diamond size={18} />
+                                                            </div>
+                                                        )}
+                                                        <div>
+                                                            <div className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-1.5">
+                                                                <span>{plan.name}</span>
+                                                                {plan.is_featured && (
+                                                                    <Star size={12} className="fill-amber-500 text-amber-500" />
+                                                                )}
+                                                            </div>
+                                                            {plan.description && (
+                                                                <div className="text-[11px] text-muted-foreground line-clamp-1 max-w-xs">
+                                                                    {plan.description}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="py-3 px-4">
+                                                    <span className="font-bold text-slate-900 dark:text-white">
+                                                        {plan.services?.length || 0}
+                                                    </span>
+                                                    <span className="text-muted-foreground ml-1">servicios</span>
+                                                </td>
+                                                <td className="py-3 px-4 text-right font-black text-primary text-sm">
+                                                    {formatCLP(plan.price)}
+                                                </td>
+                                                <td className="py-3 px-4 text-right text-muted-foreground">
+                                                    {(plan.cost || 0) > 0 ? formatCLP(plan.cost) : '—'}
+                                                </td>
+                                                <td className="py-3 px-4 text-center">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleTogglePlanActive(plan)}
+                                                        disabled={isToggling || !canEdit('servicios')}
+                                                        className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all ${
+                                                            plan.is_active
+                                                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                                                                : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                                                        }`}
+                                                    >
+                                                        {isToggling ? <Loader2 size={10} className="animate-spin" /> : null}
+                                                        <span>{plan.is_active ? 'Activo' : 'Inactivo'}</span>
+                                                    </button>
+                                                </td>
+                                                <td className="py-3 px-4 text-right">
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        {canEdit('servicios') && (
+                                                            <button
+                                                                onClick={() => router.push(`/dashboard/gestion-servicios/plan/${plan.id}`)}
+                                                                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-primary transition-colors"
+                                                                title="Editar"
+                                                            >
+                                                                <Edit2 size={14} />
+                                                            </button>
+                                                        )}
+                                                        {canDelete('servicios') && (
+                                                            <button
+                                                                onClick={() => handleDelete('plan', plan.id, plan.name)}
+                                                                className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                                                                title="Eliminar"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )
             )}
 
-            {/* Modal de CRUD */}
+            {/* Modal de Creación / Edición de Servicio (con Calculadora en Vivo de Margen) */}
             <Modal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 title={currentService?.id ? 'Editar Servicio' : 'Nuevo Servicio'}
             >
                 {currentService && (
-                    <form onSubmit={handleSaveService} className="space-y-6">
-                        <div className="bg-white/[0.03] rounded-3xl p-6 border border-white/[0.04] space-y-6">
-                            <div className="flex items-center gap-3 pb-3 border-b border-white/[0.04]">
-                                <div className="p-2 rounded-xl bg-gradient-to-br from-amber-500/15 to-amber-600/5 border border-amber-500/10">
-                                    <Tag className="text-amber-400" size={16} />
+                    <form onSubmit={handleSaveService} className="space-y-5">
+                        <div className="space-y-4">
+                            {/* Nombre */}
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                    Nombre del Servicio *
+                                </label>
+                                <input
+                                    required
+                                    value={currentService?.name || ''}
+                                    onChange={(e) => setCurrentService({ ...currentService, name: e.target.value })}
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2.5 px-3.5 text-sm font-medium outline-none focus:border-primary transition-all text-slate-900 dark:text-white"
+                                    placeholder="Ej: Cremación Individual con Sala de Duelo"
+                                />
+                            </div>
+
+                            {/* Descripción */}
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                    Descripción
+                                </label>
+                                <textarea
+                                    value={currentService?.description || ''}
+                                    onChange={(e) => setCurrentService({ ...currentService, description: e.target.value })}
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2.5 px-3.5 text-sm font-medium outline-none focus:border-primary transition-all text-slate-900 dark:text-white min-h-[75px] resize-none"
+                                    placeholder="Detalles sobre lo que incluye esta prestación..."
+                                />
+                            </div>
+
+                            {/* Precios: Venta y Costo */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                        Precio de Venta ($ CLP) *
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-sm">$</span>
+                                        <input
+                                            type="number"
+                                            required
+                                            min={0}
+                                            value={currentService?.price || 0}
+                                            onChange={(e) => setCurrentService({ ...currentService, price: Number(e.target.value) })}
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2.5 pl-8 pr-3.5 text-sm font-black outline-none focus:border-primary transition-all text-slate-900 dark:text-white"
+                                        />
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3 className="text-xs font-black uppercase tracking-widest text-white">Información del Servicio</h3>
-                                    <p className="text-[9px] text-muted-foreground/50">Define los detalles de la prestación</p>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                        Costo Directo ($ CLP)
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-sm">$</span>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            value={currentService?.cost || 0}
+                                            onChange={(e) => setCurrentService({ ...currentService, cost: Number(e.target.value) })}
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2.5 pl-8 pr-3.5 text-sm font-black outline-none focus:border-primary transition-all text-slate-900 dark:text-white"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <div className="space-y-2 md:col-span-2">
-                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Nombre del Servicio</label>
-                                    <input
-                                        required
-                                        value={currentService?.name || ''}
-                                        onChange={(e) => setCurrentService({ ...currentService, name: e.target.value })}
-                                        className="w-full bg-black/20 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-amber-500/40 transition-all text-sm font-medium"
-                                        placeholder="Ej: Cremación Individual"
-                                    />
+                            {/* Widget en Vivo: Rentabilidad Estimada */}
+                            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between text-xs">
+                                <div>
+                                    <span className="text-muted-foreground block text-[10px] uppercase font-bold tracking-wider">
+                                        Utilidad Bruta Estimada
+                                    </span>
+                                    <span className="font-extrabold text-sm text-slate-900 dark:text-white">
+                                        {formatCLP(modalProfit.profit)}
+                                    </span>
                                 </div>
-                                <div className="space-y-2 md:col-span-2">
-                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Descripción</label>
-                                    <textarea
-                                        value={currentService?.description || ''}
-                                        onChange={(e) => setCurrentService({ ...currentService, description: e.target.value })}
-                                        className="w-full bg-black/20 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-amber-500/40 transition-all min-h-[80px] text-sm font-medium resize-none"
-                                        placeholder="Describe brevemente en qué consiste este servicio..."
-                                    />
+                                <div className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                    modalProfit.pct >= 50
+                                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                                        : modalProfit.pct >= 20
+                                            ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                                            : 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-400 border border-red-200 dark:border-red-800'
+                                }`}>
+                                    {modalProfit.pct}% margen
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Precio Venta</label>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">$</span>
-                                        <input
-                                            type="number"
-                                            required
-                                            value={currentService?.price || 0}
-                                            onChange={(e) => setCurrentService({ ...currentService, price: Number(e.target.value) })}
-                                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-3 pl-8 pr-4 outline-none focus:border-amber-500/40 transition-all text-sm font-bold"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Costo</label>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">$</span>
-                                        <input
-                                            type="number"
-                                            required
-                                            value={currentService?.cost || 0}
-                                            onChange={(e) => setCurrentService({ ...currentService, cost: Number(e.target.value) })}
-                                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-3 pl-8 pr-4 outline-none focus:border-amber-500/40 transition-all text-sm font-bold"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Estado</label>
+                            </div>
+
+                            {/* Estado y Opciones Avanzadas */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                        Estado Operativo
+                                    </label>
                                     <SearchableSelect
                                         options={[
                                             { value: 'true', label: 'Activo' },
-                                            { value: 'false', label: 'Inactivo' }
+                                            { value: 'false', label: 'Inactivo / Pausado' }
                                         ]}
                                         value={currentService?.is_active ? 'true' : 'false'}
                                         onChange={(val) => setCurrentService({ ...currentService, is_active: val === 'true' })}
                                         placeholder="Seleccionar estado..."
                                     />
                                 </div>
-                                <label className="md:col-span-2 flex items-start gap-3 rounded-2xl border border-white/10 bg-black/10 p-4 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={!!currentService?.is_special}
-                                        onChange={(e) => setCurrentService({ ...currentService, is_special: e.target.checked })}
-                                        className="mt-0.5 w-4 h-4 accent-amber-500 cursor-pointer"
+
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                        Visibilidad en Formulario
+                                    </label>
+                                    <SearchableSelect
+                                        options={[
+                                            { value: 'true', label: 'Visible en formulario web' },
+                                            { value: 'false', label: 'Oculto (Solo interno)' }
+                                        ]}
+                                        value={currentService?.show_in_form !== false ? 'true' : 'false'}
+                                        onChange={(val) => setCurrentService({ ...currentService, show_in_form: val === 'true' })}
+                                        placeholder="Seleccionar visibilidad..."
                                     />
-                                    <span>
-                                        <span className="block text-sm font-bold">Servicio especial</span>
-                                        <span className="block text-[11px] text-muted-foreground mt-0.5">
-                                            Ej: eutanasia, exhumación. Se ofrece como adicional en el formulario de la familia, después de elegir el plan. Puede ir también dentro de un plan.
-                                        </span>
-                                    </span>
-                                </label>
+                                </div>
                             </div>
+
+                            {/* Checkbox Servicio Especial */}
+                            <label className="flex items-start gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 cursor-pointer hover:bg-slate-100/60 dark:hover:bg-slate-800 transition-colors">
+                                <input
+                                    type="checkbox"
+                                    checked={!!currentService?.is_special}
+                                    onChange={(e) => setCurrentService({ ...currentService, is_special: e.target.checked })}
+                                    className="mt-0.5 w-4 h-4 accent-primary rounded cursor-pointer"
+                                />
+                                <div>
+                                    <span className="block text-xs font-bold text-slate-900 dark:text-white">
+                                        Marcar como Servicio Especial (Adicional)
+                                    </span>
+                                    <span className="block text-[11px] text-muted-foreground mt-0.5">
+                                        Ej: eutanasia, exhumación o traslados urgentes. Se ofrece como un servicio opcional posterior a la selección del plan.
+                                    </span>
+                                </div>
+                            </label>
                         </div>
 
-                        <div className="flex justify-end gap-3 pt-2">
-                            <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-3 rounded-2xl hover:bg-white/5 font-bold transition-all text-sm">Cancelar</button>
-                            <button type="submit" disabled={isSaving} className="bg-gradient-to-r from-primary to-[#00B377] text-white px-8 py-3 rounded-2xl font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:-translate-y-0.5 active:scale-95 transition-all text-sm flex items-center">
-                                {isSaving && <Loader2 className="animate-spin mr-2" size={18} />}
-                                {currentService?.id ? 'Guardar Cambios' : 'Crear Servicio'}
+                        {/* Botones del Modal */}
+                        <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+                            <button
+                                type="button"
+                                onClick={() => setIsModalOpen(false)}
+                                className="px-4 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-all text-slate-700 dark:text-slate-300"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isSaving}
+                                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold shadow-md hover:bg-primary/95 active:scale-95 transition-all disabled:opacity-50"
+                            >
+                                {isSaving && <Loader2 size={14} className="animate-spin" />}
+                                <span>{currentService?.id ? 'Guardar Cambios' : 'Crear Servicio'}</span>
                             </button>
                         </div>
                     </form>
                 )}
             </Modal>
 
+            {/* Modal de Confirmación de Eliminación */}
             <DeleteConfirmationModal
                 isOpen={!!itemToDelete}
                 onClose={() => setItemToDelete(null)}
@@ -712,13 +1380,14 @@ export default function ServicesPage() {
                 description={`Estás a punto de eliminar "${itemToDelete?.name}". Esta acción no se puede deshacer.`}
             />
 
+            {/* Modal de Límite de Plan */}
             <PlanLimitModal
                 isOpen={showLimitModal}
                 onClose={() => setShowLimitModal(false)}
                 resourceName={modalResource}
             />
 
-            {/* Modal de Catálogo de Planes */}
+            {/* Modal de Catálogo Completo / Descarga PDF */}
             <Modal
                 isOpen={showPlansCatalogModal}
                 onClose={() => setShowPlansCatalogModal(false)}
@@ -726,39 +1395,40 @@ export default function ServicesPage() {
                 maxWidth="max-w-7xl"
             >
                 <div className="space-y-6">
-                    {/* Controles del Catálogo */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/[0.02] border border-white/[0.06] rounded-3xl p-5">
-                        <div className="flex flex-wrap items-center gap-6">
-                            <label className="flex items-center gap-3 text-xs font-bold text-white uppercase tracking-wider cursor-pointer group select-none">
+                    {/* Controles de Vista Previa */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-4">
+                        <div className="flex flex-wrap items-center gap-5">
+                            <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
                                 <input
                                     type="checkbox"
                                     checked={catalogPlansOnlyActive}
                                     onChange={(e) => setCatalogPlansOnlyActive(e.target.checked)}
-                                    className="w-4.5 h-4.5 rounded border-white/10 bg-white/5 text-amber-500 focus:ring-amber-500/20 focus:ring-offset-0 cursor-pointer transition-all group-hover:border-amber-500/30"
+                                    className="w-4 h-4 rounded text-primary focus:ring-primary accent-primary cursor-pointer"
                                 />
-                                <span className="group-hover:text-amber-400 transition-colors">Solo Activos</span>
+                                <span>Solo Activos</span>
                             </label>
-                            
-                            <label className="flex items-center gap-3 text-xs font-bold text-white uppercase tracking-wider cursor-pointer group select-none">
+
+                            <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
                                 <input
                                     type="checkbox"
                                     checked={catalogPlansShowPrices}
                                     onChange={(e) => setCatalogPlansShowPrices(e.target.checked)}
-                                    className="w-4.5 h-4.5 rounded border-white/10 bg-white/5 text-amber-500 focus:ring-amber-500/20 focus:ring-offset-0 cursor-pointer transition-all group-hover:border-amber-500/30"
+                                    className="w-4 h-4 rounded text-primary focus:ring-primary accent-primary cursor-pointer"
                                 />
-                                <span className="group-hover:text-amber-400 transition-colors">Mostrar Precios</span>
+                                <span>Mostrar Precios</span>
                             </label>
 
-                            <label className="flex items-center gap-3 text-xs font-bold text-white uppercase tracking-wider cursor-pointer group select-none">
+                            <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
                                 <input
                                     type="checkbox"
                                     checked={catalogPlansShowImages}
                                     onChange={(e) => setCatalogPlansShowImages(e.target.checked)}
-                                    className="w-4.5 h-4.5 rounded border-white/10 bg-white/5 text-amber-500 focus:ring-amber-500/20 focus:ring-offset-0 cursor-pointer transition-all group-hover:border-amber-500/30"
+                                    className="w-4 h-4 rounded text-primary focus:ring-primary accent-primary cursor-pointer"
                                 />
-                                <span className="group-hover:text-amber-400 transition-colors">Mostrar Imágenes</span>
+                                <span>Mostrar Imágenes</span>
                             </label>
                         </div>
+
                         <div className="shrink-0">
                             <PlansDownloadLink
                                 plans={plans.filter((p: any) => !catalogPlansOnlyActive || p.is_active)}
@@ -770,130 +1440,74 @@ export default function ServicesPage() {
                         </div>
                     </div>
 
-                    {/* Vista Previa del Catálogo de Planes */}
-                    <div className="bg-[#0f1117] rounded-3xl border border-white/[0.06] overflow-hidden">
-                        {/* Encabezado de la Vista Previa */}
-                        <div className="relative overflow-hidden bg-gradient-to-br from-amber-900/30 via-primary/5 to-transparent border-b border-white/[0.06] px-8 py-10">
-                            <div className="absolute top-0 right-0 w-72 h-72 bg-amber-500/5 rounded-full blur-3xl" />
-                            <div className="flex items-center gap-6 relative z-10">
-                                {getLogoUrl() && (
-                                    <div className="w-16 h-16 rounded-2xl bg-white/10 border border-white/10 overflow-hidden shrink-0 flex items-center justify-center p-2">
-                                        <img
-                                            src={getLogoUrl()!}
-                                            alt="Logo"
-                                            className="w-full h-full object-contain"
-                                        />
-                                    </div>
-                                )}
-                                <div>
-                                    <h2 className="text-3xl font-black tracking-tight text-white">
-                                        {tenantData?.name || 'Planes Comerciales'}
-                                    </h2>
-                                    <p className="text-muted-foreground mt-1.5 font-medium">
-                                        Dossier informativo de servicios y planes contratables
-                                    </p>
-                                    <p className="text-[10px] text-muted-foreground/50 mt-1 font-mono">
-                                        {plans.filter((p: any) => !catalogPlansOnlyActive || p.is_active).length} plan(es) • {new Date().toLocaleDateString('es-CL', { year: 'numeric', month: 'long', day: 'numeric' })}
-                                    </p>
+                    {/* Previsualización del Catálogo */}
+                    <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                        {/* Cabecera Dossier */}
+                        <div className="bg-white dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700/80 px-6 py-6 flex items-center gap-4">
+                            {getLogoUrl() && (
+                                <div className="w-14 h-14 rounded-xl bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 p-2 shrink-0 flex items-center justify-center">
+                                    <img src={getLogoUrl()!} alt="Logo" className="w-full h-full object-contain" />
                                 </div>
+                            )}
+                            <div>
+                                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
+                                    {tenantData?.name || 'Catálogo de Planes'}
+                                </h2>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                    Dossier de servicios y prestaciones disponibles
+                                </p>
                             </div>
                         </div>
 
-                        {/* Listado de Planes de la Vista Previa */}
-                        <div className="p-8 space-y-6">
+                        {/* Listado de Planes */}
+                        <div className="p-6">
                             {plans.filter((p: any) => !catalogPlansOnlyActive || p.is_active).length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-16 text-center">
-                                    <Layers size={48} className="text-muted-foreground/30 mb-4" />
-                                    <p className="text-muted-foreground font-medium">No hay planes para mostrar</p>
+                                <div className="py-12 text-center text-muted-foreground text-sm font-medium">
+                                    No hay planes para mostrar con los filtros seleccionados.
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {plans.filter((p: any) => !catalogPlansOnlyActive || p.is_active).map((plan: any) => (
                                         <div
                                             key={plan.id}
-                                            className="group bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.06] rounded-[2rem] overflow-hidden flex flex-row hover:border-amber-500/25 hover:shadow-xl hover:shadow-amber-500/5 transition-all duration-300"
+                                            className="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-4 flex gap-4"
                                         >
-                                            {/* Imagen 1:1 cuadrada al costado (si está activada y existe) */}
                                             {catalogPlansShowImages && plan.image_url && (
-                                                <div className="relative w-28 sm:w-40 aspect-square shrink-0 overflow-hidden bg-black/40 border-r border-white/5 self-stretch">
-                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                    <img src={plan.image_url} alt={plan.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                                                <div className="w-24 h-24 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-700 shrink-0">
+                                                    <img src={plan.image_url} alt={plan.name} className="w-full h-full object-cover" />
                                                 </div>
                                             )}
-
-                                            {/* Información del plan */}
-                                            <div className="p-5 space-y-3 flex-1 min-w-0">
-                                                <div className="flex justify-between items-start gap-3">
-                                                    <div className="flex items-center gap-2.5 min-w-0">
-                                                        {(!catalogPlansShowImages || !plan.image_url) && (
-                                                            <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/15 shrink-0">
-                                                                <Diamond size={16} className="text-amber-400" />
-                                                            </div>
-                                                        )}
-                                                        <h4 className="text-base font-bold text-white leading-tight truncate">{plan.name}</h4>
-                                                    </div>
-                                                    {catalogPlansShowPrices ? (
-                                                        <span className="text-base font-black text-amber-400 shrink-0">
-                                                            ${(plan.price || 0).toLocaleString('es-CL')}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-[10px] font-bold text-muted-foreground bg-white/5 border border-white/10 px-2.5 py-1 rounded-lg uppercase tracking-wider shrink-0">
-                                                            Consultar
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <h4 className="font-bold text-slate-900 dark:text-white text-sm truncate">
+                                                        {plan.name}
+                                                    </h4>
+                                                    {catalogPlansShowPrices && (
+                                                        <span className="font-black text-primary text-sm shrink-0">
+                                                            {formatCLP(plan.price)}
                                                         </span>
                                                     )}
                                                 </div>
-
-                                                <p className="text-xs text-slate-400 leading-relaxed line-clamp-3">
-                                                    {plan.description || 'Sin descripción detallada.'}
+                                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                                    {plan.description || 'Sin descripción.'}
                                                 </p>
-
-                                                {/* Composición en Dos Columnas (Servicios y Productos) */}
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-white/[0.04]">
-                                                    {/* Columna de Servicios */}
-                                                    <div>
-                                                        {plan.services && plan.services.length > 0 ? (
-                                                            <div className="space-y-2">
-                                                                <p className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest font-mono">Servicios incluidos</p>
-                                                                <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1 scrollbar-hide">
-                                                                    {plan.services.map((svc: any) => (
-                                                                        <div key={svc.id} className="flex items-start gap-2 bg-black/20 border border-white/[0.02] p-2.5 rounded-xl">
-                                                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/60 mt-1.5 shrink-0" />
-                                                                            <div className="min-w-0">
-                                                                                <p className="text-xs font-bold text-white/95">{svc.name}</p>
-                                                                                {svc.description && (
-                                                                                    <p className="text-[10px] text-slate-400 mt-0.5 leading-relaxed">{svc.description}</p>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="text-[10px] text-muted-foreground/30 italic">Sin servicios incluidos</div>
+                                                {plan.services && plan.services.length > 0 && (
+                                                    <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-700 flex flex-wrap gap-1">
+                                                        {plan.services.slice(0, 3).map((svc: any) => (
+                                                            <span
+                                                                key={svc.id}
+                                                                className="text-[10px] font-medium bg-slate-100 dark:bg-slate-700/80 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded"
+                                                            >
+                                                                ✓ {svc.name}
+                                                            </span>
+                                                        ))}
+                                                        {plan.services.length > 3 && (
+                                                            <span className="text-[10px] font-bold text-primary">
+                                                                +{plan.services.length - 3}
+                                                            </span>
                                                         )}
                                                     </div>
-
-                                                    {/* Columna de Productos */}
-                                                    <div>
-                                                        {plan.products && plan.products.length > 0 ? (
-                                                            <div className="space-y-2">
-                                                                <p className="text-[9px] font-bold text-orange-400/60 uppercase tracking-widest font-mono">Productos incluidos</p>
-                                                                <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1 scrollbar-hide">
-                                                                    {plan.products.map((prod: any) => (
-                                                                        <div key={prod.id} className="flex items-start gap-2 bg-black/20 border border-white/[0.02] p-2.5 rounded-xl">
-                                                                            <div className="w-1.5 h-1.5 rounded-full bg-orange-500/60 mt-1.5 shrink-0" />
-                                                                            <div className="min-w-0">
-                                                                                <p className="text-xs font-bold text-white/95">{prod.name}</p>
-                                                                            </div>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="text-[10px] text-muted-foreground/30 italic">Sin productos incluidos</div>
-                                                        )}
-                                                    </div>
-                                                </div>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
@@ -904,7 +1518,7 @@ export default function ServicesPage() {
                 </div>
             </Modal>
 
-            {/* Enlace público del catálogo de planes (portada + servicios de cada plan) */}
+            {/* Modal para Compartir Catálogo Público */}
             <ShareCatalogModal
                 isOpen={showSharePlansModal}
                 onClose={() => setShowSharePlansModal(false)}

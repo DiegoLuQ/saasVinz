@@ -22,6 +22,7 @@ export interface RitualProps {
     counts: Partial<Record<RitualKind, number>>;
     stars: LitStar[];
     send: SendRitual;
+    did?: Partial<Record<RitualKind, boolean>>;
 }
 
 const LABELS: Record<'es' | 'en', Record<RitualKind, [string, string]>> = {

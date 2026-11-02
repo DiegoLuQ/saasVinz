@@ -4,6 +4,7 @@ import React from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { vinzerPromoUrl, buildTrackingUrl } from '@/lib/publicUrls';
 import { API_BASE_URL } from '@/lib/api';
+import { catalogSessionId, trackCatalogEvent } from '@/lib/catalogEvents';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     MessageCircle,
@@ -77,6 +78,18 @@ export default function TenantFormPage() {
     const embedThemeParam = searchParams.get('theme');
     const widgetKey = searchParams.get('key');
     const embedRootRef = useEmbedAutoHeight(isEmbed);
+
+    // Llegada desde el catálogo de planes (`cs` = sesión anónima del catálogo): embudo
+    const catalogSid = searchParams.get('cs');
+    const catalogPlanId = Number(searchParams.get('plan_id')) || null;
+    React.useEffect(() => {
+        if (!token || !catalogSid) return;
+        trackCatalogEvent({
+            slug, token, kind: 'form_open',
+            sessionId: catalogSessionId(token, catalogSid),
+            planId: catalogPlanId,
+        });
+    }, [slug, token, catalogSid, catalogPlanId]);
     const screenMinH = isEmbed ? 'min-h-[320px]' : 'min-h-screen';
 
     const [copiedTrackLink, setCopiedTrackLink] = React.useState(false);
@@ -154,6 +167,12 @@ export default function TenantFormPage() {
         ? services.find(s => s.id === customFormPreset.associated_service_id)
         : undefined;
 
+    const hasPlanQuery = !!(searchParams.get('plan_id') || searchParams.get('plan'));
+    const hasTierQuery = !!(searchParams.get('weight_tier') || searchParams.get('weight_tier_id') || searchParams.get('tier'));
+    const activeSelectedPlan = React.useMemo(() => {
+        return services.find(s => (s.category || '').toLowerCase() === 'plan' && selectedServices.includes(s.id));
+    }, [services, selectedServices]);
+
     // Embed: tema claro por defecto (el sitio del tenant suele serlo), salvo ?theme=dark.
     React.useEffect(() => {
         if (!isEmbed) return;
@@ -216,11 +235,31 @@ export default function TenantFormPage() {
         // Teléfono solo dígitos; un celular chileno sin código (9XXXXXXXX) se prefija con 56.
         const tenantDigits = (tenant.phone || '').replace(/\D/g, '');
         const tenantWa = /^9\d{8}$/.test(tenantDigits) ? `56${tenantDigits}` : tenantDigits;
-        const tierText = tenant.weight_tiers?.find((t) => String(t.id) === petData.weightTierId)?.range_text;
+        
+        // Tramo de peso y valores
+        const matchedTier = tenant.weight_tiers?.find((t) => String(t.id) === petData.weightTierId);
+        const showWeightPrices = formConfig.show_weight_prices !== false;
+        const showServicePrices = formConfig.show_service_prices !== false;
+        const weightSurcharge = (showWeightPrices && matchedTier?.price != null) ? matchedTier.price : 0;
+        
+        const tierName = matchedTier
+            ? (matchedTier.label ? `${matchedTier.label} (${matchedTier.range_text})` : matchedTier.range_text)
+            : (petData.weightKg ? `${petData.weightKg} kg` : petData.weightRange || '');
+
+        const tierDisplayWithPrice = matchedTier
+            ? `${tierName}${weightSurcharge > 0 ? ` — $${Math.round(weightSurcharge).toLocaleString('es-CL')}` : ''}`
+            : (petData.weightKg ? `${petData.weightKg} kg` : '');
+
         const chosen = services.filter((s) => selectedServices.includes(s.id));
-        const money = (n?: number) => (n ? ` — $${Math.round(n).toLocaleString('es-CL')}` : '');
+        const money = (n?: number) => (showServicePrices && n ? ` — $${Math.round(n).toLocaleString('es-CL')}` : '');
         const chosenPlans = chosen.filter((s) => s.category === 'plan').map((s) => `• ${s.name}${money(s.price)}`);
         const chosenExtras = chosen.filter((s) => s.category !== 'plan').map((s) => `• ${s.name}${money(s.price)}`);
+
+        const plansTotal = chosen.filter((s) => s.category === 'plan').reduce((sum, s) => sum + (s.price || 0), 0);
+        const extrasTotal = chosen.filter((s) => s.category !== 'plan').reduce((sum, s) => sum + (s.price || 0), 0);
+        const servicesTotal = plansTotal + extrasTotal;
+        const estimatedTotal = (showServicePrices ? servicesTotal : 0) + weightSurcharge;
+
         const contactLabel = ownerData.contactPreference === 'whatsapp' ? 'WhatsApp' : ownerData.contactPreference === 'phone' ? 'Llamada' : ownerData.contactPreference === 'any' ? 'WhatsApp o llamada' : '';
         const joinAddr = (...parts: (string | undefined)[]) => parts.map((p) => (p || '').trim()).filter(Boolean).join(', ');
         const pickupAddr = joinAddr(ownerData.veterinary, ownerData.pickupCommune, ownerData.pickupRegion);
@@ -242,7 +281,7 @@ export default function TenantFormPage() {
             line('Nombre', petData.name),
             line('Especie', petData.type ? `${petData.type}${petData.breed ? ` (${petData.breed})` : ''}` : ''),
             line(fieldLabel(formConfig.fields.age, 'Edad'), petData.age ? `${petData.age} años` : ''),
-            line(fieldLabel(formConfig.fields.weight, 'Peso'), tierText || (petData.weightKg ? `${petData.weightKg} kg` : '')),
+            line(fieldLabel(formConfig.fields.weight, 'Peso'), tierDisplayWithPrice),
             line(fieldLabel(formConfig.fields.deathDate, 'Fecha de fallecimiento'), petData.deathDate),
             '',
             '📍 *DIRECCIONES*',
@@ -250,6 +289,15 @@ export default function TenantFormPage() {
             formConfig.fields.address.visible ? line(fieldLabel(formConfig.fields.address, 'Entrega'), deliveryAddr || 'Por coordinar') : null,
             ...(chosenPlans.length ? ['', '📦 *PLAN ELEGIDO*', ...chosenPlans] : []),
             ...(chosenExtras.length ? ['', '➕ *SERVICIOS ADICIONALES*', ...chosenExtras] : []),
+            ...(estimatedTotal > 0 ? [
+                '',
+                '💰 *VALORES ESTIMADOS*',
+                ...(chosenPlans.length && showServicePrices ? [`• Plan: $${Math.round(plansTotal).toLocaleString('es-CL')}`] : []),
+                ...(weightSurcharge > 0 ? [`• Recargo por peso (${tierName}): $${Math.round(weightSurcharge).toLocaleString('es-CL')}`] : []),
+                ...(chosenExtras.length && showServicePrices && extrasTotal > 0 ? [`• Servicios adicionales: $${Math.round(extrasTotal).toLocaleString('es-CL')}`] : []),
+                '━━━━━━━━━━━━━━━━━━━━',
+                `*TOTAL ESTIMADO: $${Math.round(estimatedTotal).toLocaleString('es-CL')}*`
+            ] : []),
             ...(ownerData.comments?.trim() ? ['', '📝 *COMENTARIOS*', ownerData.comments.trim()] : []),
             ...(trackUrl ? ['', '🔗 *Seguimiento:*', trackUrl] : []),
         ].filter((l): l is string => l !== null).join('\n');
@@ -663,6 +711,12 @@ export default function TenantFormPage() {
                             )}
                         </div>
                     )}
+                    {hasPlanQuery && activeSelectedPlan && (
+                        <div className="mt-3.5 inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 border border-amber-200/80 dark:border-amber-800/50 shadow-sm">
+                            <Sparkles size={14} className="text-amber-500 shrink-0" />
+                            <span>Plan seleccionado: <strong className="font-bold">{activeSelectedPlan.name}</strong></span>
+                        </div>
+                    )}
                     <div className="h-1 w-12 bg-sky-400 mx-auto mt-4 rounded-full" />
                 </motion.div>
                 )}
@@ -738,6 +792,7 @@ export default function TenantFormPage() {
                                         errors={petErrors}
                                         formConfig={formConfig}
                                         weightTiers={weightTiers}
+                                        isPreselectedWeight={hasTierQuery}
                                     />
                                 )}
                                 {currentStepKey === 'camino' && (

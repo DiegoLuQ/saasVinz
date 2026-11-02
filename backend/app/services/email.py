@@ -273,7 +273,7 @@ def render_vinzer_email(
     redes_html = f'<p style="margin: 0 0 8px 0;">{redes}</p>' if redes else ""
     links_html = " &nbsp;·&nbsp; ".join(links)
     if brand:  # correo de un crematorio a sus familias
-        legal = f"Este es un correo automático de {name}: si tienes dudas, responde este correo o escríbenos."
+        legal = f"Este es un correo automático de {name}, por favor no respondas a este mensaje."
         if b.get("powered_by"):
             legal += '<br>Con tecnología de <a href="https://vinzer.cl" style="color: #94a3b8;">Vinzer</a>'
     else:
@@ -320,6 +320,7 @@ async def send_action_email(
     reply_to: str | None = None,
     rows: list[tuple[str, str]] | None = None,
     image_url: str | None = None,
+    attachments: list | None = None,
 ) -> None:
     """Correo transaccional: título, párrafos (texto plano) y un botón opcional.
     Con `brand` sale con la marca de un crematorio («Crematorio X vía Vinzer»);
@@ -336,4 +337,5 @@ async def send_action_email(
         reply_to=[reply_to] if reply_to else [],
         # Remitente: «Vinzer» o, con marca de crematorio, «Crematorio X vía Vinzer» (misma cuenta).
         from_name=f"{brand['name']} vía {MAIL_FROM_NAME}"[:70] if brand and brand.get("name") else None,
+        attachments=attachments or [],  # UploadFile o rutas (fastapi-mail)
     ))

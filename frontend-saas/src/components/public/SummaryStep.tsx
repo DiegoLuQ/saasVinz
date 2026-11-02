@@ -359,11 +359,34 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
             {/* 3. El Camino Elegido */}
             {p.camino !== false && (
                 <SectionCard icon={Package} title="El Camino Elegido" step="camino" onEdit={onEditStep}>
-                    {selectedItems.length > 0 ? (
+                    {selectedItems.length > 0 || weightTierForPrice ? (
                         <div className="space-y-3">
                             {selectedItems.map(item => (
                                 <PlanAccordionItem key={item.id} item={item} showPrice={showServicePrices} />
                             ))}
+
+                            {weightTierForPrice && (
+                                <div className="rounded-2xl bg-gradient-to-br from-sky-50/70 via-white to-slate-50/50 dark:from-sky-950/20 dark:via-slate-900 dark:to-slate-950/40 border border-sky-200/60 dark:border-sky-900/30 p-4 flex items-center justify-between">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-7 h-7 rounded-lg bg-sky-100 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+                                            <PawPrint size={14} />
+                                        </div>
+                                        <div>
+                                            <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                                                Tramo de peso: {weightTierForPrice.label ? `${weightTierForPrice.label} (${weightTierForPrice.range_text})` : weightTierForPrice.range_text}
+                                            </span>
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                Recargo aplicado según el tamaño de tu mascota
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {showWeightPrices && weightTierForPrice.price != null && weightTierForPrice.price > 0 && (
+                                        <span className="shrink-0 text-sm font-bold text-sky-700 dark:text-sky-400">
+                                            +{formatCLP(weightTierForPrice.price)}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <p className="text-[12px] text-slate-400 dark:text-slate-500 italic font-medium py-2">
@@ -389,25 +412,32 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3, duration: 0.4 }}
-                    className="rounded-3xl border border-emerald-200/80 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/20 px-6 py-5"
+                    className="rounded-3xl border border-emerald-200/80 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/20 px-6 py-5 shadow-xs"
                 >
-                    <div className="space-y-1.5 text-sm text-slate-600 dark:text-slate-300">
+                    <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
                         {showServicePrices && selectedItems.filter(s => (s.price || 0) > 0).map(s => (
                             <div key={s.id} className="flex justify-between gap-3">
-                                <span className="min-w-0 truncate">{s.name}</span>
-                                <span className="shrink-0">{formatCLP(s.price || 0)}</span>
+                                <span className="min-w-0 truncate font-medium">
+                                    {(s.category || '').toLowerCase() === 'plan' ? `Plan: ${s.name}` : `Servicio adicional: ${s.name}`}
+                                </span>
+                                <span className="shrink-0 font-bold text-slate-800 dark:text-slate-200">{formatCLP(s.price || 0)}</span>
                             </div>
                         ))}
                         {weightSurcharge > 0 && (
                             <div className="flex justify-between gap-3">
-                                <span className="min-w-0 truncate">Recargo por peso{weightTierForPrice ? ` (${weightTierForPrice.label || weightTierForPrice.range_text})` : ''}</span>
-                                <span className="shrink-0">{formatCLP(weightSurcharge)}</span>
+                                <span className="min-w-0 truncate font-medium">
+                                    Recargo por peso ({weightTierForPrice ? (weightTierForPrice.label || weightTierForPrice.range_text) : 'tramo'})
+                                </span>
+                                <span className="shrink-0 font-bold text-slate-800 dark:text-slate-200">{formatCLP(weightSurcharge)}</span>
                             </div>
                         )}
                     </div>
-                    <div className="mt-3 pt-3 border-t border-emerald-200/80 dark:border-emerald-900/40 flex items-baseline justify-between gap-3">
-                        <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">Total estimado</span>
-                        <span className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400">{formatCLP(estimatedTotal)}</span>
+                    <div className="mt-3.5 pt-3 border-t border-emerald-200/80 dark:border-emerald-900/40 flex items-baseline justify-between gap-3">
+                        <div>
+                            <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">Total estimado</span>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">Plan base + recargo peso{selectedItems.some(s => (s.category || '').toLowerCase() !== 'plan') ? ' + adicionales' : ''}</p>
+                        </div>
+                        <span className="text-2xl sm:text-3xl font-extrabold text-emerald-700 dark:text-emerald-400">{formatCLP(estimatedTotal)}</span>
                     </div>
                     {!showWeightPrices && f.weight.visible && (
                         <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">El crematorio confirmará el recargo por peso, si corresponde.</p>

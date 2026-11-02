@@ -1,329 +1,382 @@
-import React, { useMemo, useState } from 'react';
+import React, { useId, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Star, Moon } from 'lucide-react';
-import Image from 'next/image';
+import { Sparkles, Star, Compass, Flame } from 'lucide-react';
 import MemorialActionButtons from '@/components/memorial/MemorialActionButtons';
-import { getLifeDates, isDarkSurface, nameSizeClass, seededRandom } from '@/lib/memorialDesign';
+import { getLifeDates, nameSizeClass, seededRandom, isDarkSurface, getMemorialThemeStyles, getMemorialAtmosphereBg } from '@/lib/memorialDesign';
 import { ritualLabel, type RitualProps } from '@/lib/memorialRituals';
 
 /**
- * Plantilla ULTRA "Constelación": cielo nocturno profundo donde la mascota
- * brilla como una estrella más. Retrato con halo lunar, estrellas titilantes
- * y estrellas fugaces ocasionales.
+ * Constelación Eterna (Escenario 4: ULTRA):
+ * - Bóveda estelar interactiva, constelación del nombre con líneas doradas
+ * - Vela eterna interactiva + encendido de estrella personal en el cielo
+ * - Portada estelar, dedicatoria solemne y descarga de imagen/tarjeta
  */
 export default function ConstelacionLayout(props: any) {
-    const {
-        memorial, mascota, randomMainImage, galleryImages,
-        tenant_info, locale, t, onShare, onSendKiss, themeConfig
-    } = props;
+    const { memorial, mascota, randomMainImage, t, tenant_info, locale, onShare, onSendKiss, themeConfig } = props;
+    const rituals: RitualProps | undefined = props.rituals;
+    const skyRef = useRef<HTMLDivElement>(null);
 
-    const [litStars, setLitStars] = useState(0);
+    const [userStars, setUserStars] = useState<{ id: number; x: number; y: number }[]>([]);
+    const [candleLitLocal, setCandleLitLocal] = useState(false);
+
+    const starCount = rituals?.counts?.estrella || 0;
+    const candleCount = rituals?.counts?.vela || 0;
+    const isCandleLit = candleLitLocal || Boolean(rituals?.did?.vela);
+
     const portadaUrl = memorial?.diseno?.portada_url;
-    // Sin portada ni color propio se pinta el cielo nocturno: el texto debe ser claro
-    // aunque el tema elegido sea "claro".
-    const usesNightSky = !portadaUrl && !memorial?.diseno?.color_fondo;
-    // Sobre portada se aplica un velo oscuro: el texto siempre va claro
-    const isDarkTheme = usesNightSky || isDarkSurface(themeConfig, portadaUrl);
+    const tema = memorial?.diseno?.tema || 'nocturno';
+    const isDarkTheme = isDarkSurface(themeConfig, portadaUrl);
+    const themeStyles = getMemorialThemeStyles(tema, isDarkTheme);
+    const petName = (mascota?.name || '').trim();
+    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale);
 
-    // Estrellas deterministas (mismas en servidor y cliente) animadas con CSS:
-    // 90 nodos de framer-motion costaban mucho en celulares de gama baja.
+    // Campo estelar de fondo determinista
     const stars = useMemo(() => {
-        const rand = seededRandom(90);
-        return Array.from({ length: 90 }, (_, i) => ({
+        const rand = seededRandom(101);
+        return Array.from({ length: 110 }, (_, i) => ({
             id: i,
-            size: rand() * 2.5 + 1,
-            top: rand() * 100,
-            left: rand() * 100,
-            duration: rand() * 4 + 2,
+            x: rand() * 100,
+            y: rand() * 100,
+            r: i % 6 === 0 ? rand() * 1.6 + 1 : rand() * 0.9 + 0.4,
             delay: rand() * 4,
+            duration: rand() * 3 + 2.5,
+            gold: i % 9 === 0,
         }));
     }, []);
 
-    const petName = mascota?.name || '';
-    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale);
+    // Nodos de la constelación: uno por letra del nombre (entre 5 y 9 puntos)
+    const constellationNodes = useMemo(() => {
+        const count = Math.min(9, Math.max(5, petName.length || 6));
+        const rand = seededRandom(petName.split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 42));
+        return Array.from({ length: count }, (_, i) => {
+            const angle = (i / count) * Math.PI * 2 - Math.PI / 2;
+            const radius = 38 + (i % 2 === 0 ? 5 : -4) + (rand() - 0.5) * 4;
+            return {
+                x: 50 + Math.cos(angle) * radius,
+                y: 50 + Math.sin(angle) * radius,
+                major: i === 0 || i === Math.floor(count / 2),
+            };
+        });
+    }, [petName]);
 
-    const rituals: RitualProps | undefined = props.rituals;
-    const starCount = rituals?.counts.estrella || 0;
-    const [askingName, setAskingName] = useState(false);
-    const [starName, setStarName] = useState('');
-    const [activeStar, setActiveStar] = useState<number | null>(null);
+    // Coordenadas celestiales ficticias derivadas del id
+    const coords = useMemo(() => {
+        const seed = String(memorial?.id_recuerdo || petName || '0');
+        let h = 0;
+        for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) & 0xffff;
+        const raH = (h % 24).toString().padStart(2, '0');
+        const raM = ((h >> 4) % 60).toString().padStart(2, '0');
+        const dec = ((h % 70) + 10);
+        return `RA ${raH}h ${raM}m · DEC +${dec}°`;
+    }, [memorial?.id_recuerdo, petName]);
 
-    // Cada estrella encendida queda en el cielo, en una posición estable según
-    // su id (franja superior, lejos del retrato y del texto).
-    const litStarPositions = useMemo(() => (rituals?.stars || []).map(st => {
-        const rand = seededRandom(Math.abs(st.id) + 7);
-        const side = rand() < 0.5;
-        return {
-            ...st,
-            top: 4 + rand() * 40,
-            left: side ? 3 + rand() * 25 : 72 + rand() * 25,
-            size: 10 + rand() * 6,
-        };
-    }), [rituals?.stars]);
-
-    const confirmStar = () => {
-        const name = starName.trim();
-        setLitStars(prev => prev + 1);
-        setAskingName(false);
-        setStarName('');
-        rituals?.send('estrella', name || undefined);
+    const placeStarAt = (xPct: number, yPct: number) => {
+        setUserStars(prev => [...prev.slice(-14), { id: Date.now() + Math.random(), x: xPct, y: yPct }]);
+        rituals?.send('estrella');
     };
+
+    const handleSkyClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        if ((e.target as HTMLElement).closest('button, a')) return;
+        const rect = skyRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        const x = ((e.clientX - rect.left) / rect.width) * 100;
+        const y = ((e.clientY - rect.top) / rect.height) * 100;
+        placeStarAt(x, y);
+    };
+
+    const handleButtonStar = () => {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 22 + Math.random() * 22;
+        placeStarAt(50 + Math.cos(angle) * dist, 38 + Math.sin(angle) * dist * 0.7);
+    };
+
+    const handleLightCandle = () => {
+        if (isCandleLit) return;
+        setCandleLitLocal(true);
+        rituals?.send('vela');
+    };
+
+    const polylinePoints = constellationNodes.map(n => `${n.x},${n.y}`).join(' ')
+        + ` ${constellationNodes[0].x},${constellationNodes[0].y}`;
 
     return (
         <div
-            className={`relative z-10 min-h-screen w-full overflow-hidden ${isDarkTheme ? 'text-white' : 'text-slate-800'}`}
+            ref={skyRef}
+            onClick={handleSkyClick}
+            className={`relative z-10 min-h-screen w-full flex flex-col items-center justify-center px-4 py-16 sm:p-8 overflow-hidden select-none cursor-crosshair ${
+                isDarkTheme ? 'text-white' : 'text-slate-900'
+            }`}
             style={{
-                fontFamily: "'Quicksand', sans-serif",
-                background: portadaUrl ? undefined : (memorial?.diseno?.color_fondo ? undefined : 'radial-gradient(ellipse at 50% 0%, #1a2151 0%, #0d1135 45%, #050816 100%)'),
-                ...(portadaUrl ? { backgroundImage: `url(${portadaUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {})
+                background: portadaUrl
+                    ? undefined
+                    : getMemorialAtmosphereBg('constelacion', tema, isDarkTheme),
+                ...(portadaUrl ? { backgroundImage: `url(${portadaUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}),
             }}
         >
-            <style>{`
-                @keyframes constelacion-twinkle { 0%, 100% { opacity: .15 } 50% { opacity: .9 } }
-                @media (prefers-reduced-motion: reduce) { .constelacion-star { animation: none !important; opacity: .5 } }
-            `}</style>
+            {portadaUrl && <div className={`absolute inset-0 pointer-events-none ${isDarkTheme ? 'bg-[#050712]/75' : 'bg-black/30'}`} />}
 
-            {/* Velo para que el texto se lea sobre cualquier portada */}
-            {portadaUrl && <div className="absolute inset-0 bg-[#050816]/55 pointer-events-none" />}
+            {/* Nebulosa: nubes de gas violeta en capas + resplandor dorado tras el retrato */}
+            {!portadaUrl && (
+                <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                    <div
+                        className="absolute -top-[10%] -left-[15%] w-[70vw] h-[60vh] rounded-full opacity-60 blur-[90px]"
+                        style={{ background: 'radial-gradient(ellipse at 60% 50%, #5b3fa0 0%, #3b2a78 35%, transparent 70%)' }}
+                    />
+                    <div
+                        className="absolute top-[5%] left-[18%] w-[38vw] h-[30vh] rounded-full opacity-45 blur-[70px] rotate-[-18deg]"
+                        style={{ background: 'radial-gradient(ellipse, #8b5cf6 0%, #4c1d95 50%, transparent 75%)' }}
+                    />
+                    <div
+                        className="absolute top-[30%] -right-[18%] w-[60vw] h-[55vh] rounded-full opacity-50 blur-[100px]"
+                        style={{ background: 'radial-gradient(ellipse at 40% 50%, #4338ca 0%, #312e81 40%, transparent 72%)' }}
+                    />
+                    <div
+                        className="absolute bottom-[-15%] left-[10%] w-[55vw] h-[45vh] rounded-full opacity-35 blur-[110px]"
+                        style={{ background: 'radial-gradient(ellipse, #6d28d9 0%, #2e1065 50%, transparent 75%)' }}
+                    />
+                    <div
+                        className="absolute top-[8%] left-1/2 -translate-x-1/2 w-[520px] h-[520px] rounded-full opacity-30 blur-[90px]"
+                        style={{ background: 'radial-gradient(circle, #f59e0b 0%, #a16207 30%, transparent 65%)' }}
+                    />
+                    {/* Viñeta para dar profundidad */}
+                    <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 40%, transparent 45%, rgba(3,4,18,0.65) 100%)' }} />
+                </div>
+            )}
 
-            {/* ─── CIELO ESTRELLADO ─── */}
+            {/* Campo estelar fijo */}
             <div className="absolute inset-0 pointer-events-none">
                 {stars.map(s => (
-                    <div
+                    <motion.span
                         key={s.id}
-                        className={`constelacion-star absolute rounded-full ${isDarkTheme ? 'bg-white' : 'bg-slate-400/40'}`}
+                        className="absolute rounded-full"
                         style={{
-                            width: s.size, height: s.size, top: `${s.top}%`, left: `${s.left}%`,
-                            animation: `constelacion-twinkle ${s.duration}s ease-in-out ${s.delay}s infinite`,
+                            left: `${s.x}%`,
+                            top: `${s.y}%`,
+                            width: s.r * 2,
+                            height: s.r * 2,
+                            backgroundColor: s.gold ? '#fde68a' : '#ffffff',
+                            boxShadow: s.gold ? '0 0 8px #fbbf24' : '0 0 6px rgba(255,255,255,0.8)',
                         }}
+                        animate={{ opacity: [0.25, 0.95, 0.25] }}
+                        transition={{ duration: s.duration, delay: s.delay, repeat: Infinity, ease: 'easeInOut' }}
                     />
                 ))}
 
-                {/* Estrellas fugaces */}
-                {isDarkTheme && [0, 1].map(i => (
-                    <motion.div
-                        key={`shooting-${i}`}
-                        className="absolute h-px w-28 bg-gradient-to-r from-transparent via-white to-transparent"
-                        style={{ top: `${12 + i * 22}%`, left: '-10%', rotate: '-20deg' }}
-                        animate={{ x: ['0vw', '120vw'], opacity: [0, 1, 0] }}
-                        transition={{ duration: 2.4, delay: 4 + i * 9, repeat: Infinity, repeatDelay: 14 }}
-                    />
-                ))}
-
-                {/* Estrellas encendidas por los visitantes */}
-                {litStarPositions.map(st => (
-                    <button
-                        key={st.id}
-                        type="button"
-                        onClick={() => setActiveStar(activeStar === st.id ? null : st.id)}
-                        className="absolute pointer-events-auto -translate-x-1/2 -translate-y-1/2 focus:outline-none"
-                        style={{ top: `${st.top}%`, left: `${st.left}%` }}
-                        aria-label={st.name
-                            ? (locale === 'es' ? `Estrella encendida por ${st.name}` : `Star lit by ${st.name}`)
-                            : (locale === 'es' ? 'Estrella encendida' : 'Lit star')}
-                    >
-                        <Star
-                            size={st.size}
-                            className="text-amber-200 fill-amber-200 drop-shadow-[0_0_6px_rgba(253,230,138,0.9)]"
-                        />
-                        {activeStar === st.id && (
-                            <span className="absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/60 px-3 py-1 text-[11px] text-amber-100 backdrop-blur-sm">
-                                {st.name
-                                    ? (locale === 'es' ? `Encendida por ${st.name}` : `Lit by ${st.name}`)
-                                    : (locale === 'es' ? 'Una estrella para siempre' : 'A star forever')}
-                            </span>
-                        )}
-                    </button>
-                ))}
-
-                {/* Luna creciente decorativa */}
-                <div className={`absolute top-10 right-8 sm:top-16 sm:right-20 ${isDarkTheme ? 'text-amber-100/30' : 'text-slate-400/20'}`}>
-                    <Moon size={44} fill="currentColor" />
-                </div>
+                {/* Estrella fugaz ocasional */}
+                <motion.div
+                    className="absolute h-[1.5px] w-24 bg-gradient-to-r from-transparent via-amber-200 to-white rounded-full"
+                    style={{ top: '18%', left: '12%', rotate: '22deg' }}
+                    animate={{ x: [0, 520], y: [0, 210], opacity: [0, 1, 0] }}
+                    transition={{ duration: 2.2, repeat: Infinity, repeatDelay: 9, ease: 'easeOut' }}
+                />
             </div>
 
-            <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-16 sm:py-24 flex flex-col items-center text-center pointer-events-none [&>*]:pointer-events-auto">
-                {/* ─── RETRATO CON HALO ─── */}
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 1.6, ease: 'easeOut' }}
-                    className="relative mb-10 sm:mb-12"
-                >
-                    {/* Halo pulsante */}
-                    <motion.div
-                        className="absolute inset-[-25px] sm:inset-[-35px] rounded-full"
-                        style={{ background: isDarkTheme ? 'radial-gradient(circle, rgba(199,210,254,0.35) 0%, rgba(199,210,254,0.08) 50%, transparent 70%)' : 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, rgba(99,102,241,0.04) 50%, transparent 70%)' }}
-                        animate={{ scale: [1, 1.08, 1], opacity: [0.7, 1, 0.7] }}
-                        transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
-                    />
-                    <div className={`relative w-56 h-56 sm:w-72 sm:h-72 rounded-full p-[3px] shadow-[0_0_60px_rgba(165,180,252,0.35)] ${
-                        isDarkTheme
-                            ? 'bg-gradient-to-br from-indigo-200/70 via-white/40 to-indigo-300/40'
-                            : 'bg-gradient-to-br from-indigo-500/40 via-white/40 to-indigo-600/40'
-                    }`}>
-                        <div className={`w-full h-full rounded-full overflow-hidden relative ${isDarkTheme ? 'bg-indigo-950' : 'bg-slate-100'}`}>
-                            {randomMainImage ? (
-                                <Image
-                                    src={randomMainImage}
-                                    alt={mascota?.name || 'Memorial'}
-                                    fill
-                                    priority
-                                    sizes="(max-width: 640px) 224px, 288px"
-                                    className="object-cover"
-                                />
-                            ) : (
-                                <div className={`w-full h-full flex items-center justify-center ${isDarkTheme ? 'text-indigo-300/40' : 'text-indigo-600/40'}`}>
-                                    <Star size={80} fill="currentColor" />
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                    {/* Estrella en la "punta" del halo */}
-                    <motion.div
-                        className={`absolute -top-3 left-1/2 -translate-x-1/2 ${isDarkTheme ? 'text-amber-200' : 'text-indigo-600'}`}
-                        animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.2, 1] }}
-                        transition={{ duration: 6, repeat: Infinity }}
-                    >
-                        <Star size={26} fill="currentColor" />
-                    </motion.div>
-                </motion.div>
-
-                {/* ─── NOMBRE Y FECHAS ─── */}
-                <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.6, duration: 1.2 }}
-                    className={`text-[10px] sm:text-xs uppercase tracking-[0.45em] mb-4 ${
-                        isDarkTheme ? 'text-indigo-200/60' : 'text-indigo-950/60'
-                    }`}
-                >
-                    {locale === 'es' ? 'Una estrella más en el cielo' : 'One more star in the sky'}
-                </motion.p>
-
-                <motion.h1
-                    initial={{ opacity: 0, y: 24 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.8, duration: 1.2 }}
-                    className={`${nameSizeClass(petName, {
-                        short: 'text-5xl sm:text-7xl md:text-8xl',
-                        long: 'text-4xl sm:text-6xl md:text-7xl',
-                        xlong: 'text-3xl sm:text-5xl md:text-6xl',
-                    })} font-bold mb-5 leading-tight break-words max-w-full bg-gradient-to-b bg-clip-text text-transparent drop-shadow-[0_0_25px_rgba(165,180,252,0.4)] ${
-                        isDarkTheme ? 'from-white via-indigo-100 to-indigo-300/80' : 'from-[#1a2151] via-indigo-950 to-indigo-900'
-                    }`}
-                    style={{ fontFamily: "'Cinzel', serif" }}
-                >
-                    {mascota?.name}
-                </motion.h1>
-
-                {dates.years && (
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 1.2, duration: 1 }}
-                    className={`inline-flex items-center gap-3 px-5 py-2 rounded-full border text-xs sm:text-sm font-bold uppercase tracking-[0.25em] ${dates.yearsOfLove ? 'mb-3' : 'mb-10'} ${
-                        isDarkTheme
-                            ? 'border-indigo-300/20 bg-indigo-400/10 text-indigo-100/80'
-                            : 'border-indigo-600/10 bg-indigo-600/5 text-indigo-900/85'
-                    }`}
-                >
-                    <Star size={12} fill="currentColor" className={isDarkTheme ? 'text-amber-200' : 'text-indigo-600'} />
-                    {dates.years}
-                    <Star size={12} fill="currentColor" className={isDarkTheme ? 'text-amber-200' : 'text-indigo-600'} />
-                </motion.div>
-                )}
-                {dates.yearsOfLove && (
-                    <p
-                        className={`mb-10 text-base sm:text-lg italic ${isDarkTheme ? 'text-indigo-100/70' : 'text-slate-600'}`}
-                        style={{ fontFamily: "'Cormorant Garamond', serif" }}
-                    >
-                        {dates.yearsOfLove}
-                    </p>
-                )}
-
-                {/* ─── MENSAJE ─── */}
-                <motion.p
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 1.2 }}
-                    className={`max-w-2xl text-lg sm:text-xl leading-relaxed mb-12 ${
-                        isDarkTheme ? 'text-indigo-100/85' : 'text-slate-700'
-                    }`}
-                    style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: 'italic' }}
-                >
-                    {memorial?.msg_despedida || t.philosophy_text || (locale === 'es'
-                        ? 'Cuando mires al cielo de noche, una de esas estrellas te estará cuidando.'
-                        : 'When you look at the night sky, one of those stars will be watching over you.')}
-                </motion.p>
-
-                {/* ─── ENCENDER UNA ESTRELLA ─── */}
-                <div className="relative mb-12 flex flex-col items-center">
-                    {askingName ? (
-                        <form
-                            onSubmit={(e) => { e.preventDefault(); confirmStar(); }}
-                            className={`flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-2 rounded-3xl sm:rounded-full border w-full max-w-md ${
-                                isDarkTheme ? 'bg-white/5 border-indigo-300/30' : 'bg-white/70 border-indigo-600/20'
-                            }`}
+            {/* Estrellas encendidas por visitantes en esta sesión */}
+            <div className="absolute inset-0 pointer-events-none">
+                <AnimatePresence>
+                    {userStars.map(s => (
+                        <motion.div
+                            key={s.id}
+                            initial={{ scale: 0, opacity: 0 }}
+                            animate={{ scale: [0, 1.5, 1], opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.6 }}
+                            style={{ left: `${s.x}%`, top: `${s.y}%` }}
+                            className="absolute -translate-x-1/2 -translate-y-1/2"
                         >
-                            <input
-                                autoFocus
-                                value={starName}
-                                maxLength={40}
-                                onChange={(e) => setStarName(e.target.value)}
-                                placeholder={locale === 'es' ? 'Tu nombre (opcional)' : 'Your name (optional)'}
-                                className={`flex-1 min-w-0 bg-transparent px-4 py-2.5 outline-none text-base ${
-                                    isDarkTheme ? 'text-white placeholder:text-indigo-200/50' : 'text-slate-800 placeholder:text-slate-400'
-                                }`}
+                            <span
+                                className="block w-3 h-3 rounded-full bg-amber-200"
+                                style={{ boxShadow: '0 0 14px 4px #fbbf24, 0 0 32px 8px rgba(251,191,36,0.55)' }}
                             />
-                            <button
-                                type="submit"
-                                className="px-6 py-2.5 rounded-full bg-amber-200 text-indigo-950 text-xs font-bold uppercase tracking-widest hover:bg-amber-100 transition-colors"
-                            >
-                                {locale === 'es' ? 'Encender' : 'Light'}
-                            </button>
-                        </form>
-                    ) : (
-                    <button
-                        onClick={() => setAskingName(true)}
-                        className={`group px-8 sm:px-10 py-4 rounded-full border font-bold text-sm uppercase tracking-widest transition-all hover:scale-105 active:scale-95 flex items-center gap-3 shadow-[0_0_30px_rgba(129,140,248,0.2)] ${
-                            isDarkTheme
-                                ? 'bg-gradient-to-r from-indigo-400/20 to-purple-400/20 hover:from-indigo-400/30 hover:to-purple-400/30 border-indigo-300/30 text-indigo-100'
-                                : 'bg-gradient-to-r from-indigo-600/10 to-indigo-700/10 hover:from-indigo-600/20 hover:to-indigo-700/20 border-indigo-600/20 text-indigo-950'
-                        }`}
-                    >
-                        <Star size={18} className={litStars > 0 ? 'fill-amber-200 text-amber-200' : (isDarkTheme ? 'text-indigo-200 group-hover:text-amber-200 transition-colors' : 'text-indigo-600 group-hover:text-indigo-800 transition-colors')} />
-                        {litStars > 0
-                            ? (locale === 'es' ? 'Encender otra estrella' : 'Light another star')
-                            : (locale === 'es' ? 'Encender una estrella' : 'Light a star')}
-                    </button>
-                    )}
-                    {starCount > 0 && (
-                        <p className={`mt-3 text-sm italic ${isDarkTheme ? 'text-indigo-100/70' : 'text-slate-600'}`}
-                            style={{ fontFamily: "'Cormorant Garamond', serif" }}>
-                            ⭐ {locale === 'es'
-                                ? `${ritualLabel('estrella', starCount, locale)} en su cielo`
-                                : `${ritualLabel('estrella', starCount, locale)} in their sky`}
-                        </p>
-                    )}
-                    <AnimatePresence>
-                        {litStars > 0 && (
-                            <motion.div
-                                key={litStars}
-                                initial={{ y: 0, opacity: 1, scale: 1 }}
-                                animate={{ y: -180, opacity: 0, scale: 1.6 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 1.6, ease: 'easeOut' }}
-                                className="absolute left-1/2 -translate-x-1/2 top-0 pointer-events-none text-2xl"
-                            >
-                                ⭐
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                            <motion.span
+                                initial={{ scale: 0.4, opacity: 0.9 }}
+                                animate={{ scale: 3.2, opacity: 0 }}
+                                transition={{ duration: 1.1 }}
+                                className="absolute inset-0 rounded-full border border-amber-300"
+                            />
+                        </motion.div>
+                    ))}
+                </AnimatePresence>
+            </div>
+
+            {/* Contenido central */}
+            <div className="relative z-10 max-w-4xl w-full flex flex-col items-center text-center cursor-default">
+                {/* Coordenadas de carta astral */}
+                <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[11px] tracking-[0.28em] uppercase mb-6 backdrop-blur-md border ${
+                    isDarkTheme
+                        ? 'bg-white/5 border-amber-300/25 text-amber-200/80'
+                        : 'bg-amber-900/10 border-amber-900/25 text-amber-950 font-bold'
+                }`}>
+                    <Compass size={12} className={isDarkTheme ? "text-amber-300" : "text-amber-800"} />
+                    <span>{locale === 'en' ? 'ETERNAL CONSTELLATION' : 'CONSTELACIÓN ETERNA'} · {coords}</span>
                 </div>
 
-                <div className={isDarkTheme ? '[&_button]:!bg-white/10 [&_button]:!text-indigo-100 [&_button]:!border-indigo-300/20 [&_button:hover]:!bg-white/20' : '[&_button]:!bg-black/5 [&_button]:!text-slate-800 [&_button]:!border-slate-300/30 [&_button:hover]:!bg-black/10'}>
+                {/* Planetario / Retrato de Portada con líneas de constelación + Vela Eterna */}
+                <div className="relative w-[300px] h-[300px] sm:w-[380px] sm:h-[380px] flex items-center justify-center mb-4">
+                    {/* Halo dorado detrás del retrato */}
+                    <div
+                        className="absolute w-56 h-56 sm:w-72 sm:h-72 rounded-full blur-3xl opacity-60 pointer-events-none"
+                        style={{ background: 'radial-gradient(circle, rgba(251,191,36,0.75) 0%, rgba(217,119,6,0.35) 45%, transparent 72%)' }}
+                    />
+
+                    {/* Marco ornamental: aros dorados, mandala, órbitas con estrellas */}
+                    <OrnateFrame />
+
+                    {/* SVG de la constelación del nombre */}
+                    <svg
+                        viewBox="0 0 100 100"
+                        className="absolute inset-0 w-full h-full pointer-events-none overflow-visible"
+                    >
+                        <motion.polyline
+                            points={polylinePoints}
+                            fill="none"
+                            stroke={isDarkTheme ? "rgba(253, 230, 138, 0.3)" : "rgba(180, 83, 9, 0.5)"}
+                            strokeWidth="0.3"
+                            strokeDasharray="1.2 1.6"
+                            initial={{ pathLength: 0, opacity: 0 }}
+                            animate={{ pathLength: 1, opacity: 1 }}
+                            transition={{ duration: 2.4, ease: 'easeInOut' }}
+                        />
+                        {constellationNodes.map((n, i) => (
+                            <g key={i}>
+                                <circle
+                                    cx={n.x}
+                                    cy={n.y}
+                                    r={n.major ? 1.25 : 0.8}
+                                    fill={isDarkTheme ? "#fde68a" : "#b45309"}
+                                    style={{ filter: isDarkTheme ? 'drop-shadow(0 0 4px #fbbf24)' : 'drop-shadow(0 0 4px #f59e0b)' }}
+                                />
+                                {n.major && (
+                                    <circle
+                                        cx={n.x}
+                                        cy={n.y}
+                                        r={3.2}
+                                        fill="none"
+                                        stroke={isDarkTheme ? "rgba(253,230,138,0.4)" : "rgba(180,83,9,0.4)"}
+                                        strokeWidth="0.3"
+                                    />
+                                )}
+                            </g>
+                        ))}
+                    </svg>
+
+                    {/* Retrato central de Portada (el aro dorado lo dibuja OrnateFrame) */}
+                    <div className="relative w-[160px] h-[160px] sm:w-[206px] sm:h-[206px] rounded-full overflow-hidden bg-[#0b1026] flex items-center justify-center shadow-[inset_0_0_18px_rgba(0,0,0,0.5)]">
+                        {randomMainImage ? (
+                            <img src={randomMainImage} alt={petName} className="w-full h-full object-cover" />
+                        ) : (
+                            <Star size={64} className="text-amber-200/50" />
+                        )}
+                        <div className="absolute inset-0 rounded-full pointer-events-none" style={{ boxShadow: 'inset 0 0 0 1px rgba(253,230,138,0.35), inset 0 -24px 30px rgba(0,0,0,0.25)' }} />
+                    </div>
+                </div>
+
+                {/* Nombre */}
+                <h1
+                    className={`${nameSizeClass(petName, {
+                        short: 'text-3xl sm:text-5xl md:text-6xl',
+                        long: 'text-2xl sm:text-4xl md:text-5xl',
+                        xlong: 'text-xl sm:text-3xl md:text-4xl',
+                    })} font-normal tracking-wider mb-3 bg-clip-text text-transparent ${
+                        isDarkTheme
+                            ? 'bg-gradient-to-b from-white via-amber-100 to-amber-300/90 drop-shadow-[0_2px_20px_rgba(251,191,36,0.25)]'
+                            : 'bg-gradient-to-b from-slate-950 via-amber-950 to-slate-900 drop-shadow-[0_1px_2px_rgba(0,0,0,0.12)]'
+                    }`}
+                    style={{ fontFamily: "'Cinzel', 'Playfair Display', serif" }}
+                >
+                    <span className="inline-flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+                        {petName.split(/\s+/).map((word: string, idx: number) => (
+                            <span key={idx} className="inline-block whitespace-nowrap">
+                                {word}
+                            </span>
+                        ))}
+                    </span>
+                </h1>
+
+                {/* Fechas y años de amor */}
+                {(dates.full || dates.yearsOfLove) && (
+                    <div className={`flex flex-wrap items-center justify-center gap-2 text-xs sm:text-sm tracking-[0.2em] uppercase mb-6 ${
+                        isDarkTheme ? 'text-amber-200/80' : 'text-amber-950 font-bold'
+                    }`}>
+                        {dates.full && <span>{dates.full}</span>}
+                        {dates.full && dates.yearsOfLove && <span className={isDarkTheme ? "text-amber-400" : "text-amber-800"}>✦</span>}
+                        {dates.yearsOfLove && (
+                            <span className={`italic normal-case tracking-normal ${isDarkTheme ? 'text-amber-100' : 'text-amber-900 font-semibold'}`}>
+                                {dates.yearsOfLove}
+                            </span>
+                        )}
+                    </div>
+                )}
+
+                {/* Dedicatoria Principal */}
+                <p
+                    className={`max-w-2xl text-lg sm:text-xl md:text-2xl italic leading-relaxed mb-2 px-2 ${
+                        isDarkTheme ? 'font-light text-slate-100/90' : 'font-normal text-slate-900'
+                    }`}
+                    style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
+                >
+                    “{memorial?.msg_despedida}”
+                </p>
+
+                {/* Vela Eterna sobre una nube */}
+                <CelestialCandle
+                    lit={isCandleLit}
+                    onLight={handleLightCandle}
+                    label={locale === 'en' ? 'Light Eternal Candle' : 'Encender Vela Eterna'}
+                />
+
+                {/* Rituales: Encender Vela Eterna + Encender Estrella */}
+                <div className="relative z-10 flex flex-wrap items-center justify-center gap-3.5 -mt-3 mb-3">
+                    <motion.button
+                        whileHover={{ scale: 1.04 }}
+                        whileTap={{ scale: 0.96 }}
+                        onClick={handleLightCandle}
+                        className={`${GOLD_PILL} ${isCandleLit ? 'text-[#2a1a05]' : (isDarkTheme ? 'text-amber-100' : 'text-amber-950')}`}
+                        style={isCandleLit ? GOLD_PILL_STYLE : (isDarkTheme ? DARK_PILL_STYLE : LIGHT_PILL_STYLE)}
+                    >
+                        <Flame size={17} className={isCandleLit ? 'fill-[#2a1a05] text-[#2a1a05]' : (isDarkTheme ? 'text-amber-300 fill-amber-300' : 'text-amber-700 fill-amber-700')} />
+                        {isCandleLit
+                            ? (locale === 'en' ? 'Eternal Candle Lit' : 'Vela eterna encendida')
+                            : (locale === 'en' ? 'Light Eternal Candle' : 'Encender vela eterna')}
+                    </motion.button>
+
+                    <motion.button
+                        whileHover={{ scale: 1.04 }}
+                        whileTap={{ scale: 0.96 }}
+                        onClick={handleButtonStar}
+                        className={`${GOLD_PILL} text-[#2a1a05]`}
+                        style={GOLD_PILL_STYLE}
+                    >
+                        <Sparkles size={17} className="fill-[#2a1a05]" />
+                        {locale === 'en' ? 'Light a star for them' : 'Encender una estrella'}
+                    </motion.button>
+                </div>
+
+                <p className={`text-xs mb-2 ${isDarkTheme ? 'text-slate-300/75' : 'text-slate-700 font-medium'}`}>
+                    {locale === 'en'
+                        ? 'Or tap anywhere on the night sky to place your star'
+                        : 'O toca cualquier punto del cielo nocturno para dejar tu estrella'}
+                </p>
+
+                {(candleCount > 0 || starCount > 0) && (
+                    <div
+                        style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}
+                        className={`flex flex-wrap items-center justify-center gap-4 text-sm sm:text-base italic mb-8 ${
+                        isDarkTheme ? 'text-amber-200/90' : 'text-amber-950 font-semibold'
+                    }`}>
+                        {candleCount > 0 && (
+                            <span>🕯️ {ritualLabel('vela', candleCount, locale)}</span>
+                        )}
+                        {starCount > 0 && (
+                            <span>✦ {ritualLabel('estrella', starCount, locale)}</span>
+                        )}
+                    </div>
+                )}
+
+                {candleCount === 0 && starCount === 0 && <div className="mb-6" />}
+
+                {/* Acciones para compartir y descargar imagen/tarjeta */}
+                <div className={themeStyles.actionButtonsClass}>
                     <MemorialActionButtons
                         onSendKiss={onSendKiss}
                         onShare={onShare}
@@ -335,35 +388,233 @@ export default function ConstelacionLayout(props: any) {
                         mainImage={randomMainImage || mascota?.image_url}
                     />
                 </div>
-
-                {/* ─── CONSTELACIÓN DE RECUERDOS (galería) ─── */}
-                {galleryImages?.length > 1 && (
-                    <div className="mt-20 w-full">
-                        <p className={`text-[10px] uppercase tracking-[0.5em] mb-8 ${
-                            isDarkTheme ? 'text-indigo-200/40' : 'text-slate-500/40'
-                        }`}>
-                            {locale === 'es' ? 'Constelación de recuerdos' : 'Constellation of memories'}
-                        </p>
-                        <div className="flex flex-wrap justify-center gap-5 sm:gap-8">
-                            {galleryImages.map((img: string, i: number) => (
-                                <motion.div
-                                    key={i}
-                                    initial={{ opacity: 0, scale: 0.7 }}
-                                    whileInView={{ opacity: 1, scale: 1 }}
-                                    viewport={{ once: true }}
-                                    transition={{ delay: i * 0.15, duration: 0.8 }}
-                                    className={`relative w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden border-2 shadow-[0_0_25px_rgba(129,140,248,0.25)] hover:scale-110 transition-all duration-500 ${
-                                        isDarkTheme ? 'border-indigo-300/30 hover:border-amber-200/50' : 'border-indigo-600/30 hover:border-indigo-600'
-                                    }`}
-                                    style={{ marginTop: i % 2 === 1 ? '2rem' : '0' }}
-                                >
-                                    <Image src={img} alt={`${mascota?.name} ${i + 1}`} fill sizes="128px" className="object-cover" />
-                                </motion.div>
-                            ))}
-                        </div>
-                    </div>
-                )}
             </div>
+        </div>
+    );
+}
+
+// Botones dorados tipo píldora (serif, brillo interior). Misma acción y texto de siempre.
+const GOLD_PILL =
+    'px-7 py-3.5 rounded-full text-base sm:text-lg flex items-center gap-2.5 border transition-shadow hover:shadow-[0_0_45px_rgba(251,191,36,0.6)] font-semibold tracking-wide';
+const GOLD_PILL_STYLE: React.CSSProperties = {
+    fontFamily: "'Cormorant Garamond', Georgia, serif",
+    background: 'linear-gradient(180deg, #fbe7a6 0%, #e9c46a 45%, #c99a3b 100%)',
+    borderColor: 'rgba(255,240,200,0.75)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.7), inset 0 -2px 6px rgba(120,72,10,0.35), 0 0 28px rgba(251,191,36,0.35), 0 6px 18px rgba(0,0,0,0.35)',
+};
+const DARK_PILL_STYLE: React.CSSProperties = {
+    fontFamily: "'Cormorant Garamond', Georgia, serif",
+    background: 'linear-gradient(180deg, rgba(30,27,75,0.85) 0%, rgba(15,13,45,0.9) 100%)',
+    borderColor: 'rgba(233,196,106,0.7)',
+    boxShadow: 'inset 0 1px 0 rgba(253,230,138,0.25), 0 0 22px rgba(251,191,36,0.18), 0 6px 18px rgba(0,0,0,0.35)',
+};
+const LIGHT_PILL_STYLE: React.CSSProperties = {
+    fontFamily: "'Cormorant Garamond', Georgia, serif",
+    background: 'linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(254,243,199,0.9) 100%)',
+    borderColor: 'rgba(180,83,9,0.55)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9), 0 4px 14px rgba(120,72,10,0.18)',
+};
+
+// Estrella de 4 puntas centrada en (0,0), radio 1.
+const SPARKLE = 'M0,-1 L0.22,-0.22 L1,0 L0.22,0.22 L0,1 L-0.22,0.22 L-1,0 L-0.22,-0.22Z';
+
+const ORBITS = [
+    { rx: 93, ry: 30, rot: -24, stars: [0.35, 1.2, 2.1, 4.6, 5.5] },
+    { rx: 86, ry: 42, rot: 38, stars: [0.9, 2.8, 3.9, 5.9] },
+];
+
+/**
+ * Marco ornamental del retrato (viewBox 200×200, el retrato ocupa r≈54):
+ * banda oscura + doble aro dorado, mandala geométrico tenue, marcas de carta
+ * celeste y dos órbitas inclinadas con estrellas que giran lentamente.
+ */
+function OrnateFrame() {
+    const uid = useId().replace(/:/g, '');
+    const gold = `gold-${uid}`;
+    const ticks = Array.from({ length: 48 }, (_, i) => i * 7.5);
+
+    return (
+        <svg viewBox="0 0 200 200" className="absolute inset-0 w-full h-full pointer-events-none overflow-visible" aria-hidden="true">
+            <defs>
+                <linearGradient id={gold} x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#fff2c4" />
+                    <stop offset="35%" stopColor="#e9c46a" />
+                    <stop offset="65%" stopColor="#b8862b" />
+                    <stop offset="100%" stopColor="#fbe7a6" />
+                </linearGradient>
+            </defs>
+
+            {/* Mandala tenue: octograma + círculo exterior */}
+            <g stroke={`url(#${gold})`} fill="none" opacity="0.38" strokeWidth="0.45">
+                <rect x="50" y="50" width="100" height="100" />
+                <rect x="50" y="50" width="100" height="100" transform="rotate(45 100 100)" />
+                <circle cx="100" cy="100" r="71" />
+                <circle cx="100" cy="100" r="74" strokeDasharray="0.6 2.2" />
+            </g>
+
+            {/* Marcas de carta celeste */}
+            <g stroke="#e9c46a" opacity="0.55">
+                {ticks.map((a) => {
+                    const long = a % 45 === 0;
+                    const r1 = 64.5;
+                    const r2 = long ? 69 : 66.5;
+                    const rad = (a * Math.PI) / 180;
+                    return (
+                        <line
+                            key={a}
+                            x1={100 + Math.cos(rad) * r1}
+                            y1={100 + Math.sin(rad) * r1}
+                            x2={100 + Math.cos(rad) * r2}
+                            y2={100 + Math.sin(rad) * r2}
+                            strokeWidth={long ? 0.6 : 0.3}
+                        />
+                    );
+                })}
+            </g>
+
+            {/* Banda oscura + doble aro dorado alrededor del retrato */}
+            <circle cx="100" cy="100" r="59" fill="#16133a" stroke={`url(#${gold})`} strokeWidth="2.2" />
+            <circle cx="100" cy="100" r="62.5" fill="none" stroke={`url(#${gold})`} strokeWidth="0.8" />
+            {[0, 90, 180, 270].map((a) => (
+                <path key={a} d="M100,35.5 L102,38 L100,40.5 L98,38Z" fill={`url(#${gold})`} transform={`rotate(${a} 100 100)`} />
+            ))}
+
+            {/* Órbitas inclinadas con estrellas, giro muy lento */}
+            <motion.g
+                style={{ originX: '100px', originY: '100px' }}
+                animate={{ rotate: 360 }}
+                transition={{ duration: 220, repeat: Infinity, ease: 'linear' }}
+            >
+                {ORBITS.map((o, oi) => (
+                    <g key={oi} transform={`rotate(${o.rot} 100 100)`}>
+                        <ellipse cx="100" cy="100" rx={o.rx} ry={o.ry} fill="none" stroke="#e9c46a" strokeOpacity="0.4" strokeWidth="0.45" />
+                        {o.stars.map((t, si) => {
+                            const x = 100 + Math.cos(t) * o.rx;
+                            const y = 100 + Math.sin(t) * o.ry;
+                            const size = si % 2 === 0 ? 3.4 : 2.2;
+                            return (
+                                <motion.path
+                                    key={si}
+                                    d={SPARKLE}
+                                    fill="#fff4cc"
+                                    transform={`translate(${x} ${y}) scale(${size})`}
+                                    style={{ filter: 'drop-shadow(0 0 2px #fbbf24)' }}
+                                    animate={{ opacity: [0.55, 1, 0.55] }}
+                                    transition={{ duration: 2.6 + si * 0.4, repeat: Infinity, ease: 'easeInOut', delay: oi * 0.7 + si * 0.3 }}
+                                />
+                            );
+                        })}
+                    </g>
+                ))}
+            </motion.g>
+        </svg>
+    );
+}
+
+/**
+ * Vela Eterna: cirio dorado que asoma de una nube, con mecha, llama de doble
+ * capa y halo. Al tocarla se enciende (misma acción que el botón).
+ */
+function CelestialCandle({ lit, onLight, label }: { lit: boolean; onLight: () => void; label: string }) {
+    return (
+        <div className="relative w-72 h-44 flex items-end justify-center pointer-events-none">
+            {/* Destellos que suben desde la nube */}
+            <div
+                className="absolute inset-x-10 top-2 bottom-10 opacity-60"
+                style={{
+                    backgroundImage: 'radial-gradient(1px 1px at 20% 30%, #fde68a, transparent), radial-gradient(1px 1px at 70% 20%, #fff, transparent), radial-gradient(1.5px 1.5px at 85% 55%, #fde68a, transparent), radial-gradient(1px 1px at 35% 65%, #fff, transparent), radial-gradient(1px 1px at 60% 75%, #fde68a, transparent)',
+                }}
+            />
+
+            <button
+                type="button"
+                onClick={onLight}
+                title={label}
+                aria-label={label}
+                aria-pressed={lit}
+                className="pointer-events-auto relative z-10 mb-9 flex flex-col items-center group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/70 rounded-xl"
+            >
+                {/* Llama */}
+                <div className="relative w-14 h-12 flex items-end justify-center">
+                    <AnimatePresence>
+                        {lit && (
+                            <>
+                                <motion.div
+                                    key="halo"
+                                    initial={{ scale: 0, opacity: 0 }}
+                                    animate={{ scale: [1, 1.3, 0.95, 1.2, 1], opacity: [0.7, 1, 0.65, 0.9, 0.7] }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+                                    className="absolute -bottom-6 w-28 h-28 rounded-full pointer-events-none"
+                                    style={{
+                                        background: 'radial-gradient(circle, rgba(253,224,71,0.55) 0%, rgba(245,158,11,0.22) 45%, transparent 72%)',
+                                        filter: 'blur(4px)',
+                                    }}
+                                />
+                                <motion.div
+                                    key="flame"
+                                    initial={{ scale: 0, opacity: 0 }}
+                                    animate={{ scale: [1, 1.1, 0.94, 1.06, 1], rotate: [-1.5, 2, -2, 1.5, -1.5], opacity: 1 }}
+                                    exit={{ scale: 0, opacity: 0 }}
+                                    // La opacidad va aparte: con repeat infinito volvería a 0 en cada ciclo
+                                    // y la llama parecería apagarse y encenderse sola.
+                                    transition={{ duration: 1.9, repeat: Infinity, ease: 'easeInOut', opacity: { duration: 0.4 } }}
+                                    className="relative w-[22px] h-10 origin-bottom flex items-end justify-center"
+                                    style={{
+                                        borderRadius: '50% 50% 50% 50% / 62% 62% 38% 38%',
+                                        background: 'radial-gradient(ellipse at 50% 78%, #ffffff 0%, #fef9c3 22%, #fcd34d 48%, #f59e0b 74%, #ea580c 100%)',
+                                        filter: 'drop-shadow(0 0 8px #fbbf24) drop-shadow(0 0 18px rgba(245,158,11,0.8))',
+                                    }}
+                                >
+                                    {/* Núcleo azulado en la base, como una llama real */}
+                                    <span
+                                        className="mb-[4px] w-[8px] h-[11px]"
+                                        style={{
+                                            borderRadius: '50% 50% 50% 50% / 60% 60% 40% 40%',
+                                            background: 'radial-gradient(ellipse at 50% 80%, rgba(255,255,255,0.95) 0%, rgba(147,197,253,0.6) 70%, transparent 100%)',
+                                        }}
+                                    />
+                                </motion.div>
+                            </>
+                        )}
+                    </AnimatePresence>
+                    {!lit && (
+                        <span className="mb-0.5 w-3 h-3.5 rounded-full bg-amber-300/30 group-hover:bg-amber-300/70 transition-colors animate-pulse" />
+                    )}
+                </div>
+
+                {/* Mecha */}
+                <div className={`w-[2px] h-2 -mt-px ${lit ? 'bg-stone-800' : 'bg-stone-600'}`} />
+
+                {/* Cirio dorado */}
+                <div
+                    className="relative w-12 h-16 sm:w-14 sm:h-[72px] rounded-t-[6px] overflow-hidden"
+                    style={{
+                        background: 'linear-gradient(90deg, #a87a26 0%, #e9c46a 22%, #fbe7a6 42%, #f1d080 60%, #c99a3b 85%, #8f6420 100%)',
+                        boxShadow: lit
+                            ? '0 0 30px rgba(251,191,36,0.6), inset 0 8px 12px rgba(255,236,170,0.55)'
+                            : '0 0 14px rgba(251,191,36,0.25)',
+                    }}
+                >
+                    <div className="absolute inset-x-0 top-0 h-2 bg-gradient-to-b from-[#fff4cc]/80 to-transparent" />
+                    <div className="absolute top-0 left-2 w-1.5 h-4 rounded-b-full bg-[#fff2c4]/80" />
+                    <div className="absolute top-0 right-2.5 w-1 h-2.5 rounded-b-full bg-[#fff2c4]/70" />
+                </div>
+            </button>
+
+            {/* Nube: capas difuminadas que cubren la base del cirio */}
+            <motion.div
+                className="absolute bottom-0 inset-x-0 h-20 z-20"
+                animate={{ x: [-3, 3, -3] }}
+                transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut' }}
+            >
+                <div className="absolute bottom-1 left-6 w-28 h-12 rounded-full bg-white/70 blur-[10px]" />
+                <div className="absolute bottom-0 right-6 w-32 h-12 rounded-full bg-white/65 blur-[10px]" />
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-36 h-14 rounded-full bg-white/85 blur-[8px]" />
+                <div className="absolute bottom-6 left-[30%] w-16 h-10 rounded-full bg-white/80 blur-[6px]" />
+                <div className="absolute bottom-6 right-[28%] w-20 h-11 rounded-full bg-white/75 blur-[7px]" />
+                <div className="absolute bottom-0 inset-x-2 h-6 rounded-full bg-indigo-200/40 blur-[12px]" />
+            </motion.div>
         </div>
     );
 }

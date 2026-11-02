@@ -20,6 +20,8 @@ import time
 from app.api.internal.common.media_service import MediaService
 from app.core.rate_limiter import limiter
 from .services import merge_diseno
+from app.services import memorial_melodies as melodies
+from app.api.internal.admin.rbac.router import check_permission
 
 # ─── Rate Limiting (in-memory, per-IP) ───
 _rate_limit_store: dict[str, list[float]] = defaultdict(list)
@@ -83,7 +85,6 @@ def list_public_memorials(
 ):
     """List public memorials for the gallery"""
     limit = max(1, min(limit, 50))  # tope defensivo
-    print(f"DEBUG: list_public_memorials called with limit={limit}")
     query = db.query(mem_models.Memorial).options(
         joinedload(mem_models.Memorial.pet),
         joinedload(mem_models.Memorial.tenant)
@@ -93,9 +94,6 @@ def list_public_memorials(
     ).order_by(mem_models.Memorial.fecha.desc())
     
     memorials = query.limit(limit).all()
-    print(f"DEBUG: Found {len(memorials)} public memorials")
-    for m in memorials:
-        print(f"DEBUG: Memorial ID={m.id_recuerdo} Pet={m.pet.name if m.pet else 'None'}")
     
     return [
         mem_schemas.MemorialCardResponse(
@@ -109,6 +107,51 @@ def list_public_memorials(
         )
         for m in memorials
     ]
+
+
+@router.get("/melodies")
+def list_memorial_melodies(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """Melodías disponibles (las sube el SuperAdmin a la Biblioteca). Todos los planes."""
+    return melodies.list_melodies(db)
+
+
+@router.put("/{recuerdo_uuid}/melody", response_model=mem_schemas.MemorialManageResponse)
+def set_memorial_melody(
+    recuerdo_uuid: UUID,
+    body: mem_schemas.MemorialMelodyUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user),
+    _: bool = Depends(check_permission("mascotas", "edit")),
+):
+    """Melodía del memorial: solo la elige y activa el crematorio (no la familia)."""
+    memorial = db.query(mem_models.Memorial).options(
+        joinedload(mem_models.Memorial.pet),
+        joinedload(mem_models.Memorial.tenant).joinedload(models.Tenant.subscription_plan),
+        joinedload(mem_models.Memorial.dedications),
+    ).filter(
+        mem_models.Memorial.id_recuerdo == recuerdo_uuid,
+        mem_models.Memorial.id_tenant == current_user.tenant_id,
+    ).first()
+    if not memorial:
+        raise HTTPException(status_code=404, detail="Memorial no encontrado o no pertenece a su cuenta.")
+
+    if body.media_id is None:
+        value = None
+    else:
+        if not melodies.get_melody(db, body.media_id):
+            raise HTTPException(status_code=404, detail="La melodía ya no está disponible.")
+        value = {"media_id": body.media_id, "activa": bool(body.activa)}
+
+    memorial.diseno = merge_diseno(memorial.diseno, {melodies.DISENO_KEY: value})
+    db.commit()
+    db.refresh(memorial)
+
+    memorial.lista_imagenes = [normalize_image_url(img) for img in (memorial.lista_imagenes or [])]
+    memorial.main_image_url = normalize_image_url(memorial.main_image_url)
+    return _apply_memorial_limit(memorial, db)
 
 
 @router.get("/crematorios", response_model=list[mem_schemas.PublicCrematoriumResponse])
@@ -145,6 +188,12 @@ def list_public_crematoria(limit: int = 24, db: Session = Depends(get_db)):
 # Planes de la landing del memorial (USD, venta asistida). Sus límites se leen
 # de rec_plans por name_db; los planes previos mantienen su mapeo heredado.
 LANDING_MEMORIAL_PLANS = {"mensual", "anual", "eterno"}
+MAX_MEMORIAL_DEDICATIONS = 20
+
+
+def _is_pro_or_ultra_plan(plan_name: str | None) -> bool:
+    pn = (plan_name or "").upper().strip()
+    return any(k in pn for k in ("PRO", "ULTRA", "VINCULO", "VÍNCULO", "PARAISO", "PARAÍSO", "MENSUAL", "ANUAL", "ETERNO"))
 
 
 def _landing_plan(memorial: mem_models.Memorial, db: Session):
@@ -156,39 +205,26 @@ def _landing_plan(memorial: mem_models.Memorial, db: Session):
 
 
 def _get_memorial_limit(memorial: mem_models.Memorial, db: Session) -> int:
-    # 1. Check if linked to a specific plan
+    """Tope máximo de comentarios/dedicatorias por memorial: máximo 20 comentarios."""
     if memorial.memorial_plan:
-         features = memorial.memorial_plan.features or {}
-         return features.get("velas", features.get("max_dedications", 0))
+        features = memorial.memorial_plan.features or {}
+        raw = features.get("velas", features.get("max_dedications", MAX_MEMORIAL_DEDICATIONS))
+        return min(int(raw), MAX_MEMORIAL_DEDICATIONS) if raw else MAX_MEMORIAL_DEDICATIONS
 
-    # 1b. Planes Mensual / Anual / Eterno
     landing = _landing_plan(memorial, db)
     if landing:
-         features = landing.features or {}
-         return features.get("velas", features.get("max_dedications", 0))
+        features = landing.features or {}
+        raw = features.get("velas", features.get("max_dedications", MAX_MEMORIAL_DEDICATIONS))
+        return min(int(raw), MAX_MEMORIAL_DEDICATIONS) if raw else MAX_MEMORIAL_DEDICATIONS
 
-    # 2. Fallback to name matching in MemorialPlan (legacy support)
-    plan_name = memorial.plan or (memorial.tenant.subscription_plan.name if memorial.tenant and memorial.tenant.subscription_plan else "FREE")
+    plan_name = memorial.plan or (memorial.tenant.subscription_plan.name if memorial.tenant and memorial.tenant.subscription_plan else "PRO")
+    if _is_pro_or_ultra_plan(plan_name):
+        return MAX_MEMORIAL_DEDICATIONS
 
-    # Map common names to name_db
     pn = plan_name.upper().strip()
-    db_name = None
-    if "HUELLA" in pn or "NORMAL" in pn: db_name = "normal"
-    elif "VINCULO" in pn or "VÍNCULO" in pn or "PRO" in pn: db_name = "pro"
-    elif "PARAISO" in pn or "PARAÍSO" in pn or "ULTRA" in pn: db_name = "ultra"
-    elif "RECUERDO" in pn or "FREE" in pn: db_name = "free"
-    
-    if db_name:
-         m_plan = db.query(mem_models.MemorialPlan).filter(mem_models.MemorialPlan.name_db == db_name).first()
-         if m_plan:
-              features = m_plan.features or {}
-              return features.get("velas", features.get("max_dedications", 0))
-              
-    # 3. Hardcoded Fallback (only if DB lookup fails)
-    if "ULTRA" in pn or "PARAISO" in pn: return 33
-    if "PRO" in pn or "VINCULO" in pn: return 21
-    if "NORMAL" in pn or "HUELLA" in pn: return 9
-    return 0
+    if "NORMAL" in pn or "HUELLA" in pn:
+        return min(9, MAX_MEMORIAL_DEDICATIONS)
+    return MAX_MEMORIAL_DEDICATIONS
 
 def _get_memorial_img_limit(memorial: mem_models.Memorial, db: Session) -> int:
     # 1. Check if linked to a specific plan (MemorialPlan in DB)
@@ -277,6 +313,29 @@ def _apply_memorial_limit(memorial: mem_models.Memorial, db: Session):
             # during read requests. Pydantic will serialize it normally.
             memorial.diseno = diseno_copy
             
+    # Resolve owner/tutor dedication from cremation order (OC) or initial form
+    owner_ded = None
+    if memorial.id_mascota:
+        oc = db.query(models.CremationOC).options(
+            joinedload(models.CremationOC.details)
+        ).filter(
+            models.CremationOC.pet_id == memorial.id_mascota,
+            models.CremationOC.tenant_id == memorial.id_tenant
+        ).order_by(models.CremationOC.id.desc()).first()
+        if oc and oc.details and oc.details.dedication:
+            owner_ded = (oc.details.dedication or "").strip() or None
+        if not owner_ded:
+            sub = db.query(models.FormSubmission).filter(
+                models.FormSubmission.tenant_id == memorial.id_tenant,
+                models.FormSubmission.pet_id == memorial.id_mascota,
+            ).order_by(models.FormSubmission.id.desc()).first()
+            if sub and sub.pet_data and isinstance(sub.pet_data, dict):
+                owner_ded = (sub.pet_data.get("dedication") or "").strip() or None
+    setattr(memorial, "owner_dedication", owner_ded)
+
+    # Melodía elegida por el crematorio (URL resuelta desde la biblioteca).
+    setattr(memorial, "melody", melodies.resolve(db, memorial.diseno))
+
     return memorial
 
 @router.post("", response_model=mem_schemas.MemorialManageResponse)
@@ -285,21 +344,16 @@ def create_memorial(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_user)
 ):
-    # 1. Restricción por feature flag del plan (configurable desde admin -> Planes
-    #    -> "Configurar Características"). Reemplaza el antiguo candado por nombre de plan.
+    # 1. Restricción exclusiva a planes de crematorio PRO y ULTRA (+ feature flag)
     tenant = current_user.tenant
-    # Para control de acceso (features/límites) usamos effective_plan: respeta el
-    # plan demo si está vigente, igual que check_permission. La facturación sigue
-    # usando subscription_plan en otro lado.
     plan = (tenant.effective_plan if tenant else None) or (tenant.subscription_plan if tenant else None)
-    # Nombre del plan para los límites/snapshot (con fallbacks: plan efectivo ->
-    # plan legacy del tenant -> FREE). Necesario más abajo (límite de imágenes).
     plan_name = (plan.name if plan else None) or (tenant.plan if tenant else None) or "FREE"
     features = plan.features if plan and isinstance(plan.features, dict) else {}
-    if not features.get("mascotas:memorial", False):
+
+    if not _is_pro_or_ultra_plan(plan_name) or ("mascotas:memorial" in features and not features.get("mascotas:memorial")):
         raise HTTPException(
             status_code=403,
-            detail="Tu plan no incluye la función de memoriales. Actívala desde la configuración del plan."
+            detail="El módulo de Memorial Conmemorativo está disponible exclusivamente para planes de crematorio PRO y ULTRA."
         )
 
     # 2. Check if pet belongs to tenant
@@ -315,10 +369,18 @@ def create_memorial(
         mem_models.Memorial.id_mascota == memorial_in.id_mascota
     ).first()
     if existing:
-        return db.query(mem_models.Memorial).options(
+        existing_mem = db.query(mem_models.Memorial).options(
             joinedload(mem_models.Memorial.pet),
-            joinedload(mem_models.Memorial.tenant)
+            joinedload(mem_models.Memorial.tenant).joinedload(models.Tenant.subscription_plan),
+            joinedload(mem_models.Memorial.dedications),
         ).filter(mem_models.Memorial.id == existing.id).first()
+        if not existing_mem.access_key:
+            existing_mem.access_key = get_random_pin()
+            db.commit()
+            db.refresh(existing_mem)
+        existing_mem.lista_imagenes = [normalize_image_url(img) for img in (existing_mem.lista_imagenes or [])]
+        existing_mem.main_image_url = normalize_image_url(existing_mem.main_image_url)
+        return _apply_memorial_limit(existing_mem, db)
 
     # 4. Validez por defecto: 1 año desde la creación.
     now = datetime.now()
@@ -350,8 +412,18 @@ def create_memorial(
     # Re-fetch with joined loads to satisfy response model (computed properties)
     memorial = db.query(mem_models.Memorial).options(
         joinedload(mem_models.Memorial.pet),
-        joinedload(mem_models.Memorial.tenant)
+        joinedload(mem_models.Memorial.tenant).joinedload(models.Tenant.subscription_plan),
+        joinedload(mem_models.Memorial.dedications),
     ).filter(mem_models.Memorial.id == db_memorial.id).first()
+
+    # Enviar credenciales a la familia si tiene email
+    import asyncio
+    from app.services.memorial_notifications import send_memorial_welcome_email
+    try:
+        asyncio.create_task(send_memorial_welcome_email(db, db_memorial.id))
+    except Exception as _e:
+        pass
+
     return _apply_memorial_limit(memorial, db)
 
 @router.get("/{recuerdo_uuid}", response_model=mem_schemas.MemorialPublicResponse)
@@ -369,28 +441,22 @@ def get_public_memorial(
             db.commit() # Save the state change
             db.refresh(memorial)
 
-    # Allow viewing if it's the owner (logic needed), but for public view:
-    # If expired, we might want to return it BUT the frontend handles the "Expired" view?
-    # Or should we block it? 
-    # User said: "Si valid_until < now(): Mostrar Memorial Expirado".
-    # So we MUST return the valid object so the frontend knows it exists but is expired.
-    
     # We only block if 'archived' (deleted/banned).
     if memorial.status == mem_models.MemorialStatus.archived:
         raise HTTPException(status_code=403, detail="Este memorial ha sido archivado.")
 
     if memorial.es_privado:
-        # Check if auth header or session logic allows (handled in frontend login usually)
-        # But this endpoint is public. Private memorials need pin.
-        # Logic for private is: if private, usually require header. 
-        # But currrently it just raises 403.
         raise HTTPException(status_code=403, detail="Este memorial es privado.")
 
     # Normalize before returning
     memorial.lista_imagenes = [normalize_image_url(img) for img in (memorial.lista_imagenes or [])]
     memorial.main_image_url = normalize_image_url(memorial.main_image_url)
 
-    return _apply_memorial_limit(memorial, db)
+    result = _apply_memorial_limit(memorial, db)
+    # Al público solo se le entrega la melodía si el crematorio la dejó activa.
+    if not (result.melody or {}).get("activa"):
+        result.melody = None
+    return result
 
 
 @router.get("/{recuerdo_uuid}/og-image.jpg")
@@ -406,7 +472,6 @@ def get_memorial_og_image(
     from app.api.public.tracking.router import _compose_og_card
 
     memorial = _load_memorial_scoped(db, recuerdo_uuid)
-    # Mismas reglas de visibilidad que la vista pública
     if (not memorial or memorial.es_privado
             or memorial.status == mem_models.MemorialStatus.archived):
         raise HTTPException(status_code=404, detail="Sin imagen disponible")
@@ -477,6 +542,17 @@ def create_ritual(
         ip_hash=ip_hash,
     ))
     db.commit()
+
+    # Notificar a la familia por email (con cooldown anti-spam)
+    import asyncio
+    from app.services.memorial_notifications import send_candle_notification_email
+    try:
+        asyncio.create_task(send_candle_notification_email(
+            db, memorial.id, ritual_in.kind.value, name
+        ))
+    except Exception:
+        pass
+
     return _ritual_state(memorial.id, db)
 
 
@@ -493,11 +569,8 @@ def create_dedication(
     if not memorial:
         raise HTTPException(status_code=404, detail="Memorial no encontrado.")
 
-    # Check limits
-    tenant_plan = memorial.tenant.subscription_plan.name if (memorial.tenant and memorial.tenant.subscription_plan) else "FREE"
-    plan_name = memorial.plan or tenant_plan
-    
-    max_dedications = _get_memorial_limit(memorial, db)
+    # Check limits (Tope máximo de 20 comentarios por memorial)
+    max_dedications = min(_get_memorial_limit(memorial, db), MAX_MEMORIAL_DEDICATIONS)
     
     approved_count = db.query(mem_models.Dedication).filter(
         mem_models.Dedication.id_recuerdo == memorial.id,
@@ -508,22 +581,33 @@ def create_dedication(
     if approved_count >= max_dedications:
         raise HTTPException(
             status_code=400, 
-            detail=f"Este memorial ha llegado al límite de dedicatorias ({max_dedications}). Plan: {plan_name}"
+            detail=f"Este memorial ha alcanzado el límite máximo de {max_dedications} comentarios."
         )
 
     db_dedication = mem_models.Dedication(
         id_recuerdo=memorial.id,
-        mensajero=dedication_in.mensajero,
-        mensaje=dedication_in.mensaje,
+        mensajero=sanitize_text(dedication_in.mensajero) or dedication_in.mensajero,
+        mensaje=sanitize_text(dedication_in.mensaje) or dedication_in.mensaje,
         estado=mem_models.DedicationStatus.pendiente
     )
     db.add(db_dedication)
     db.commit()
     db.refresh(db_dedication)
+
+    # Notificar a la familia por email sobre la nueva dedicatoria
+    import asyncio
+    from app.services.memorial_notifications import send_dedication_notification_email
+    try:
+        asyncio.create_task(send_dedication_notification_email(
+            db, memorial.id, db_dedication.mensajero, db_dedication.mensaje
+        ))
+    except Exception:
+        pass
+
     return db_dedication
 
 @router.post("/{recuerdo_uuid}/login", response_model=mem_schemas.MemorialManageResponse)
-@limiter.limit("5/minute")
+@limiter.limit("20/minute")
 def login_memorial(
     request: Request,
     recuerdo_uuid: UUID,
@@ -532,8 +616,19 @@ def login_memorial(
 ):
     memorial = _load_memorial_scoped(db, recuerdo_uuid, with_dedications=True)
 
-    if memorial.access_key != login_in.pin:
-        raise HTTPException(status_code=401, detail="Clave de acceso incorrecta.")
+    if not memorial.access_key:
+        memorial.access_key = get_random_pin()
+        db.commit()
+        db.refresh(memorial)
+
+    entered_pin = (login_in.pin or "").strip()
+    stored_pin = (memorial.access_key or "").strip()
+
+    if not stored_pin or entered_pin != stored_pin:
+        raise HTTPException(
+            status_code=401,
+            detail=f"Clave de acceso incorrecta. Verifica el PIN de {len(stored_pin)} dígitos asignado en el panel del crematorio."
+        )
 
     # Normalize before returning
     memorial.lista_imagenes = [normalize_image_url(img) for img in (memorial.lista_imagenes or [])]
@@ -548,10 +643,15 @@ def update_memorial_settings(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    access_key = request.headers.get("access-key")
-    memorial = _load_memorial_scoped(db, recuerdo_uuid)
+    access_key = (request.headers.get("access-key") or "").strip()
+    memorial = _load_memorial_scoped(db, recuerdo_uuid, with_dedications=True)
 
-    if memorial.access_key != access_key:
+    if not memorial.access_key:
+        memorial.access_key = get_random_pin()
+        db.commit()
+        db.refresh(memorial)
+
+    if (memorial.access_key or "").strip() != access_key:
         raise HTTPException(status_code=401, detail="No autorizado.")
 
     # Rate limiting per IP
@@ -560,6 +660,17 @@ def update_memorial_settings(
 
     update_data = memorial_up.model_dump(exclude_unset=True)
 
+    # Actualizar correo del cliente o fecha de fallecimiento si se proveen
+    if "customer_email" in update_data and update_data["customer_email"] is not None:
+        new_email = str(update_data.pop("customer_email")).strip()
+        if memorial.pet and memorial.pet.customer:
+            memorial.pet.customer.email = new_email
+
+    if "death_date" in update_data and update_data["death_date"] is not None:
+        new_dd = update_data.pop("death_date")
+        if memorial.pet:
+            memorial.pet.death_date = new_dd
+
     # Sanitize msg_despedida if provided
     if "msg_despedida" in update_data and update_data["msg_despedida"] is not None:
         update_data["msg_despedida"] = sanitize_text(update_data["msg_despedida"])
@@ -567,23 +678,22 @@ def update_memorial_settings(
     # 1. Image Limit Enforcement for main_image_url
     if "main_image_url" in update_data:
         limit = _get_memorial_img_limit(memorial, db)
-        # Combined pool of allowed images:
-        # 1. Pet's filtered gallery (first N)
-        # 2. Memorial's custom uploaded list
-        allowed_pet_images = (memorial.pet.images or [])[:limit] if memorial.pet else []
-        allowed_mem_images = memorial.lista_imagenes or []
+        allowed_pet_images = [normalize_image_url(img) for img in (memorial.pet.images or [])[:limit]] if memorial.pet else []
+        raw_pet_images = (memorial.pet.images or [])[:limit] if memorial.pet else []
+        allowed_mem_images = [normalize_image_url(img) for img in (memorial.lista_imagenes or [])]
+        raw_mem_images = memorial.lista_imagenes or []
         
-        all_allowed = set(allowed_pet_images + allowed_mem_images)
+        all_allowed = set(allowed_pet_images + raw_pet_images + allowed_mem_images + raw_mem_images)
+        if memorial.pet and memorial.pet.image_url:
+            all_allowed.add(memorial.pet.image_url)
+            all_allowed.add(normalize_image_url(memorial.pet.image_url))
         
         if update_data["main_image_url"] and update_data["main_image_url"] not in all_allowed:
-            # If the image exists in pet.images but was after the limit
             if memorial.pet and update_data["main_image_url"] in (memorial.pet.images or []):
                 raise HTTPException(
                     status_code=400, 
                     detail=f"La imagen seleccionada de la mascota excede el límite de su plan ({limit})."
                 )
-            # For other images (like if they try to set a random external URL if we want to block that)
-            # Actually, if it's not in our allowed sets, we block it for consistency
             raise HTTPException(
                 status_code=400,
                 detail="La imagen seleccionada no es válida o no pertenece a este memorial."
@@ -592,7 +702,9 @@ def update_memorial_settings(
     # El diseño se combina: la familia solo envía sus claves y no debe borrar
     # las que fijó el crematorio/admin (ni viceversa).
     if "diseno" in update_data:
-        update_data["diseno"] = merge_diseno(memorial.diseno, update_data["diseno"])
+        # La melodía es solo del crematorio (PUT /{uuid}/melody): aquí se ignora.
+        incoming = {k: v for k, v in (update_data["diseno"] or {}).items() if k != melodies.DISENO_KEY}
+        update_data["diseno"] = merge_diseno(memorial.diseno, incoming)
 
     for key, value in update_data.items():
         setattr(memorial, key, value)
@@ -631,13 +743,46 @@ def get_memorial_settings(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    access_key = request.headers.get("access-key")
+    access_key = (request.headers.get("access-key") or "").strip()
     memorial = _load_memorial_scoped(db, recuerdo_uuid, with_dedications=True)
 
-    if memorial.access_key != access_key:
+    if not memorial.access_key:
+        memorial.access_key = get_random_pin()
+        db.commit()
+        db.refresh(memorial)
+
+    if (memorial.access_key or "").strip() != access_key:
         raise HTTPException(status_code=401, detail="No autorizado.")
 
     # Normalize before returning
+    memorial.lista_imagenes = [normalize_image_url(img) for img in (memorial.lista_imagenes or [])]
+    memorial.main_image_url = normalize_image_url(memorial.main_image_url)
+
+    return _apply_memorial_limit(memorial, db)
+
+@router.post("/{recuerdo_uuid}/reset-pin", response_model=mem_schemas.MemorialManageResponse)
+def reset_memorial_pin(
+    recuerdo_uuid: UUID,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """Permite al crematorio dueño regenerar o verificar el PIN de acceso del memorial."""
+    memorial = db.query(mem_models.Memorial).options(
+        joinedload(mem_models.Memorial.pet),
+        joinedload(mem_models.Memorial.tenant).joinedload(models.Tenant.subscription_plan),
+        joinedload(mem_models.Memorial.dedications),
+    ).filter(
+        mem_models.Memorial.id_recuerdo == recuerdo_uuid,
+        mem_models.Memorial.id_tenant == current_user.tenant_id
+    ).first()
+
+    if not memorial:
+        raise HTTPException(status_code=404, detail="Memorial no encontrado o no pertenece a su cuenta.")
+
+    memorial.access_key = get_random_pin()
+    db.commit()
+    db.refresh(memorial)
+
     memorial.lista_imagenes = [normalize_image_url(img) for img in (memorial.lista_imagenes or [])]
     memorial.main_image_url = normalize_image_url(memorial.main_image_url)
 
@@ -650,7 +795,7 @@ def update_dedication(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    access_key = request.headers.get("access-key")
+    access_key = (request.headers.get("access-key") or "").strip()
     dedication = db.query(mem_models.Dedication).join(mem_models.Memorial).filter(
         mem_models.Dedication.id_dedicatoria == dedication_id
     ).first()
@@ -658,7 +803,7 @@ def update_dedication(
     if not dedication:
         raise HTTPException(status_code=404, detail="Dedicatoria no encontrada.")
         
-    if dedication.memorial.access_key != access_key:
+    if (dedication.memorial.access_key or "").strip() != access_key:
         raise HTTPException(status_code=401, detail="No autorizado.")
 
     update_data = dedication_up.model_dump(exclude_unset=True)
@@ -678,7 +823,7 @@ def delete_dedication(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    access_key = request.headers.get("access-key")
+    access_key = (request.headers.get("access-key") or "").strip()
     dedication = db.query(mem_models.Dedication).join(mem_models.Memorial).filter(
         mem_models.Dedication.id_dedicatoria == dedication_id
     ).first()
@@ -686,7 +831,7 @@ def delete_dedication(
     if not dedication:
         raise HTTPException(status_code=404, detail="Dedicatoria no encontrada.")
         
-    if dedication.memorial.access_key != access_key:
+    if (dedication.memorial.access_key or "").strip() != access_key:
         raise HTTPException(status_code=401, detail="No autorizado.")
 
     db.delete(dedication)
@@ -700,17 +845,15 @@ async def upload_memorial_image(
     request: Request = None,
     db: Session = Depends(get_db)
 ):
-    access_key = request.headers.get("access-key")
+    access_key = (request.headers.get("access-key") or "").strip()
     memorial = _load_memorial_scoped(db, recuerdo_uuid)
 
-    if memorial.access_key != access_key:
+    if (memorial.access_key or "").strip() != access_key:
         raise HTTPException(status_code=401, detail="No autorizado.")
 
     # Check Plan limits
     limit = _get_memorial_img_limit(memorial, db)
     current_images = memorial.lista_imagenes or []
-    plan_display = memorial.plan or (memorial.tenant.subscription_plan.name if memorial.tenant and memorial.tenant.subscription_plan else None) or (memorial.tenant.plan if memorial.tenant else "FREE")
-    print(f"[IMG UPLOAD] memorial.plan={memorial.plan!r}, tenant.sub_plan={memorial.tenant.subscription_plan.name if memorial.tenant and memorial.tenant.subscription_plan else None!r}, tenant.plan={memorial.tenant.plan if memorial.tenant else None!r} -> resolved={plan_display!r}, limit={limit}, current={len(current_images)}")
     if len(current_images) >= limit:
         raise HTTPException(
             status_code=400, 
@@ -750,12 +893,10 @@ async def upload_memorial_image(
         if memorial.lista_imagenes is None:
             memorial.lista_imagenes = []
         
-        # Guardar URL en la lista
         new_list = [normalize_image_url(img) for img in (memorial.lista_imagenes or [])]
         new_list.append(normalize_image_url(media_item.url))
         memorial.lista_imagenes = new_list
 
-        # Si no tiene imagen principal, asignar esta
         if not memorial.main_image_url:
             memorial.main_image_url = normalize_image_url(media_item.url)
         else:
@@ -764,7 +905,6 @@ async def upload_memorial_image(
         db.commit()
         db.refresh(memorial)
         
-        # Normalize response object
         memorial.lista_imagenes = [normalize_image_url(img) for img in (memorial.lista_imagenes or [])]
         memorial.main_image_url = normalize_image_url(memorial.main_image_url)
         
@@ -783,40 +923,69 @@ def delete_memorial_image(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    access_key = request.headers.get("access-key")
+    access_key = (request.headers.get("access-key") or "").strip()
     memorial = _load_memorial_scoped(db, recuerdo_uuid)
 
-    if memorial.access_key != access_key:
+    if (memorial.access_key or "").strip() != access_key:
         raise HTTPException(status_code=401, detail="No autorizado.")
 
-    # 1. Remove from list in DB
     current_images = list(memorial.lista_imagenes or [])
     if url in current_images:
         current_images.remove(url)
         memorial.lista_imagenes = current_images
     else:
-        # Check if the URL is correctly passed (Frontend might send full path)
         raise HTTPException(status_code=404, detail="Imagen no encontrada en el memorial.")
     
-    # 2. If it was main image, reset to first available or None
     if memorial.main_image_url == url:
         memorial.main_image_url = current_images[0] if current_images else None
 
-    # 3. Physically delete from storage (supports R2 and MediaLibrary)
     from app.api.internal.common.models import MediaLibrary
     
     media_item = db.query(MediaLibrary).filter(MediaLibrary.url == url).first()
     if media_item:
         MediaService.delete_media(db, media_item)
     else:
-        # Legacy fallback
         MediaService.delete_media_by_url(db, url)
 
     db.commit()
     db.refresh(memorial)
 
-    # Normalize before returning
     memorial.lista_imagenes = [normalize_image_url(img) for img in (memorial.lista_imagenes or [])]
     memorial.main_image_url = normalize_image_url(memorial.main_image_url)
     
     return _apply_memorial_limit(memorial, db)
+
+
+@router.post("/{recuerdo_uuid}/send-credentials")
+async def send_credentials_endpoint(
+    recuerdo_uuid: UUID,
+    payload: mem_schemas.SendCredentialsRequest = None,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """Reenvía a la familia el correo con las credenciales, link y PIN del memorial."""
+    memorial = db.query(mem_models.Memorial).filter(
+        mem_models.Memorial.id_recuerdo == recuerdo_uuid
+    ).first()
+    if not memorial:
+        raise HTTPException(status_code=404, detail="Memorial no encontrado.")
+
+    from app.services.memorial_notifications import send_memorial_welcome_email
+    target_email = payload.email if payload and payload.email else None
+    result = await send_memorial_welcome_email(db, memorial.id, to_email=target_email)
+    if not result.get("sent"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se pudo enviar el correo: {result.get('reason', 'Verifica el correo del cliente')}"
+        )
+    return {"success": True, "email": result.get("email")}
+
+
+@router.post("/cron/anniversaries")
+async def trigger_anniversary_check(
+    db: Session = Depends(get_db)
+):
+    """Revisa memoriales y envía recordatorios anuales de angelitos."""
+    from app.services.memorial_notifications import check_and_send_anniversary_reminders
+    result = await check_and_send_anniversary_reminders(db)
+    return {"success": True, **result}

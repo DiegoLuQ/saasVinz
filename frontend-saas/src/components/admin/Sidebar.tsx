@@ -27,6 +27,8 @@ import {
     Code2,
     Coins,
     TrendingUp,
+    Filter,
+    ClipboardCheck,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAdminMetadata, useAdminSaasConfig } from '@/hooks/useAdminBootstrap';
@@ -90,6 +92,8 @@ export default function Sidebar({ onLogout, isCollapsed: isCollapsedProp, setIsC
             title: 'Comercial',
             items: [
                 { href: '/dashboard/negocio', icon: TrendingUp, label: 'Métricas del negocio' },
+                { href: '/dashboard/catalogos', icon: Filter, label: 'KPIs del catálogo' },
+                { href: '/dashboard/diagnosticos', icon: ClipboardCheck, label: 'Diagnóstico 360°' },
                 { href: '/dashboard/transacciones', icon: Receipt, label: 'Transacciones y Recibos' },
                 {
                     href: '/dashboard/suscripciones',

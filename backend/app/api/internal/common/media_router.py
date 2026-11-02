@@ -5,6 +5,7 @@ from app.database import get_db
 from app.auth import get_current_creator, get_token_from_request
 from app.api.internal.common.media_service import MediaService
 from app.api.internal.common.models import MediaLibrary, MediaCategory
+from app.services import memorial_melodies as melodies
 import os
 import re
 import uuid
@@ -60,8 +61,13 @@ async def upload_media(
 
     if ext_clean in image_exts:
         media_type = "image"
-    elif ext_clean in video_exts:
+    elif ext_clean in video_exts and category != melodies.CATEGORY:
         media_type = "video"
+    elif ext_clean in melodies.AUDIO_EXTS:
+        # Melodías para memoriales (máx. 60 s, se validan al procesar).
+        media_type = melodies.MEDIA_TYPE
+        category = melodies.CATEGORY
+        ratio = "original"
     else:
         os.remove(temp_path)
         raise HTTPException(status_code=400, detail=f"Unsupported file format '{ext}'")
@@ -81,10 +87,14 @@ async def upload_media(
             # Las subidas por tenant se segregan en sus endpoints de negocio.
         )
         return media_item
+    except HTTPException:
+        # Errores de validación (p. ej. melodía de más de 60 s): se devuelven tal cual.
+        raise
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
-        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/")
 @router.get("")
