@@ -17,7 +17,8 @@ from app.core.tenant_context import apply_tenant_rls, apply_bypass_rls
 from typing import Dict, List, Optional, Any
 from pydantic import BaseModel, Field
 from app.services.public_form_config import (
-    DEFAULT_FIELDS, MAX_WEIGHT_TIERS, form_config_with_meta, get_weight_tiers, normalize_form_config,
+    DEFAULT_FIELDS, MAX_WEIGHT_TIERS, WEIGHT_PRICING_MODES, clean_weight_prices, form_config_with_meta,
+    get_weight_tiers, normalize_form_config, uses_price_table,
 )
 from app.services import form_video
 from app.api.deps_features import check_feature
@@ -159,6 +160,69 @@ def replace_weight_pricing_rules(
     return get_weight_tiers(db, tenant_id)
 
 
+# ===== PRECIO POR PLAN Y PESO =====
+# Modo "table" (form_config.weight_pricing_mode): cada plan tiene su precio por
+# tramo en srv_plans.weight_prices. Celda vacía = precio base del plan.
+
+class PlanWeightPricesRow(BaseModel):
+    plan_id: int
+    prices: Dict[str, Optional[float]] = Field(default_factory=dict)
+
+
+class PlanWeightPricesUpdate(BaseModel):
+    plans: List[PlanWeightPricesRow] = Field(default_factory=list)
+
+
+def _plan_weight_prices_payload(db: Session, tenant_id: int) -> dict:
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    plans = db.query(models.Plan).filter(models.Plan.tenant_id == tenant_id).order_by(
+        models.Plan.sort_order.asc(), models.Plan.price.asc(), models.Plan.name.asc()
+    ).all()
+    tier_ids = {t.id for t in get_weight_tiers(db, tenant_id)}
+    return {
+        "mode": "table" if uses_price_table(tenant) else "surcharge",
+        "plans": [
+            {"plan_id": p.id, "name": p.name, "price": p.price or 0, "is_active": bool(p.is_active),
+             "prices": clean_weight_prices(p.weight_prices, tier_ids) or {}}
+            for p in plans
+        ],
+    }
+
+
+@router.get("/plan-weight-prices")
+def get_plan_weight_prices(
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    _: models.User = Depends(auth.get_current_user)  # lo usa el formulario de orden
+):
+    """Modo de precio por peso y la tabla plan × tramo."""
+    return _plan_weight_prices_payload(db, tenant_id)
+
+
+@router.put("/plan-weight-prices")
+def update_plan_weight_prices(
+    payload: PlanWeightPricesUpdate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    admin: models.User = Depends(check_permission("configuracion", "edit")),
+    _f: bool = Depends(FORM_FEATURE)
+):
+    """Guarda los precios por tramo de los planes enviados (los demás no cambian)."""
+    tier_ids = {t.id for t in get_weight_tiers(db, tenant_id)}
+    ids = [r.plan_id for r in payload.plans]
+    plans = {p.id: p for p in db.query(models.Plan).filter(
+        models.Plan.tenant_id == tenant_id, models.Plan.id.in_(ids or [0])
+    ).all()}
+    for row in payload.plans:
+        plan = plans.get(row.plan_id)
+        if not plan:
+            raise HTTPException(status_code=404, detail="Plan no encontrado")
+        plan.weight_prices = clean_weight_prices(row.prices, tier_ids)
+    db.commit()
+    apply_tenant_rls(db, tenant_id)
+    return _plan_weight_prices_payload(db, tenant_id)
+
+
 # ===== PUBLIC FORM CONFIGURATION =====
 
 class FormFieldSetting(BaseModel):
@@ -171,6 +235,7 @@ class FormConfigUpdate(BaseModel):
     show_weight_prices: bool = False
     show_service_prices: bool = False
     show_plan_request_button: bool = True  # catálogo de planes: botón «Solicitar este plan»
+    weight_pricing_mode: str = "surcharge"  # "surcharge" (recargo por tramo) | "table" (precio por plan y peso)
     memories: Dict[str, bool] = Field(default_factory=dict)
     delivery_notice: Optional[str] = None
     welcome_modal: Optional[Dict[str, Any]] = None
@@ -199,6 +264,8 @@ def update_form_config(
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
+    if payload.weight_pricing_mode not in WEIGHT_PRICING_MODES:
+        raise HTTPException(status_code=400, detail="Modo de precio por peso inválido")
     unknown = set(payload.fields) - set(DEFAULT_FIELDS)
     if unknown:
         raise HTTPException(status_code=400, detail=f"Campos desconocidos: {', '.join(sorted(unknown))}")
@@ -211,6 +278,7 @@ def update_form_config(
         "show_weight_prices": payload.show_weight_prices,
         "show_service_prices": payload.show_service_prices,
         "show_plan_request_button": payload.show_plan_request_button,
+        "weight_pricing_mode": payload.weight_pricing_mode,
         "memories": payload.memories,
         "delivery_notice": payload.delivery_notice,
         "welcome_modal": payload.welcome_modal,

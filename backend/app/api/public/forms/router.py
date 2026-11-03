@@ -311,6 +311,10 @@ async def submit_public_form(
 
     # 3. Enrich Services Data (Snapshot Prices)
     enriched_services = []
+    # Precio por plan y peso: el plan se congela con el precio del tramo elegido.
+    from app.services.public_form_config import uses_price_table, plan_price_for_tier, submission_tier_id
+    price_table = uses_price_table(tenant)
+    sub_tier_id = submission_tier_id(db, tenant_id, pet_dict) if price_table else None
     
     # Pre-fetch lookup to avoid N+1 queries ideally, but for now simple loop is fine for small forms
     from sqlalchemy.orm import joinedload
@@ -331,9 +335,9 @@ async def submit_public_form(
                         "type": "plan",
                         "id": plan.id,
                         "name": plan.name,
-                        "price": plan.price or 0.0,
+                        "price": plan_price_for_tier(plan, sub_tier_id, price_table),
                         "cost": plan.cost or 0.0,
-                        # Congelamos la imagen en el momento de la selección: si el
+                        # Congelamosla imagen en el momento de la selección: si el
                         # crematorio luego la cambia/borra, el registro histórico
                         # conserva la que vio la familia al elegir el plan.
                         "image_url": plan.image_url,

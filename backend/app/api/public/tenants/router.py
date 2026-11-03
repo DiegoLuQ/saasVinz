@@ -46,7 +46,11 @@ def get_tenant_by_slug(slug: str, db: Session = Depends(get_db)):
     from app.services.plan_features import show_vinzer_brand
     info.show_vinzer_brand = show_vinzer_brand(tenant)
     info.form_config = form_config
-    info.weight_tiers = public_weight_tiers(db, tenant.id, include_price=form_config["show_weight_prices"])
+    # Con la tabla por plan los tramos no llevan recargo (el precio va en cada plan).
+    info.weight_tiers = public_weight_tiers(
+        db, tenant.id,
+        include_price=form_config["show_weight_prices"] and form_config["weight_pricing_mode"] != "table",
+    )
     return info
 
 class ServicePublicInfo(BaseModel):
@@ -58,6 +62,8 @@ class ServicePublicInfo(BaseModel):
     image_url: str | None = None  # Solo planes (catálogo); servicios/productos lo dejan None
     sub_items: list[dict] | None = None
     is_special: bool = False  # adicional ofrecido tras elegir el plan
+    # Precio del plan por tramo {"<id tramo>": precio} (modo «precio por plan y peso»)
+    weight_prices: dict | None = None
 
     class Config:
         from_attributes = True
@@ -105,6 +111,10 @@ def get_tenant_services(slug: str, db: Session = Depends(get_db)):
         models.Plan.is_active == True
     ).all()
     
+    from app.services.public_form_config import clean_weight_prices, get_weight_tiers, uses_price_table
+    price_table = uses_price_table(tenant)
+    tier_ids = {t.id for t in get_weight_tiers(db, tenant.id)} if price_table else set()
+
     for p in plans:
         # Load associated items (services + products)
         plan_items = []
@@ -120,7 +130,8 @@ def get_tenant_services(slug: str, db: Session = Depends(get_db)):
             "price": p.price,
             "category": "plan",
             "image_url": p.image_url,
-            "sub_items": plan_items
+            "sub_items": plan_items,
+            "weight_prices": clean_weight_prices(p.weight_prices, tier_ids) if price_table else None,
         })
         
     # Fetch Products

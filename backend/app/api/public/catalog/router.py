@@ -10,7 +10,9 @@ from app.core.rate_limiter import limiter
 from app.core.tenant_context import apply_bypass_rls, apply_tenant_rls
 from app.api.internal.catalog.models import CatalogShareToken, Product, Category, Plan
 from app.utils import tz
-from app.services.public_form_config import normalize_form_config, public_weight_tiers
+from app.services.public_form_config import (
+    clean_weight_prices, get_weight_tiers, normalize_form_config, public_weight_tiers, uses_price_table,
+)
 
 router = APIRouter()
 
@@ -114,16 +116,18 @@ def get_public_catalog(
 
     # 5a. Catálogo de planes (compartido desde Gestión de Servicios)
     if catalog_type == "plans":
+        price_table = uses_price_table(tenant)
         return schemas.PublicCatalogResponse(
             catalog_type="plans",
             is_expired=False,
             **tenant_info,
-            plans=_active_plans(db, tenant.id),
+            plans=_active_plans(db, tenant.id, price_table),
             catalog_message=share_token.message,
             show_plan_request=normalize_form_config(tenant.form_config)["show_plan_request_button"],
+            # Con la tabla por plan los tramos no llevan recargo (el precio va en cada plan).
             weight_tiers=public_weight_tiers(
                 db, tenant.id,
-                include_price=True,
+                include_price=not price_table,
             ),
         )
 
@@ -213,7 +217,7 @@ def track_catalog_event(
     return Response(status_code=204)
 
 
-def _active_plans(db: Session, tenant_id: int) -> list:
+def _active_plans(db: Session, tenant_id: int, price_table: bool = False) -> list:
     """Planes activos con su portada y los servicios/productos activos que incluyen.
 
     Orden: el definido por el tenant (sort_order), luego precio y nombre. Los
@@ -230,6 +234,7 @@ def _active_plans(db: Session, tenant_id: int) -> list:
         .order_by(Plan.sort_order.asc(), Plan.price.asc(), Plan.name.asc())
         .all()
     )
+    tier_ids = {t.id for t in get_weight_tiers(db, tenant_id)} if price_table else set()
     result = []
     for p in plans:
         optional_ids = set(p.optional_service_ids)
@@ -243,6 +248,7 @@ def _active_plans(db: Session, tenant_id: int) -> list:
                 important_note=p.important_note,
                 is_featured=bool(p.is_featured),
                 image_url=p.image_url,
+                weight_prices=clean_weight_prices(p.weight_prices, tier_ids) if price_table else None,
                 services=[
                     schemas.PublicCatalogPlanItem(
                         name=s.name or "", description=s.description, is_optional=s.id in optional_ids

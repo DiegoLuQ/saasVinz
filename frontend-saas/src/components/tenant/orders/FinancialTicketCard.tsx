@@ -45,6 +45,8 @@ interface FinancialTicketCardProps {
     onAddProduct: (productId: string) => void;
     /** Cambia el ánfora incluida en el plan (línea `index`) por otro producto. */
     onSwapProduct?: (index: number, productId: number) => void;
+    /** Precio por plan y peso: sin recargo aparte (el peso va en el precio del plan) */
+    weightPriceTable?: boolean;
     onUpdateProduct:(index: number, field: keyof SelectedProduct, value: number) => void;
     onRemoveProduct: (index: number) => void;
     onUpdatePlanPrice: (index: number, price: number) => void;
@@ -97,6 +99,7 @@ export default function FinancialTicketCard({
     onAddService,
     onAddProduct,
     onSwapProduct,
+    weightPriceTable = false,
     onUpdateProduct,
     onRemoveProduct,
     onUpdatePlanPrice,
@@ -375,7 +378,7 @@ export default function FinancialTicketCard({
 
                             {/* Weight Surcharge */}
                             {/* Con kg o con recargo guardado (tramo elegido en el formulario público, sin kg) */}
-                            {(currentCremation?.weight || (currentCremation?.weight_price ?? 0) > 0) && (
+                            {((currentCremation?.weight && !weightPriceTable) || (currentCremation?.weight_price ?? 0) > 0) && (
                                 <div className="flex justify-between items-center pt-3 border-t border-dashed border-white/[0.05] group gap-3">
                                     <div className="flex items-center gap-2 min-w-0">
                                         <span className="w-1.5 h-1.5 rounded-full bg-[#00C985] shrink-0" aria-hidden="true" />

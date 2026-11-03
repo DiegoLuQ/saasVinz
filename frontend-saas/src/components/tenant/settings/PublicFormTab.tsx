@@ -39,6 +39,7 @@ import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
 import { apiRequest } from '@/lib/tenant/api';
 import CondolenceModal from '@/components/public/CondolenceModal';
 import WelcomeVideoField, { uploadPendingVideo } from './WelcomeVideoField';
+import PlanWeightPriceTable, { type PlanWeightRow } from './PlanWeightPriceTable';
 import {
     formatCLP,
     MAX_FIELD_LABEL,
@@ -65,6 +66,8 @@ const FIELD_GRID = 'grid grid-cols-[minmax(0,1fr)_4.5rem_5.5rem] items-center ga
 
 // Rangos de peso en escritorio: nombre | desde | hasta | recargo | eliminar
 const TIER_GRID_MD = 'md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_2.5rem]';
+// Con la tabla «precio por plan y peso» el rango no lleva recargo.
+const TIER_GRID_MD_TABLE = 'md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_2.5rem]';
 
 const TIER_PLACEHOLDERS = ['Mini', 'Pequeño', 'Mediano', 'Grande', 'Extra grande', 'Gigante'];
 
@@ -103,6 +106,7 @@ interface SpecialService {
 const EMPTY_SPECIAL = { name: '', description: '', price: '' };
 
 interface SavedTier {
+    id?: number;
     label: string | null;
     min_weight: number | null;
     max_weight: number | null;
@@ -269,6 +273,11 @@ export function PublicFormTab() {
     const [showPrices, setShowPrices] = useState(false);
     const [showServicePrices, setShowServicePrices] = useState(false);
     const [showPlanRequest, setShowPlanRequest] = useState(true);
+    // Precio por peso: recargo por rango ('surcharge') o precio de cada plan por rango ('table')
+    const [weightMode, setWeightMode] = useState<'surcharge' | 'table'>('surcharge');
+    const [tablePlans, setTablePlans] = useState<PlanWeightRow[]>([]);
+    // Precio por plan, en el orden de los rangos ('' = precio base del plan)
+    const [tableValues, setTableValues] = useState<Record<number, string[]>>({});
     const [specials, setSpecials] = useState<SpecialService[]>([]);
     const [savedSpecialVisibility, setSavedSpecialVisibility] = useState<Record<number, boolean>>({});
     const [newSpecial, setNewSpecial] = useState<typeof EMPTY_SPECIAL | null>(null);
@@ -280,9 +289,10 @@ export function PublicFormTab() {
     useEffect(() => {
         (async () => {
             try {
-                const [cfg, rules] = await Promise.all([
+                const [cfg, rules, weightTable] = await Promise.all([
                     apiRequest('/api/internal/maintenance/form-config'),
                     apiRequest('/api/internal/maintenance/weight-pricing'),
+                    apiRequest('/api/internal/maintenance/plan-weight-prices').catch(() => null),
                 ]);
                 if (cfg.phases) {
                     setPhases({ ...DEFAULT_PHASES, ...cfg.phases });
@@ -305,6 +315,19 @@ export function PublicFormTab() {
                     setMemories({ ...DEFAULT_MEMORIES_CONFIG, ...cfg.memories });
                 }
                 setTiers(toTierRows(rules as SavedTier[]));
+                setWeightMode(cfg.weight_pricing_mode === 'table' ? 'table' : 'surcharge');
+                if (weightTable) {
+                    const rows = ((weightTable.plans || []) as (PlanWeightRow & { prices: Record<string, number> })[])
+                        .filter(p => p.is_active !== false);
+                    setTablePlans(rows);
+                    setTableValues(Object.fromEntries(rows.map(p => [
+                        p.plan_id,
+                        (rules as SavedTier[]).map(r => {
+                            const v = r.id != null ? p.prices?.[String(r.id)] : undefined;
+                            return v != null ? String(Math.round(v)) : '';
+                        }),
+                    ])));
+                }
 
                 const [services, plans] = await Promise.all([
                     apiRequest('/api/internal/services/').catch(() => []) as Promise<SpecialService[]>,
@@ -352,9 +375,32 @@ export function PublicFormTab() {
     const addTier = () => {
         if (tiers.length >= MAX_TIERS) return;
         setTiers(prev => [...prev, { label: '', min_weight: prev.length === 0 ? '0' : '', max_weight: '', price: '0' }]);
+        setTableValues(prev => Object.fromEntries(Object.entries(prev).map(([k, row]) => [k, [...row, '']])));
     };
 
-    const removeTier = (idx: number) => setTiers(prev => prev.filter((_, i) => i !== idx));
+    // La columna del rango quitado sale también de la tabla por plan.
+    const removeTier = (idx: number) => {
+        setTiers(prev => prev.filter((_, i) => i !== idx));
+        setTableValues(prev => Object.fromEntries(Object.entries(prev).map(([k, row]) => [k, row.filter((_, i) => i !== idx)])));
+    };
+
+    const updateTableCell = (planId: number, tierIdx: number, value: string) =>
+        setTableValues(prev => {
+            const row = [...(prev[planId] || [])];
+            while (row.length < tiers.length) row.push('');
+            row[tierIdx] = value;
+            return { ...prev, [planId]: row };
+        });
+
+    const fillRowWithBase = (planId: number) => {
+        const plan = tablePlans.find(p => p.plan_id === planId);
+        if (!plan) return;
+        const base = String(Math.round(plan.price || 0));
+        setTableValues(prev => ({
+            ...prev,
+            [planId]: tiers.map((_, i) => (prev[planId]?.[i] || '').trim() || base),
+        }));
+    };
 
     const createSpecial = async () => {
         if (!newSpecial) return;
@@ -425,6 +471,7 @@ export function PublicFormTab() {
                 show_weight_prices: showPrices,
                 show_service_prices: showServicePrices,
                 show_plan_request_button: showPlanRequest,
+                weight_pricing_mode: weightMode,
                 delivery_notice: deliveryNotice.trim() || null,
                 welcome_modal: wm,
                 custom_forms: forms,
@@ -439,6 +486,10 @@ export function PublicFormTab() {
         const tierError = validateTiers();
         if (tierError) {
             showToast(tierError, 'error');
+            return;
+        }
+        if (weightMode === 'table' && tiers.length === 0) {
+            showToast('Para cobrar por plan y peso agrega al menos un rango de peso', 'error');
             return;
         }
         setSaving(true);
@@ -456,6 +507,22 @@ export function PublicFormTab() {
                 }),
             });
             setTiers(toTierRows(saved as SavedTier[]));
+            // Tabla por plan: las columnas siguen la posición de los rangos guardados.
+            if (tablePlans.length > 0) {
+                const savedTiers = saved as SavedTier[];
+                await apiRequest('/api/internal/maintenance/plan-weight-prices', {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        plans: tablePlans.map(p => ({
+                            plan_id: p.plan_id,
+                            prices: Object.fromEntries(savedTiers
+                                .map((tier, i) => [String(tier.id), (tableValues[p.plan_id]?.[i] || '').trim()] as const)
+                                .filter(([, v]) => v !== '')
+                                .map(([k, v]) => [k, parseFloat(v)])),
+                        })),
+                    }),
+                });
+            }
             const changed = specials.filter(sv => (sv.show_in_form !== false) !== savedSpecialVisibility[sv.id]);
             await Promise.all(changed.map(sv => apiRequest(`/api/internal/services/${sv.id}`, {
                 method: 'PATCH',
@@ -1137,9 +1204,41 @@ export function PublicFormTab() {
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1 max-w-xl">
                                     Hasta {MAX_TIERS} rangos. Escribe desde y hasta cuántos kg (ej. 0 – 4, 4,1 – 7). Deja vacío el “hasta” del último para “desde X kg”.
-                                    Se usan en el formulario, en el catálogo y para el cálculo de recargo en las órdenes.
+                                    Se usan en el formulario, en el catálogo y para el precio de las órdenes.
                                 </p>
                             </div>
+
+                            {/* Cómo cobra el peso */}
+                            <fieldset>
+                                <legend className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">¿Cómo cobras según el peso?</legend>
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                    {([
+                                        { id: 'surcharge', title: 'Recargo por peso', desc: 'Cada rango suma un monto al plan o servicio elegido.' },
+                                        { id: 'table', title: 'Precio por plan y peso', desc: 'Cada plan tiene su propio precio en cada rango. Los servicios especiales no cambian con el peso.' },
+                                    ] as const).map(opt => {
+                                        const active = weightMode === opt.id;
+                                        return (
+                                            <label
+                                                key={opt.id}
+                                                className={`flex cursor-pointer gap-3 rounded-2xl border p-3.5 transition-colors ${active ? 'border-primary bg-primary/10' : 'border-foreground/10 hover:border-foreground/20'}`}
+                                            >
+                                                <input
+                                                    type="radio"
+                                                    name="weight-pricing-mode"
+                                                    value={opt.id}
+                                                    checked={active}
+                                                    onChange={() => setWeightMode(opt.id)}
+                                                    className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--primary)]"
+                                                />
+                                                <span className="min-w-0">
+                                                    <span className="block text-sm font-bold text-foreground">{opt.title}</span>
+                                                    <span className="mt-0.5 block text-xs text-muted-foreground">{opt.desc}</span>
+                                                </span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            </fieldset>
 
                             {tiers.length === 0 ? (
                                 <p className="text-sm text-muted-foreground py-4">
@@ -1147,17 +1246,17 @@ export function PublicFormTab() {
                                 </p>
                             ) : (
                                 <div className="space-y-3">
-                                    <div className={`hidden md:grid ${TIER_GRID_MD} gap-3 px-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground`}>
+                                    <div className={`hidden md:grid ${weightMode === 'table' ? TIER_GRID_MD_TABLE : TIER_GRID_MD} gap-3 px-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground`}>
                                         <span>Nombre (opcional)</span>
                                         <span>Desde</span>
                                         <span>Hasta</span>
-                                        <span>Recargo</span>
+                                        {weightMode !== 'table' && <span>Recargo</span>}
                                         <span className="w-10" />
                                     </div>
                                     {tiers.map((t, idx) => {
                                         const isLast = idx === tiers.length - 1;
                                         return (
-                                            <div key={idx} className={`grid grid-cols-2 gap-x-3 gap-y-2.5 rounded-2xl border border-foreground/10 p-3 ${TIER_GRID_MD} md:items-start md:gap-3 md:rounded-none md:border-0 md:p-0`}>
+                                            <div key={idx} className={`grid grid-cols-2 gap-x-3 gap-y-2.5 rounded-2xl border border-foreground/10 p-3 ${weightMode === 'table' ? TIER_GRID_MD_TABLE : TIER_GRID_MD} md:items-start md:gap-3 md:rounded-none md:border-0 md:p-0`}>
                                                 <div className="col-span-2 md:col-span-1 flex items-end gap-2 min-w-0">
                                                     <div className="flex-1 min-w-0">
                                                         <TierLabel>Rango {idx + 1} · Nombre (opcional)</TierLabel>
@@ -1187,7 +1286,7 @@ export function PublicFormTab() {
                                                         onChange={v => updateTier(idx, { max_weight: v.replace(/[^\d.,]/g, '') })}
                                                     />
                                                 </div>
-                                                <div className="col-span-2 md:col-span-1 min-w-0">
+                                                {weightMode !== 'table' && <div className="col-span-2 md:col-span-1 min-w-0">
                                                     <TierLabel>Recargo</TierLabel>
                                                     <FormInputLite
                                                         placeholder="0"
@@ -1198,7 +1297,7 @@ export function PublicFormTab() {
                                                         onChange={v => updateTier(idx, { price: v.replace(/\D/g, '') })}
                                                         hint={parseFloat(t.price) > 0 ? formatCLP(parseFloat(t.price)) : undefined}
                                                     />
-                                                </div>
+                                                </div>}
                                                 <RemoveTierButton idx={idx} onClick={() => removeTier(idx)} className="hidden md:flex" />
                                             </div>
                                         );
@@ -1216,6 +1315,29 @@ export function PublicFormTab() {
                                 {tiers.length >= MAX_TIERS ? `Máximo ${MAX_TIERS} rangos` : 'Agregar rango de peso'}
                             </button>
                         </div>
+
+                        {/* Precio por plan y peso */}
+                        {weightMode === 'table' && (
+                            <div className="glass-card p-5 sm:p-6 rounded-3xl space-y-4">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <Layers size={18} className="text-amber-400" />
+                                        <h4 className="font-bold text-white">Precio de cada plan según el peso</h4>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-1 max-w-xl">
+                                        Escribe el precio final de cada plan en cada rango (ya incluye el peso, no se suma recargo).
+                                        Si dejas una celda vacía se usa el precio base del plan. Se aplica en el formulario, el catálogo y las órdenes nuevas.
+                                    </p>
+                                </div>
+                                <PlanWeightPriceTable
+                                    tiers={tiers}
+                                    plans={tablePlans}
+                                    values={tableValues}
+                                    onChange={updateTableCell}
+                                    onFillRow={fillRowWithBase}
+                                />
+                            </div>
+                        )}
                         {/* Precios visibles en el formulario */}
                         <div className="glass-card p-5 sm:p-6 rounded-3xl space-y-4">
                             <div>
@@ -1228,15 +1350,19 @@ export function PublicFormTab() {
                                 </p>
                             </div>
                             <div className="divide-y divide-foreground/5">
-                                <PriceToggleRow
-                                    title="Precio según el peso"
-                                    description="Muestra el recargo correspondiente a cada rango de peso."
-                                    checked={showPrices}
-                                    onChange={setShowPrices}
-                                />
+                                {weightMode !== 'table' && (
+                                    <PriceToggleRow
+                                        title="Precio según el peso"
+                                        description="Muestra el recargo correspondiente a cada rango de peso."
+                                        checked={showPrices}
+                                        onChange={setShowPrices}
+                                    />
+                                )}
                                 <PriceToggleRow
                                     title="Precio según el plan elegido"
-                                    description="Muestra el precio de cada plan de cremación y de los servicios adicionales al seleccionarlos."
+                                    description={weightMode === 'table'
+                                        ? 'Muestra el precio de cada plan (según el peso elegido) y de los servicios adicionales.'
+                                        : 'Muestra el precio de cada plan de cremación y de los servicios adicionales al seleccionarlos.'}
                                     checked={showServicePrices}
                                     onChange={setShowServicePrices}
                                 />

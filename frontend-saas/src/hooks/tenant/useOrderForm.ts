@@ -11,6 +11,7 @@ import { readCatalogCache, writeCatalogCache } from '@/lib/tenant/orders/catalog
 import type { OrderTemplate } from '@/lib/tenant/orders/templates';
 import {
     calculateWeightPrice,
+    findWeightRule,
     calculateGrandTotal,
     calculateGrandTotalCost,
 } from '@/lib/tenant/orders/calculations';
@@ -95,6 +96,11 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
     const [partners, setPartners] = useState<Partner[]>([]);
     const [agreements, setAgreements] = useState<AgreementOption[]>([]);
     const [weightPricingRules, setWeightPricingRules] = useState<WeightPricingRule[]>([]);
+    // Precio por plan y peso (Configuración → Formulario y Pesos): con 'table' cada plan
+    // tiene su precio por tramo y no se suma recargo por peso.
+    const [weightPricingMode, setWeightPricingMode] = useState<'surcharge' | 'table'>('surcharge');
+    const [planWeightPrices, setPlanWeightPrices] = useState<Record<number, Record<string, number>>>({});
+    const priceTable = weightPricingMode === 'table';
 
     // ==========================================
     // Form state
@@ -374,6 +380,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
                 apiRequest('/api/internal/products/'),
                 apiRequest('/api/internal/partners/active-options'),
                 apiRequest('/api/internal/agreements/active-options'),
+                apiRequest('/api/internal/maintenance/plan-weight-prices'),
             ]);
             const settled = (i: number): any[] =>
                 results[i].status === 'fulfilled' ? (results[i] as PromiseFulfilledResult<any>).value ?? [] : [];
@@ -385,6 +392,13 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
             const productsData = settled(5);
             const partnersData = settled(6);
             setAgreements(settled(7));
+            type WeightTable = { mode?: string; plans?: { plan_id: number; prices?: Record<string, number> }[] } | null;
+            const weightTable: WeightTable = results[8].status === 'fulfilled' ? (results[8] as PromiseFulfilledResult<WeightTable>).value : null;
+            const tableMode = weightTable?.mode === 'table';
+            setWeightPricingMode(tableMode ? 'table' : 'surcharge');
+            setPlanWeightPrices(Object.fromEntries(
+                (weightTable?.plans || []).map(p => [p.plan_id, p.prices || {}])
+            ));
 
             const normalizedServices = normalizeServices(servicesData);
             const normalizedPlans = normalizePlans(plansData);
@@ -409,7 +423,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
                 // solo en el efecto de abajo: fetchData corre dos veces (al resolverse
                 // el tenant) y la orden llega después de los tramos, pisando el valor
                 // calculado con el weight_price guardado (0) sin que cambie el peso.
-                if (formState.weight && Array.isArray(weightRules) && weightRules.length > 0) {
+                if (!tableMode && formState.weight && Array.isArray(weightRules) && weightRules.length > 0) {
                     formState.weight_price = calculateWeightPrice(formState.weight, weightRules);
                 }
                 setCurrentCremation(formState);
@@ -922,6 +936,14 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
     // ==========================================
     // Handlers: Plans
     // ==========================================
+    /** Precio del plan para un peso: el de la tabla del tramo (modo 'table') o el base. */
+    const planPriceForWeight = useCallback((planId: number, basePrice: number, weight?: number | null) => {
+        if (!priceTable) return basePrice;
+        const tier = findWeightRule(weight, weightPricingRules);
+        const value = tier?.id != null ? planWeightPrices[planId]?.[String(tier.id)] : undefined;
+        return value != null ? Number(value) : basePrice;
+    }, [priceTable, weightPricingRules, planWeightPrices]);
+
     const handleAddPlan = useCallback((planId: number) => {
         const original = plans.find(p => p.id === planId);
         if (!original) return;
@@ -933,7 +955,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
             setSelectedPlans([
                 {
                     plan_id: planId,
-                    unit_price: original.unit_price ?? original.price ?? 0,
+                    unit_price: planPriceForWeight(planId, original.unit_price ?? original.price ?? 0, currentCremation.weight),
                     unit_cost: original.unit_cost ?? original.cost ?? 0,
                     name: original.name,
                     es_principal: true,
@@ -984,7 +1006,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
         }
 
         executeAddPlan();
-    }, [plans, selectedProducts, selectedPlans, showToast, stockAvailable]);
+    }, [plans, selectedProducts, selectedPlans, showToast, stockAvailable, planPriceForWeight, currentCremation.weight]);
 
     const handleRemovePlanItem = useCallback((index: number) => {
         const removed = selectedPlans[index];
@@ -1013,13 +1035,20 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
     // ==========================================
     const handleWeightChange = useCallback((value: string) => {
         const w = value ? parseFloat(value) : undefined;
-        const wp = calculateWeightPrice(w, weightPricingRules);
+        const wp = priceTable ? 0 : calculateWeightPrice(w, weightPricingRules);
         setCurrentCremation(prev => ({
             ...prev,
             weight: w,
             weight_price: wp,
         }));
-    }, [weightPricingRules]);
+        // Tabla por plan: el plan toma el precio del nuevo tramo.
+        if (priceTable && w) {
+            setSelectedPlans(prev => prev.map(p => {
+                const base = plans.find(pl => pl.id === p.plan_id);
+                return { ...p, unit_price: planPriceForWeight(p.plan_id, base?.unit_price ?? base?.price ?? p.unit_price, w) };
+            }));
+        }
+    }, [weightPricingRules, priceTable, plans, planPriceForWeight]);
 
     // Con peso en kg, el recargo se deriva de las reglas vigentes. Las órdenes
     // creadas por otros flujos (p. ej. el Registro Rápido) guardan weight_price = 0
@@ -1027,14 +1056,14 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
     // Sin kg se respeta el recargo guardado (p. ej. el tramo elegido por la familia
     // en el formulario público): recalcularlo daría 0 y lo borraría.
     useEffect(() => {
-        if (weightPricingRules.length === 0) return;
+        if (weightPricingRules.length === 0 || priceTable) return;
         setCurrentCremation(prev => {
             if (!prev.weight) return prev;
             const expected = calculateWeightPrice(prev.weight, weightPricingRules);
             if (expected === (prev.weight_price || 0)) return prev;
             return { ...prev, weight_price: expected };
         });
-    }, [weightPricingRules, currentCremation.weight]);
+    }, [weightPricingRules, currentCremation.weight, priceTable]);
 
     // ==========================================
     // Handler: Save
@@ -1312,6 +1341,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
         agreementTerms,
         agreementBreakdown,
         weightPricingRules,
+        weightPricingMode,
         refreshData: fetchData,
         refreshServices,
         refreshingServices,

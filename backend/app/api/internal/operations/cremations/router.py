@@ -115,7 +115,7 @@ def obtener_expediente(
     from app import models
     from app.api.internal.memorials.models import Memorial
     from app.api.public.tenants.router import resolve_farewell_template
-    from app.services.public_form_config import get_weight_tiers, weight_surcharge
+    from app.services.public_form_config import get_weight_tiers, uses_price_table, weight_surcharge
 
     C = models.Cremation
     oc = db.query(C).options(
@@ -166,7 +166,9 @@ def obtener_expediente(
     # elegido por la familia) o sin tramos, se usa el monto guardado en la orden.
     tiers = get_weight_tiers(db, tenant_id)
     saved_weight_price = (oc.financial.weight_price or 0) if oc.financial else 0
-    weight_price = weight_surcharge(tiers, oc.weight) if (tiers and oc.weight) else saved_weight_price
+    # Con la tabla «precio por plan y peso» el peso ya va en el precio del plan.
+    table = uses_price_table(db.query(models.Tenant).get(tenant_id))
+    weight_price = weight_surcharge(tiers, oc.weight) if (tiers and oc.weight and not table) else saved_weight_price
     if weight_price:
         if oc.weight:
             label = f"Recargo por peso ({oc.weight:g} kg)".replace(".", ",")

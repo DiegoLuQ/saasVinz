@@ -42,6 +42,8 @@ export interface PublicPlan {
     important_note?: string | null;
     is_featured?: boolean;
     image_url?: string | null;
+    /** Precio por tramo de peso {"<id tramo>": precio} (crematorios con tabla por plan) */
+    weight_prices?: Record<string, number> | null;
     services: PublicPlanItem[];
     products: PublicPlanItem[];
 }
@@ -358,7 +360,12 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                 ) : (
                     // flex-wrap centra la última fila incompleta; las tarjetas de una fila quedan de igual altura
                     <div className="flex flex-wrap justify-center gap-6">
-                        {filtered.map(view => {
+                        {filtered.map(rawView => {
+                            // Tabla «precio por plan y peso»: el precio del plan es el del tamaño elegido.
+                            const tablePrice = rawView.plan.weight_prices?.[sizeKey];
+                            const view = tablePrice != null
+                                ? { ...rawView, plan: { ...rawView.plan, price: Number(tablePrice), price_label: null } }
+                                : rawView;
                             const basePrice = view.plan.price || 0;
                             const totalPrice = basePrice + tierPrice;
                             const waText = tierPrice > 0 && basePrice > 0

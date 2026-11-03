@@ -5,7 +5,7 @@ import { compressImages } from '@/lib/clientImageCompressor';
 import { Service } from '@/components/public/ServiceSelectionStep';
 import { saveDraftImages, loadDraftImages, clearDraftImages } from '@/lib/formDraftImages';
 import { MAX_MEMORIAL_PHOTOS } from '@/components/public/ImageUploadStep';
-import { mergeWelcomeModal, resolveFormConfig, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
+import { mergeWelcomeModal, planPriceForTier, resolveFormConfig, tierForWeight, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
 
 export interface Tenant {
     id: number;
@@ -402,6 +402,23 @@ export function useTenantForm(
 
     const weightTiers = useMemo(() => tenant?.weight_tiers ?? [], [tenant]);
 
+    // Precio por plan y peso: con el tramo elegido (o el que cubre los kg) cada plan
+    // muestra su precio de ese tramo. Sin tabla, los precios no cambian.
+    const activeTierId = useMemo(() => {
+        if (petData.weightTierId) return petData.weightTierId;
+        const kg = parseFloat((petData.weightKg || '').replace(',', '.'));
+        const tier = kg > 0 ? tierForWeight(weightTiers, kg) : null;
+        return tier ? String(tier.id) : '';
+    }, [petData.weightTierId, petData.weightKg, weightTiers]);
+    const pricedServices = useMemo(
+        () => activeTierId
+            ? services.map(s => s.weight_prices
+                ? { ...s, price: planPriceForTier(s.price ?? 0, s.weight_prices, activeTierId) }
+                : s)
+            : services,
+        [services, activeTierId]
+    );
+
     // 6. Validaciones
     const validateOwner = useCallback(() => {
         const errors: Record<string, string> = {};
@@ -733,7 +750,7 @@ export function useTenantForm(
         setPetData,
         images,
         setImages,
-        services,
+        services: pricedServices,
         selectedServices,
         ownerErrors,
         petErrors,

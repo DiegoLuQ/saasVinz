@@ -88,9 +88,12 @@ class Plan(Base):
     price_label = Column(String(60), nullable=True)  # Reemplaza al precio (ej. "Según peso")
     important_note = Column(String(200), nullable=True)  # Aviso destacado (ej. "Exclusivo mascotas < 1 kg")
     sort_order = Column(Integer, nullable=False, default=0, server_default="0")
+    # Precio por tramo de peso {"<id srv_weight_pricing>": precio}; solo con
+    # form_config.weight_pricing_mode = "table" (app/services/public_form_config.py).
+    weight_prices = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
 
-    # Ordenados según el orden definido en el plan (srv_plan_services.sort_order)
+    # Ordenados según el orden definido en el plan(srv_plan_services.sort_order)
     services = relationship(
         "Service", secondary="srv_plan_services", overlaps="plan,plan_links,service",
         order_by="[PlanService.sort_order, PlanService.id]",

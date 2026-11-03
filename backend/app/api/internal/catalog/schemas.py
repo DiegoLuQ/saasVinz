@@ -261,6 +261,8 @@ class PublicCatalogPlan(BaseModel):
     important_note: Optional[str] = None
     is_featured: bool = False
     image_url: Optional[str] = None  # portada del plan
+    # Precio por tramo {"<id tramo>": precio} (modo «precio por plan y peso»)
+    weight_prices: Optional[dict] = None
     services: List[PublicCatalogPlanItem] = []
     products: List[PublicCatalogPlanItem] = []
 

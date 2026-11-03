@@ -13,14 +13,21 @@ export function calculateWeightPrice(
     weight: number | undefined,
     rules: WeightPricingRule[]
 ): number {
-    if (!weight || weight <= 0) return 0;
+    return findWeightRule(weight, rules)?.price ?? 0;
+}
+
+/** Tramo que cubre un peso en kg (misma regla que el recargo); null bajo el mínimo. */
+export function findWeightRule(
+    weight: number | undefined | null,
+    rules: WeightPricingRule[]
+): WeightPricingRule | null {
+    if (!weight || weight <= 0) return null;
     const sorted = [...rules].sort(
         (a, b) => (a.max_weight ?? Infinity) - (b.max_weight ?? Infinity)
     );
-    // Reglas antiguas cuyo primer tramo no parte en 0: bajo ese mínimo no hay recargo.
-    if (sorted.length === 0 || weight < (sorted[0].min_weight ?? 0)) return 0;
-    const matchingRule = sorted.find(rule => weight <= (rule.max_weight ?? Infinity));
-    return matchingRule?.price ?? 0;
+    // Reglas antiguas cuyo primer tramo no parte en 0: bajo ese mínimo no hay tramo.
+    if (sorted.length === 0 || weight < (sorted[0].min_weight ?? 0)) return null;
+    return sorted.find(rule => weight <= (rule.max_weight ?? Infinity)) ?? null;
 }
 
 /**

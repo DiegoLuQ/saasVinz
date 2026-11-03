@@ -170,6 +170,9 @@ def normalize_form_config(raw: Any) -> dict:
         "show_service_prices": bool(raw.get("show_service_prices", False)),
         # Catálogo de planes: botón «Solicitar este plan» (lleva al formulario). Sin marcar = visible.
         "show_plan_request_button": bool(raw.get("show_plan_request_button", True)),
+        # Precio por peso: "surcharge" = recargo del tramo que se suma al plan/servicio;
+        # "table" = cada plan tiene su precio por tramo (srv_plans.weight_prices), sin recargo.
+        "weight_pricing_mode": raw.get("weight_pricing_mode") if raw.get("weight_pricing_mode") in WEIGHT_PRICING_MODES else "surcharge",
         "memories": memories,
         "delivery_notice": delivery_notice,
         "welcome_modal": welcome_modal,
@@ -189,6 +192,7 @@ def form_config_with_meta(raw: Any) -> dict:
         "show_weight_prices": cfg["show_weight_prices"],
         "show_service_prices": cfg["show_service_prices"],
         "show_plan_request_button": cfg["show_plan_request_button"],
+        "weight_pricing_mode": cfg["weight_pricing_mode"],
         "memories": cfg["memories"],
         "delivery_notice": cfg["delivery_notice"],
         "welcome_modal": cfg["welcome_modal"],
@@ -197,6 +201,73 @@ def form_config_with_meta(raw: Any) -> dict:
 
 
 # ===== Tramos de peso =====
+
+WEIGHT_PRICING_MODES = ("surcharge", "table")
+
+
+def uses_price_table(tenant_or_cfg: Any) -> bool:
+    """True si el crematorio cobra con la tabla «precio por plan y peso»."""
+    raw = getattr(tenant_or_cfg, "form_config", tenant_or_cfg)
+    return isinstance(raw, dict) and raw.get("weight_pricing_mode") == "table"
+
+
+def tier_for_weight(tiers: list, weight: float | None):
+    """Tramo que corresponde a un peso en kg (misma regla que el recargo): el
+    primero, por máximo ascendente, cuyo máximo lo cubre. None bajo el mínimo."""
+    if not weight or weight <= 0 or not tiers:
+        return None
+    if weight < (tiers[0].min_weight or 0):
+        return None
+    for r in tiers:
+        if r.max_weight is None or weight <= r.max_weight:
+            return r
+    return None
+
+
+def clean_weight_prices(raw: Any, tier_ids: set) -> dict | None:
+    """{"<id tramo>": precio} solo con tramos existentes y montos válidos."""
+    if not isinstance(raw, dict):
+        return None
+    out = {}
+    for k, v in raw.items():
+        if not str(k).isdigit() or int(k) not in tier_ids or v is None or v == "":
+            continue
+        try:
+            price = float(v)
+        except (TypeError, ValueError):
+            continue
+        if price < 0 or price > 100_000_000:
+            raise HTTPException(status_code=400, detail="Precio por peso fuera de rango")
+        out[str(int(k))] = price
+    return out or None
+
+
+def plan_price_for_tier(plan, tier_id: Any, table: bool) -> float:
+    """Precio del plan para un tramo: el de la tabla si el crematorio la usa y la
+    celda tiene valor; si no, el precio base del plan."""
+    base = float(plan.price or 0.0)
+    if not table or tier_id is None:
+        return base
+    prices = plan.weight_prices if isinstance(plan.weight_prices, dict) else {}
+    value = prices.get(str(tier_id))
+    return float(value) if value is not None else base
+
+
+def submission_tier_id(db: Session, tenant_id: int, pet: dict | None):
+    """Tramo de una solicitud: el elegido por la familia o el que cubre los kg."""
+    pet = pet or {}
+    tier = pet.get("weightTier") if isinstance(pet.get("weightTier"), dict) else None
+    tier_id = (tier or {}).get("id") or pet.get("weightTierId")
+    if tier_id is not None and str(tier_id).isdigit():
+        return int(tier_id)
+    if _filled(pet.get("weightKg")):
+        try:
+            kg = float(str(pet.get("weightKg")).replace(",", "."))
+        except ValueError:
+            return None
+        row = tier_for_weight(get_weight_tiers(db, tenant_id), kg)
+        return row.id if row else None
+    return None
 
 def get_weight_tiers(db: Session, tenant_id: int) -> list:
     """Tramos ordenados por límite superior; el abierto (NULL) al final."""
@@ -208,14 +279,8 @@ def weight_surcharge(tiers: list, weight: float | None) -> float:
     """Recargo por peso (misma regla que calculateWeightPrice del frontend): el
     primer tramo, por máximo ascendente, cuyo máximo cubre el peso. Bajo el
     mínimo del primer tramo no hay recargo. `tiers` viene de get_weight_tiers."""
-    if not weight or weight <= 0 or not tiers:
-        return 0.0
-    if weight < (tiers[0].min_weight or 0):
-        return 0.0
-    for r in tiers:
-        if r.max_weight is None or weight <= r.max_weight:
-            return r.price or 0.0
-    return 0.0
+    row = tier_for_weight(tiers, weight)
+    return (row.price or 0.0) if row else 0.0
 
 
 def submission_weight_charge(db: Session, tenant_id: int, pet: dict | None) -> dict | None:
@@ -228,6 +293,9 @@ def submission_weight_charge(db: Session, tenant_id: int, pet: dict | None) -> d
     price = None
     if tier and tier.get("price") is not None:
         price = float(tier.get("price") or 0)
+    elif uses_price_table(db.query(models.Tenant).get(tenant_id)):
+        # Con la tabla por plan el peso ya va en el precio del plan.
+        return None
     else:
         tier_id = pet.get("weightTierId") or (tier or {}).get("id")
         if tier_id is not None and str(tier_id).isdigit():
@@ -333,7 +401,8 @@ def apply_form_config_to_submission(
                 "id": tier.id, "label": tier.label,
                 "min_weight": tier.min_weight or 0, "max_weight": tier.max_weight,
                 # Precio al momento del envío: el registro no cambia si luego se editan los tramos.
-                "price": tier.price or 0,
+                # Con la tabla por plan no hay recargo: el peso va en el precio del plan.
+                "price": 0 if uses_price_table(tenant) else (tier.price or 0),
             }
             pet["size"] = f"{tier.label} ({range_text})" if tier.label else range_text
         elif _filled(weight_kg):

@@ -103,10 +103,25 @@ export interface PublicFormConfig {
     show_service_prices: boolean;
     /** Catálogo de planes: muestra el botón «Solicitar este plan» (lleva al formulario) */
     show_plan_request_button: boolean;
+    /** Precio por peso: 'surcharge' = recargo del tramo que se suma; 'table' = cada plan
+     *  tiene su precio por tramo (srv_plans.weight_prices) y no hay recargo */
+    weight_pricing_mode: WeightPricingMode;
     memories: MemoriesConfig;
     delivery_notice?: string | null;
     welcome_modal?: WelcomeModalConfig;
     custom_forms?: CustomFormPreset[];
+}
+
+export type WeightPricingMode = 'surcharge' | 'table';
+
+/** Precio por tramo de un plan {"<id tramo>": precio} (modo 'table'). */
+export type PlanWeightPrices = Record<string, number>;
+
+/** Precio del plan para un tramo: el de su tabla si la celda tiene valor; si no, el base. */
+export function planPriceForTier(basePrice: number, weightPrices: PlanWeightPrices | null | undefined, tierId: string | number | null | undefined): number {
+    if (tierId == null || tierId === '' || !weightPrices) return basePrice;
+    const value = weightPrices[String(tierId)];
+    return value != null ? Number(value) : basePrice;
 }
 
 /** Tramo de peso "hasta X kg" del crematorio (max_weight null = abierto). */
@@ -154,6 +169,7 @@ export const DEFAULT_FORM_CONFIG: PublicFormConfig = {
     show_weight_prices: false,
     show_service_prices: false,
     show_plan_request_button: true,
+    weight_pricing_mode: 'surcharge',
     memories: DEFAULT_MEMORIES_CONFIG,
     delivery_notice: null,
     welcome_modal: DEFAULT_WELCOME_MODAL_CONFIG,
@@ -167,6 +183,7 @@ export function resolveFormConfig(raw?: Partial<PublicFormConfig> | null): Publi
         show_weight_prices: !!raw?.show_weight_prices,
         show_service_prices: !!raw?.show_service_prices,
         show_plan_request_button: raw?.show_plan_request_button !== false,
+        weight_pricing_mode: raw?.weight_pricing_mode === 'table' ? 'table' : 'surcharge',
         memories:{ ...DEFAULT_MEMORIES_CONFIG, ...(raw?.memories || {}) },
         delivery_notice: raw?.delivery_notice || null,
         welcome_modal: {

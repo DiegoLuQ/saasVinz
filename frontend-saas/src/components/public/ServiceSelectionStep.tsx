@@ -33,6 +33,8 @@ export interface Service {
     sub_items?: SubItem[] | null;
     /** Servicio especial (eutanasia, exhumación…): adicional tras elegir el plan */
     is_special?: boolean;
+    /** Planes con precio por tramo de peso {"<id tramo>": precio} */
+    weight_prices?: Record<string, number> | null;
 }
 
 /** ids de servicios ya incluidos en los planes seleccionados (no se cobran aparte). */

@@ -134,6 +134,7 @@ export default function RegisterServicePage() {
         handleRemoveRemoteImage,
         handleAddProduct,
         handleSwapIncludedProduct,
+        weightPricingMode,
         handleRemoveProduct,
         handleUpdateProduct,
         handleAddService,
@@ -615,6 +616,7 @@ export default function RegisterServicePage() {
                                     onAddService={handleAddService}
                                     onAddProduct={handleAddProduct}
                                     onSwapProduct={handleSwapIncludedProduct}
+                                    weightPriceTable={weightPricingMode === 'table'}
                                     onUpdateProduct={handleUpdateProduct}
                                     onRemoveProduct={handleRemoveProduct}
                                     onUpdatePlanPrice={handleUpdatePlanPrice}
