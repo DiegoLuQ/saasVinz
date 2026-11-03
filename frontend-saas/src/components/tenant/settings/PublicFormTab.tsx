@@ -18,6 +18,8 @@ import {
     EyeOff,
     ChevronRight,
     ChevronLeft,
+    ChevronUp,
+    ChevronDown,
     Info,
     Camera,
     MessageSquareQuote,
@@ -65,9 +67,9 @@ const MAX_TIERS = 20;
 const FIELD_GRID = 'grid grid-cols-[minmax(0,1fr)_4.5rem_5.5rem] items-center gap-x-2';
 
 // Rangos de peso en escritorio: nombre | desde | hasta | recargo | eliminar
-const TIER_GRID_MD = 'md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_2.5rem]';
+const TIER_GRID_MD = 'md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_7.5rem]';
 // Con la tabla «precio por plan y peso» el rango no lleva recargo.
-const TIER_GRID_MD_TABLE = 'md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_2.5rem]';
+const TIER_GRID_MD_TABLE = 'md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_7.5rem]';
 
 const TIER_PLACEHOLDERS = ['Mini', 'Pequeño', 'Mediano', 'Grande', 'Extra grande', 'Gigante'];
 
@@ -384,6 +386,23 @@ export function PublicFormTab() {
         setTableValues(prev => Object.fromEntries(Object.entries(prev).map(([k, row]) => [k, row.filter((_, i) => i !== idx)])));
     };
 
+    // Mover un rango arriba/abajo: su columna de la tabla por plan se mueve con él.
+    const moveTier = (idx: number, dir: -1 | 1) => {
+        const j = idx + dir;
+        if (j < 0 || j >= tiers.length) return;
+        const swap = <T,>(list: T[]) => {
+            const next = [...list];
+            [next[idx], next[j]] = [next[j], next[idx]];
+            return next;
+        };
+        setTiers(prev => swap(prev));
+        setTableValues(prev => Object.fromEntries(Object.entries(prev).map(([k, row]) => {
+            const full = [...row];
+            while (full.length < tiers.length) full.push('');
+            return [k, swap(full)];
+        })));
+    };
+
     const updateTableCell = (planId: number, tierIdx: number, value: string) =>
         setTableValues(prev => {
             const row = [...(prev[planId] || [])];
@@ -434,7 +453,7 @@ export function PublicFormTab() {
         }
     };
 
-    const validateTiers = (): string | null => {
+    const validateTiers = (tiers: TierRow[]): string | null => {
         let prevMax: number | null = null;
         for (let i = 0; i < tiers.length; i++) {
             const t = tiers[i];
@@ -483,7 +502,22 @@ export function PublicFormTab() {
     };
 
     const handleSave = async () => {
-        const tierError = validateTiers();
+        // Los rangos se guardan ordenados por «desde» (un rango agregado al final, p. ej.
+        // 0 – 0,9, pasa a su lugar); las columnas de la tabla por plan se mueven con ellos.
+        const minOf = (t: TierRow) => {
+            const v = parseKg(t.min_weight || '');
+            return isNaN(v) ? Infinity : v;
+        };
+        const order = tiers.map((_, i) => i).sort((a, b) => minOf(tiers[a]) - minOf(tiers[b]) || a - b);
+        const sortedTiers = order.map(i => tiers[i]);
+        const sortedValues: Record<number, string[]> = Object.fromEntries(
+            Object.entries(tableValues).map(([k, row]) => [k, order.map(i => row[i] ?? '')])
+        );
+        if (order.some((i, pos) => i !== pos)) {
+            setTiers(sortedTiers);
+            setTableValues(sortedValues);
+        }
+        const tierError = validateTiers(sortedTiers);
         if (tierError) {
             showToast(tierError, 'error');
             return;
@@ -498,7 +532,7 @@ export function PublicFormTab() {
             const saved = await apiRequest('/api/internal/maintenance/weight-pricing', {
                 method: 'PUT',
                 body: JSON.stringify({
-                    tiers: tiers.map(t => ({
+                    tiers: sortedTiers.map(t => ({
                         label: t.label.trim() || null,
                         min_weight: parseKg(t.min_weight),
                         max_weight: t.max_weight.trim() ? parseKg(t.max_weight) : null,
@@ -516,7 +550,7 @@ export function PublicFormTab() {
                         plans: tablePlans.map(p => ({
                             plan_id: p.plan_id,
                             prices: Object.fromEntries(savedTiers
-                                .map((tier, i) => [String(tier.id), (tableValues[p.plan_id]?.[i] || '').trim()] as const)
+                                .map((tier, i) => [String(tier.id), (sortedValues[p.plan_id]?.[i] || '').trim()] as const)
                                 .filter(([, v]) => v !== '')
                                 .map(([k, v]) => [k, parseFloat(v)])),
                         })),
@@ -1251,7 +1285,7 @@ export function PublicFormTab() {
                                         <span>Desde</span>
                                         <span>Hasta</span>
                                         {weightMode !== 'table' && <span>Recargo</span>}
-                                        <span className="w-10" />
+                                        <span className="w-[7.5rem]" />
                                     </div>
                                     {tiers.map((t, idx) => {
                                         const isLast = idx === tiers.length - 1;
@@ -1262,7 +1296,7 @@ export function PublicFormTab() {
                                                         <TierLabel>Rango {idx + 1} · Nombre (opcional)</TierLabel>
                                                         <FormInputLite placeholder={`Ej: ${TIER_PLACEHOLDERS[idx] ?? `Rango ${idx + 1}`}`} value={t.label} maxLength={40} ariaLabel={`Rango ${idx + 1}: nombre`} onChange={v => updateTier(idx, { label: v })} />
                                                     </div>
-                                                    <RemoveTierButton idx={idx} onClick={() => removeTier(idx)} className="flex md:hidden" />
+                                                    <TierActions idx={idx} total={tiers.length} onMove={dir => moveTier(idx, dir)} onRemove={() => removeTier(idx)} className="flex md:hidden" />
                                                 </div>
                                                 <div className="min-w-0">
                                                     <TierLabel>Desde</TierLabel>
@@ -1298,7 +1332,7 @@ export function PublicFormTab() {
                                                         hint={parseFloat(t.price) > 0 ? formatCLP(parseFloat(t.price)) : undefined}
                                                     />
                                                 </div>}
-                                                <RemoveTierButton idx={idx} onClick={() => removeTier(idx)} className="hidden md:flex" />
+                                                <TierActions idx={idx} total={tiers.length} onMove={dir => moveTier(idx, dir)} onRemove={() => removeTier(idx)} className="hidden md:flex" />
                                             </div>
                                         );
                                     })}
@@ -2541,16 +2575,33 @@ function TierLabel({ children }: { children: React.ReactNode }) {
     return <span className="md:hidden block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 ml-1">{children}</span>;
 }
 
-function RemoveTierButton({ idx, onClick, className = '' }: { idx: number; onClick: () => void; className?: string }) {
+/** Subir / bajar / eliminar un rango de peso (al guardar igual se ordenan por «desde»). */
+function TierActions({ idx, total, onMove, onRemove, className = '' }: {
+    idx: number;
+    total: number;
+    onMove: (dir: -1 | 1) => void;
+    onRemove: () => void;
+    className?: string;
+}) {
+    const moveCls = 'flex h-[42px] w-8 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:bg-foreground/5 hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-all cursor-pointer';
     return (
-        <button
-            type="button"
-            onClick={onClick}
-            aria-label={`Eliminar rango ${idx + 1}`}
-            className={`${className} h-[42px] w-10 shrink-0 items-center justify-center text-red-400 hover:bg-red-500/10 rounded-xl transition-all cursor-pointer`}
-        >
-            <Trash2 size={16} />
-        </button>
+        <div className={`${className} shrink-0 items-center gap-0.5`}>
+            <button type="button" onClick={() => onMove(-1)} disabled={idx === 0} aria-label={`Subir rango ${idx + 1}`} title="Subir" className={moveCls}>
+                <ChevronUp size={16} />
+            </button>
+            <button type="button" onClick={() => onMove(1)} disabled={idx === total - 1} aria-label={`Bajar rango ${idx + 1}`} title="Bajar" className={moveCls}>
+                <ChevronDown size={16} />
+            </button>
+            <button
+                type="button"
+                onClick={onRemove}
+                aria-label={`Eliminar rango ${idx + 1}`}
+                title="Eliminar"
+                className="flex h-[42px] w-9 shrink-0 items-center justify-center text-red-400 hover:bg-red-500/10 rounded-xl transition-all cursor-pointer"
+            >
+                <Trash2 size={16} />
+            </button>
+        </div>
     );
 }
 
