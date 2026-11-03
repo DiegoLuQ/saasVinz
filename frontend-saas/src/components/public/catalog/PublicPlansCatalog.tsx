@@ -73,6 +73,8 @@ interface Props {
     message?: string | null;
     /** «Potenciado por vinzer.cl» en el pie (false = plan con marca blanca) */
     showVinzerBrand?: boolean;
+    /** Botón «Solicitar este plan» (Configuración → Formulario y Pesos); false = solo WhatsApp */
+    showRequestButton?: boolean;
 }
 
 // Paleta cálida y luminosa, igual para todos los tenants: el catálogo lo abren
@@ -153,7 +155,7 @@ interface PlanView {
 }
 
 /** Catálogo público de planes: diseño sobrio y cálido; los datos son los de cada tenant. */
-export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare, copiedLink, catalogToken, weightTiers = [], message, showVinzerBrand = true }: Props) {
+export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare, copiedLink, catalogToken, weightTiers = [], message, showVinzerBrand = true, showRequestButton = true }: Props) {
     const [searchTerm, setSearchTerm] = useState('');
     const sizes = useMemo(
         () => (weightTiers.length > 0 ? tierSizes(weightTiers) : PET_SIZES.map(s => ({ ...s, display: s.label, price: 0 }))),
@@ -302,7 +304,7 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                 {plans.length > 0 && (
                     <div className="mb-10 mx-auto max-w-5xl rounded-3xl bg-white border border-[var(--cat-line)] shadow-[0_10px_30px_-24px_rgba(43,39,36,0.35)] px-4 py-6 sm:px-6 text-center">
                         <h2 id="pet-size-title" className="[font-family:var(--cat-serif)] text-2xl font-semibold">
-                            ¿Cuál es el tamaño aproximado de tu mascota?
+                            ¿Cuál es el peso aproximado de tu mascota?
                         </h2>
                         <p className="mt-1 text-xs text-[var(--cat-muted)]">
                             Selecciona un rango para calcular automáticamente el valor final estimado en cada plan.
@@ -382,7 +384,7 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                                     sizeLabel={sizeLabel}
                                     tierPrice={tierPrice}
                                     waUrl={whatsappUrl(waText)}
-                                    formUrl={formUrl}
+                                    formUrl={showRequestButton ? formUrl : null}
                                     onRequest={() => track('plan_request', view.plan.id)}
                                     onWhatsApp={() => track('whatsapp', view.plan.id)}
                                 />

@@ -170,6 +170,7 @@ class FormConfigUpdate(BaseModel):
     fields: Dict[str, FormFieldSetting] = Field(default_factory=dict)
     show_weight_prices: bool = False
     show_service_prices: bool = False
+    show_plan_request_button: bool = True  # catálogo de planes: botón «Solicitar este plan»
     memories: Dict[str, bool] = Field(default_factory=dict)
     delivery_notice: Optional[str] = None
     welcome_modal: Optional[Dict[str, Any]] = None
@@ -209,6 +210,7 @@ def update_form_config(
         "fields": {k: v.model_dump() for k, v in payload.fields.items()},
         "show_weight_prices": payload.show_weight_prices,
         "show_service_prices": payload.show_service_prices,
+        "show_plan_request_button": payload.show_plan_request_button,
         "memories": payload.memories,
         "delivery_notice": payload.delivery_notice,
         "welcome_modal": payload.welcome_modal,

@@ -63,6 +63,7 @@ interface PublicCatalogData {
     plans?: PublicPlan[];
     weight_tiers?: WeightTier[];
     catalog_message?: string | null;
+    show_plan_request?: boolean;
 }
 
 export default function PublicCatalogPage() {
@@ -333,6 +334,7 @@ export default function PublicCatalogPage() {
                 plans={data.plans ?? []}
                 weightTiers={data.weight_tiers ?? []}
                 message={data.catalog_message}
+                showRequestButton={data.show_plan_request !== false}
                 catalogToken={token}
                 getImageUrl={getImageUrl}
                 onShare={handleShareLink}

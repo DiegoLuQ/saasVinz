@@ -268,6 +268,7 @@ export function PublicFormTab() {
     // Camino (Servicios especiales y precios)
     const [showPrices, setShowPrices] = useState(false);
     const [showServicePrices, setShowServicePrices] = useState(false);
+    const [showPlanRequest, setShowPlanRequest] = useState(true);
     const [specials, setSpecials] = useState<SpecialService[]>([]);
     const [savedSpecialVisibility, setSavedSpecialVisibility] = useState<Record<number, boolean>>({});
     const [newSpecial, setNewSpecial] = useState<typeof EMPTY_SPECIAL | null>(null);
@@ -298,6 +299,7 @@ export function PublicFormTab() {
                 }
                 setFields(cfg.fields || []);
                 setShowPrices(!!cfg.show_weight_prices);
+                setShowPlanRequest(cfg.show_plan_request_button !== false);
                 setShowServicePrices(!!cfg.show_service_prices);
                 if (cfg.memories) {
                     setMemories({ ...DEFAULT_MEMORIES_CONFIG, ...cfg.memories });
@@ -422,6 +424,7 @@ export function PublicFormTab() {
                 fields: Object.fromEntries(fields.map(f => [f.key, { visible: f.visible, required: f.required }])),
                 show_weight_prices: showPrices,
                 show_service_prices: showServicePrices,
+                show_plan_request_button: showPlanRequest,
                 delivery_notice: deliveryNotice.trim() || null,
                 welcome_modal: wm,
                 custom_forms: forms,
@@ -1236,6 +1239,27 @@ export function PublicFormTab() {
                                     description="Muestra el precio de cada plan de cremación y de los servicios adicionales al seleccionarlos."
                                     checked={showServicePrices}
                                     onChange={setShowServicePrices}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Catálogo de planes compartido */}
+                        <div className="glass-card p-5 sm:p-6 rounded-3xl space-y-4">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <Tag size={18} className="text-emerald-400" />
+                                    <h4 className="font-bold text-white">Catálogo de planes</h4>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1 max-w-xl">
+                                    Lo que ve la familia en el enlace del catálogo de planes (Gestión de Servicios → Compartir Catálogo de Planes).
+                                </p>
+                            </div>
+                            <div className="divide-y divide-foreground/5">
+                                <PriceToggleRow
+                                    title="Botón «Solicitar este plan»"
+                                    description="Lleva al formulario de registro con el plan y el peso elegidos. Si lo ocultas, cada plan solo muestra «Consultar por WhatsApp»."
+                                    checked={showPlanRequest}
+                                    onChange={setShowPlanRequest}
                                 />
                             </div>
                         </div>

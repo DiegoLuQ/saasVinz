@@ -168,6 +168,8 @@ def normalize_form_config(raw: Any) -> dict:
         "fields": fields,
         "show_weight_prices": bool(raw.get("show_weight_prices", False)),
         "show_service_prices": bool(raw.get("show_service_prices", False)),
+        # Catálogo de planes: botón «Solicitar este plan» (lleva al formulario). Sin marcar = visible.
+        "show_plan_request_button": bool(raw.get("show_plan_request_button", True)),
         "memories": memories,
         "delivery_notice": delivery_notice,
         "welcome_modal": welcome_modal,
@@ -186,6 +188,7 @@ def form_config_with_meta(raw: Any) -> dict:
         ],
         "show_weight_prices": cfg["show_weight_prices"],
         "show_service_prices": cfg["show_service_prices"],
+        "show_plan_request_button": cfg["show_plan_request_button"],
         "memories": cfg["memories"],
         "delivery_notice": cfg["delivery_notice"],
         "welcome_modal": cfg["welcome_modal"],

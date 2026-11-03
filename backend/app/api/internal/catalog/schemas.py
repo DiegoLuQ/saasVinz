@@ -286,4 +286,5 @@ class PublicCatalogResponse(BaseModel):
     # Tramos de peso del crematorio para el selector de tamaño (precio solo si
     # el crematorio habilitó mostrarlo; ver app/services/public_form_config.py)
     weight_tiers: List[dict] = []
+    show_plan_request: bool = True  # catálogo de planes: botón «Solicitar este plan»
 

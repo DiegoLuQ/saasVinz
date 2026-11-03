@@ -101,6 +101,8 @@ export interface PublicFormConfig {
     show_weight_prices: boolean;
     /** Muestra el precio de planes/servicios y el total estimado en el resumen */
     show_service_prices: boolean;
+    /** Catálogo de planes: muestra el botón «Solicitar este plan» (lleva al formulario) */
+    show_plan_request_button: boolean;
     memories: MemoriesConfig;
     delivery_notice?: string | null;
     welcome_modal?: WelcomeModalConfig;
@@ -151,6 +153,7 @@ export const DEFAULT_FORM_CONFIG: PublicFormConfig = {
     },
     show_weight_prices: false,
     show_service_prices: false,
+    show_plan_request_button: true,
     memories: DEFAULT_MEMORIES_CONFIG,
     delivery_notice: null,
     welcome_modal: DEFAULT_WELCOME_MODAL_CONFIG,
@@ -163,7 +166,8 @@ export function resolveFormConfig(raw?: Partial<PublicFormConfig> | null): Publi
         fields: { ...DEFAULT_FORM_CONFIG.fields, ...(raw?.fields || {}) },
         show_weight_prices: !!raw?.show_weight_prices,
         show_service_prices: !!raw?.show_service_prices,
-        memories: { ...DEFAULT_MEMORIES_CONFIG, ...(raw?.memories || {}) },
+        show_plan_request_button: raw?.show_plan_request_button !== false,
+        memories:{ ...DEFAULT_MEMORIES_CONFIG, ...(raw?.memories || {}) },
         delivery_notice: raw?.delivery_notice || null,
         welcome_modal: {
             ...DEFAULT_WELCOME_MODAL_CONFIG,

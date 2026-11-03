@@ -329,7 +329,7 @@ export default function ShareCatalogModal({
                                     className="w-full resize-none bg-white border border-slate-300 dark:bg-slate-950/60 dark:border-white/15 rounded-xl py-2.5 px-3.5 text-xs text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-amber-500 transition-all"
                                 />
                                 <p className="text-[10px] text-slate-500 dark:text-slate-400 ml-1">
-                                    Aparece en negrita en el catálogo, entre &quot;¿Cuál es el tamaño aproximado de tu mascota?&quot; y los planes.
+                                    Aparece en negrita en el catálogo, entre &quot;¿Cuál es el peso aproximado de tu mascota?&quot;y los planes.
                                 </p>
                             </div>
                         )}
