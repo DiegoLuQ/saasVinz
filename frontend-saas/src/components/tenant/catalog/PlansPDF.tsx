@@ -140,16 +140,21 @@ export default function PlansPDF({
         [contact.address, contact.city].filter(Boolean).join(', '),
     ].filter(Boolean).join('  ·  ');
 
-    // Precio del plan en cada rango (null = no aplica una tabla para este plan)
+    // Precio del plan en cada rango (null = no aplica una tabla para este plan).
+    // Las filas en $0 no se muestran.
     const weightRows = (plan: PDFPlan): { tier: PDFWeightTier; price: number }[] | null => {
         if (!showPrices || tiers.length === 0) return null;
+        let rows: { tier: PDFWeightTier; price: number }[];
         if (weightMode === 'table') {
             const prices = planWeightPrices[plan.id] || {};
             if (Object.keys(prices).length === 0) return null;
-            return tiers.map(t => ({ tier: t, price: prices[String(t.id)] ?? plan.price ?? 0 }));
+            rows = tiers.map(t => ({ tier: t, price: Number(prices[String(t.id)] ?? plan.price ?? 0) }));
+        } else {
+            if (!plan.price || plan.price <= 0 || !tiers.some(t => (t.price ?? 0) > 0)) return null;
+            rows = tiers.map(t => ({ tier: t, price: (plan.price || 0) + (t.price ?? 0) }));
         }
-        if (!plan.price || plan.price <= 0 || !tiers.some(t => (t.price ?? 0) > 0)) return null;
-        return tiers.map(t => ({ tier: t, price: (plan.price || 0) + (t.price ?? 0) }));
+        rows = rows.filter(r => r.price > 0);
+        return rows.length > 0 ? rows : null;
     };
 
     return (
@@ -161,6 +166,7 @@ export default function PlansPDF({
                 const products = plan.products || [];
                 const rows = weightRows(plan);
                 const minPrice = rows ? Math.min(...rows.map(r => r.price)) : null;
+                const maxPrice = rows ? Math.max(...rows.map(r => r.price)) : null;
                 const hero = showImages ? getImageSrc(plan.image_url) : undefined;
 
                 return (
@@ -190,10 +196,12 @@ export default function PlansPDF({
                             <View style={styles.priceBox}>
                                 {!showPrices ? (
                                     <Text style={styles.priceLabel}>Precio a consultar</Text>
-                                ) : rows && minPrice != null ? (
+                                ) : rows && minPrice != null && maxPrice != null ? (
                                     <>
-                                        <Text style={styles.priceCaption}>Desde</Text>
-                                        <Text style={styles.price}>{clp(minPrice)}</Text>
+                                        <Text style={styles.priceCaption}>{minPrice === maxPrice ? 'Valor' : 'Según peso'}</Text>
+                                        <Text style={styles.price}>
+                                            {minPrice === maxPrice ? clp(minPrice) : `${clp(minPrice)} – ${clp(maxPrice)}`}
+                                        </Text>
                                     </>
                                 ) : plan.price_label?.trim() ? (
                                     <Text style={styles.priceLabel}>{plan.price_label.trim()}</Text>

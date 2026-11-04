@@ -155,7 +155,7 @@ export default function DocumentConfigPage() {
                                         let tagBadge = null;
                                         const isLocked = item.type === 'document' && !!(item as Template).is_locked;
                                         const lockedBadge = isLocked && (
-                                            <span className="text-[9px] bg-amber-500/20 text-amber-400 px-2.5 py-1 rounded-md font-black uppercase tracking-widest flex items-center gap-1" title="Diseñada exclusivamente para tu crematorio. Solo Vinzer puede modificarla.">
+                                            <span className="text-[9px] bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/20 dark:text-amber-400 dark:border-transparent px-2.5 py-1 rounded-md font-black uppercase tracking-widest flex items-center gap-1" title="Diseñada exclusivamente para tu crematorio. Solo Vinzer puede modificarla.">
                                                 <Lock size={10}/> Exclusiva
                                             </span>
                                         );
@@ -170,7 +170,7 @@ export default function DocumentConfigPage() {
                                         } else if (item.isGlobal) {
                                             cardTheme = "border-amber-500/20 bg-amber-500/5 hover:border-amber-500/40";
                                             iconTheme = "bg-amber-500/20 text-amber-500";
-                                            tagBadge = <span className="text-[9px] bg-amber-500/20 text-amber-500 px-2.5 py-1 rounded-md font-black uppercase tracking-widest flex items-center gap-1"><Globe size={10}/> Global</span>;
+                                            tagBadge = <span className="text-[9px] bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-transparent px-2.5 py-1 rounded-md font-black uppercase tracking-widest flex items-center gap-1"><Globe size={10}/> Global</span>;
                                         } else if (item.type === 'farewell') {
                                             cardTheme = "border-purple-500/20 bg-purple-500/5 hover:border-purple-500/40";
                                             iconTheme = "bg-purple-500/20 text-purple-400";

@@ -407,7 +407,8 @@ export default function Sidebar() {
                                                 </motion.span>
                                             )}
                                         </div>
-                                        {item.href === '/dashboard/recepcion-pedidos' && pendingSubmissionsCount > 0 && (
+                                        {/* Solicitudes web pendientes: se revisan en el Dashboard (aviso «N solicitudes web pendientes») */}
+                                        {item.href === '/dashboard' && pendingSubmissionsCount > 0 && (
                                             collapsed ? (
                                                 <span
                                                     title={`${pendingSubmissionsCount} solicitud(es) web pendiente(s)`}

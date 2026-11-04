@@ -25,6 +25,13 @@ import {
     BarChart3,
     Stamp,
     Lock,
+    Share2,
+    Copy,
+    Check,
+    ExternalLink,
+    AlertCircle,
+    Stethoscope,
+    Boxes,
 } from 'lucide-react';
 import { getImageUrl } from '@/lib/tenant/api';
 import { useRouter } from 'next/navigation';
@@ -35,12 +42,17 @@ import { useDashboardSummary, type DashboardOrder, type DashboardSummary } from 
 import { useCurrentUser, useInitialSubmissions, type BootstrapSubmissionData } from '@/hooks/useSessionBootstrap';
 import QuickRegistrationModal from '@/components/tenant/dashboard/QuickRegistrationModal';
 import QuickTrackingModal from '@/components/tenant/dashboard/QuickTrackingModal';
+import SharePublicLinksModal from '@/components/tenant/dashboard/SharePublicLinksModal';
 import DashboardHeroCarousel from '@/components/tenant/dashboard/DashboardHeroCarousel';
 import OnboardingChecklist from '@/components/tenant/dashboard/OnboardingChecklist';
 import SatisfactionCard from '@/components/tenant/dashboard/SatisfactionCard';
 import { useFeatures } from '@/hooks/useFeatures';
 import { useCanOpen } from '@/hooks/useCanOpen';
 import { usePermissions } from '@/app/(tenant)/tenant/context/PermissionContext';
+import { copyToClipboard } from '@/lib/clipboard';
+import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
+import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
+import { buildTrackingUrl } from '@/lib/publicUrls';
 
 const OWNER_ROLES = ['admin', 'contabilidad', 'creator'];
 const OPERATOR_ROLES = ['operador_cremacion', 'operator', 'driver'];
@@ -85,16 +97,11 @@ function DashboardSkeleton() {
     );
 }
 
-// Solo el tope mensual de órdenes se avisa en el inicio: los usuarios son fijos
-// (con 4 de 5 el aviso de 80 % quedaba encendido para siempre aunque no necesites
-// otro usuario). Al 80 % de órdenes del mes se avisa con tiempo; al 100 % ya no
-// se puede crear más. El mismo aviso llega como notificación y correo (backend
-// services/limit_alerts.py).
 const NEAR_LIMIT = 0.8;
 
 function planLimits(data: DashboardSummary) {
     const items = [
-        { name: 'Órdenes', unit: ['orden', 'órdenes'], monthly: true, item: data.limits.orders },
+        { name: 'Órdenes', unit: ['orden', 'órdenes'], monthly: true, item: data.limits?.orders },
     ].filter(l => l.item && l.item.max > 0 && l.item.max < UNLIMITED);
     return {
         reached: items.filter(l => l.item.usage >= l.item.max),
@@ -106,14 +113,19 @@ export default function DashboardPage() {
     const { data, isError, refetch, isFetching } = useDashboardSummary();
     const router = useRouter();
     const currentUser = useCurrentUser();
+    const { tenantData } = useTenant();
+    const { showToast } = useToast();
+
     const [limitModalResource, setLimitModalResource] = useState<string | null>(null);
     const [showQuickRegistrationModal, setShowQuickRegistrationModal] = useState(false);
     const [showQuickTrackingModal, setShowQuickTrackingModal] = useState(false);
+    const [showShareModal, setShowShareModal] = useState(false);
     const [showAllSubmissions, setShowAllSubmissions] = useState(false);
+    const [processTab, setProcessTab] = useState<'today' | 'active' | 'overdue'>('today');
+    const [copiedCodeId, setCopiedCodeId] = useState<number | null>(null);
 
     const role = currentUser?.role ?? '';
     const isOwner = OWNER_ROLES.includes(role);
-    // Indicadores y gráfico: característica del plan "Métricas y Analíticas" (sin flag = visible)
     const { hasFeature } = useFeatures();
     const { canOpen } = useCanOpen();
     const { canCreate } = usePermissions();
@@ -129,6 +141,25 @@ export default function DashboardPage() {
         );
 
     const openOrder = (id: number) => router.push(`/dashboard/recepcion-pedidos?orden=${id}`);
+
+    const handleCopyTracking = async (e: React.MouseEvent, item: DashboardOrder) => {
+        e.stopPropagation();
+        const code = item.verification_code;
+        if (!code) {
+            showToast('Esta orden no posee código de seguimiento', 'info');
+            return;
+        }
+        const slug = tenantData?.slug || 'crematorio';
+        const url = buildTrackingUrl(slug, item.pet || 'mascota', code);
+        const ok = await copyToClipboard(url);
+        if (ok) {
+            setCopiedCodeId(item.id);
+            showToast(`Enlace de seguimiento copiado (${code})`, 'success');
+            setTimeout(() => setCopiedCodeId(null), 2000);
+        } else {
+            showToast('No se pudo copiar el enlace', 'error');
+        }
+    };
 
     if (isError && !data) {
         return (
@@ -150,12 +181,23 @@ export default function DashboardPage() {
     const { stats } = data;
     const todayItems = data.today_cremations ?? [];
     const otherActive = data.recent_cremations ?? [];
-    const allRecentOrders = [...todayItems, ...otherActive].slice(0, showMetrics ? 5 : 8);
+    const overdueItems = data.overdue_cremations ?? [];
+    const pipeline = data.pipeline_counts ?? { por_iniciar: 0, en_planta: 0, atrasadas: overdueItems.length };
+    const lowStockProducts = data.low_stock_products ?? [];
 
-    // KPIs con datos reales del tenant (antes: fallbacks inventados y % fijos)
+    // Selección de órdenes según pestaña
+    let displayedOrders: DashboardOrder[] = [];
+    if (processTab === 'today') {
+        displayedOrders = todayItems;
+    } else if (processTab === 'active') {
+        displayedOrders = otherActive;
+    } else {
+        displayedOrders = overdueItems;
+    }
+
+    // KPIs con datos reales del tenant
     const totalPetsCount = stats.total_pets ?? 0;
     const totalClientsCount = stats.total_customers ?? 0;
-    // Pendientes = órdenes abiertas (ni entregadas ni canceladas)
     const pendingCount = data.active_count ?? 0;
     const scheduledToday = todayItems.filter(i => statusTone(i.status).label !== 'Entregado').length;
 
@@ -165,7 +207,7 @@ export default function DashboardPage() {
     return (
         <div className="space-y-6 max-w-7xl mx-auto pb-10">
             {/* ACCESOS RÁPIDOS (arriba del banner) */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 <button
                     onClick={() => canCreateOrder ? setShowQuickRegistrationModal(true) : router.push('/dashboard/configuracion?tab=facturacion')}
                     disabled={!canCreateOrder && !isOwner}
@@ -179,6 +221,7 @@ export default function DashboardPage() {
                         <span className="block text-[11px] text-slate-400 dark:text-slate-500 truncate">Asistente en 4 pasos</span>
                     </div>
                 </button>
+
                 <button
                     onClick={() => canCreateOrder ? router.push('/dashboard/recepcion-pedidos/registro') : router.push('/dashboard/configuracion?tab=facturacion')}
                     disabled={!canCreateOrder && !isOwner}
@@ -189,9 +232,10 @@ export default function DashboardPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                         <span className="block text-sm font-bold text-slate-800 dark:text-slate-100 truncate">Nueva orden</span>
-                        <span className="block text-[11px] text-slate-400 dark:text-slate-500 truncate">Ficha completa y cotizador</span>
+                        <span className="block text-[11px] text-slate-400 dark:text-slate-500 truncate">Ficha y cotizador</span>
                     </div>
                 </button>
+
                 <button
                     onClick={() => canEmitCertificate ? router.push('/dashboard/documentos') : (isOwner ? router.push('/dashboard/configuracion?tab=facturacion') : undefined)}
                     disabled={!canEmitCertificate && !isOwner}
@@ -207,10 +251,11 @@ export default function DashboardPage() {
                             {!canEmitCertificate && <Lock size={12} className="text-amber-500 shrink-0" />}
                         </span>
                         <span className="block text-[11px] text-slate-400 dark:text-slate-500 truncate">
-                            {canEmitCertificate ? 'Certificado PDF oficial' : 'Requiere mejorar plan'}
+                            {canEmitCertificate ? 'Certificado PDF oficial' : 'Requiere plan'}
                         </span>
                     </div>
                 </button>
+
                 <button
                     onClick={() => setShowQuickTrackingModal(true)}
                     className="flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all text-left group"
@@ -220,18 +265,73 @@ export default function DashboardPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                         <span className="block text-sm font-bold text-slate-800 dark:text-slate-100 truncate">Buscar tracking</span>
-                        <span className="block text-[11px] text-slate-400 dark:text-slate-500 truncate">Consultar y compartir link</span>
+                        <span className="block text-[11px] text-slate-400 dark:text-slate-500 truncate">Estado y link cliente</span>
+                    </div>
+                </button>
+
+                {/* NUEVO: Compartir formulario / catálogo público */}
+                <button
+                    onClick={() => setShowShareModal(true)}
+                    className="flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all text-left group col-span-2 sm:col-span-1"
+                >
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ring-1 bg-amber-100 text-amber-700 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-500/25">
+                        <Share2 size={17} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <span className="block text-sm font-bold text-slate-800 dark:text-slate-100 truncate">Compartir público</span>
+                        <span className="block text-[11px] text-slate-400 dark:text-slate-500 truncate">Formulario y catálogo</span>
                     </div>
                 </button>
             </div>
 
-            {/* 1. Banner del inicio: carrusel editable desde el admin (Configuración → Banner del panel) */}
+            {/* 1. Banner del inicio */}
             <DashboardHeroCarousel />
 
-            {/* Primeros pasos de los crematorios nuevos (solo el admin; se oculta al completar o cerrar) */}
+            {/* Primeros pasos de los crematorios nuevos */}
             <OnboardingChecklist />
 
-            {/* Solicitudes web pendientes (Alerta compacta si existen) */}
+            {/* ALERTA DE STOCK CRÍTICO (Urnas / Insumos <= 3) */}
+            {lowStockProducts.length > 0 && (
+                <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div className="flex items-start md:items-center gap-3 min-w-0">
+                        <div className="p-2.5 rounded-xl bg-rose-500/20 text-rose-600 dark:text-rose-400 shrink-0">
+                            <AlertTriangle size={20} />
+                        </div>
+                        <div>
+                            <p className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                Alerta de Stock Crítico
+                                <span className="text-[11px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-700 dark:text-rose-300 font-extrabold">
+                                    {lowStockProducts.length} producto{lowStockProducts.length !== 1 ? 's' : ''}
+                                </span>
+                            </p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                Existencias de urnas o insumos en nivel crítico (3 o menos unidades). Repón stock para no interrumpir operaciones.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {lowStockProducts.slice(0, 3).map((prod) => (
+                            <span
+                                key={prod.id}
+                                className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-900/50 text-slate-800 dark:text-slate-200 shadow-xs"
+                            >
+                                <span className="truncate max-w-[120px]">{prod.name}</span>
+                                <strong className={prod.stock === 0 ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}>
+                                    ({prod.stock} u.)
+                                </strong>
+                            </span>
+                        ))}
+                        <Link
+                            href="/dashboard/inventario/productos"
+                            className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 dark:text-rose-400 hover:underline px-2.5 py-1"
+                        >
+                            Ver inventario <ArrowRight size={13} />
+                        </Link>
+                    </div>
+                </div>
+            )}
+
+            {/* Solicitudes web pendientes */}
             {pendingSubmissions.length > 0 && (
                 <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
@@ -285,7 +385,7 @@ export default function DashboardPage() {
                 </button>
             )}
 
-            {/* Aviso previo: desde el 80 % del tope */}
+            {/* Aviso previo de límite */}
             {limitsHit.length === 0 && limits.near.length > 0 && (() => {
                 const l = limits.near[0];
                 const left = l.item.max - l.item.usage;
@@ -306,7 +406,7 @@ export default function DashboardPage() {
                 );
             })()}
 
-            {/* 2. KPIs del crematorio (datos reales; comparación mes a la fecha) */}
+            {/* 2. KPIs del crematorio */}
             {showMetrics && (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <KpiCard
@@ -336,8 +436,10 @@ export default function DashboardPage() {
                     label="Pendientes"
                     value={pendingCount}
                     trend={{
-                        tone: 'flat',
-                        text: scheduledToday > 0
+                        tone: pipeline.atrasadas > 0 ? 'down' : 'flat',
+                        text: pipeline.atrasadas > 0
+                            ? `⚠️ ${pipeline.atrasadas} atrasada${pipeline.atrasadas === 1 ? '' : 's'}`
+                            : scheduledToday > 0
                             ? `${scheduledToday} programada${scheduledToday === 1 ? '' : 's'} para hoy`
                             : pendingCount > 0 ? 'Órdenes en curso' : 'Sin órdenes abiertas',
                     }}
@@ -345,62 +447,140 @@ export default function DashboardPage() {
             </div>
             )}
 
-            {/* Satisfacción de las familias (encuesta al concluir; solo con respuestas) */}
+            {/* Satisfacción de las familias */}
             {isOwner && showMetrics && <SatisfactionCard />}
 
-            {/* 3. SECCIÓN CENTRAL: GRÁFICO (~35%) + ÚLTIMOS PROCESOS (~65% o 100% sin métricas) */}
+            {/* MINI-EMBUDO OPERATIVO RÁPIDO */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-3.5 shadow-xs flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <Boxes size={16} className="text-primary" />
+                    <span>Embudo Operativo Hoy:</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setProcessTab('active')}
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                            processTab === 'active'
+                                ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }`}
+                    >
+                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                        Por iniciar / Recepción:
+                        <span className="font-extrabold tabular-nums">{pipeline.por_iniciar}</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setProcessTab('today')}
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                            processTab === 'today'
+                                ? 'bg-sky-500/20 text-sky-800 dark:text-sky-300 border border-sky-500/30'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }`}
+                    >
+                        <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                        En Planta / Horno:
+                        <span className="font-extrabold tabular-nums">{pipeline.en_planta}</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setProcessTab('overdue')}
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                            pipeline.atrasadas > 0
+                                ? (processTab === 'overdue'
+                                    ? 'bg-rose-600 text-white shadow-xs'
+                                    : 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500/25')
+                                : (processTab === 'overdue'
+                                    ? 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700')
+                        }`}
+                    >
+                        <span className={`w-2 h-2 rounded-full ${pipeline.atrasadas > 0 ? 'bg-rose-500' : 'bg-slate-400'}`}></span>
+                        Atrasadas:
+                        <span className="font-extrabold tabular-nums">{pipeline.atrasadas}</span>
+                    </button>
+                </div>
+            </div>
+
+            {/* 3. SECCIÓN CENTRAL: GRÁFICO (~35%) + GESTIÓN OPERATIVA (~65%) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                {/* Columna Izquierda: Cremaciones e ingresos por mes (solo cuando el plan incluye métricas) */}
+                {/* Columna Izquierda: Cremaciones e ingresos por mes */}
                 {showMetrics && (
                     <div className="lg:col-span-4 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-xs flex flex-col justify-between">
                         <div className="space-y-3 mb-2">
                             <div className="flex items-center justify-between gap-2">
                                 <h2 className="text-base font-bold text-[#0A192F] dark:text-white tracking-tight">
-                                    Cremaciones e ingresos por mes
+                                    Cremaciones e ingresos
                                 </h2>
                                 <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 shrink-0">
                                     6 meses
                                 </span>
                             </div>
 
-                            {/* Resumen financiero mensual para roles propietarios/contabilidad */}
+                            {/* Resumen financiero mensual para roles propietarios */}
                             {isOwner && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2.5 pt-1">
-                                    <div className="rounded-2xl bg-emerald-50/70 dark:bg-emerald-500/10 border border-emerald-200/60 dark:border-emerald-500/20 px-3 py-2">
-                                        <div className="flex items-center justify-between gap-1.5">
-                                            <span className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 flex items-center gap-1 truncate">
-                                                <Wallet size={12} className="shrink-0" /> Ingresos mes
-                                            </span>
-                                            {(() => {
-                                                const t = revenueTrend(stats.monthly_revenue ?? 0, stats.previous_month_revenue ?? 0);
-                                                if (!t) return null;
-                                                return (
-                                                    <span
-                                                        title={t.hint}
-                                                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0 ${
-                                                            t.tone === 'up'
-                                                                ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-                                                                : t.tone === 'down'
-                                                                ? 'bg-red-500/15 text-red-600 dark:text-red-400'
-                                                                : 'bg-slate-500/10 text-slate-600 dark:text-slate-400'
-                                                        }`}
-                                                    >
-                                                        {t.text}
-                                                    </span>
-                                                );
-                                            })()}
+                                <div className="space-y-2 pt-1">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2.5">
+                                        <div className="rounded-2xl bg-emerald-50/70 dark:bg-emerald-500/10 border border-emerald-200/60 dark:border-emerald-500/20 px-3 py-2">
+                                            <div className="flex items-center justify-between gap-1.5">
+                                                <span className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 flex items-center gap-1 truncate">
+                                                    <Wallet size={12} className="shrink-0" /> Ingresos mes
+                                                </span>
+                                                {(() => {
+                                                    const t = revenueTrend(stats.monthly_revenue ?? 0, stats.previous_month_revenue ?? 0);
+                                                    if (!t) return null;
+                                                    return (
+                                                        <span
+                                                            title={t.hint}
+                                                            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0 ${
+                                                                t.tone === 'up'
+                                                                    ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                                                    : t.tone === 'down'
+                                                                    ? 'bg-red-500/15 text-red-600 dark:text-red-400'
+                                                                    : 'bg-slate-500/10 text-slate-600 dark:text-slate-400'
+                                                            }`}
+                                                        >
+                                                            {t.text}
+                                                        </span>
+                                                    );
+                                                })()}
+                                            </div>
+                                            <p className="text-base font-black text-emerald-950 dark:text-white tabular-nums mt-0.5">
+                                                {formatCLP(stats.monthly_revenue ?? 0)}
+                                            </p>
                                         </div>
-                                        <p className="text-base font-black text-emerald-950 dark:text-white tabular-nums mt-0.5">
-                                            {formatCLP(stats.monthly_revenue ?? 0)}
-                                        </p>
+
+                                        <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 px-3 py-2">
+                                            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1 truncate">
+                                                <Clock size={12} className="shrink-0" /> En curso
+                                            </span>
+                                            <p className="text-base font-black text-slate-900 dark:text-white tabular-nums mt-0.5">
+                                                {formatCLP(stats.pending_revenue ?? 0)}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 px-3 py-2">
-                                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1 truncate">
-                                            <Clock size={12} className="shrink-0" /> En curso
-                                        </span>
-                                        <p className="text-base font-black text-slate-900 dark:text-white tabular-nums mt-0.5">
-                                            {formatCLP(stats.pending_revenue ?? 0)}
-                                        </p>
+
+                                    {/* Métricas de Convenios / Veterinarias Aliadas */}
+                                    <div className="p-2.5 rounded-2xl bg-indigo-50/50 dark:bg-indigo-500/10 border border-indigo-200/50 dark:border-indigo-500/20 text-xs">
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-semibold text-indigo-900 dark:text-indigo-300 flex items-center gap-1.5">
+                                                <Stethoscope size={13} className="shrink-0" /> Veterinarias aliadas
+                                            </span>
+                                            <span className="font-bold text-indigo-700 dark:text-indigo-400">
+                                                {stats.partner_orders_this_month ?? 0} {stats.partner_orders_this_month === 1 ? 'orden' : 'órdenes'}
+                                            </span>
+                                        </div>
+                                        {(stats.pending_commissions_amount ?? 0) > 0 && (
+                                            <div className="flex items-center justify-between mt-1 text-[11px] text-slate-600 dark:text-slate-400 pt-1 border-t border-indigo-100 dark:border-indigo-900/30">
+                                                <span>Comisiones pendientes:</span>
+                                                <strong className="text-amber-700 dark:text-amber-400 font-bold tabular-nums">
+                                                    {formatCLP(stats.pending_commissions_amount ?? 0)}
+                                                </strong>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -411,17 +591,69 @@ export default function DashboardPage() {
                     </div>
                 )}
 
-                {/* Columna Derecha: Últimos procesos */}
+                {/* Columna Derecha: Control de Procesos y Operaciones */}
                 <div className={`${showMetrics ? 'lg:col-span-8' : 'lg:col-span-12'} bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-xs flex flex-col`}>
-                    <div className="flex items-center justify-between mb-4 pb-1">
-                        <h2 className="text-base font-bold text-[#0A192F] dark:text-white tracking-tight">
-                            Últimos procesos
-                        </h2>
+                    {/* Header con Pestañas Operativas */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-2 border-b border-slate-100 dark:border-slate-800">
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setProcessTab('today')}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                                    processTab === 'today'
+                                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
+                                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                                }`}
+                            >
+                                <CalendarDays size={14} />
+                                Agenda de Hoy
+                                <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-extrabold">
+                                    {todayItems.length}
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setProcessTab('active')}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                                    processTab === 'active'
+                                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
+                                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                                }`}
+                            >
+                                <Flame size={14} />
+                                En Proceso
+                                <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-extrabold">
+                                    {otherActive.length}
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setProcessTab('overdue')}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                                    processTab === 'overdue'
+                                        ? 'bg-rose-600 text-white shadow-xs'
+                                        : overdueItems.length > 0
+                                        ? 'text-rose-600 dark:text-rose-400 font-black'
+                                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                                }`}
+                            >
+                                <AlertCircle size={14} />
+                                Atrasadas
+                                {overdueItems.length > 0 && (
+                                    <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-rose-500 text-white font-black animate-pulse">
+                                        {overdueItems.length}
+                                    </span>
+                                )}
+                            </button>
+                        </div>
+
                         <button
                             onClick={() => router.push('/dashboard/recepcion-pedidos')}
-                            className="text-xs font-bold text-sky-700 dark:text-sky-400 hover:underline flex items-center gap-1"
+                            className="text-xs font-bold text-sky-700 dark:text-sky-400 hover:underline flex items-center gap-1 shrink-0 self-end sm:self-auto"
                         >
-                            Ver todos <ArrowRight size={12} />
+                            Ver todas <ArrowRight size={12} />
                         </button>
                     </div>
 
@@ -433,18 +665,21 @@ export default function DashboardPage() {
                                     <th className="font-semibold pb-2.5">Mascota</th>
                                     <th className="font-semibold pb-2.5">Cliente</th>
                                     <th className="font-semibold pb-2.5">Estado</th>
-                                    <th className="font-semibold pb-2.5 text-right">Fecha</th>
+                                    <th className="font-semibold pb-2.5 text-right">Programación</th>
+                                    <th className="font-semibold pb-2.5 text-center">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                                {allRecentOrders.length > 0 ? (
-                                    allRecentOrders.map((item) => {
+                                {displayedOrders.length > 0 ? (
+                                    displayedOrders.map((item) => {
                                         const tone = statusTone(item.status);
                                         return (
                                             <tr
                                                 key={item.id}
                                                 onClick={() => openOrder(item.id)}
-                                                className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer transition-colors group"
+                                                className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/40 cursor-pointer transition-colors group ${
+                                                    item.is_overdue ? 'bg-rose-50/30 dark:bg-rose-950/10' : ''
+                                                }`}
                                             >
                                                 <td className="py-3 flex items-center gap-2.5">
                                                     <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex items-center justify-center shrink-0 border border-slate-200/60">
@@ -455,36 +690,75 @@ export default function DashboardPage() {
                                                         )}
                                                     </div>
                                                     <div className="min-w-0">
-                                                        <p className="font-bold text-slate-900 dark:text-white truncate group-hover:text-[#0EA5E9] transition-colors">
-                                                            {item.pet}
-                                                        </p>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <p className="font-bold text-slate-900 dark:text-white truncate group-hover:text-[#0EA5E9] transition-colors">
+                                                                {item.pet}
+                                                            </p>
+                                                            {item.is_overdue && (
+                                                                <span className="text-[9px] px-1.5 py-0.2 rounded-md bg-rose-500/20 text-rose-700 dark:text-rose-300 font-black">
+                                                                    Atrasada
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                         <p className="text-[10px] text-slate-400 truncate">
                                                             {item.pet_species || 'Mascota'}
                                                             {item.service_name ? ` · ${item.service_name}` : ''}
                                                         </p>
                                                     </div>
                                                 </td>
-                                                <td className="py-3 text-slate-600 dark:text-slate-300 truncate max-w-[180px]">
+                                                <td className="py-3 text-slate-600 dark:text-slate-300 truncate max-w-[160px]">
                                                     {item.client}
                                                 </td>
                                                 <td className="py-3">
                                                     <span
-                                                        className={`text-[10px] px-2.5 py-0.5 rounded-full inline-block max-w-[220px] truncate align-middle ${tone.className}`}
+                                                        className={`text-[10px] px-2.5 py-0.5 rounded-full inline-block max-w-[180px] truncate align-middle ${tone.className}`}
                                                         title={item.step_name && tone.label !== 'Entregado' ? `${tone.label}: ${item.step_name}` : tone.label}
                                                     >
                                                         {item.step_name && tone.label !== 'Entregado' ? item.step_name : tone.label}
                                                     </span>
                                                 </td>
-                                                <td className="py-3 text-right text-slate-400 tabular-nums text-[11px]">
-                                                    {item.time && item.time !== 'N/A' ? item.time : 'Hoy'}
+                                                <td className="py-3 text-right text-slate-500 dark:text-slate-400 tabular-nums text-[11px]">
+                                                    <span className={item.is_overdue ? 'text-rose-600 dark:text-rose-400 font-bold' : ''}>
+                                                        {item.time && item.time !== 'N/A' ? item.time : 'Hoy'}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        {item.verification_code && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => handleCopyTracking(e, item)}
+                                                                title={`Copiar tracking (${item.verification_code})`}
+                                                                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                                            >
+                                                                {copiedCodeId === item.id ? (
+                                                                    <Check size={14} className="text-emerald-500" />
+                                                                ) : (
+                                                                    <Copy size={14} />
+                                                                )}
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openOrder(item.id)}
+                                                            title="Ver expediente de la orden"
+                                                            className="p-1.5 rounded-lg text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                                        >
+                                                            <ExternalLink size={14} />
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );
                                     })
                                 ) : (
                                     <tr>
-                                        <td colSpan={4} className="py-8 text-center text-slate-400 italic">
-                                            Sin procesos recientes hoy
+                                        <td colSpan={5} className="py-10 text-center text-slate-400 italic">
+                                            {processTab === 'today'
+                                                ? 'No hay cremaciones programadas para hoy'
+                                                : processTab === 'overdue'
+                                                ? '¡Excelente! No hay procesos atrasados'
+                                                : 'No hay procesos abiertos en esta categoría'}
                                         </td>
                                     </tr>
                                 )}
@@ -531,6 +805,11 @@ export default function DashboardPage() {
             <QuickTrackingModal
                 isOpen={showQuickTrackingModal}
                 onClose={() => setShowQuickTrackingModal(false)}
+            />
+
+            <SharePublicLinksModal
+                isOpen={showShareModal}
+                onClose={() => setShowShareModal(false)}
             />
         </div>
     );

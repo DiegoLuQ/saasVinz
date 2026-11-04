@@ -410,6 +410,8 @@ class DashboardStatData(BaseModel):
     new_customers_this_month: int = 0
     new_customers_previous_month: int = 0
     cremations_previous_month: int = 0
+    partner_orders_this_month: int = 0
+    pending_commissions_amount: float = 0.0
 
 class DashboardLimitItem(BaseModel):
     usage: int
@@ -425,6 +427,19 @@ class DashboardLimitsData(BaseModel):
     partners: Optional[DashboardLimitItem] = None
     users: Optional[DashboardLimitItem] = None
 
+class DashboardPipelineCounts(BaseModel):
+    por_iniciar: int = 0
+    en_planta: int = 0
+    atrasadas: int = 0
+
+class DashboardLowStockProduct(BaseModel):
+    id: int
+    name: str
+    code: Optional[str] = None
+    stock: int
+    category_name: Optional[str] = None
+    image_url: Optional[str] = None
+
 class DashboardRecentActivity(BaseModel):
     id: int
     pet: str
@@ -436,12 +451,18 @@ class DashboardRecentActivity(BaseModel):
     status: str
     step_name: Optional[str] = None
     time: str
+    verification_code: Optional[str] = None
+    is_overdue: Optional[bool] = False
+    scheduled_at_iso: Optional[str] = None
 
 class DashboardSummarySchema(BaseModel):
     stats: DashboardStatData
     limits: DashboardLimitsData
     recent_cremations: List[DashboardRecentActivity]
     today_cremations: List[DashboardRecentActivity] = []
+    overdue_cremations: List[DashboardRecentActivity] = []
+    pipeline_counts: DashboardPipelineCounts = DashboardPipelineCounts()
+    low_stock_products: List[DashboardLowStockProduct] = []
     active_count: int = 0
     model_config = {"from_attributes": True}
 

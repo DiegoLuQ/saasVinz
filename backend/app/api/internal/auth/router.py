@@ -465,7 +465,7 @@ def get_bootstrap(
         ))
 
     # 8. Dashboard Summary (sin listas de órdenes: el dashboard las pide a /dashboard/summary)
-    dashboard_summary = dashboard_services.build_dashboard_summary(db, user.tenant, include_lists=False)
+    dashboard_summary = dashboard_services.build_dashboard_summary(db, user.tenant, include_lists=False, current_user=user)
 
     # 9. Get Templates
     # Incluye las plantillas propias del tenant + las GLOBALES del sistema

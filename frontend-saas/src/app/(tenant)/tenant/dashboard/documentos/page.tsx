@@ -472,12 +472,12 @@ export default function EmitirDocumentosPage() {
                                         )}
                                         <div className="absolute top-3 left-3 flex items-center gap-1.5">
                                             {isExclusive ? (
-                                                <span className="text-[10px] text-amber-300 bg-black/60 backdrop-blur-md border border-amber-500/40 px-2 py-0.5 rounded-md font-black uppercase tracking-wider flex items-center gap-1 shadow-lg">
-                                                    <Lock size={10} className="text-amber-400" /> Exclusiva
+                                                <span className="text-[10px] text-amber-800 bg-amber-50 border border-amber-300 dark:text-amber-300 dark:bg-black/60 dark:border-amber-500/40 backdrop-blur-md px-2 py-0.5 rounded-md font-black uppercase tracking-wider flex items-center gap-1 shadow-lg">
+                                                    <Lock size={10} className="text-amber-700 dark:text-amber-400" /> Exclusiva
                                                 </span>
                                             ) : (
-                                                <span className="text-[10px] text-emerald-300 bg-black/60 backdrop-blur-md border border-emerald-500/40 px-2 py-0.5 rounded-md font-black uppercase tracking-wider flex items-center gap-1 shadow-lg">
-                                                    <Globe size={10} className="text-emerald-400" /> Global
+                                                <span className="text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-300 dark:text-emerald-300 dark:bg-black/60 dark:border-emerald-500/40 backdrop-blur-md px-2 py-0.5 rounded-md font-black uppercase tracking-wider flex items-center gap-1 shadow-lg">
+                                                    <Globe size={10} className="text-emerald-700 dark:text-emerald-400" /> Global
                                                 </span>
                                             )}
                                         </div>

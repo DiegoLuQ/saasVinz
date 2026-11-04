@@ -919,7 +919,7 @@ export default function ServicesPage() {
                                                     {canEdit('servicios') && (
                                                         <button
                                                             onClick={() => router.push(`/dashboard/gestion-servicios/plan/${plan.id}`)}
-                                                            className="w-8 h-8 rounded-xl bg-black/40 backdrop-blur-md border border-white/20 text-white hover:bg-primary transition-all flex items-center justify-center shadow-sm"
+                                                            className="w-8 h-8 rounded-xl bg-slate-900/70 backdrop-blur-md border border-white/30 text-white hover:bg-primary hover:border-primary transition-all flex items-center justify-center shadow-sm"
                                                             title="Editar plan"
                                                         >
                                                             <Edit2 size={13} />
@@ -928,7 +928,7 @@ export default function ServicesPage() {
                                                     {canDelete('servicios') && (
                                                         <button
                                                             onClick={() => handleDelete('plan', plan.id, plan.name)}
-                                                            className="w-8 h-8 rounded-xl bg-black/40 backdrop-blur-md border border-white/20 text-white hover:bg-red-600 transition-all flex items-center justify-center shadow-sm"
+                                                            className="w-8 h-8 rounded-xl bg-slate-900/70 backdrop-blur-md border border-white/30 text-white hover:bg-red-600 hover:border-red-600 transition-all flex items-center justify-center shadow-sm"
                                                             title="Eliminar plan"
                                                         >
                                                             <Trash2 size={13} />
