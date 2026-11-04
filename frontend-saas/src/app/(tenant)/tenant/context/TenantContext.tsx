@@ -37,6 +37,11 @@ interface TenantData {
     // Plantilla de certificado elegida en Configuración (null = automática)
     default_certificate_template_id?: number | null;
     form_config?: any;
+    // Contacto del crematorio (pie del PDF de planes, etc.)
+    phone?: string | null;
+    email?: string | null;
+    address?: string | null;
+    city?: string | null;
 }
 
 interface TenantContextType {

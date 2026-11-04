@@ -37,6 +37,7 @@ import dynamic from 'next/dynamic';
 import { API_URL } from '@/lib/tenant/api';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { sortPlansForCatalog } from '@/lib/tenant/planOrder';
 const PlansDownloadLink = dynamic(() => import('@/components/tenant/catalog/PDFPlansDownloadButton'), { ssr: false });
 import {
     useCatalogServices,
@@ -1433,6 +1434,8 @@ export default function ServicesPage() {
                             <PlansDownloadLink
                                 plans={plans.filter((p: any) => !catalogPlansOnlyActive || p.is_active)}
                                 showPrices={catalogPlansShowPrices}
+                                showImages={catalogPlansShowImages}
+                                contact={{ phone: tenantData?.phone, email: tenantData?.email, address: tenantData?.address, city: tenantData?.city }}
                                 tenantName={tenantData?.name || 'Catálogo de Planes'}
                                 logoUrl={getLogoUrl()}
                                 filename={`planes-${tenantData?.name?.toLowerCase().replace(/\s+/g, '-') || 'crematorio'}.pdf`}
@@ -1467,7 +1470,7 @@ export default function ServicesPage() {
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {plans.filter((p: any) => !catalogPlansOnlyActive || p.is_active).map((plan: any) => (
+                                    {sortPlansForCatalog(plans.filter((p: any) => !catalogPlansOnlyActive || p.is_active)).map((plan: any) => (
                                         <div
                                             key={plan.id}
                                             className="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-4 flex gap-4"
