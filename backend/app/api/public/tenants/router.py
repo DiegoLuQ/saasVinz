@@ -71,6 +71,7 @@ class ServicePublicInfo(BaseModel):
     is_special: bool = False  # adicional ofrecido tras elegir el plan
     # Precio del plan por tramo {"<id tramo>": precio} (modo «precio por plan y peso»)
     weight_prices: dict | None = None
+    max_weight: float | None = None  # kg (planes): el formulario lo oculta en pesos mayores
 
     class Config:
         from_attributes = True
@@ -141,6 +142,7 @@ def get_tenant_services(slug: str, token: str | None = None, db: Session = Depen
             "image_url": p.image_url,
             "sub_items": plan_items,
             "weight_prices": clean_weight_prices(plan_weight_prices(price_list, p), tier_ids) if price_table else None,
+            "max_weight": p.max_weight,
         })
         
     # Fetch Products

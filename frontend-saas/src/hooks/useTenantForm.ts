@@ -5,7 +5,7 @@ import { compressImages } from '@/lib/clientImageCompressor';
 import { Service } from '@/components/public/ServiceSelectionStep';
 import { saveDraftImages, loadDraftImages, clearDraftImages } from '@/lib/formDraftImages';
 import { MAX_MEMORIAL_PHOTOS } from '@/components/public/ImageUploadStep';
-import { mergeWelcomeModal, planPriceForTier, resolveFormConfig, tierForWeight, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
+import { mergeWelcomeModal, planFitsWeight, planPriceForTier, resolveFormConfig, tierForWeight, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
 
 export interface Tenant {
     id: number;
@@ -412,13 +412,28 @@ export function useTenantForm(
         const tier = kg > 0 ? tierForWeight(weightTiers, kg) : null;
         return tier ? String(tier.id) : '';
     }, [petData.weightTierId, petData.weightKg, weightTiers]);
+    // Planes con peso máximo (ej. «Minigarritas» hasta 1 kg): se ocultan si la mascota lo supera.
+    const hiddenPlanIds = useMemo(() => {
+        const kg = parseFloat((petData.weightKg || '').replace(',', '.'));
+        const tier = weightTiers.find(t => String(t.id) === activeTierId);
+        return new Set(services
+            .filter(s => s.max_weight && !planFitsWeight(s.max_weight, tier?.min_weight, kg > 0 ? kg : null))
+            .map(s => String(s.id)));
+    }, [services, petData.weightKg, weightTiers, activeTierId]);
+    const visibleSelected = useMemo(
+        () => selectedServices.filter(id => !hiddenPlanIds.has(String(id))),
+        [selectedServices, hiddenPlanIds]
+    );
     const pricedServices = useMemo(
-        () => activeTierId
-            ? services.map(s => s.weight_prices
-                ? { ...s, price: planPriceForTier(s.price ?? 0, s.weight_prices, activeTierId) }
-                : s)
-            : services,
-        [services, activeTierId]
+        () => {
+            const shown = services.filter(s => !hiddenPlanIds.has(String(s.id)));
+            return activeTierId
+                ? shown.map(s => s.weight_prices
+                    ? { ...s, price: planPriceForTier(s.price ?? 0, s.weight_prices, activeTierId) }
+                    : s)
+                : shown;
+        },
+        [services, activeTierId, hiddenPlanIds]
     );
 
     // 6. Validaciones
@@ -659,7 +674,7 @@ export function useTenantForm(
             else pet.weightTierId = '';
             formData.append('owner_data', JSON.stringify(owner));
             formData.append('pet_data', JSON.stringify(pet));
-            formData.append('selected_services', JSON.stringify(selectedServices));
+            formData.append('selected_services', JSON.stringify(visibleSelected));
             if (token) formData.append('token', token);
             if (widgetKey) formData.append('widget_key', widgetKey);
             if (customFormParam) formData.append('form_preset_id', customFormParam);
@@ -753,7 +768,7 @@ export function useTenantForm(
         images,
         setImages,
         services: pricedServices,
-        selectedServices,
+        selectedServices: visibleSelected,
         ownerErrors,
         petErrors,
         handleNext,

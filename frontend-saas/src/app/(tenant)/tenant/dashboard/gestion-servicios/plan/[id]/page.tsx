@@ -54,6 +54,8 @@ export default function EditPlanPage() {
     const [quickProduct, setQuickProduct] = useState({ name: '', cost_price: 0, sale_price: 0 });
     const [notFound, setNotFound] = useState(false);
     const [serviceGroupFilter, setServiceGroupFilter] = useState<string>('all');
+    // Texto del campo «Peso máximo» (acepta coma decimal); el número va en currentPlan.max_weight
+    const [maxWeightText, setMaxWeightText] = useState('');
 
     // Grupos: de servicios (para elegir los incluidos) y de planes (para el campo Grupo)
     const serviceGroupNames = useMemo(
@@ -86,6 +88,7 @@ export default function EditPlanPage() {
                     optional_service_ids: plan.optional_service_ids || [],
                     product_ids: plan.products?.map(p => p.id) || [],
                 });
+                setMaxWeightText(plan.max_weight ? String(plan.max_weight).replace('.', ',') : '');
             } else {
                 setNotFound(true);
             }
@@ -393,6 +396,29 @@ export default function EditPlanPage() {
                         </datalist>
                         <p className="text-[10px] text-muted-foreground/60 ml-1">
                             Al compartir el catálogo eliges qué grupos muestra cada enlace. El nombre del plan puede repetirse en otro grupo. Vacío = «Sin grupo».
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Peso máximo de la mascota (opcional)</label>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="text"
+                                inputMode="decimal"
+                                value={maxWeightText}
+                                onChange={(e) => {
+                                    const raw = e.target.value.replace(/[^\d.,]/g, '');
+                                    setMaxWeightText(raw);
+                                    const n = parseFloat(raw.replace(',', '.'));
+                                    setCurrentPlan({ ...currentPlan, max_weight: raw && n > 0 ? n : null });
+                                }}
+                                className="w-32 bg-black/20 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-amber-500/40 transition-all text-sm font-medium"
+                                placeholder="Sin límite"
+                            />
+                            <span className="text-sm text-muted-foreground">kg</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground/60 ml-1">
+                            Ej. 1 para un plan solo hasta 1 kg. En el catálogo y el formulario este plan se oculta cuando el tamaño o el peso de la mascota es mayor.
                         </p>
                     </div>
 

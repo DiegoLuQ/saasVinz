@@ -124,6 +124,18 @@ export function planPriceForTier(basePrice: number, weightPrices: PlanWeightPric
     return value != null ? Number(value) : basePrice;
 }
 
+/**
+ * ¿El plan acepta esta mascota? Peso máximo del plan (ej. «Minigarritas» hasta 1 kg).
+ * Con kg: kg <= máximo. Con un tramo: se muestra si el tramo empieza bajo el máximo
+ * («0 – 1» sí, «1 – 4» no). Mismo criterio que plan_fits_weight del backend.
+ */
+export function planFitsWeight(planMax: number | null | undefined, tierMin?: number | null, kg?: number | null): boolean {
+    if (!planMax) return true;
+    if (kg != null && kg > 0) return kg <= planMax;
+    if (tierMin != null) return tierMin <= 0 || tierMin < planMax;
+    return true;
+}
+
 /** Tramo de peso "hasta X kg" del crematorio (max_weight null = abierto). */
 export interface WeightTier {
     id: number;

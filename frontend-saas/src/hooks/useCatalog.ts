@@ -42,6 +42,8 @@ export interface Plan {
     sort_order?: number;
     /** Grupo del plan; cada enlace del catálogo elige qué grupos muestra. null = «Sin grupo» */
     group_name?: string | null;
+    /** Peso máximo de la mascota en kg (null = sin límite) */
+    max_weight?: number | null;
     services?: Service[];
     service_ids?: number[];          // el orden de la lista es el orden en el catálogo
     optional_service_ids?: number[]; // subconjunto de service_ids marcados como opcionales

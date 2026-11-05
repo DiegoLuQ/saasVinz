@@ -337,6 +337,27 @@ async def submit_public_form(
                                           "max_weight": tier.max_weight, "price": 0}
     sub_tier_id = submission_tier_id(db, tenant_id, pet_dict, list_tiers) if price_table else None
 
+    # Peso máximo del plan (ej. «Minigarritas» hasta 1 kg): no se acepta para mascotas mayores.
+    from app.services.public_form_config import plan_fits_weight
+    _kg = None
+    if pet_dict.get("weightKg") not in (None, ""):
+        try:
+            _kg = float(str(pet_dict["weightKg"]).replace(",", "."))
+        except ValueError:
+            _kg = None
+    _snap = pet_dict.get("weightTier") if isinstance(pet_dict.get("weightTier"), dict) else {}
+    _tier_min = _snap.get("min_weight") if _snap else None
+    _plan_ids = [int(i.split("_")[1]) for i in services_list_ids
+                 if isinstance(i, str) and i.startswith("plan_") and i.split("_")[1].isdigit()]
+    if _plan_ids and (_kg is not None or _tier_min is not None):
+        for _p in db.query(models.Plan).filter(models.Plan.id.in_(_plan_ids), models.Plan.tenant_id == tenant_id,
+                                               models.Plan.max_weight.isnot(None)):
+            if not plan_fits_weight(_p.max_weight, _tier_min, _kg):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"El plan «{_p.name}» es solo para mascotas de hasta {f'{_p.max_weight:g}'.replace('.', ',')} kg. Elige otro plan.",
+                )
+
     # Pre-fetch lookup to avoid N+1 queries ideally, but for now simple loop is fine for small forms
     from sqlalchemy.orm import joinedload
     

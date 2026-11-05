@@ -35,6 +35,8 @@ export interface Service {
     is_special?: boolean;
     /** Planes con precio por tramo de peso {"<id tramo>": precio} */
     weight_prices?: Record<string, number> | null;
+    /** Planes: peso máximo de la mascota en kg (null = sin límite) */
+    max_weight?: number | null;
 }
 
 /** ids de servicios ya incluidos en los planes seleccionados (no se cobran aparte). */

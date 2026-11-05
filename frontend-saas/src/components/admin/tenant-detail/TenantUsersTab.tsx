@@ -268,6 +268,7 @@ export default function TenantUsersTab({
             </div>
 
             <TenantUserModal
+                key={showUserModal ? `${userModalMode}-${selectedUser?.id ?? 'new'}` : 'closed'}
                 isOpen={showUserModal}
                 mode={userModalMode}
                 formData={userFormData}

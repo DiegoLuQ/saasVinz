@@ -164,6 +164,7 @@ class PlanBase(BaseModel):
     important_note: Optional[str] = Field(None, max_length=200)
     sort_order: int = 0
     group_name: Optional[str] = None
+    max_weight: Optional[float] = Field(None, gt=0, le=500)  # kg; None = sin límite
 
     _clean_group = field_validator("group_name", mode="before")(clean_group_name)
 
@@ -184,6 +185,7 @@ class PlanUpdate(BaseModel):
     important_note: Optional[str] = Field(None, max_length=200)
     sort_order: Optional[int] = None
     group_name: Optional[str] = None
+    max_weight: Optional[float] = Field(None, gt=0, le=500)  # null = sin límite
     service_ids: Optional[List[int]] = None
     product_ids: Optional[List[int]] = None
     optional_service_ids: Optional[List[int]] = None
@@ -308,6 +310,7 @@ class PublicCatalogPlan(BaseModel):
     image_url: Optional[str] = None  # portada del plan
     # Precio por tramo {"<id tramo>": precio} (modo «precio por plan y peso»)
     weight_prices: Optional[dict] = None
+    max_weight: Optional[float] = None  # kg; el catálogo lo oculta en tamaños mayores
     services: List[PublicCatalogPlanItem] = []
     products: List[PublicCatalogPlanItem] = []
 

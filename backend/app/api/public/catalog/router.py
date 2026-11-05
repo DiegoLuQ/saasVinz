@@ -257,6 +257,7 @@ def _active_plans(db: Session, tenant_id: int, price_table: bool = False, groups
                 is_featured=bool(p.is_featured),
                 image_url=p.image_url,
                 weight_prices=clean_weight_prices(plan_weight_prices(price_list, p), tier_ids) if price_table else None,
+                max_weight=p.max_weight,
                 services=[
                     schemas.PublicCatalogPlanItem(
                         name=s.name or "", description=s.description, is_optional=s.id in optional_ids

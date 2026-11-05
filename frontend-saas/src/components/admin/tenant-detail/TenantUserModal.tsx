@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { UserPlus, Pencil, UserCircle, Mail, Lock, Activity, Save } from 'lucide-react';
 import { apiRequest } from '@/lib/admin/api';
@@ -23,6 +23,12 @@ export default function TenantUserModal({
     onClose,
     onSave
 }: TenantUserModalProps) {
+    // Al editar, la contraseña solo se envía si se pide cambiarla: así el navegador no
+    // puede autocompletar el campo con la clave guardada del SuperAdmin y reemplazar
+    // en silencio la del usuario al guardar otro dato (rol, nombre…).
+    const [changePassword, setChangePassword] = useState(false);
+    const showPassword = mode === 'create' || changePassword;
+
     // Solo roles habilitados pueden asignarse (el SuperAdmin los gestiona).
     const { data: enabledRoles } = useQuery<{ key: string; label: string }[]>({
         queryKey: ['enabled-roles'],
@@ -58,6 +64,7 @@ export default function TenantUserModal({
                                 <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={18} />
                                 <input
                                     type="text"
+                                    autoComplete="off"
                                     value={formData.name}
                                     onChange={(e) => onChange({ ...formData, name: e.target.value })}
                                     className="w-full bg-[#0f2642] border border-white/10 rounded-2xl p-4 pl-12 text-white font-bold outline-none focus:border-blue-500 transition-all shadow-inner"
@@ -72,6 +79,7 @@ export default function TenantUserModal({
                                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={18} />
                                 <input
                                     type="email"
+                                    autoComplete="off"
                                     value={formData.email}
                                     onChange={(e) => onChange({ ...formData, email: e.target.value })}
                                     className="w-full bg-[#0f2642] border border-white/10 rounded-2xl p-4 pl-12 text-white font-bold outline-none focus:border-blue-500 transition-all shadow-inner"
@@ -81,19 +89,41 @@ export default function TenantUserModal({
                         </div>
 
                         <div>
-                            <label className="text-[10px] uppercase font-black text-white/30 mb-2 block tracking-widest">
-                                {mode === 'edit' ? 'Nueva Contraseña (Dejar vacío para mantener)' : 'Contraseña Temporal'}
-                            </label>
+                            <div className="mb-2 flex items-center justify-between gap-2">
+                                <label className="text-[10px] uppercase font-black text-white/30 block tracking-widest">
+                                    {mode === 'edit' ? 'Contraseña' : 'Contraseña Temporal'}
+                                </label>
+                                {mode === 'edit' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (changePassword) onChange({ ...formData, password: '' });
+                                            setChangePassword(v => !v);
+                                        }}
+                                        className="text-[11px] font-bold text-blue-400 hover:text-blue-300"
+                                    >
+                                        {changePassword ? 'Mantener la actual' : 'Cambiar contraseña'}
+                                    </button>
+                                )}
+                            </div>
+                            {!showPassword ? (
+                                <p className="rounded-2xl border border-white/10 bg-[#0f2642] p-4 text-xs text-white/50">
+                                    Se mantiene la contraseña actual.
+                                </p>
+                            ) : (
                             <div className="relative">
                                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={18} />
                                 <input
                                     type="password"
+                                    autoComplete="new-password"
+                                    name="tenant-user-new-password"
                                     value={formData.password}
                                     onChange={(e) => onChange({ ...formData, password: e.target.value })}
                                     className="w-full bg-[#0f2642] border border-white/10 rounded-2xl p-4 pl-12 text-white font-bold outline-none focus:border-blue-500 transition-all shadow-inner"
                                     placeholder="••••••••"
                                 />
                             </div>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">

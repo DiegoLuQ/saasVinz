@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { catalogSessionId, trackCatalogEvent, type CatalogEventKind } from '@/lib/catalogEvents';
 import localFont from 'next/font/local';
 import { DEFAULT_CATALOG_INTRO } from '@/lib/catalogDefaults';
-import type { WeightTier } from '@/lib/publicFormConfig';
+import { planFitsWeight, type WeightTier } from '@/lib/publicFormConfig';
 import {
     ArrowRight, Check, ChevronDown, Facebook, Feather, Globe, Info, Instagram, Mail, MapPin, MessageCircle, Phone, Plus, Search, Share2, X,
 } from 'lucide-react';
@@ -44,6 +44,8 @@ export interface PublicPlan {
     image_url?: string | null;
     /** Precio por tramo de peso {"<id tramo>": precio} (crematorios con tabla por plan) */
     weight_prices?: Record<string, number> | null;
+    /** Peso máximo de la mascota en kg: se oculta en tamaños mayores */
+    max_weight?: number | null;
     services: PublicPlanItem[];
     products: PublicPlanItem[];
 }
@@ -193,16 +195,19 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
         optional: plan.services.filter(s => s.is_optional),
     })), [plans]);
 
+    // Tamaño elegido: los planes con peso máximo menor (ej. «Minigarritas» hasta 1 kg) se ocultan.
+    const selectedTier = useMemo(() => weightTiers.find(t => String(t.id) === sizeKey), [weightTiers, sizeKey]);
     const filtered = useMemo(() => {
         const q = searchTerm.trim().toLowerCase();
-        if (!q) return views;
-        return views.filter(({ plan }) =>
+        const fitting = views.filter(({ plan }) => planFitsWeight(plan.max_weight, selectedTier?.min_weight));
+        if (!q) return fitting;
+        return fitting.filter(({ plan }) =>
             plan.name.toLowerCase().includes(q) ||
             (plan.description || '').toLowerCase().includes(q) ||
             plan.services.some(s => s.name.toLowerCase().includes(q)) ||
             plan.products.some(s => s.name.toLowerCase().includes(q))
         );
-    }, [views, searchTerm]);
+    }, [views, searchTerm, selectedTier]);
 
     const whatsappUrl = (text: string) =>
         tenant.whatsapp ? `https://wa.me/${tenant.whatsapp}?text=${encodeURIComponent(text)}` : null;

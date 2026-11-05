@@ -93,6 +93,9 @@ class Plan(Base):
     # Grupo del plan (texto libre). Cada enlace del catálogo elige qué grupos muestra
     # (CatalogShareToken.plan_groups). Migración b8e0a2c4d571.
     group_name = Column(String(60), nullable=True)
+    # Peso máximo de la mascota (kg, NULL = sin límite): se oculta en catálogo/formulario
+    # para tamaños mayores (plan_fits_weight en public_form_config). Migración f6c8e0a2b419.
+    max_weight = Column(Float, nullable=True)
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
 
     # Ordenados según el orden definido en el plan(srv_plan_services.sort_order)

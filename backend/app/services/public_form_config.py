@@ -224,6 +224,19 @@ def tier_for_weight(tiers: list, weight: float | None):
     return None
 
 
+def plan_fits_weight(plan_max: float | None, tier_min: float | None = None, kg: float | None = None) -> bool:
+    """¿El plan acepta esta mascota? (mismo criterio que planFitsWeight del frontend)
+    Con kg: kg <= máximo. Con un tramo: se muestra si el tramo empieza bajo el máximo
+    (ej. máximo 1 kg: «0 – 1» sí, «1 – 4» no). Sin peso o sin máximo: sí."""
+    if not plan_max:
+        return True
+    if kg is not None and kg > 0:
+        return kg <= plan_max
+    if tier_min is not None:
+        return tier_min <= 0 or tier_min < plan_max
+    return True
+
+
 def clean_weight_prices(raw: Any, tier_ids: set) -> dict | None:
     """{"<id tramo>": precio} solo con tramos existentes y montos válidos."""
     if not isinstance(raw, dict):
