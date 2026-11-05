@@ -117,8 +117,8 @@ def get_public_catalog(
     # 5a. Catálogo de planes (compartido desde Gestión de Servicios)
     if catalog_type == "plans":
         from app.services.price_lists import effective_for_token
-        price_table = uses_price_table(tenant)
         price_list = effective_for_token(db, share_token)  # promoción del enlace (None = General)
+        price_table = uses_price_table(tenant) or price_list is not None
         return schemas.PublicCatalogResponse(
             catalog_type="plans",
             is_expired=False,
@@ -238,7 +238,7 @@ def _active_plans(db: Session, tenant_id: int, price_table: bool = False, groups
         .order_by(Plan.sort_order.asc(), Plan.price.asc(), Plan.name.asc())
         .all()
     )
-    tier_ids = {t.id for t in get_weight_tiers(db, tenant_id)} if price_table else set()
+    tier_ids = {t.id for t in get_weight_tiers(db, tenant_id, price_list.id if price_list else None)} if price_table else set()
     # Grupos que muestra este enlace (None = todos)
     from app.services.plan_groups import plan_matches
     from app.services.price_lists import plan_weight_prices

@@ -233,6 +233,8 @@ class CremationOCInDB(CremationOCBase):
     agreement_name: Optional[str] = None
     agreement_discount: Optional[float] = None
     agreement_terms: Optional[dict] = None
+    # Tabla de precios (promoción) de la solicitud de origen: {id, name, tiers, plan_prices}
+    price_list: Optional[dict] = None
     images: Optional[List[str]] = None
     notes: Optional[str] = None
     tracking_token: Optional[str] = None

@@ -253,8 +253,9 @@ def plan_price_for_tier(plan, tier_id: Any, table: bool) -> float:
     return float(value) if value is not None else base
 
 
-def submission_tier_id(db: Session, tenant_id: int, pet: dict | None):
-    """Tramo de una solicitud: el elegido por la familia o el que cubre los kg."""
+def submission_tier_id(db: Session, tenant_id: int, pet: dict | None, tiers: list | None = None):
+    """Tramo de una solicitud: el elegido por la familia o el que cubre los kg
+    (`tiers`: los de una tabla de precios; por defecto los de la General)."""
     pet = pet or {}
     tier = pet.get("weightTier") if isinstance(pet.get("weightTier"), dict) else None
     tier_id = (tier or {}).get("id") or pet.get("weightTierId")
@@ -265,14 +266,49 @@ def submission_tier_id(db: Session, tenant_id: int, pet: dict | None):
             kg = float(str(pet.get("weightKg")).replace(",", "."))
         except ValueError:
             return None
-        row = tier_for_weight(get_weight_tiers(db, tenant_id), kg)
+        row = tier_for_weight(tiers if tiers is not None else get_weight_tiers(db, tenant_id), kg)
         return row.id if row else None
     return None
 
-def get_weight_tiers(db: Session, tenant_id: int) -> list:
-    """Tramos ordenados por límite superior; el abierto (NULL) al final."""
-    rules = db.query(models.WeightPricing).filter(models.WeightPricing.tenant_id == tenant_id).all()
-    return sorted(rules, key=lambda r: (r.max_weight is None, r.max_weight or 0))
+def get_weight_tiers(db: Session, tenant_id: int, price_list_id: int | None = None) -> list:
+    """Tramos ordenados por límite superior; el abierto (NULL) al final.
+    Sin `price_list_id` los de la General; con él, los propios de esa tabla de precios."""
+    q = db.query(models.WeightPricing).filter(models.WeightPricing.tenant_id == tenant_id)
+    q = q.filter(models.WeightPricing.price_list_id == price_list_id) if price_list_id \
+        else q.filter(models.WeightPricing.price_list_id.is_(None))
+    return sorted(q.all(), key=lambda r: (r.max_weight is None, r.max_weight or 0))
+
+
+def resolve_tier_inputs(tiers: list) -> list:
+    """Valida rangos «desde – hasta» escritos por el crematorio (sin solapes, solo el
+    último abierto, 0–500 kg). Devuelve [(tramo, min_weight)]. Sin min_weight se usa
+    el máximo del anterior (clientes antiguos)."""
+    if len(tiers) > MAX_WEIGHT_TIERS:
+        raise HTTPException(status_code=400, detail=f"Máximo {MAX_WEIGHT_TIERS} rangos de peso")
+    resolved = []
+    prev_max = None
+    for idx, t in enumerate(tiers):
+        n = idx + 1
+        is_last = idx == len(tiers) - 1
+        min_w = t.min_weight if t.min_weight is not None else (prev_max or 0.0)
+        if min_w < 0 or min_w > 500:
+            raise HTTPException(status_code=400, detail=f"Rango {n}: el peso desde debe estar entre 0 y 500 kg")
+        if prev_max is not None and min_w < prev_max:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Rango {n}: debe empezar en {prev_max:g} kg o más (el rango anterior llega hasta {prev_max:g} kg)"
+            )
+        if t.max_weight is None:
+            if not is_last:
+                raise HTTPException(status_code=400, detail="Solo el último rango puede quedar abierto (sin máximo)")
+        else:
+            if t.max_weight <= min_w:
+                raise HTTPException(status_code=400, detail=f"Rango {n}: el peso hasta debe ser mayor que el peso desde")
+            if t.max_weight > 500:
+                raise HTTPException(status_code=400, detail=f"Rango {n}: máximo fuera de rango (500 kg)")
+            prev_max = t.max_weight
+        resolved.append((t, min_w))
+    return resolved
 
 
 def weight_surcharge(tiers: list, weight: float | None) -> float:
@@ -328,11 +364,12 @@ def tier_range_text(min_weight: float | None, max_weight: float | None) -> str:
 
 
 def public_weight_tiers(db: Session, tenant_id: int, include_price: bool, price_list=None) -> list[dict]:
-    """Tramos públicos; con `price_list` (promoción del enlace) el recargo sale de esa tabla."""
+    """Tramos públicos; con `price_list` (promoción del enlace) los rangos propios de
+    esa tabla, sin recargo (el precio va en cada plan)."""
     if price_list is not None:
-        from app.services.price_lists import tier_price
+        include_price = False
     tiers = []
-    for r in get_weight_tiers(db, tenant_id):
+    for r in get_weight_tiers(db, tenant_id, price_list.id if price_list is not None else None):
         item = {
             "id": r.id,
             "label": r.label,
@@ -341,7 +378,7 @@ def public_weight_tiers(db: Session, tenant_id: int, include_price: bool, price_
             "range_text": tier_range_text(r.min_weight, r.max_weight),
         }
         if include_price:
-            item["price"] = tier_price(price_list, r) if price_list is not None else (r.price or 0)
+            item["price"] = r.price or 0
         tiers.append(item)
     return tiers
 
@@ -405,7 +442,7 @@ def apply_form_config_to_submission(
                 "min_weight": tier.min_weight or 0, "max_weight": tier.max_weight,
                 # Precio al momento del envío: el registro no cambia si luego se editan los tramos.
                 # Con la tabla por plan no hay recargo: el peso va en el precio del plan.
-                "price": 0 if uses_price_table(tenant) else (tier.price or 0),
+                "price": 0 if (uses_price_table(tenant) or tier.price_list_id) else (tier.price or 0),
             }
             pet["size"] = f"{tier.label} ({range_text})" if tier.label else range_text
         elif _filled(weight_kg):

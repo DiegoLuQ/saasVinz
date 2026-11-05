@@ -221,6 +221,8 @@ class CremationFinancial(Base):
     agreement_name = Column(String(120), nullable=True)
     agreement_discount = Column(Float, nullable=False, default=0.0, server_default="0")
     agreement_terms = Column(JSON, nullable=True)
+    # Tabla de precios (promoción) de la solicitud de origen: con kg se usa su tabla
+    price_list_id = Column(Integer, ForeignKey("srv_price_lists.id", ondelete="SET NULL"), nullable=True)
 
     cremation = relationship("CremationOC", back_populates="financial")
 

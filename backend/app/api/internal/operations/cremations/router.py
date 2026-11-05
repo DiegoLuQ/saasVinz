@@ -166,8 +166,10 @@ def obtener_expediente(
     # elegido por la familia) o sin tramos, se usa el monto guardado en la orden.
     tiers = get_weight_tiers(db, tenant_id)
     saved_weight_price = (oc.financial.weight_price or 0) if oc.financial else 0
-    # Con la tabla «precio por plan y peso» el peso ya va en el precio del plan.
-    table = uses_price_table(db.query(models.Tenant).get(tenant_id))
+    # Con la tabla «precio por plan y peso» (o una tabla de precios de promoción)
+    # el peso ya va en el precio del plan.
+    table = uses_price_table(db.query(models.Tenant).get(tenant_id)) or \
+        bool(oc.financial and oc.financial.price_list_id)
     weight_price = weight_surcharge(tiers, oc.weight) if (tiers and oc.weight and not table) else saved_weight_price
     if weight_price:
         if oc.weight:
@@ -358,7 +360,17 @@ def obtener_cremacion(
     _: bool = Depends(check_permission("ordenes", "view"))
 ):
     """Obtiene los detalles de una OC específica."""
-    return service.get_by_id(tenant_id, cremation_id)
+    oc = service.get_by_id(tenant_id, cremation_id)
+    out = schemas.CremationOCInDB.model_validate(oc)
+    pl_id = oc.financial.price_list_id if oc.financial else None
+    if pl_id:
+        from app import models
+        from app.services.price_lists import order_payload
+        pl = service.db.query(models.PriceList).filter(
+            models.PriceList.id == pl_id, models.PriceList.tenant_id == tenant_id,
+        ).first()
+        out.price_list = order_payload(service.db, pl)
+    return out
 
 @router.patch("/{cremation_id}", response_model=schemas.CremationOCInDB)
 def actualizar_cremacion(

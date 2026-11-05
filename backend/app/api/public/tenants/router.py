@@ -49,11 +49,15 @@ def get_tenant_by_slug(slug: str, token: str | None = None, db: Session = Depend
     info.form_config = form_config
     # Con la tabla por plan los tramos no llevan recargo (el precio va en cada plan).
     from app.services.price_lists import effective_for_token_str
+    price_list = effective_for_token_str(db, tenant.id, token)
     info.weight_tiers = public_weight_tiers(
         db, tenant.id,
         include_price=form_config["show_weight_prices"] and form_config["weight_pricing_mode"] != "table",
-        price_list=effective_for_token_str(db, tenant.id, token),
+        price_list=price_list,
     )
+    if price_list is not None and isinstance(info.form_config, dict):
+        # La tabla del enlace siempre cobra por plan y peso (sus rangos, sin recargo).
+        info.form_config = {**info.form_config, "weight_pricing_mode": "table"}
     return info
 
 class ServicePublicInfo(BaseModel):
@@ -116,9 +120,9 @@ def get_tenant_services(slug: str, token: str | None = None, db: Session = Depen
     
     from app.services.public_form_config import clean_weight_prices, get_weight_tiers, uses_price_table
     from app.services.price_lists import effective_for_token_str, plan_weight_prices
-    price_table = uses_price_table(tenant)
-    tier_ids = {t.id for t in get_weight_tiers(db, tenant.id)} if price_table else set()
-    price_list = effective_for_token_str(db, tenant.id, token) if price_table else None
+    price_list = effective_for_token_str(db, tenant.id, token)  # promoción del enlace del catálogo
+    price_table = uses_price_table(tenant) or price_list is not None
+    tier_ids = {t.id for t in get_weight_tiers(db, tenant.id, price_list.id if price_list else None)} if price_table else set()
 
     for p in plans:
         # Load associated items (services + products)

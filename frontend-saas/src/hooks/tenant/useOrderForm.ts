@@ -419,11 +419,23 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
             if (editId) {
                 const cremationData = await apiRequest(`/api/internal/cremations/${editId}`);
                 const formState = mapCremationToFormState(cremationData, petsData, timeZone);
+                // Orden creada desde una solicitud con tabla de precios (promoción del catálogo):
+                // se recalcula con los rangos y precios por plan de esa tabla, sin recargo.
+                type OrderPriceList = { tiers?: WeightPricingRule[]; plan_prices?: Record<string, Record<string, number>> } | null;
+                const orderList: OrderPriceList = cremationData.price_list || null;
+                if (orderList) {
+                    setWeightPricingMode('table');
+                    setWeightPricingRules(orderList.tiers || []);
+                    setPlanWeightPrices(Object.fromEntries(
+                        Object.entries(orderList.plan_prices || {}).map(([k, v]) => [Number(k), v || {}])
+                    ));
+                }
+                const orderTable = tableMode || !!orderList;
                 // Con kg, el recargo sale de los tramos vigentes. Se aplica aquí y no
                 // solo en el efecto de abajo: fetchData corre dos veces (al resolverse
                 // el tenant) y la orden llega después de los tramos, pisando el valor
                 // calculado con el weight_price guardado (0) sin que cambie el peso.
-                if (!tableMode && formState.weight && Array.isArray(weightRules) && weightRules.length > 0) {
+                if (!orderTable && formState.weight && Array.isArray(weightRules) && weightRules.length > 0) {
                     formState.weight_price = calculateWeightPrice(formState.weight, weightRules);
                 }
                 setCurrentCremation(formState);

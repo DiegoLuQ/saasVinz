@@ -1,16 +1,16 @@
-"""Tablas de precios por peso con nombre (promociones / plantillas).
+"""Tablas de precios con nombre (promociones / plantillas).
 
-- Usan los MISMOS rangos de peso de la General (srv_weight_pricing); solo cambian
-  precios. Celda vacía = precio de la General.
-- Modo recargo (form_config.weight_pricing_mode = "surcharge"): `tier_prices`
-  reemplaza el recargo de cada tramo.
-- Modo tabla ("table"): `plan_prices[plan][tramo]` reemplaza el precio del plan
-  en ese tramo (`srv_plans.weight_prices` es la General).
+- Independientes de la General: cada tabla tiene sus PROPIOS rangos de peso
+  (filas de srv_weight_pricing con price_list_id) y el precio final de cada plan
+  en cada rango (`plan_prices` = {"<plan>": {"<tramo de la tabla>": precio}}).
+  Siempre funcionan como «precio por plan y peso» (sin recargo), aunque la General
+  esté en modo recargo. Celda vacía = precio base del plan.
 - Cada enlace del catálogo de planes elige su tabla (`inv_catalog_tokens.price_list_id`,
-  NULL = General). El formulario abierto desde ese enlace muestra esos precios y
-  la solicitud los congela (snapshot), así la orden creada desde ella los conserva.
+  NULL = General). El catálogo y el formulario abierto desde ese enlace muestran sus
+  rangos y precios; la solicitud los congela (snapshot) y la orden creada desde ella
+  recuerda la tabla (`oc_financial.price_list_id`) para recalcular con sus rangos.
 - Vigencia: `valid_from` / `valid_until` (fechas, incluidas) e `is_active`. Fuera de
-  vigencia el enlace usa la General automáticamente.
+  vigencia el enlace usa la General automáticamente (las órdenes ya creadas no cambian).
 """
 from datetime import date
 from typing import Any, Optional
@@ -18,7 +18,9 @@ from typing import Any, Optional
 from sqlalchemy.orm import Session
 
 from app import models
-from app.services.public_form_config import clean_weight_prices, plan_price_for_tier
+from app.services.public_form_config import (
+    clean_weight_prices, get_weight_tiers, plan_price_for_tier, tier_range_text,
+)
 from app.utils import tz
 
 
@@ -72,42 +74,46 @@ def effective_for_token_str(db: Session, tenant_id: int, token: Optional[str]) -
     return effective_for_token(db, t) if t else None
 
 
-def tier_price(pl: Optional[models.PriceList], tier) -> float:
-    """Recargo de un tramo con la tabla (vacío = el de la General)."""
-    general = float(tier.price or 0)
-    if not pl or not isinstance(pl.tier_prices, dict):
-        return general
-    value = pl.tier_prices.get(str(tier.id))
-    return float(value) if value is not None else general
+def list_tiers(db: Session, pl: models.PriceList) -> list:
+    """Rangos propios de la tabla, ordenados como los de la General."""
+    return get_weight_tiers(db, pl.tenant_id, pl.id)
+
+
+def tier_ids(db: Session, tenant_id: int, pl: Optional[models.PriceList]) -> set:
+    return {t.id for t in get_weight_tiers(db, tenant_id, pl.id if pl else None)}
 
 
 def plan_weight_prices(pl: Optional[models.PriceList], plan) -> dict:
-    """{"<tramo>": precio} del plan: los de la General con los de la tabla encima."""
-    base = dict(plan.weight_prices) if isinstance(plan.weight_prices, dict) else {}
-    if pl and isinstance(pl.plan_prices, dict):
-        base.update(pl.plan_prices.get(str(plan.id)) or {})
-    return base
+    """{"<tramo>": precio} del plan: los de la tabla (si hay) o los de la General."""
+    if pl is not None:
+        row = (pl.plan_prices or {}).get(str(plan.id)) if isinstance(pl.plan_prices, dict) else None
+        return dict(row) if isinstance(row, dict) else {}
+    return dict(plan.weight_prices) if isinstance(plan.weight_prices, dict) else {}
 
 
 def plan_price(pl: Optional[models.PriceList], plan, tier_id: Any, table: bool) -> float:
-    """Precio del plan en un tramo (modo tabla) con la tabla; si no, el de la General."""
-    if not pl or not table or tier_id is None:
+    """Precio del plan en un tramo. Con tabla: su celda o el precio base del plan."""
+    if pl is None:
         return plan_price_for_tier(plan, tier_id, table)
-    value = (pl.plan_prices or {}).get(str(plan.id), {}).get(str(tier_id)) if isinstance(pl.plan_prices, dict) else None
-    return float(value) if value is not None else plan_price_for_tier(plan, tier_id, table)
+    base = float(plan.price or 0.0)
+    if tier_id is None:
+        return base
+    value = plan_weight_prices(pl, plan).get(str(tier_id))
+    return float(value) if value is not None else base
 
 
-def clean_payload(db: Session, tenant_id: int, tier_prices: Any, plan_prices: Any) -> tuple:
-    """Deja solo tramos y planes existentes del tenant con montos válidos."""
-    tier_ids = {t.id for t in db.query(models.WeightPricing.id).filter(models.WeightPricing.tenant_id == tenant_id)}
-    tiers = clean_weight_prices(tier_prices, tier_ids)
-    plans_out = {}
-    if isinstance(plan_prices, dict):
-        plan_ids = {p.id for p in db.query(models.Plan.id).filter(models.Plan.tenant_id == tenant_id)}
-        for k, v in plan_prices.items():
-            if str(k).isdigit() and int(k) in plan_ids:
-                row = clean_weight_prices(v, tier_ids)
-                if row:
-                    plans_out[str(int(k))] = row
-    return tiers, (plans_out or None)
-
+def order_payload(db: Session, pl: Optional[models.PriceList]) -> Optional[dict]:
+    """Lo que necesita el formulario de orden para recalcular con la tabla."""
+    if pl is None:
+        return None
+    tiers = list_tiers(db, pl)
+    ids = {t.id for t in tiers}
+    return {
+        "id": pl.id,
+        "name": pl.name,
+        "tiers": [{"id": t.id, "label": t.label, "min_weight": t.min_weight or 0,
+                   "max_weight": t.max_weight, "price": 0,
+                   "range_text": tier_range_text(t.min_weight, t.max_weight)} for t in tiers],
+        "plan_prices": {k: (clean_weight_prices(v, ids) or {})
+                        for k, v in (pl.plan_prices or {}).items() if isinstance(v, dict)},
+    }

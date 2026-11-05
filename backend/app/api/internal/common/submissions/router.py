@@ -63,6 +63,18 @@ class SubmissionListItem(BaseModel):
     class Config:
         from_attributes = True
 
+
+def _submission_price_list_id(db: Session, tenant_id: int, pet_data) -> int | None:
+    """Tabla de precios (promoción) con que se envió la solicitud, si aún existe."""
+    pl = (pet_data or {}).get("priceList") if isinstance(pet_data, dict) else None
+    pl_id = pl.get("id") if isinstance(pl, dict) else None
+    if not isinstance(pl_id, int):
+        return None
+    exists = db.query(models.PriceList.id).filter(
+        models.PriceList.id == pl_id, models.PriceList.tenant_id == tenant_id,
+    ).first()
+    return pl_id if exists else None
+
 @router.get("", response_model=list[SubmissionListItem])
 def get_submissions(
     db: Session = Depends(get_db),
@@ -648,6 +660,7 @@ def create_services_from_submission(
             total_cost=total_cost,
             discount=0.0,
             weight_price=weight_price,
+            price_list_id=_submission_price_list_id(db, tenant_id, submission.pet_data),
         ))
         
         # 4. Partitioned: Details

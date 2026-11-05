@@ -1,13 +1,17 @@
 """price_lists (tablas de precios por peso: promociones / plantillas)
 
-srv_price_lists: tablas con nombre que usan los MISMOS rangos de peso de la
-General (srv_weight_pricing) y cambian solo los precios:
-- tier_prices: {"<id tramo>": recargo}            (modo recargo por tramo)
-- plan_prices: {"<id plan>": {"<id tramo>": precio}} (modo precio por plan y peso)
-Celda vacía = precio de la General. valid_from / valid_until (fechas, opcional).
+srv_price_lists: tablas con nombre, independientes de la General, siempre en
+modo «precio por plan y peso»:
+- sus PROPIOS rangos de peso: filas de srv_weight_pricing con price_list_id
+  (NULL = rangos de la General); así los IDs de tramo son únicos y todo lo que
+  busca un tramo por id sigue funcionando.
+- plan_prices: {"<id plan>": {"<id tramo de la tabla>": precio}}; celda vacía =
+  precio base del plan.
+valid_from / valid_until (fechas, opcional) e is_active.
 inv_catalog_tokens.price_list_id: tabla que usa ese enlace del catálogo de
 planes (NULL = General); el formulario abierto desde el enlace la respeta y la
-solicitud congela esos precios hasta la orden.
+solicitud congela esos precios. oc_financial.price_list_id: la orden creada desde
+esa solicitud recuerda la tabla (al ingresar kg se usa la tabla, no la General).
 
 Revision ID: d2a4c6e8f795
 Revises: c0f2b4d6e683
@@ -30,7 +34,6 @@ def upgrade() -> None:
             id SERIAL PRIMARY KEY,
             tenant_id INTEGER NOT NULL REFERENCES sys_tenants(id) ON DELETE CASCADE,
             name VARCHAR(60) NOT NULL,
-            tier_prices JSON,
             plan_prices JSON,
             valid_from DATE,
             valid_until DATE,
@@ -58,6 +61,11 @@ def upgrade() -> None:
 
         ALTER TABLE inv_catalog_tokens ADD COLUMN IF NOT EXISTS price_list_id INTEGER
             REFERENCES srv_price_lists(id) ON DELETE SET NULL;
+        ALTER TABLE srv_weight_pricing ADD COLUMN IF NOT EXISTS price_list_id INTEGER
+            REFERENCES srv_price_lists(id) ON DELETE CASCADE;
+        CREATE INDEX IF NOT EXISTS ix_srv_weight_pricing_price_list ON srv_weight_pricing(price_list_id);
+        ALTER TABLE oc_financial ADD COLUMN IF NOT EXISTS price_list_id INTEGER
+            REFERENCES srv_price_lists(id) ON DELETE SET NULL;
     """)
     _grant_to_app_role()
 
@@ -83,5 +91,8 @@ def _grant_to_app_role() -> None:
 def downgrade() -> None:
     op.execute("""
         ALTER TABLE inv_catalog_tokens DROP COLUMN IF EXISTS price_list_id;
+        ALTER TABLE oc_financial DROP COLUMN IF EXISTS price_list_id;
+        DELETE FROM srv_weight_pricing WHERE price_list_id IS NOT NULL;
+        ALTER TABLE srv_weight_pricing DROP COLUMN IF EXISTS price_list_id;
         DROP TABLE IF EXISTS srv_price_lists CASCADE;
     """)

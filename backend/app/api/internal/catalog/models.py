@@ -138,18 +138,20 @@ class WeightPricing(Base):
     min_weight = Column(Float)
     max_weight = Column(Float)  # NULL = tramo abierto ("X kg o más"), solo el último
     price = Column(Float)
+    # NULL = rango de la General; con valor = rango propio de una tabla de precios
+    price_list_id = Column(Integer, ForeignKey("srv_price_lists.id", ondelete="CASCADE"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
 
 class PriceList(Base):
-    """Tabla de precios por peso con nombre (promoción / plantilla). Usa los mismos
-    rangos que la General y solo cambia precios; vacío = precio de la General.
+    """Tabla de precios con nombre (promoción / plantilla), independiente de la
+    General: sus propios rangos (srv_weight_pricing.price_list_id) y el precio de
+    cada plan por rango; vacío = precio base del plan.
     Lógica en app/services/price_lists.py (migración d2a4c6e8f795)."""
     __tablename__ = "srv_price_lists"
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(Integer, ForeignKey("sys_tenants.id"), nullable=False, index=True)
     name = Column(String(60), nullable=False)
-    tier_prices = Column(JSON, nullable=True)   # {"<id tramo>": recargo}
-    plan_prices = Column(JSON, nullable=True)   # {"<id plan>": {"<id tramo>": precio}}
+    plan_prices = Column(JSON, nullable=True)   # {"<id plan>": {"<id tramo de la tabla>": precio}}
     valid_from = Column(Date, nullable=True)
     valid_until = Column(Date, nullable=True)
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")

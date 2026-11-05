@@ -2,30 +2,27 @@
 
 /**
  * Tablas de precios con nombre (promociones / plantillas) — Configuración → Formulario y Pesos →
- * Pesos y precios. Usan los mismos rangos de peso de la General; solo cambian precios (celda vacía =
- * precio de la General). Cada enlace del catálogo de planes elige su tabla. Se guardan solas
- * (API /api/internal/price-lists), con los rangos y planes YA guardados.
+ * Pesos y precios. Cada tabla es independiente de la General: tiene sus PROPIOS rangos de peso y el
+ * precio de cada plan según el peso (celda vacía = precio base del plan). Cada enlace del catálogo
+ * de planes elige su tabla. Se guardan solas (API /api/internal/price-lists).
  */
-import React, { useCallback, useEffect, useState } from 'react';
-import { CalendarRange, Copy, Loader2, Pencil, Plus, Trash2, X, BadgePercent } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { BadgePercent, CalendarRange, Copy, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { apiRequest } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import PlanWeightPriceTable, { type PlanWeightRow } from './PlanWeightPriceTable';
 
-interface SavedTier {
-    id?: number;
+interface ListTier {
+    id: number;
     label: string | null;
-    min_weight: number | null;
+    min_weight: number;
     max_weight: number | null;
-    price: number | null;
 }
-
-type PlanRow = PlanWeightRow & { prices: Record<string, number> };
 
 export interface PriceList {
     id: number;
     name: string;
-    tier_prices: Record<string, number>;
+    tiers: ListTier[];
     plan_prices: Record<string, Record<string, number>>;
     valid_from: string | null;
     valid_until: string | null;
@@ -34,15 +31,25 @@ export interface PriceList {
     links: number;
 }
 
+interface TierRow {
+    label: string;
+    min_weight: string;
+    max_weight: string;
+}
+
 interface Draft {
     id?: number;
     name: string;
     valid_from: string;
     valid_until: string;
     is_active: boolean;
-    tier: string[];                     // por posición del rango
-    plans: Record<number, string[]>;    // plan_id → por posición del rango
+    tiers: TierRow[];
+    plans: Record<number, string[]>;    // plan_id → precio por posición del rango
 }
+
+const MAX_TIERS = 20;
+const NO_GROUP = '__none__';
+const ALL = '__all__';
 
 export const PRICE_LIST_STATUS: Record<PriceList['status'], { label: string; cls: string }> = {
     activa: { label: 'Activa', cls: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
@@ -52,46 +59,32 @@ export const PRICE_LIST_STATUS: Record<PriceList['status'], { label: string; cls
 };
 
 const fmtKg = (n: number) => String(n).replace('.', ',');
-const formatCLP = (n: number) =>
-    new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n);
+const parseKg = (v: string) => parseFloat(v.trim().replace(',', '.'));
 const fmtDate = (d: string) => d.split('-').reverse().join('-');
-const num = (v: number | undefined | null) => (v != null ? String(Math.round(v)) : '');
-
-const tierHeaders = (tiers: SavedTier[]) => tiers.map(t => ({
-    label: t.label || '',
-    min_weight: fmtKg(t.min_weight ?? 0),
-    max_weight: t.max_weight != null ? fmtKg(t.max_weight) : '',
-}));
-
 const errMsg = (err: unknown, fallback: string) => (err as { message?: string })?.message || fallback;
+const inputCls = 'w-full rounded-xl border border-foreground/10 bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary';
 
-export default function PriceListsSection({ reloadKey, dirty }: {
-    /** Cambia después de guardar la configuración (rangos / modo / tabla General). */
+export default function PriceListsSection({ reloadKey }: {
+    /** Cambia después de guardar la configuración (recarga los planes). */
     reloadKey: number;
-    /** Hay cambios sin guardar en la General: los rangos de esta sección son los guardados. */
-    dirty?: boolean;
 }) {
     const { showToast } = useToast();
     const [loading, setLoading] = useState(true);
     const [lists, setLists] = useState<PriceList[]>([]);
-    const [tiers, setTiers] = useState<SavedTier[]>([]);
-    const [plans, setPlans] = useState<PlanRow[]>([]);
-    const [mode, setMode] = useState<'surcharge' | 'table'>('surcharge');
+    const [plans, setPlans] = useState<PlanWeightRow[]>([]);
     const [draft, setDraft] = useState<Draft | null>(null);
+    const [groupFilter, setGroupFilter] = useState<string>(ALL);
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState<number | null>(null);
 
     const load = useCallback(async () => {
         try {
-            const [ls, rules, table] = await Promise.all([
+            const [ls, table] = await Promise.all([
                 apiRequest('/api/internal/price-lists'),
-                apiRequest('/api/internal/maintenance/weight-pricing'),
                 apiRequest('/api/internal/maintenance/plan-weight-prices').catch(() => null),
             ]);
             setLists(ls as PriceList[]);
-            setTiers((rules as SavedTier[]).filter(t => t.id != null));
-            setMode(table?.mode === 'table' ? 'table' : 'surcharge');
-            setPlans(((table?.plans || []) as PlanRow[]).filter(p => p.is_active !== false));
+            setPlans(((table?.plans || []) as PlanWeightRow[]).filter(p => p.is_active !== false));
         } catch {
             // la sección queda vacía; el resto de la pestaña sigue funcionando
         } finally {
@@ -101,29 +94,67 @@ export default function PriceListsSection({ reloadKey, dirty }: {
 
     useEffect(() => { load(); }, [load, reloadKey]);
 
-    const toDraft = (pl?: PriceList): Draft => ({
-        id: pl?.id,
-        name: pl?.name || '',
-        valid_from: pl?.valid_from || '',
-        valid_until: pl?.valid_until || '',
-        is_active: pl?.is_active ?? true,
-        tier: tiers.map(t => num(pl?.tier_prices?.[String(t.id)])),
-        plans: Object.fromEntries(plans.map(p => [
-            p.plan_id,
-            tiers.map(t => num(pl?.plan_prices?.[String(p.plan_id)]?.[String(t.id)])),
-        ])),
-    });
+    const groups = useMemo(() => {
+        const names = Array.from(new Set(plans.map(p => p.group_name).filter((g): g is string => !!g)));
+        return names.sort((a, b) => a.localeCompare(b, 'es'));
+    }, [plans]);
+    const hasUngrouped = plans.some(p => !p.group_name);
+    const visiblePlans = useMemo(() => plans.filter(p => (
+        groupFilter === ALL ? true : groupFilter === NO_GROUP ? !p.group_name : p.group_name === groupFilter
+    )), [plans, groupFilter]);
 
-    const copyGeneral = () => setDraft(d => d && ({
-        ...d,
-        tier: tiers.map(t => num(t.price)),
-        plans: Object.fromEntries(plans.map(p => [
-            p.plan_id,
-            tiers.map(t => num(p.prices?.[String(t.id)] ?? p.price)),
-        ])),
+    const toDraft = (pl?: PriceList): Draft => {
+        const tiers = pl?.tiers || [];
+        return {
+            id: pl?.id,
+            name: pl?.name || '',
+            valid_from: pl?.valid_from || '',
+            valid_until: pl?.valid_until || '',
+            is_active: pl?.is_active ?? true,
+            tiers: tiers.length
+                ? tiers.map(t => ({
+                    label: t.label || '',
+                    min_weight: fmtKg(t.min_weight ?? 0),
+                    max_weight: t.max_weight != null ? fmtKg(t.max_weight) : '',
+                }))
+                : [{ label: '', min_weight: '0', max_weight: '' }],
+            plans: Object.fromEntries(plans.map(p => [
+                p.plan_id,
+                (tiers.length ? tiers : [null]).map(t => {
+                    const v = t ? pl?.plan_prices?.[String(p.plan_id)]?.[String(t.id)] : undefined;
+                    return v != null ? String(Math.round(v)) : '';
+                }),
+            ])),
+        };
+    };
+
+    const openDraft = (d: Draft) => {
+        setGroupFilter(ALL);
+        setDraft(d);
+    };
+
+    const duplicate = (pl: PriceList) => openDraft({ ...toDraft(pl), id: undefined, name: `${pl.name} (copia)`.slice(0, 60) });
+
+    // --- rangos de la tabla ---
+    const updateTier = (idx: number, patch: Partial<TierRow>) => setDraft(d => d && ({
+        ...d, tiers: d.tiers.map((t, i) => (i === idx ? { ...t, ...patch } : t)),
     }));
-
-    const duplicate = (pl: PriceList) => setDraft({ ...toDraft(pl), id: undefined, name: `${pl.name} (copia)`.slice(0, 60) });
+    const addTier = () => setDraft(d => {
+        if (!d || d.tiers.length >= MAX_TIERS) return d;
+        const last = d.tiers[d.tiers.length - 1];
+        const lastMax = last ? parseKg(last.max_weight) : NaN;
+        const next = Number.isFinite(lastMax) ? fmtKg(Math.round((lastMax + 0.1) * 10) / 10) : '';
+        return {
+            ...d,
+            tiers: [...d.tiers, { label: '', min_weight: next, max_weight: '' }],
+            plans: Object.fromEntries(Object.entries(d.plans).map(([k, row]) => [k, [...row, '']])),
+        };
+    });
+    const removeTier = (idx: number) => setDraft(d => d && d.tiers.length > 1 ? ({
+        ...d,
+        tiers: d.tiers.filter((_, i) => i !== idx),
+        plans: Object.fromEntries(Object.entries(d.plans).map(([k, row]) => [k, row.filter((_, i) => i !== idx)])),
+    }) : d);
 
     const save = async () => {
         if (!draft) return;
@@ -131,21 +162,25 @@ export default function PriceListsSection({ reloadKey, dirty }: {
             showToast('Escribe un nombre para la tabla', 'error');
             return;
         }
-        const original = lists.find(l => l.id === draft.id);
-        const row = (values: string[]) => Object.fromEntries(tiers
-            .map((t, i) => [String(t.id), (values[i] || '').trim()] as const)
-            .filter(([, v]) => v !== '')
-            .map(([k, v]) => [k, parseFloat(v)]));
-        // Se edita la parte del modo actual; la del otro modo se conserva tal cual.
+        const tiers = draft.tiers.map((t, i) => ({
+            label: t.label.trim() || null,
+            min_weight: t.min_weight.trim() ? parseKg(t.min_weight) : (i === 0 ? 0 : null),
+            max_weight: t.max_weight.trim() ? parseKg(t.max_weight) : null,
+        }));
+        if (tiers.some(t => (t.min_weight != null && !Number.isFinite(t.min_weight)) || (t.max_weight != null && !Number.isFinite(t.max_weight)))) {
+            showToast('Revisa los pesos: usa números (ej. 4 o 4,5)', 'error');
+            return;
+        }
         const body = {
             name: draft.name.trim(),
             valid_from: draft.valid_from || null,
             valid_until: draft.valid_until || null,
             is_active: draft.is_active,
-            tier_prices: mode === 'surcharge' ? row(draft.tier) : (original?.tier_prices || {}),
-            plan_prices: mode === 'table'
-                ? Object.fromEntries(plans.map(p => [String(p.plan_id), row(draft.plans[p.plan_id] || [])]))
-                : (original?.plan_prices || {}),
+            tiers,
+            plan_prices: Object.fromEntries(Object.entries(draft.plans).map(([planId, row]) => [
+                planId,
+                draft.tiers.map((_, i) => ((row[i] || '').trim() ? parseFloat(row[i]) : null)),
+            ])),
         };
         setSaving(true);
         try {
@@ -177,8 +212,6 @@ export default function PriceListsSection({ reloadKey, dirty }: {
         }
     };
 
-    const headers = tierHeaders(tiers);
-
     return (
         <div className="glass-card p-5 sm:p-6 rounded-3xl space-y-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -188,16 +221,17 @@ export default function PriceListsSection({ reloadKey, dirty }: {
                         <h4 className="font-bold text-white">Tablas de precios (promociones)</h4>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1 max-w-xl">
-                        Guarda otros precios con nombre (ej. «Promo Diciembre») usando los mismos rangos de peso. Cada enlace del
-                        catálogo de planes elige su tabla; la familia que llega por ese enlace ve esos precios y su solicitud los conserva.
-                        Fuera de las fechas de vigencia el enlace usa la General.
+                        Crea tablas desde cero, con sus propios rangos de peso y el precio de cada plan según el peso
+                        (ej. «Promo Diciembre»). Cada enlace del catálogo de planes elige su tabla: la familia que llega por
+                        ese enlace ve esos rangos y precios, y su solicitud y la orden los conservan. Fuera de las fechas de
+                        vigencia el enlace usa la General.
                     </p>
                 </div>
                 {!draft && (
                     <button
                         type="button"
-                        disabled={loading || tiers.length === 0}
-                        onClick={() => setDraft(toDraft())}
+                        disabled={loading}
+                        onClick={() => openDraft(toDraft())}
                         className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-foreground disabled:opacity-50 cursor-pointer"
                     >
                         <Plus size={14} /> Nueva tabla
@@ -205,23 +239,15 @@ export default function PriceListsSection({ reloadKey, dirty }: {
                 )}
             </div>
 
-            {dirty && (
-                <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                    Tienes cambios sin guardar en los rangos o el modo: estas tablas usan lo ya guardado. Guarda primero para verlos aquí.
-                </p>
-            )}
-
             {loading ? (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 size={14} className="animate-spin" /> Cargando…</div>
-            ) : tiers.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Guarda al menos un rango de peso para crear tablas de precios.</p>
             ) : (
                 <>
                     {/* Lista */}
                     <div className="divide-y divide-foreground/5 rounded-2xl border border-foreground/10">
                         <div className="flex items-center gap-3 px-4 py-3">
                             <span className="font-semibold text-sm text-foreground">General</span>
-                            <span className="text-[11px] text-muted-foreground">Precios de arriba · la usan los enlaces sin tabla</span>
+                            <span className="text-[11px] text-muted-foreground">Rangos y precios de arriba · la usan los enlaces sin tabla</span>
                         </div>
                         {lists.map(pl => {
                             const st = PRICE_LIST_STATUS[pl.status];
@@ -236,10 +262,10 @@ export default function PriceListsSection({ reloadKey, dirty }: {
                                         </span>
                                     )}
                                     <span className="text-[11px] text-muted-foreground">
-                                        {pl.links === 1 ? '1 enlace' : `${pl.links} enlaces`}
+                                        {pl.tiers.length === 1 ? '1 rango' : `${pl.tiers.length} rangos`} · {pl.links === 1 ? '1 enlace' : `${pl.links} enlaces`}
                                     </span>
                                     <div className="ml-auto flex items-center gap-1">
-                                        <button type="button" onClick={() => setDraft(toDraft(pl))} title="Editar"
+                                        <button type="button" onClick={() => openDraft(toDraft(pl))} title="Editar"
                                             className="rounded-lg p-1.5 text-muted-foreground hover:bg-foreground/5 hover:text-foreground cursor-pointer">
                                             <Pencil size={14} />
                                         </button>
@@ -260,7 +286,7 @@ export default function PriceListsSection({ reloadKey, dirty }: {
 
                     {/* Editor */}
                     {draft && (
-                        <div className="space-y-4 rounded-2xl border border-primary/30 p-4">
+                        <div className="space-y-5 rounded-2xl border border-primary/30 p-4">
                             <div className="flex items-center justify-between gap-2">
                                 <h5 className="text-sm font-bold text-foreground">{draft.id ? 'Editar tabla' : 'Nueva tabla'}</h5>
                                 <button type="button" onClick={() => setDraft(null)} aria-label="Cerrar"
@@ -271,25 +297,21 @@ export default function PriceListsSection({ reloadKey, dirty }: {
                             <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
                                 <label className="text-xs font-semibold text-muted-foreground">
                                     Nombre
-                                    <input
-                                        value={draft.name}
-                                        maxLength={60}
-                                        placeholder="Ej. Promo Diciembre"
+                                    <input value={draft.name} maxLength={60} placeholder="Ej. Promo Diciembre"
                                         onChange={e => setDraft({ ...draft, name: e.target.value })}
-                                        className="mt-1 w-full rounded-xl border border-foreground/10 bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-                                    />
+                                        className={`mt-1 ${inputCls}`} />
                                 </label>
                                 <label className="text-xs font-semibold text-muted-foreground">
                                     Desde (opcional)
                                     <input type="date" value={draft.valid_from}
                                         onChange={e => setDraft({ ...draft, valid_from: e.target.value })}
-                                        className="mt-1 w-full rounded-xl border border-foreground/10 bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary" />
+                                        className={`mt-1 ${inputCls}`} />
                                 </label>
                                 <label className="text-xs font-semibold text-muted-foreground">
                                     Hasta (opcional)
                                     <input type="date" value={draft.valid_until} min={draft.valid_from || undefined}
                                         onChange={e => setDraft({ ...draft, valid_until: e.target.value })}
-                                        className="mt-1 w-full rounded-xl border border-foreground/10 bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary" />
+                                        className={`mt-1 ${inputCls}`} />
                                 </label>
                             </div>
                             <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer">
@@ -298,61 +320,82 @@ export default function PriceListsSection({ reloadKey, dirty }: {
                                 Activa (si la pausas, sus enlaces usan la General)
                             </label>
 
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                <p className="text-xs text-muted-foreground">
-                                    {mode === 'table'
-                                        ? 'Precio final de cada plan en cada rango. Celda vacía = precio de la General.'
-                                        : 'Recargo de cada rango de peso. Vacío = recargo de la General.'}
-                                </p>
-                                <button type="button" onClick={copyGeneral}
-                                    className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline cursor-pointer">
-                                    <Copy size={12} /> Copiar precios de la General
-                                </button>
+                            {/* Rangos propios */}
+                            <div className="space-y-2">
+                                <div>
+                                    <h6 className="text-xs font-bold text-foreground">Rangos de peso de esta tabla</h6>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        Desde – hasta en kg (ej. 0 – 1, 1,1 – 5). Solo el último puede quedar sin «hasta» (abierto).
+                                    </p>
+                                </div>
+                                {draft.tiers.map((t, idx) => (
+                                    <div key={idx} className="grid grid-cols-[1fr_5.5rem_5.5rem_auto] items-center gap-2">
+                                        <input value={t.label} maxLength={40} placeholder={`Rango ${idx + 1} (nombre opcional)`}
+                                            aria-label={`Rango ${idx + 1}: nombre`}
+                                            onChange={e => updateTier(idx, { label: e.target.value })} className={inputCls} />
+                                        <input value={t.min_weight} inputMode="decimal" placeholder="Desde"
+                                            aria-label={`Rango ${idx + 1}: desde (kg)`}
+                                            onChange={e => updateTier(idx, { min_weight: e.target.value.replace(/[^\d.,]/g, '') })} className={inputCls} />
+                                        <input value={t.max_weight} inputMode="decimal"
+                                            placeholder={idx === draft.tiers.length - 1 ? 'o más' : 'Hasta'}
+                                            aria-label={`Rango ${idx + 1}: hasta (kg)`}
+                                            onChange={e => updateTier(idx, { max_weight: e.target.value.replace(/[^\d.,]/g, '') })} className={inputCls} />
+                                        <button type="button" onClick={() => removeTier(idx)} disabled={draft.tiers.length <= 1}
+                                            aria-label={`Quitar rango ${idx + 1}`}
+                                            className="rounded-lg p-1.5 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 disabled:opacity-30 cursor-pointer">
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                ))}
+                                {draft.tiers.length < MAX_TIERS && (
+                                    <button type="button" onClick={addTier}
+                                        className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline cursor-pointer">
+                                        <Plus size={12} /> Agregar rango
+                                    </button>
+                                )}
                             </div>
 
-                            {mode === 'table' ? (
-                                <PlanWeightPriceTable
-                                    tiers={headers}
-                                    plans={plans}
-                                    values={draft.plans}
-                                    onChange={(planId, idx, value) => setDraft(d => d && ({
-                                        ...d,
-                                        plans: { ...d.plans, [planId]: (d.plans[planId] || tiers.map(() => '')).map((v, i) => (i === idx ? value : v)) },
-                                    }))}
-                                    onFillRow={planId => setDraft(d => {
-                                        if (!d) return d;
-                                        const plan = plans.find(p => p.plan_id === planId);
-                                        const base = String(Math.round(plan?.price || 0));
-                                        return { ...d, plans: { ...d.plans, [planId]: (d.plans[planId] || tiers.map(() => '')).map(v => v || base) } };
-                                    })}
-                                />
-                            ) : (
-                                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                                    {tiers.map((t, idx) => {
-                                        const h = headers[idx];
-                                        const range = h.max_weight ? `${h.min_weight} – ${h.max_weight} kg` : `Desde ${h.min_weight} kg`;
-                                        return (
-                                            <label key={t.id} className="rounded-xl border border-foreground/10 p-3 text-xs">
-                                                <span className="block font-semibold text-foreground">{h.label || `Rango ${idx + 1}`}</span>
-                                                <span className="block text-[11px] text-muted-foreground">{range} · General {formatCLP(t.price || 0)}</span>
-                                                <span className="mt-2 flex items-center rounded-lg border border-foreground/10 bg-background focus-within:border-primary">
-                                                    <span className="pl-2 text-muted-foreground">$</span>
-                                                    <input
-                                                        value={draft.tier[idx] || ''}
-                                                        inputMode="numeric"
-                                                        placeholder={String(Math.round(t.price || 0))}
-                                                        onChange={e => {
-                                                            const v = e.target.value.replace(/\D/g, '');
-                                                            setDraft(d => d && ({ ...d, tier: d.tier.map((x, i) => (i === idx ? v : x)) }));
-                                                        }}
-                                                        className="w-full bg-transparent px-1.5 py-1.5 text-sm font-semibold text-foreground outline-none placeholder:text-muted-foreground/50"
-                                                    />
-                                                </span>
-                                            </label>
-                                        );
-                                    })}
+                            {/* Precio de cada plan según el peso */}
+                            <div className="space-y-2">
+                                <div className="flex flex-wrap items-end justify-between gap-2">
+                                    <div>
+                                        <h6 className="text-xs font-bold text-foreground">Precio de cada plan según el peso</h6>
+                                        <p className="text-[11px] text-muted-foreground">
+                                            Precio final de cada plan en cada rango (sin recargo aparte). Celda vacía = precio base del plan.
+                                        </p>
+                                    </div>
+                                    {(groups.length > 0) && (
+                                        <label className="text-[11px] font-semibold text-muted-foreground">
+                                            Grupo de planes{' '}
+                                            <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)}
+                                                className="ml-1 rounded-lg border border-foreground/10 bg-background px-2 py-1 text-xs text-foreground cursor-pointer">
+                                                <option value={ALL}>Todos</option>
+                                                {groups.map(g => <option key={g} value={g}>{g}</option>)}
+                                                {hasUngrouped && <option value={NO_GROUP}>Sin grupo</option>}
+                                            </select>
+                                        </label>
+                                    )}
                                 </div>
-                            )}
+                                {visiblePlans.length === 0 ? (
+                                    <p className="text-xs text-muted-foreground">No hay planes activos{groupFilter !== ALL ? ' en este grupo' : ''}.</p>
+                                ) : (
+                                    <PlanWeightPriceTable
+                                        tiers={draft.tiers}
+                                        plans={visiblePlans}
+                                        values={draft.plans}
+                                        onChange={(planId, idx, value) => setDraft(d => d && ({
+                                            ...d,
+                                            plans: { ...d.plans, [planId]: (d.plans[planId] || d.tiers.map(() => '')).map((v, i) => (i === idx ? value : v)) },
+                                        }))}
+                                        onFillRow={planId => setDraft(d => {
+                                            if (!d) return d;
+                                            const plan = plans.find(p => p.plan_id === planId);
+                                            const base = String(Math.round(plan?.price || 0));
+                                            return { ...d, plans: { ...d.plans, [planId]: (d.plans[planId] || d.tiers.map(() => '')).map(v => v || base) } };
+                                        })}
+                                    />
+                                )}
+                            </div>
 
                             <div className="flex justify-end gap-2">
                                 <button type="button" onClick={() => setDraft(null)}

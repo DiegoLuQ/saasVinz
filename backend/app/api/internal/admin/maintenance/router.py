@@ -18,7 +18,7 @@ from typing import Dict, List, Optional, Any
 from pydantic import BaseModel, Field
 from app.services.public_form_config import (
     DEFAULT_FIELDS, MAX_WEIGHT_TIERS, WEIGHT_PRICING_MODES, clean_weight_prices, form_config_with_meta,
-    get_weight_tiers, normalize_form_config, uses_price_table,
+    get_weight_tiers, normalize_form_config, uses_price_table, resolve_tier_inputs,
 )
 from app.services import form_video
 from app.api.deps_features import check_feature
@@ -116,32 +116,7 @@ def replace_weight_pricing_rules(
     posición para conservar sus IDs (borradores del formulario público).
     """
     tiers = payload.tiers
-    if len(tiers) > MAX_WEIGHT_TIERS:
-        raise HTTPException(status_code=400, detail=f"Máximo {MAX_WEIGHT_TIERS} rangos de peso")
-
-    resolved = []  # (tramo, min_weight)
-    prev_max = None
-    for idx, t in enumerate(tiers):
-        n = idx + 1
-        is_last = idx == len(tiers) - 1
-        min_w = t.min_weight if t.min_weight is not None else (prev_max or 0.0)
-        if min_w < 0 or min_w > 500:
-            raise HTTPException(status_code=400, detail=f"Rango {n}: el peso desde debe estar entre 0 y 500 kg")
-        if prev_max is not None and min_w < prev_max:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Rango {n}: debe empezar en {prev_max:g} kg o más (el rango anterior llega hasta {prev_max:g} kg)"
-            )
-        if t.max_weight is None:
-            if not is_last:
-                raise HTTPException(status_code=400, detail="Solo el último rango puede quedar abierto (sin máximo)")
-        else:
-            if t.max_weight <= min_w:
-                raise HTTPException(status_code=400, detail=f"Rango {n}: el peso hasta debe ser mayor que el peso desde")
-            if t.max_weight > 500:
-                raise HTTPException(status_code=400, detail=f"Rango {n}: máximo fuera de rango (500 kg)")
-            prev_max = t.max_weight
-        resolved.append((t, min_w))
+    resolved = resolve_tier_inputs(tiers)  # (tramo, min_weight)
 
     existing = get_weight_tiers(db, tenant_id)
     for idx, (t, min_w) in enumerate(resolved):
