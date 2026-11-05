@@ -144,6 +144,9 @@ export interface WeightTier {
     max_weight: number | null;
     range_text: string;
     price?: number;
+    /** Tarjeta del tamaño en el catálogo: ícono (imagen) y ejemplos («Gatos, Chihuahuas») */
+    icon_url?: string | null;
+    examples?: string | null;
 }
 
 export const DEFAULT_PHASES: PhaseConfig = {

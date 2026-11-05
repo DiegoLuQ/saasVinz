@@ -8,6 +8,7 @@ import { DEFAULT_CATALOG_INTRO } from '@/lib/catalogDefaults';
 import { planFitsWeight, type WeightTier } from '@/lib/publicFormConfig';
 import {
     ArrowRight, Check, ChevronDown, Facebook, Feather, Globe, Info, Instagram, Mail, MapPin, MessageCircle, Phone, Plus, Search, Share2, X,
+    PawPrint,
 } from 'lucide-react';
 
 // Fuentes autoalojadas (OFL, variables, subconjunto latino) en src/fonts.
@@ -100,25 +101,41 @@ const COLLAPSED_ITEMS = 5; // ítems visibles antes de "Ver más"
 // Tamaños de mascota para cotizar: el precio de cremación depende del peso.
 // Respaldo si el crematorio no definió sus tramos de peso en Configuración.
 const PET_SIZES = [
-    { key: 'mini', label: 'Aves / Menos de 1 kg', price: 0 },
-    { key: 'small', label: 'Pequeño (1 a 10 kg)', price: 0 },
-    { key: 'medium', label: 'Mediano (10 a 25 kg)', price: 0 },
-    { key: 'large', label: 'Grande (25 a 45 kg)', price: 0 },
-    { key: 'giant', label: 'Gigante (+45 kg)', price: 0 },
+    { key: 'mini', label: 'Aves / Menos de 1 kg', name: 'Aves', range: 'Menos de 1 kg', price: 0 },
+    { key: 'small', label: 'Pequeño (1 a 10 kg)', name: 'Pequeño', range: '1 – 10 kg', price: 0 },
+    { key: 'medium', label: 'Mediano (10 a 25 kg)', name: 'Mediano', range: '10 – 25 kg', price: 0 },
+    { key: 'large', label: 'Grande (25 a 45 kg)', name: 'Grande', range: '25 – 45 kg', price: 0 },
+    { key: 'giant', label: 'Gigante (+45 kg)', name: 'Gigante', range: 'Desde 45 kg', price: 0 },
 ] as const;
+
+/** Opción del selector de tamaño (tarjeta): nombre, rango, ícono y ejemplos del crematorio. */
+interface SizeOption {
+    key: string;
+    label: string;
+    display: string;
+    name: string;
+    range: string;
+    price: number;
+    icon?: string | null;
+    examples?: string | null;
+}
 const DEFAULT_SIZE = 'small';
 
 const formatCLP = (value: number) => `$${Math.round(value).toLocaleString('es-CL')}`;
 
 /** Tramos del crematorio como opciones del selector ("Pequeño (Hasta 4 kg) · +$10.000"). */
-const tierSizes = (tiers: WeightTier[]) => tiers.map(t => {
+const tierSizes = (tiers: WeightTier[]): SizeOption[] => tiers.map(t => {
     const base = t.label ? `${t.label} (${t.range_text})` : t.range_text;
     const tierPrice = t.price != null ? Number(t.price) : 0;
     return {
         key: String(t.id),
         label: base,
         display: tierPrice > 0 ? `${base} · +${formatCLP(tierPrice)}` : base,
+        name: t.label || t.range_text,
+        range: t.range_text,
         price: tierPrice,
+        icon: t.icon_url,
+        examples: t.examples,
     };
 });
 
@@ -161,7 +178,7 @@ interface PlanView {
 /** Catálogo público de planes: diseño sobrio y cálido; los datos son los de cada tenant. */
 export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare, copiedLink, catalogToken, weightTiers = [], message, showVinzerBrand = true, showRequestButton = true }: Props) {
     const [searchTerm, setSearchTerm] = useState('');
-    const sizes = useMemo(
+    const sizes = useMemo<SizeOption[]>(
         () => (weightTiers.length > 0 ? tierSizes(weightTiers) : PET_SIZES.map(s => ({ ...s, display: s.label, price: 0 }))),
         [weightTiers]
     );
@@ -310,13 +327,18 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                 {/* Selector de tamaño: ajusta el texto de cotización y el mensaje de WhatsApp de cada plan */}
                 {plans.length > 0 && (
                     <div className="mb-10 mx-auto max-w-5xl rounded-3xl bg-white border border-[var(--cat-line)] shadow-[0_10px_30px_-24px_rgba(43,39,36,0.35)] px-4 py-6 sm:px-6 text-center">
-                        <h2 id="pet-size-title" className="[font-family:var(--cat-serif)] text-2xl font-semibold">
-                            ¿Cuál es el peso aproximado de tu mascota?
+                        <h2 id="pet-size-title" className="[font-family:var(--cat-serif)] text-2xl sm:text-[28px] font-semibold">
+                            ¿Cuál es el tamaño aproximado de tu mascota?
                         </h2>
-                        <p className="mt-1 text-xs text-[var(--cat-muted)]">
+                        <p className="mt-1 text-xs sm:text-sm text-[var(--cat-muted)]">
                             Selecciona un rango para calcular automáticamente el valor final estimado en cada plan.
                         </p>
-                        <div role="radiogroup" aria-labelledby="pet-size-title" className="mt-5 flex flex-wrap justify-center gap-2.5">
+                        {/* Celular: dos filas que se deslizan hacia el lado; escritorio: filas de hasta 6 tarjetas */}
+                        <div
+                            role="radiogroup"
+                            aria-labelledby="pet-size-title"
+                            className="mt-6 -mx-4 px-4 sm:mx-0 sm:px-0 grid grid-rows-2 grid-flow-col auto-cols-[38%] gap-2.5 overflow-x-auto snap-x snap-mandatory pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid-rows-none sm:grid-flow-row sm:auto-cols-auto sm:grid-cols-3 lg:grid-cols-6 sm:gap-3 sm:overflow-visible sm:pb-0"
+                        >
                             {sizes.map(size => {
                                 const active = size.key === sizeKey;
                                 return (
@@ -329,17 +351,41 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                                             setSizeKey(size.key);
                                             track('size_select', undefined, size.label);
                                         }}
-                                        className={`rounded-full px-3.5 py-2.5 text-[14px] font-medium border transition-all ${
+                                        className={`snap-start flex flex-col items-center gap-1.5 rounded-2xl px-2.5 pt-4 pb-3.5 text-center transition-all ${
                                             active
-                                                ? 'bg-[var(--cat-gold-deep)] border-[var(--cat-gold-deep)] text-white shadow-[0_6px_16px_-8px_rgba(138,100,40,0.7)]'
-                                                : 'bg-[var(--cat-bg)] border-[var(--cat-line)] text-[var(--cat-ink)] hover:border-[var(--cat-gold)]/60'
+                                                ? 'bg-[var(--cat-bg)] border-2 border-[var(--cat-gold-deep)] shadow-[0_10px_24px_-16px_rgba(138,100,40,0.8)]'
+                                                : 'bg-white border border-[var(--cat-line)] hover:border-[var(--cat-gold)]/60 hover:-translate-y-0.5'
                                         }`}
                                     >
-                                        {size.display}
+                                        <span className="flex h-10 w-10 items-center justify-center">
+                                            {size.icon ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img src={size.icon} alt="" loading="lazy" className="h-10 w-10 object-contain" />
+                                            ) : (
+                                                <PawPrint size={22} className="text-[var(--cat-gold)]" aria-hidden="true" />
+                                            )}
+                                        </span>
+                                        <span className="text-[14px] font-semibold leading-tight text-[var(--cat-ink)]">{size.name}</span>
+                                        {size.range !== size.name && (
+                                            <span className="rounded-full bg-[var(--cat-sand)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--cat-gold-deep)]">
+                                                {size.range}
+                                            </span>
+                                        )}
+                                        {size.price > 0 && (
+                                            <span className="text-[11px] font-semibold text-[var(--cat-gold-deep)]">+{formatCLP(size.price)}</span>
+                                        )}
+                                        {size.examples && (
+                                            <span className="text-[11px] leading-snug text-[var(--cat-muted)] line-clamp-2">{size.examples}</span>
+                                        )}
                                     </button>
                                 );
                             })}
                         </div>
+                        {currentSize && (
+                            <p className="mt-5 pt-4 border-t border-dashed border-[var(--cat-line)] text-xs sm:text-sm text-[var(--cat-muted)]">
+                                Mostrando planes para: <span className="font-semibold text-[var(--cat-gold-deep)]">{currentSize.name}{currentSize.range !== currentSize.name ? ` (${currentSize.range})` : ''}</span>
+                            </p>
+                        )}
                     </div>
                 )}
 

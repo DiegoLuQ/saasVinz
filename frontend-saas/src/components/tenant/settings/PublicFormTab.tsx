@@ -43,6 +43,7 @@ import CondolenceModal from '@/components/public/CondolenceModal';
 import WelcomeVideoField, { uploadPendingVideo } from './WelcomeVideoField';
 import PlanWeightPriceTable, { type PlanWeightRow } from './PlanWeightPriceTable';
 import PriceListsSection from './PriceListsSection';
+import TierIconField from './TierIconField';
 import {
     formatCLP,
     MAX_FIELD_LABEL,
@@ -89,6 +90,8 @@ interface TierRow {
     min_weight: string;
     max_weight: string;
     price: string;
+    icon_url?: string;
+    examples?: string;
 }
 
 const FIXED_FIELDS: Record<FieldRow['section'], string[]> = {
@@ -114,6 +117,8 @@ interface SavedTier {
     min_weight: number | null;
     max_weight: number | null;
     price: number | null;
+    icon_url?: string | null;
+    examples?: string | null;
 }
 
 const fmtKg = (n: number) => String(n).replace('.', ',');
@@ -124,6 +129,8 @@ const toTierRows = (rules: SavedTier[]): TierRow[] => rules.map(r => ({
     min_weight: fmtKg(r.min_weight ?? 0),
     max_weight: r.max_weight != null ? fmtKg(r.max_weight) : '',
     price: r.price != null ? String(r.price) : '0',
+    icon_url: r.icon_url || '',
+    examples: r.examples || '',
 }));
 
 function Toggle({
@@ -539,6 +546,8 @@ export function PublicFormTab() {
                         min_weight: parseKg(t.min_weight),
                         max_weight: t.max_weight.trim() ? parseKg(t.max_weight) : null,
                         price: parseFloat(t.price || '0') || 0,
+                        icon_url: t.icon_url || null,
+                        examples: (t.examples || '').trim() || null,
                     })),
                 }),
             });
@@ -1336,6 +1345,19 @@ export function PublicFormTab() {
                                                     />
                                                 </div>}
                                                 <TierActions idx={idx} total={tiers.length} onMove={dir => moveTier(idx, dir)} onRemove={() => removeTier(idx)} className="hidden md:flex" />
+                                                {/* Tarjeta del tamaño en el catálogo de planes */}
+                                                <div className="col-span-2 md:col-span-full flex items-center gap-3 md:pb-3 md:border-b md:border-foreground/5">
+                                                    <TierIconField value={t.icon_url} label={`Rango ${idx + 1}`} onChange={url => updateTier(idx, { icon_url: url })} />
+                                                    <div className="flex-1 min-w-0">
+                                                        <FormInputLite
+                                                            placeholder="Ejemplos en el catálogo (opcional): Gatos, Chihuahuas"
+                                                            value={t.examples || ''}
+                                                            maxLength={60}
+                                                            ariaLabel={`Rango ${idx + 1}: ejemplos`}
+                                                            onChange={v => updateTier(idx, { examples: v })}
+                                                        />
+                                                    </div>
+                                                </div>
                                             </div>
                                         );
                                     })}

@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from app.services.public_form_config import (
     DEFAULT_FIELDS, MAX_WEIGHT_TIERS, WEIGHT_PRICING_MODES, clean_weight_prices, form_config_with_meta,
     get_weight_tiers, normalize_form_config, uses_price_table, resolve_tier_inputs,
+    clean_tier_examples, clean_tier_icon,
 )
 from app.services import form_video
 from app.api.deps_features import check_feature
@@ -125,6 +126,8 @@ def replace_weight_pricing_rules(
         row.min_weight = min_w
         row.max_weight = t.max_weight
         row.price = t.price
+        row.icon_url = clean_tier_icon(t.icon_url)
+        row.examples = clean_tier_examples(t.examples)
         if idx >= len(existing):
             db.add(row)
     for row in existing[len(tiers):]:
@@ -287,6 +290,47 @@ def check_form_video_link(
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     form_video.require_form_video_plan(tenant)
     return form_video.check_link(payload.url)
+
+
+TIER_ICON_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
+TIER_ICON_MAX = 2 * 1024 * 1024
+
+
+@router.post("/weight-icon")
+def upload_weight_tier_icon(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    admin: models.User = Depends(check_permission("configuracion", "edit")),
+    _f: bool = Depends(FORM_FEATURE)
+):
+    """Sube el ícono de un rango de peso (tarjetas de tamaño del catálogo). Devuelve su URL;
+    se guarda en el rango al guardar los rangos (General o tabla de precios)."""
+    from app.api.internal.common.media_service import MediaService
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in TIER_ICON_EXTS:
+        raise HTTPException(status_code=400, detail="Formato no admitido. Usa PNG, JPG o WebP.")
+    content = file.file.read(TIER_ICON_MAX + 1)
+    if len(content) > TIER_ICON_MAX:
+        raise HTTPException(status_code=400, detail="La imagen supera 2 MB.")
+    tmp = os.path.join(tempfile.gettempdir(), f"tiericon_{uuid.uuid4().hex}{ext}")
+    try:
+        with open(tmp, "wb") as out:
+            out.write(content)
+        item = MediaService.upload_media(
+            db=db, local_path=tmp, media_type="image", category="tamanos", ratio="original",
+            description="Ícono de rango de peso", alt_text="Ícono de tamaño",
+            processing_mode="optimized", custom_prefix="tamano", tenant_id=tenant_id,
+        )
+        return {"url": item.url}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("weight-icon upload failed")
+        raise HTTPException(status_code=500, detail=f"No se pudo procesar la imagen: {e}")
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
 
 
 @router.post("/form-video")

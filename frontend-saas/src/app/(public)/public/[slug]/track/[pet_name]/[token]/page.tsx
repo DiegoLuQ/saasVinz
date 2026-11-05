@@ -1289,6 +1289,23 @@ export default function TrackingPage() {
                             </a>
                         )}
                     </div>
+
+                    {/* Firma Vinzer: sutil y en todos los planes (la marca blanca solo quita el aviso de arriba). */}
+                    <div className="mt-6 flex flex-col items-center gap-3">
+                        <div className={`h-px w-20 bg-gradient-to-r from-transparent to-transparent ${isDarkMode ? 'via-neutral-800' : 'via-gray-200'}`} />
+                        <a
+                            href={vinzerPromoUrl('seguimiento')}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="Con tecnología de Vinzer, software para crematorios"
+                            className={`group inline-flex items-baseline gap-1.5 transition-colors duration-500 ${isDarkMode ? 'text-neutral-600 hover:text-neutral-300' : 'text-gray-400 hover:text-gray-700'}`}
+                        >
+                            <span className="text-[9px] uppercase tracking-[0.28em] font-medium">Con tecnología de</span>
+                            <span className="text-[12px] font-semibold tracking-[0.06em]">
+                                Vinzer<span className={`transition-colors duration-500 ${isDarkMode ? 'text-emerald-500/60 group-hover:text-emerald-400' : 'text-emerald-600/60 group-hover:text-emerald-600'}`}>.</span>
+                            </span>
+                        </a>
+                    </div>
                 </div>
 
             </div>

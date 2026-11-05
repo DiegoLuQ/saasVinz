@@ -207,6 +207,8 @@ class WeightPricingBase(BaseModel):
     min_weight: Optional[float] = 0
     max_weight: Optional[float] = None  # None = tramo abierto ("X kg o más")
     price: Optional[float] = 0
+    icon_url: Optional[str] = None
+    examples: Optional[str] = None
 
 class WeightPricingCreate(BaseModel):
     """Un tramo al guardar la tabla completa: rango "desde – hasta" escrito
@@ -215,6 +217,8 @@ class WeightPricingCreate(BaseModel):
     min_weight: Optional[float] = None
     max_weight: Optional[float] = None
     price: float = Field(default=0, ge=0)
+    icon_url: Optional[str] = Field(default=None, max_length=500)
+    examples: Optional[str] = Field(default=None, max_length=60)
 
 class WeightPricingReplace(BaseModel):
     tiers: List[WeightPricingCreate] = Field(default_factory=list)

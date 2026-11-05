@@ -112,7 +112,7 @@ def order_payload(db: Session, pl: Optional[models.PriceList]) -> Optional[dict]
         "id": pl.id,
         "name": pl.name,
         "tiers": [{"id": t.id, "label": t.label, "min_weight": t.min_weight or 0,
-                   "max_weight": t.max_weight, "price": 0,
+                   "max_weight": t.max_weight, "price": 0, "icon_url": t.icon_url, "examples": t.examples,
                    "range_text": tier_range_text(t.min_weight, t.max_weight)} for t in tiers],
         "plan_prices": {k: (clean_weight_prices(v, ids) or {})
                         for k, v in (pl.plan_prices or {}).items() if isinstance(v, dict)},

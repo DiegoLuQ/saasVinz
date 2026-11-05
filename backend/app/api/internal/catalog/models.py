@@ -141,6 +141,9 @@ class WeightPricing(Base):
     min_weight = Column(Float)
     max_weight = Column(Float)  # NULL = tramo abierto ("X kg o más"), solo el último
     price = Column(Float)
+    # Tarjeta del tamaño en el catálogo: ícono (imagen subida) y ejemplos («Gatos, Chihuahuas»)
+    icon_url = Column(String(500), nullable=True)
+    examples = Column(String(60), nullable=True)
     # NULL = rango de la General; con valor = rango propio de una tabla de precios
     price_list_id = Column(Integer, ForeignKey("srv_price_lists.id", ondelete="CASCADE"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), default=tz.get_now)

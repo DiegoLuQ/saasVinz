@@ -11,12 +11,15 @@ import { BadgePercent, CalendarRange, Copy, Loader2, Pencil, Plus, Trash2, X } f
 import { apiRequest } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import PlanWeightPriceTable, { type PlanWeightRow } from './PlanWeightPriceTable';
+import TierIconField from './TierIconField';
 
 interface ListTier {
     id: number;
     label: string | null;
     min_weight: number;
     max_weight: number | null;
+    icon_url?: string | null;
+    examples?: string | null;
 }
 
 export interface PriceList {
@@ -35,6 +38,8 @@ interface TierRow {
     label: string;
     min_weight: string;
     max_weight: string;
+    icon_url?: string;
+    examples?: string;
 }
 
 interface Draft {
@@ -116,6 +121,8 @@ export default function PriceListsSection({ reloadKey }: {
                     label: t.label || '',
                     min_weight: fmtKg(t.min_weight ?? 0),
                     max_weight: t.max_weight != null ? fmtKg(t.max_weight) : '',
+                    icon_url: t.icon_url || '',
+                    examples: t.examples || '',
                 }))
                 : [{ label: '', min_weight: '0', max_weight: '' }],
             plans: Object.fromEntries(plans.map(p => [
@@ -166,6 +173,8 @@ export default function PriceListsSection({ reloadKey }: {
             label: t.label.trim() || null,
             min_weight: t.min_weight.trim() ? parseKg(t.min_weight) : (i === 0 ? 0 : null),
             max_weight: t.max_weight.trim() ? parseKg(t.max_weight) : null,
+            icon_url: t.icon_url || null,
+            examples: (t.examples || '').trim() || null,
         }));
         if (tiers.some(t => (t.min_weight != null && !Number.isFinite(t.min_weight)) || (t.max_weight != null && !Number.isFinite(t.max_weight)))) {
             showToast('Revisa los pesos: usa números (ej. 4 o 4,5)', 'error');
@@ -209,7 +218,7 @@ export default function PriceListsSection({ reloadKey }: {
                     valid_from: pl.valid_from,
                     valid_until: pl.valid_until,
                     is_active: true,
-                    tiers: pl.tiers.map(t => ({ label: t.label, min_weight: t.min_weight, max_weight: t.max_weight })),
+                    tiers: pl.tiers.map(t => ({ label: t.label, min_weight: t.min_weight, max_weight: t.max_weight, icon_url: t.icon_url, examples: t.examples })),
                     plan_prices: Object.fromEntries(Object.entries(pl.plan_prices || {}).map(([planId, row]) => [
                         planId, pl.tiers.map(t => row?.[String(t.id)] ?? null),
                     ])),
@@ -378,6 +387,14 @@ export default function PriceListsSection({ reloadKey }: {
                                             className="rounded-lg p-1.5 text-muted-foreground hover:bg-red-500/10 hover:text-red-500 disabled:opacity-30 cursor-pointer">
                                             <Trash2 size={14} />
                                         </button>
+                                        {/* Tarjeta del tamaño en el catálogo */}
+                                        <div className="col-span-4 flex items-center gap-2 pb-2 border-b border-foreground/5">
+                                            <TierIconField value={t.icon_url} label={`Rango ${idx + 1}`} onChange={url => updateTier(idx, { icon_url: url })} />
+                                            <input value={t.examples || ''} maxLength={60}
+                                                placeholder="Ejemplos en el catálogo (opcional): Gatos, Chihuahuas"
+                                                aria-label={`Rango ${idx + 1}: ejemplos`}
+                                                onChange={e => updateTier(idx, { examples: e.target.value })} className={inputCls} />
+                                        </div>
                                     </div>
                                 ))}
                                 {draft.tiers.length < MAX_TIERS && (

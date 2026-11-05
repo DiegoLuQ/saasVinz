@@ -292,6 +292,21 @@ def get_weight_tiers(db: Session, tenant_id: int, price_list_id: int | None = No
     return sorted(q.all(), key=lambda r: (r.max_weight is None, r.max_weight or 0))
 
 
+def clean_tier_icon(value: Any) -> str | None:
+    """URL del ícono de un rango: solo http(s) o una ruta local (/static…); vacío = sin ícono."""
+    v = (value or "").strip() if isinstance(value, str) else ""
+    if not v:
+        return None
+    if not (v.startswith("https://") or v.startswith("http://") or v.startswith("/")):
+        raise HTTPException(status_code=400, detail="El ícono del rango debe ser una imagen subida (URL).")
+    return v[:500]
+
+
+def clean_tier_examples(value: Any) -> str | None:
+    v = " ".join(value.split()) if isinstance(value, str) else ""
+    return v[:60] or None
+
+
 def resolve_tier_inputs(tiers: list) -> list:
     """Valida rangos «desde – hasta» escritos por el crematorio (sin solapes, solo el
     último abierto, 0–500 kg). Devuelve [(tramo, min_weight)]. Sin min_weight se usa
@@ -389,6 +404,8 @@ def public_weight_tiers(db: Session, tenant_id: int, include_price: bool, price_
             "min_weight": r.min_weight or 0,
             "max_weight": r.max_weight,
             "range_text": tier_range_text(r.min_weight, r.max_weight),
+            "icon_url": r.icon_url,
+            "examples": r.examples,
         }
         if include_price:
             item["price"] = r.price or 0

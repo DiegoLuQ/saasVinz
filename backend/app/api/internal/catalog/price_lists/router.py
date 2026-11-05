@@ -17,7 +17,7 @@ from app.api.internal.catalog.models import CatalogShareToken
 from app.core.tenant_context import apply_tenant_rls
 from app.database import get_db
 from app.services import price_lists as svc
-from app.services.public_form_config import resolve_tier_inputs
+from app.services.public_form_config import clean_tier_examples, clean_tier_icon, resolve_tier_inputs
 
 router = APIRouter(prefix="/api/internal/price-lists", tags=["Catálogo - Tablas de precios"])
 
@@ -30,6 +30,8 @@ class PriceListTierIn(BaseModel):
     label: Optional[str] = Field(default=None, max_length=40)
     min_weight: Optional[float] = None
     max_weight: Optional[float] = None
+    icon_url: Optional[str] = Field(default=None, max_length=500)
+    examples: Optional[str] = Field(default=None, max_length=60)
 
 
 class PriceListIn(BaseModel):
@@ -93,6 +95,8 @@ def _apply(db: Session, tenant_id: int, pl: models.PriceList, data: PriceListIn)
         row.min_weight = min_w
         row.max_weight = t.max_weight
         row.price = 0  # sin recargo: el peso va en el precio del plan
+        row.icon_url = clean_tier_icon(t.icon_url)
+        row.examples = clean_tier_examples(t.examples)
         if idx >= len(existing):
             db.add(row)
         rows.append(row)
