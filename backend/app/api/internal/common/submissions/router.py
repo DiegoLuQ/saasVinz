@@ -341,10 +341,10 @@ def create_customer_from_submission(
     
     owner = submission.owner_data
     print(f"Creating customer for submission {submission_id}. owner_data: {owner}")
-    rut = owner.get("rut")
+    rut = str(owner.get("rut") or "").strip() or None
     
     # Check if RUT already exists for this tenant (only if RUT is provided)
-    if rut and str(rut).strip():
+    if rut:
         existing = db.query(models.Customer).filter(
             models.Customer.rut == rut,
             models.Customer.tenant_id == tenant_id

@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Enum, JSON, UniqueConstraint
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, validates
 from app.database import Base
 from datetime import datetime
 from app.utils import tz
@@ -27,6 +27,14 @@ class Customer(Base):
     __table_args__ = (
         UniqueConstraint('tenant_id', 'rut', name='uix_customer_rut_tenant'),
     )
+
+    @validates('rut')
+    def _blank_rut_to_null(self, _key, value):
+        # Sin RUT = NULL: un '' choca con el índice único (tenant, rut) del segundo cliente sin RUT.
+        if value is None:
+            return None
+        value = str(value).strip()
+        return value or None
 
 class Pet(Base):
     __tablename__ = "crm_pets"
