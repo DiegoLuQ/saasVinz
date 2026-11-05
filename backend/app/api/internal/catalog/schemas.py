@@ -54,6 +54,21 @@ class ProviderInDB(ProviderBase):
     model_config = {"from_attributes": True}
 
 # Servicios
+MAX_GROUP_NAME = 60
+
+
+def clean_group_name(value):
+    """Grupo de servicio: espacios normalizados, vacío = None, máximo 60 caracteres."""
+    if value is None:
+        return None
+    text = " ".join(str(value).split())
+    if not text:
+        return None
+    if len(text) > MAX_GROUP_NAME:
+        raise ValueError(f"El grupo admite como máximo {MAX_GROUP_NAME} caracteres")
+    return text
+
+
 class ServiceBase(BaseModel):
     name: str
     description: Optional[str] = None
@@ -62,6 +77,9 @@ class ServiceBase(BaseModel):
     is_active: bool = True
     is_special: bool = False
     show_in_form: bool = True
+    group_name: Optional[str] = None
+
+    _clean_group = field_validator("group_name", mode="before")(clean_group_name)
 
 class ServiceCreate(ServiceBase):
     pass
@@ -74,6 +92,13 @@ class ServiceUpdate(BaseModel):
     is_active: Optional[bool] = None
     is_special: Optional[bool] = None
     show_in_form: Optional[bool] = None
+    group_name: Optional[str] = None
+
+    _clean_group = field_validator("group_name", mode="before")(clean_group_name)
+
+class ServiceGroupRename(BaseModel):
+    old_name: str
+    new_name: Optional[str] = None  # vacío = quitar el grupo («Sin grupo»)
 
 class ServiceInDB(ServiceBase):
     id: int

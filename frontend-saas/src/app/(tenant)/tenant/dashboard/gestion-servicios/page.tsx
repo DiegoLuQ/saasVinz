@@ -31,7 +31,10 @@ import {
     ArrowUpDown,
     Check,
     Eye,
-    EyeOff
+    EyeOff,
+    FileSpreadsheet,
+    Folder,
+    Pencil
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { API_URL } from '@/lib/tenant/api';
@@ -57,9 +60,44 @@ import Modal from '@/components/tenant/Modal';
 import DeleteConfirmationModal from '@/components/tenant/DeleteConfirmationModal';
 import SearchableSelect from '@/components/tenant/SearchableSelect';
 import ShareCatalogModal from '@/components/tenant/catalog/ShareCatalogModal';
+import ImportServicesModal from '@/components/tenant/catalog/ImportServicesModal';
+import { apiRequest } from '@/lib/tenant/api';
+import { useQueryClient } from '@tanstack/react-query';
+
+const NO_GROUP = '__none__';
 
 const cardInitial = { opacity: 0, y: 15 };
 const cardAnimate = { opacity: 1, y: 0 };
+
+/** Interruptor Activo / Inactivo de un plan. `onImage`: versión sobre la foto del plan. */
+function ActiveSwitch({ active, loading, disabled, onToggle, onImage = false }: {
+    active: boolean; loading?: boolean; disabled?: boolean; onToggle: () => void; onImage?: boolean;
+}) {
+    return (
+        <button
+            type="button"
+            role="switch"
+            aria-checked={active}
+            onClick={onToggle}
+            disabled={disabled || loading}
+            title={disabled ? undefined : active ? 'Clic para desactivar' : 'Clic para activar'}
+            className={`inline-flex items-center gap-2 rounded-full pl-1 pr-2.5 py-1 text-[10px] font-bold border transition-all disabled:cursor-default ${
+                onImage
+                    ? 'bg-slate-900/70 backdrop-blur-md border-white/25 text-white'
+                    : active
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800'
+                        : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
+            } ${disabled ? '' : 'cursor-pointer hover:brightness-95'}`}
+        >
+            <span className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors ${active ? 'bg-emerald-500' : 'bg-slate-400 dark:bg-slate-600'}`}>
+                <span className={`absolute h-3 w-3 rounded-full bg-white shadow flex items-center justify-center transition-transform ${active ? 'translate-x-3.5' : 'translate-x-0.5'}`}>
+                    {loading && <Loader2 size={8} className="animate-spin text-slate-500" />}
+                </span>
+            </span>
+            <span>{active ? 'Activo' : 'Inactivo'}</span>
+        </button>
+    );
+}
 
 const formatCLP = (val: number) => `$${Math.round(val || 0).toLocaleString('es-CL')}`;
 
@@ -69,6 +107,7 @@ export default function ServicesPage() {
     const { canDelete, canCreate, canEdit } = usePermissions();
     const { tenantData, formatLimit } = useTenant();
 
+    const queryClient = useQueryClient();
     const { data: services = [], isLoading: loadingServices } = useCatalogServices();
     const { data: plans = [], isLoading: loadingPlans } = useCatalogPlans();
 
@@ -93,6 +132,12 @@ export default function ServicesPage() {
     const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
     const [sortBy, setSortBy] = useState<'name' | 'price_desc' | 'price_asc' | 'margin_desc'>('name');
     const [marginInfoId, setMarginInfoId] = useState<number | null>(null);
+    const [groupFilter, setGroupFilter] = useState<string>('all');
+
+    // Grupos de servicios (solo panel) e importación desde Excel
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [groupToRename, setGroupToRename] = useState<{ old: string; value: string } | null>(null);
+    const [renamingGroup, setRenamingGroup] = useState(false);
 
     // Catalog modal states
     const [showPlansCatalogModal, setShowPlansCatalogModal] = useState(false);
@@ -161,11 +206,14 @@ export default function ServicesPage() {
         const filtered = services.filter((s: Service) => {
             const matchSearch = !searchLower ||
                 s.name.toLowerCase().includes(searchLower) ||
-                (s.description?.toLowerCase()?.includes(searchLower) ?? false);
+                (s.description?.toLowerCase()?.includes(searchLower) ?? false) ||
+                (s.group_name?.toLowerCase()?.includes(searchLower) ?? false);
             const matchStatus = statusFilter === 'all' ||
                 (statusFilter === 'active' && s.is_active) ||
                 (statusFilter === 'inactive' && !s.is_active);
-            return matchSearch && matchStatus;
+            const matchGroup = groupFilter === 'all' ||
+                (groupFilter === NO_GROUP ? !s.group_name : s.group_name === groupFilter);
+            return matchSearch && matchStatus && matchGroup;
         });
 
         return filtered.sort((a, b) => {
@@ -178,7 +226,73 @@ export default function ServicesPage() {
             }
             return (a.name || '').localeCompare(b.name || '');
         });
-    }, [services, searchTerm, statusFilter, sortBy]);
+    }, [services, searchTerm, statusFilter, sortBy, groupFilter]);
+
+    // Grupos existentes (orden alfabético) y servicios filtrados agrupados; «Sin grupo» al final.
+    const serviceGroupNames = useMemo(
+        () => Array.from(new Set(services.map((s: Service) => s.group_name).filter((g): g is string => !!g)))
+            .sort((a, b) => a.localeCompare(b, 'es')),
+        [services]
+    );
+    const hasGroups = serviceGroupNames.length > 0;
+    const groupedServices = useMemo(() => {
+        const map = new Map<string, Service[]>();
+        for (const s of filteredAndSortedServices) {
+            const key = s.group_name || NO_GROUP;
+            if (!map.has(key)) map.set(key, []);
+            map.get(key)!.push(s);
+        }
+        return Array.from(map.entries())
+            .sort(([a], [b]) => (a === NO_GROUP ? 1 : b === NO_GROUP ? -1 : a.localeCompare(b, 'es')))
+            .map(([key, items]) => ({ key, name: key === NO_GROUP ? null : key, items }));
+    }, [filteredAndSortedServices]);
+
+    useEffect(() => {
+        if (groupFilter !== 'all' && groupFilter !== NO_GROUP && !serviceGroupNames.includes(groupFilter)) {
+            setGroupFilter('all');
+        }
+    }, [groupFilter, serviceGroupNames]);
+
+    const handleRenameGroup = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!groupToRename) return;
+        setRenamingGroup(true);
+        try {
+            const res = await apiRequest('/api/internal/services/groups/rename', {
+                method: 'PUT',
+                body: JSON.stringify({ old_name: groupToRename.old, new_name: groupToRename.value }),
+            });
+            queryClient.invalidateQueries({ queryKey: ['catalog-services'] });
+            if (groupFilter === groupToRename.old) setGroupFilter(res?.group_name || 'all');
+            showToast(res?.group_name ? `Grupo renombrado a «${res.group_name}»` : 'Servicios movidos a «Sin grupo»', 'success');
+            setGroupToRename(null);
+        } catch (err) {
+            showToast((err as { message?: string })?.message || 'No se pudo renombrar el grupo', 'error');
+        } finally {
+            setRenamingGroup(false);
+        }
+    };
+
+    const renderGroupHeader = (g: { key: string; name: string | null; items: Service[] }) => (
+        <div className="flex items-center gap-2 mb-3">
+            <Folder size={15} className={g.name ? 'text-primary' : 'text-muted-foreground'} />
+            <h2 className={`text-sm font-bold ${g.name ? 'text-slate-900 dark:text-white' : 'text-muted-foreground'}`}>
+                {g.name || 'Sin grupo'}
+            </h2>
+            <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold">{g.items.length}</span>
+            {g.name && canEdit('servicios') && (
+                <button
+                    type="button"
+                    onClick={() => setGroupToRename({ old: g.name!, value: g.name! })}
+                    className="p-1 rounded-lg text-muted-foreground hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    title="Renombrar grupo"
+                >
+                    <Pencil size={12} />
+                </button>
+            )}
+            <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+        </div>
+    );
 
     // Filter & Sort Plans
     const filteredAndSortedPlans = useMemo(() => {
@@ -342,6 +456,17 @@ export default function ServicesPage() {
                         </>
                     )}
 
+                    {activeTab === 'servicios' && canCreate('servicios') && (
+                        <button
+                            onClick={() => setShowImportModal(true)}
+                            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-all"
+                            title="Crear varios servicios desde una planilla Excel"
+                        >
+                            <FileSpreadsheet size={15} className="text-emerald-600 dark:text-emerald-400" />
+                            <span>Importar Excel</span>
+                        </button>
+                    )}
+
                     {/* Botón Principal Crear */}
                     {canCreate('servicios') && (
                         <button
@@ -442,7 +567,7 @@ export default function ServicesPage() {
                 {/* Tabs Principales: Servicios vs Planes */}
                 <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-white/5 rounded-xl border border-slate-200/60 dark:border-white/5">
                     <button
-                        onClick={() => { setActiveTab('servicios'); setSearchTerm(''); setStatusFilter('all'); }}
+                        onClick={() => { setActiveTab('servicios'); setSearchTerm(''); setStatusFilter('all'); setGroupFilter('all'); }}
                         className={`relative flex items-center gap-2 py-1.5 px-4 rounded-lg text-xs font-bold transition-all ${
                             activeTab === 'servicios'
                                 ? 'bg-white dark:bg-slate-800 text-primary shadow-sm'
@@ -521,6 +646,20 @@ export default function ServicesPage() {
                         ))}
                     </div>
 
+                    {/* Filtro Grupo */}
+                    {activeTab === 'servicios' && hasGroups && (
+                        <select
+                            value={groupFilter}
+                            onChange={(e) => setGroupFilter(e.target.value)}
+                            className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl py-1.5 px-3 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none cursor-pointer max-w-[11rem]"
+                            title="Filtrar por grupo"
+                        >
+                            <option value="all">Todos los grupos</option>
+                            {serviceGroupNames.map(g => <option key={g} value={g}>{g}</option>)}
+                            <option value={NO_GROUP}>Sin grupo</option>
+                        </select>
+                    )}
+
                     {/* Selector de Orden */}
                     <div className="relative">
                         <select
@@ -579,14 +718,14 @@ export default function ServicesPage() {
                             <Tag size={32} />
                         </div>
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
-                            {searchTerm || statusFilter !== 'all' ? 'Sin resultados para los filtros' : 'Aún no hay servicios registrados'}
+                            {searchTerm || statusFilter !== 'all' || groupFilter !== 'all' ? 'Sin resultados para los filtros' : 'Aún no hay servicios registrados'}
                         </h3>
                         <p className="text-muted-foreground text-sm max-w-md">
-                            {searchTerm || statusFilter !== 'all'
+                            {searchTerm || statusFilter !== 'all' || groupFilter !== 'all'
                                 ? 'Prueba con otros términos de búsqueda o restablece los filtros.'
-                                : 'Comienza creando los servicios principales de tu crematorio.'}
+                                : 'Comienza creando los servicios principales de tu crematorio, o impórtalos desde un Excel.'}
                         </p>
-                        {!searchTerm && statusFilter === 'all' && canCreate('servicios') && (
+                        {!searchTerm && statusFilter === 'all' && groupFilter === 'all' && canCreate('servicios') && (
                             <button
                                 onClick={() => handleOpenServiceModal()}
                                 disabled={isServiceLimitReached}
@@ -598,9 +737,13 @@ export default function ServicesPage() {
                         )}
                     </div>
                 ) : viewMode === 'grid' ? (
-                    /* Vista Grid de Servicios */
+                    /* Vista Grid de Servicios (por grupo) */
+                    <div className="space-y-7">
+                    {groupedServices.map((g) => (
+                    <section key={g.key}>
+                    {hasGroups && renderGroupHeader(g)}
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
-                        {filteredAndSortedServices.map((service) => {
+                        {g.items.map((service) => {
                             const isToggling = togglingId === service.id;
                             const mPct = margin(service.price, service.cost);
                             const profit = (service.price || 0) - (service.cost || 0);
@@ -723,9 +866,13 @@ export default function ServicesPage() {
                                 </motion.div>
                             );
                         })}
+                    </div>
+                    </section>
+                    ))}
 
                         {/* Card Agregar Nuevo Servicio */}
                         {canCreate('servicios') && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
                             <button
                                 type="button"
                                 onClick={() => handleOpenServiceModal()}
@@ -742,6 +889,7 @@ export default function ServicesPage() {
                                     Añadir otra prestación al catálogo
                                 </span>
                             </button>
+                    </div>
                         )}
                     </div>
                 ) : (
@@ -761,7 +909,14 @@ export default function ServicesPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                                    {filteredAndSortedServices.map((service) => {
+                                    {groupedServices.map((g) => (
+                                    <React.Fragment key={g.key}>
+                                    {hasGroups && (
+                                        <tr className="bg-slate-50/80 dark:bg-slate-800/30">
+                                            <td colSpan={7} className="pt-3 pb-1 px-4">{renderGroupHeader(g)}</td>
+                                        </tr>
+                                    )}
+                                    {g.items.map((service) => {
                                         const isToggling = togglingId === service.id;
                                         const mPct = margin(service.price, service.cost);
                                         const profit = (service.price || 0) - (service.cost || 0);
@@ -855,6 +1010,8 @@ export default function ServicesPage() {
                                             </tr>
                                         );
                                     })}
+                                    </React.Fragment>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
@@ -936,20 +1093,16 @@ export default function ServicesPage() {
                                                     )}
                                                 </div>
 
-                                                {/* Toggle Status sobre imagen */}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleTogglePlanActive(plan)}
-                                                    disabled={isToggling || !canEdit('servicios')}
-                                                    className={`absolute bottom-3 left-3 inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full backdrop-blur-md border transition-all ${
-                                                        plan.is_active
-                                                            ? 'bg-emerald-500/80 text-white border-emerald-400/40'
-                                                            : 'bg-black/60 text-slate-300 border-white/20'
-                                                    }`}
-                                                >
-                                                    {isToggling ? <Loader2 size={10} className="animate-spin" /> : plan.is_active ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
-                                                    <span>{plan.is_active ? 'Activo' : 'Inactivo'}</span>
-                                                </button>
+                                                {/* Toggle Activo / Inactivo sobre imagen */}
+                                                <div className="absolute bottom-3 left-3 z-10">
+                                                    <ActiveSwitch
+                                                        onImage
+                                                        active={plan.is_active}
+                                                        loading={isToggling}
+                                                        disabled={!canEdit('servicios')}
+                                                        onToggle={() => handleTogglePlanActive(plan)}
+                                                    />
+                                                </div>
                                             </div>
                                         ) : (
                                             <div className="p-5 pb-0 flex items-start justify-between gap-3">
@@ -957,19 +1110,12 @@ export default function ServicesPage() {
                                                     <div className="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/15">
                                                         <Diamond size={20} />
                                                     </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleTogglePlanActive(plan)}
-                                                        disabled={isToggling || !canEdit('servicios')}
-                                                        className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all ${
-                                                            plan.is_active
-                                                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
-                                                                : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
-                                                        }`}
-                                                    >
-                                                        {isToggling ? <Loader2 size={10} className="animate-spin" /> : plan.is_active ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
-                                                        <span>{plan.is_active ? 'Activo' : 'Inactivo'}</span>
-                                                    </button>
+                                                    <ActiveSwitch
+                                                        active={plan.is_active}
+                                                        loading={isToggling}
+                                                        disabled={!canEdit('servicios')}
+                                                        onToggle={() => handleTogglePlanActive(plan)}
+                                                    />
                                                 </div>
 
                                                 <div className="flex items-center gap-1">
@@ -1159,19 +1305,12 @@ export default function ServicesPage() {
                                                     {(plan.cost || 0) > 0 ? formatCLP(plan.cost) : '—'}
                                                 </td>
                                                 <td className="py-3 px-4 text-center">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleTogglePlanActive(plan)}
-                                                        disabled={isToggling || !canEdit('servicios')}
-                                                        className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all ${
-                                                            plan.is_active
-                                                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
-                                                                : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
-                                                        }`}
-                                                    >
-                                                        {isToggling ? <Loader2 size={10} className="animate-spin" /> : null}
-                                                        <span>{plan.is_active ? 'Activo' : 'Inactivo'}</span>
-                                                    </button>
+                                                    <ActiveSwitch
+                                                        active={plan.is_active}
+                                                        loading={isToggling}
+                                                        disabled={!canEdit('servicios')}
+                                                        onToggle={() => handleTogglePlanActive(plan)}
+                                                    />
                                                 </td>
                                                 <td className="py-3 px-4 text-right">
                                                     <div className="flex items-center justify-end gap-1">
@@ -1226,6 +1365,27 @@ export default function ServicesPage() {
                                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2.5 px-3.5 text-sm font-medium outline-none focus:border-primary transition-all text-slate-900 dark:text-white"
                                     placeholder="Ej: Cremación Individual con Sala de Duelo"
                                 />
+                            </div>
+
+                            {/* Grupo (solo para ordenar este panel) */}
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                    Grupo
+                                </label>
+                                <input
+                                    list="service-groups"
+                                    maxLength={60}
+                                    value={currentService?.group_name || ''}
+                                    onChange={(e) => setCurrentService({ ...currentService, group_name: e.target.value })}
+                                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2.5 px-3.5 text-sm font-medium outline-none focus:border-primary transition-all text-slate-900 dark:text-white"
+                                    placeholder={serviceGroupNames.length ? 'Elige uno existente o escribe uno nuevo' : 'Ej: Cremaciones, Traslados, Ceremonias'}
+                                />
+                                <datalist id="service-groups">
+                                    {serviceGroupNames.map(g => <option key={g} value={g} />)}
+                                </datalist>
+                                <p className="text-[11px] text-muted-foreground">
+                                    Solo ordena esta lista; la familia no lo ve. Vacío = «Sin grupo».
+                                </p>
                             </div>
 
                             {/* Descripción */}
@@ -1380,6 +1540,55 @@ export default function ServicesPage() {
                 title={`¿Eliminar ${itemToDelete?.type === 'service' ? 'Servicio' : 'Plan'}?`}
                 description={`Estás a punto de eliminar "${itemToDelete?.name}". Esta acción no se puede deshacer.`}
             />
+
+            {/* Importar servicios desde Excel */}
+            <ImportServicesModal isOpen={showImportModal} onClose={() => setShowImportModal(false)} />
+
+            {/* Renombrar grupo */}
+            <Modal
+                isOpen={!!groupToRename}
+                onClose={() => !renamingGroup && setGroupToRename(null)}
+                title="Renombrar grupo"
+                maxWidth="max-w-md"
+            >
+                {groupToRename && (
+                    <form onSubmit={handleRenameGroup} className="space-y-4">
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                Nuevo nombre para «{groupToRename.old}»
+                            </label>
+                            <input
+                                autoFocus
+                                maxLength={60}
+                                value={groupToRename.value}
+                                onChange={(e) => setGroupToRename({ ...groupToRename, value: e.target.value })}
+                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2.5 px-3.5 text-sm font-medium outline-none focus:border-primary transition-all text-slate-900 dark:text-white"
+                            />
+                            <p className="text-[11px] text-muted-foreground">
+                                Cambia el grupo de todos sus servicios. Si escribes el nombre de otro grupo, se unen. Vacío = «Sin grupo».
+                            </p>
+                        </div>
+                        <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+                            <button
+                                type="button"
+                                onClick={() => setGroupToRename(null)}
+                                disabled={renamingGroup}
+                                className="px-4 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-all text-slate-700 dark:text-slate-300"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={renamingGroup || groupToRename.value.trim() === groupToRename.old}
+                                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold shadow-md hover:bg-primary/95 active:scale-95 transition-all disabled:opacity-50"
+                            >
+                                {renamingGroup && <Loader2 size={14} className="animate-spin" />}
+                                <span>Guardar</span>
+                            </button>
+                        </div>
+                    </form>
+                )}
+            </Modal>
 
             {/* Modal de Límite de Plan */}
             <PlanLimitModal

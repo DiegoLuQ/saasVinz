@@ -23,6 +23,8 @@ export interface Service {
     is_special?: boolean;
     /** Si la familia lo ve en el formulario (Configuración → Formulario y Pesos) */
     show_in_form?: boolean;
+    /** Grupo (solo para ordenar el panel); null = «Sin grupo» */
+    group_name?: string | null;
 }
 
 export interface Plan {

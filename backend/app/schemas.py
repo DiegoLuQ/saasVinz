@@ -16,7 +16,7 @@ from app.api.internal.crm.schemas import (
 from app.api.internal.catalog.schemas import (
     CategoryBase, CategoryCreate, CategoryUpdate, CategoryInDB,
     ProviderBase, ProviderCreate, ProviderUpdate, ProviderInDB,
-    ServiceBase, ServiceCreate, ServiceUpdate, ServiceInDB,
+    ServiceBase, ServiceCreate, ServiceUpdate, ServiceInDB, ServiceGroupRename,
     ProductBase, ProductCreate, ProductUpdate, ProductInDB,
     PlanBase, PlanCreate, PlanUpdate, PlanInDB,
     WeightPricingBase, WeightPricingCreate, WeightPricingReplace, WeightPricingInDB,

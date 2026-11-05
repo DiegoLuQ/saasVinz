@@ -216,8 +216,11 @@ def process_import(db: Session, tenant_id: int, content: bytes, *, dry_run: bool
         raise ImportFileError("El archivo no tiene filas para importar.")
 
     # Datos actuales del tenant (RLS ya aplicado + filtro explícito)
+    # Esta carga crea servicios sin grupo: solo choca con los que tampoco tienen grupo.
     existing_services = {
-        n.lower() for (n,) in db.query(models.Service.name).filter(models.Service.tenant_id == tenant_id) if n
+        n.lower() for (n,) in db.query(models.Service.name).filter(
+            models.Service.tenant_id == tenant_id, models.Service.group_name.is_(None)
+        ) if n
     }
     existing_codes = {
         c.lower() for (c,) in db.query(models.Product.code).filter(models.Product.tenant_id == tenant_id) if c

@@ -67,11 +67,10 @@ class Service(Base):
     # Servicio especial (eutanasia, exhumación…): adicional en el formulario público
     is_special = Column(Boolean, nullable=False, default=False, server_default='false')
     show_in_form = Column(Boolean, nullable=False, default=True, server_default='true')
+    # Grupo (texto libre, solo para ordenar el panel). Unicidad: (tenant, nombre, grupo)
+    # vía índice uix_service_name_group_tenant (migración a6c8e0b2d359).
+    group_name = Column(String(60), nullable=True)
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
-
-    __table_args__ = (
-        UniqueConstraint('tenant_id', 'name', name='uix_service_name_tenant'),
-    )
 
 class Plan(Base):
     __tablename__ = "srv_plans"
