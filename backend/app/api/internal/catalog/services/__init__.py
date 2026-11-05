@@ -289,6 +289,7 @@ class PlanService:
             price_label=(plan_in.price_label or "").strip() or None,
             important_note=(plan_in.important_note or "").strip() or None,
             sort_order=plan_in.sort_order,
+            group_name=plan_in.group_name,
             tenant_id=tenant_id
         )
         self.db.add(db_plan)

@@ -90,6 +90,9 @@ class Plan(Base):
     # Precio por tramo de peso {"<id srv_weight_pricing>": precio}; solo con
     # form_config.weight_pricing_mode = "table" (app/services/public_form_config.py).
     weight_prices = Column(JSON, nullable=True)
+    # Grupo del plan (texto libre). Cada enlace del catálogo elige qué grupos muestra
+    # (CatalogShareToken.plan_groups). Migración b8e0a2c4d571.
+    group_name = Column(String(60), nullable=True)
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
 
     # Ordenados según el orden definido en el plan(srv_plan_services.sort_order)
@@ -148,6 +151,8 @@ class CatalogShareToken(Base):
     # Mensaje del crematorio en el catálogo de planes (entre el selector de tamaño y los planes)
     message = Column(Text, nullable=True)
     catalog_type = Column(String(20), nullable=False, default="products", server_default="products")  # 'products' | 'plans'
+    # Catálogo de planes: grupos de planes que muestra (NULL = todos; "" = «Sin grupo»)
+    plan_groups = Column(JSON, nullable=True)
     expires_at = Column(DateTime(timezone=True), nullable=True) # None = sin vencimiento
     is_active = Column(Boolean, default=True)
     views_count = Column(Integer, default=0)

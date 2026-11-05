@@ -10,7 +10,8 @@ from app.api.deps import get_tenant_id, get_current_user
 from app.api.internal.admin.rbac.router import check_permission
 from app.api.deps_features import check_feature
 from app.api.internal.catalog.models import CatalogShareToken
-from app.api.internal.catalog.schemas import CatalogType, CatalogShareTokenBulkUpdate
+from app.api.internal.catalog.schemas import CatalogType, CatalogShareTokenBulkUpdate, CatalogShareTokenPlanGroups
+from app.services.plan_groups import clean_plan_groups
 
 # Catálogo de planes: vigencias permitidas (10 días, 1 año; sin valor = permanente)
 PLANS_EXPIRATION_HOURS = {240, 8760}
@@ -42,6 +43,7 @@ def _to_dto(item: CatalogShareToken, now, stats: dict | None = None) -> schemas.
         name=item.name,
         catalog_type=item.catalog_type or "products",
         message=item.message,
+        plan_groups=item.plan_groups if (item.catalog_type or "products") == "plans" else None,
         expires_at=item.expires_at,
         is_active=item.is_active,
         views_count=item.views_count or 0,
@@ -105,6 +107,10 @@ def create_catalog_share_link(
         expires_at = now + timedelta(hours=data.expires_in_hours)
 
     message = ((data.message or "").strip() or None) if data.catalog_type == "plans" else None
+    try:
+        groups = clean_plan_groups(data.plan_groups) if data.catalog_type == "plans" else None
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     # Genera token aleatorio URL-safe de 16 bytes (~22 chars)
     token_str = secrets.token_urlsafe(16)
@@ -115,6 +121,7 @@ def create_catalog_share_link(
         name=data.name.strip() if data.name else None,
         catalog_type=data.catalog_type,
         message=message,
+        plan_groups=groups,
         expires_at=expires_at,
         is_active=True,
         views_count=0,
@@ -158,6 +165,36 @@ def bulk_update_catalog_share_links(
 
     now = tz.get_now()
     return [_to_dto(item, now) for item in tokens]
+
+
+@router.patch("/{token_id}/plan-groups", response_model=schemas.CatalogShareTokenInDB)
+def update_catalog_link_plan_groups(
+    token_id: int,
+    data: CatalogShareTokenPlanGroups,
+    tenant_id: int = Depends(get_tenant_id),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Elige qué grupos de planes muestra un enlace del catálogo (vacío = todos)."""
+    _authorize(db, current_user, tenant_id, "plans", "edit")
+    item = (
+        db.query(CatalogShareToken)
+        .filter(
+            CatalogShareToken.id == token_id,
+            CatalogShareToken.tenant_id == tenant_id,
+            CatalogShareToken.catalog_type == "plans",
+        )
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Enlace no encontrado")
+    try:
+        item.plan_groups = clean_plan_groups(data.plan_groups)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    db.commit()
+    db.refresh(item)
+    return _to_dto(item, tz.get_now())
 
 
 @router.delete("/{token_id}", status_code=status.HTTP_204_NO_CONTENT)

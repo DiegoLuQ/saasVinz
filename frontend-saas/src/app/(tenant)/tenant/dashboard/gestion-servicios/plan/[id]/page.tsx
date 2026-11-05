@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
     ArrowLeft,
@@ -15,7 +15,8 @@ import {
     ChevronUp,
     ChevronDown,
     Star,
-    Store
+    Store,
+    Folder
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -52,6 +53,27 @@ export default function EditPlanPage() {
     const [showQuickProduct, setShowQuickProduct] = useState(false);
     const [quickProduct, setQuickProduct] = useState({ name: '', cost_price: 0, sale_price: 0 });
     const [notFound, setNotFound] = useState(false);
+    const [serviceGroupFilter, setServiceGroupFilter] = useState<string>('all');
+
+    // Grupos: de servicios (para elegir los incluidos) y de planes (para el campo Grupo)
+    const serviceGroupNames = useMemo(
+        () => Array.from(new Set(services.map((s: Service) => s.group_name).filter((g): g is string => !!g)))
+            .sort((a, b) => a.localeCompare(b, 'es')),
+        [services]
+    );
+    const planGroupNames = useMemo(
+        () => Array.from(new Set(plans.map((p: Plan) => p.group_name).filter((g): g is string => !!g)))
+            .sort((a, b) => a.localeCompare(b, 'es')),
+        [plans]
+    );
+    const serviceOptions = useMemo(() => services
+        .filter((s: Service) => serviceGroupFilter === 'all'
+            || (serviceGroupFilter === '__none__' ? !s.group_name : s.group_name === serviceGroupFilter))
+        .sort((a: Service, b: Service) =>
+            (a.group_name || '\uffff').localeCompare(b.group_name || '\uffff', 'es') || a.name.localeCompare(b.name, 'es'))
+        .map((s: Service) => ({ value: s.id, label: s.group_name ? `${s.name} · ${s.group_name}` : s.name })),
+        [services, serviceGroupFilter]
+    );
 
     useEffect(() => {
         if (isNew) return;
@@ -355,6 +377,25 @@ export default function EditPlanPage() {
                     </div>
 
                     <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Grupo</label>
+                        <input
+                            type="text"
+                            list="plan-groups"
+                            maxLength={60}
+                            value={currentPlan?.group_name || ''}
+                            onChange={(e) => setCurrentPlan({ ...currentPlan, group_name: e.target.value })}
+                            className="w-full bg-black/20 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-amber-500/40 transition-all text-sm font-medium"
+                            placeholder={planGroupNames.length ? 'Elige uno existente o escribe uno nuevo' : 'Ej: Perros, Gatos, Exóticos'}
+                        />
+                        <datalist id="plan-groups">
+                            {planGroupNames.map(g => <option key={g} value={g} />)}
+                        </datalist>
+                        <p className="text-[10px] text-muted-foreground/60 ml-1">
+                            Al compartir el catálogo eliges qué grupos muestra cada enlace. Vacío = «Sin grupo».
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
                         <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Importante (opcional)</label>
                         <input
                             type="text"
@@ -379,13 +420,29 @@ export default function EditPlanPage() {
                             <h3 className="text-[10px] font-black uppercase tracking-widest text-white">Servicios Incluidos</h3>
                         </div>
 
-                        <SearchableSelect
-                            isMulti
-                            options={services.map(s => ({ value: s.id, label: s.name }))}
-                            value={currentPlan?.service_ids || []}
-                            onChange={(val) => setCurrentPlan({ ...currentPlan, service_ids: val })}
-                            placeholder="Agregar servicios..."
-                        />
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            {serviceGroupNames.length > 0 && (
+                                <select
+                                    value={serviceGroupFilter}
+                                    onChange={(e) => setServiceGroupFilter(e.target.value)}
+                                    className="sm:w-44 shrink-0 bg-black/20 border border-white/10 rounded-2xl py-2.5 px-3 text-xs font-semibold outline-none focus:border-blue-500/40 cursor-pointer"
+                                    title="Filtrar servicios por grupo"
+                                >
+                                    <option value="all">Todos los grupos</option>
+                                    {serviceGroupNames.map(g => <option key={g} value={g}>{g}</option>)}
+                                    <option value="__none__">Sin grupo</option>
+                                </select>
+                            )}
+                            <div className="flex-1 min-w-0">
+                                <SearchableSelect
+                                    isMulti
+                                    options={serviceOptions}
+                                    value={currentPlan?.service_ids || []}
+                                    onChange={(val) => setCurrentPlan({ ...currentPlan, service_ids: val })}
+                                    placeholder={serviceGroupFilter === 'all' ? 'Agregar servicios...' : 'Agregar servicios de este grupo...'}
+                                />
+                            </div>
+                        </div>
 
                         {(currentPlan?.service_ids?.length || 0) > 1 && (
                             <p className="mt-3 text-[10px] text-muted-foreground/60">Usa las flechas para definir el orden en el catálogo. Marca como &quot;Opcional&quot; los extras que no vienen incluidos.</p>
@@ -428,6 +485,11 @@ export default function EditPlanPage() {
                                                     </button>
                                                 </div>
                                                 <span className={`text-xs font-medium truncate ${isOptional ? 'text-white/50' : 'text-white/80'}`}>{service.name}</span>
+                                                {service.group_name && (
+                                                    <span className="shrink-0 inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/20">
+                                                        <Folder size={9} /> {service.group_name}
+                                                    </span>
+                                                )}
                                             </div>
                                             <div className="flex items-center gap-1 shrink-0">
                                                 <button

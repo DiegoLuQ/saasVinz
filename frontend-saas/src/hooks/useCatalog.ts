@@ -40,6 +40,8 @@ export interface Plan {
     price_label?: string | null;
     important_note?: string | null;  // aviso destacado en la tarjeta del catálogo
     sort_order?: number;
+    /** Grupo del plan; cada enlace del catálogo elige qué grupos muestra. null = «Sin grupo» */
+    group_name?: string | null;
     services?: Service[];
     service_ids?: number[];          // el orden de la lista es el orden en el catálogo
     optional_service_ids?: number[]; // subconjunto de service_ids marcados como opcionales

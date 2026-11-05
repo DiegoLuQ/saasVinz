@@ -136,7 +136,9 @@ export default function ServicesPage() {
 
     // Grupos de servicios (solo panel) e importación desde Excel
     const [showImportModal, setShowImportModal] = useState(false);
-    const [groupToRename, setGroupToRename] = useState<{ old: string; value: string } | null>(null);
+    const [groupToRename, setGroupToRename] = useState<{ kind: 'service' | 'plan'; old: string; value: string } | null>(null);
+    const [planGroupFilter, setPlanGroupFilter] = useState<string>('all');
+    const [catalogPlansGroup, setCatalogPlansGroup] = useState<string>('all');
     const [renamingGroup, setRenamingGroup] = useState(false);
 
     // Catalog modal states
@@ -258,13 +260,18 @@ export default function ServicesPage() {
         if (!groupToRename) return;
         setRenamingGroup(true);
         try {
-            const res = await apiRequest('/api/internal/services/groups/rename', {
+            const isPlan = groupToRename.kind === 'plan';
+            const res = await apiRequest(`/api/internal/${isPlan ? 'plans' : 'services'}/groups/rename`, {
                 method: 'PUT',
                 body: JSON.stringify({ old_name: groupToRename.old, new_name: groupToRename.value }),
             });
-            queryClient.invalidateQueries({ queryKey: ['catalog-services'] });
-            if (groupFilter === groupToRename.old) setGroupFilter(res?.group_name || 'all');
-            showToast(res?.group_name ? `Grupo renombrado a «${res.group_name}»` : 'Servicios movidos a «Sin grupo»', 'success');
+            queryClient.invalidateQueries({ queryKey: [isPlan ? 'catalog-plans' : 'catalog-services'] });
+            if (isPlan) {
+                if (planGroupFilter === groupToRename.old) setPlanGroupFilter(res?.group_name || 'all');
+            } else if (groupFilter === groupToRename.old) {
+                setGroupFilter(res?.group_name || 'all');
+            }
+            showToast(res?.group_name ? `Grupo renombrado a «${res.group_name}»` : `${isPlan ? 'Planes' : 'Servicios'} movidos a «Sin grupo»`, 'success');
             setGroupToRename(null);
         } catch (err) {
             showToast((err as { message?: string })?.message || 'No se pudo renombrar el grupo', 'error');
@@ -273,7 +280,7 @@ export default function ServicesPage() {
         }
     };
 
-    const renderGroupHeader = (g: { key: string; name: string | null; items: Service[] }) => (
+    const renderGroupHeader = (g: { key: string; name: string | null; items: unknown[] }, kind: 'service' | 'plan' = 'service') => (
         <div className="flex items-center gap-2 mb-3">
             <Folder size={15} className={g.name ? 'text-primary' : 'text-muted-foreground'} />
             <h2 className={`text-sm font-bold ${g.name ? 'text-slate-900 dark:text-white' : 'text-muted-foreground'}`}>
@@ -283,7 +290,7 @@ export default function ServicesPage() {
             {g.name && canEdit('servicios') && (
                 <button
                     type="button"
-                    onClick={() => setGroupToRename({ old: g.name!, value: g.name! })}
+                    onClick={() => setGroupToRename({ kind, old: g.name!, value: g.name! })}
                     className="p-1 rounded-lg text-muted-foreground hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                     title="Renombrar grupo"
                 >
@@ -300,11 +307,14 @@ export default function ServicesPage() {
         const filtered = plans.filter((p: Plan) => {
             const matchSearch = !searchLower ||
                 p.name.toLowerCase().includes(searchLower) ||
-                (p.description?.toLowerCase()?.includes(searchLower) ?? false);
+                (p.description?.toLowerCase()?.includes(searchLower) ?? false) ||
+                (p.group_name?.toLowerCase()?.includes(searchLower) ?? false);
             const matchStatus = statusFilter === 'all' ||
                 (statusFilter === 'active' && p.is_active) ||
                 (statusFilter === 'inactive' && !p.is_active);
-            return matchSearch && matchStatus;
+            const matchGroup = planGroupFilter === 'all' ||
+                (planGroupFilter === NO_GROUP ? !p.group_name : p.group_name === planGroupFilter);
+            return matchSearch && matchStatus && matchGroup;
         });
 
         return filtered.sort((a, b) => {
@@ -312,7 +322,41 @@ export default function ServicesPage() {
             if (sortBy === 'price_asc') return (a.price || 0) - (b.price || 0);
             return (a.name || '').localeCompare(b.name || '');
         });
-    }, [plans, searchTerm, statusFilter, sortBy]);
+    }, [plans, searchTerm, statusFilter, sortBy, planGroupFilter]);
+
+    // Grupos de planes (cada enlace del catálogo elige cuáles muestra)
+    const planGroupNames = useMemo(
+        () => Array.from(new Set(plans.map((p: Plan) => p.group_name).filter((g): g is string => !!g)))
+            .sort((a, b) => a.localeCompare(b, 'es')),
+        [plans]
+    );
+    const hasPlanGroups = planGroupNames.length > 0;
+    const groupedPlans = useMemo(() => {
+        const map = new Map<string, Plan[]>();
+        for (const pl of filteredAndSortedPlans) {
+            const key = pl.group_name || NO_GROUP;
+            if (!map.has(key)) map.set(key, []);
+            map.get(key)!.push(pl);
+        }
+        return Array.from(map.entries())
+            .sort(([a], [b]) => (a === NO_GROUP ? 1 : b === NO_GROUP ? -1 : a.localeCompare(b, 'es')))
+            .map(([key, items]) => ({ key, name: key === NO_GROUP ? null : key, items }));
+    }, [filteredAndSortedPlans]);
+
+    useEffect(() => {
+        if (planGroupFilter !== 'all' && planGroupFilter !== NO_GROUP && !planGroupNames.includes(planGroupFilter)) {
+            setPlanGroupFilter('all');
+        }
+        if (catalogPlansGroup !== 'all' && catalogPlansGroup !== NO_GROUP && !planGroupNames.includes(catalogPlansGroup)) {
+            setCatalogPlansGroup('all');
+        }
+    }, [planGroupFilter, catalogPlansGroup, planGroupNames]);
+
+    // Planes del catálogo PDF / vista previa (solo activos y grupo elegido)
+    const catalogPdfPlans = useMemo(() => plans.filter((p: Plan) =>
+        (!catalogPlansOnlyActive || p.is_active) &&
+        (catalogPlansGroup === 'all' || (catalogPlansGroup === NO_GROUP ? !p.group_name : p.group_name === catalogPlansGroup))
+    ), [plans, catalogPlansOnlyActive, catalogPlansGroup]);
 
     const handleOpenServiceModal = (service?: Service) => {
         if (!service && isServiceLimitReached) {
@@ -590,6 +634,7 @@ export default function ServicesPage() {
                             setActiveTab('planes');
                             setSearchTerm('');
                             setStatusFilter('all');
+                            setPlanGroupFilter('all');
                         }}
                         className={`relative flex items-center gap-2 py-1.5 px-4 rounded-lg text-xs font-bold transition-all ${
                             !isPlanesEnabled
@@ -656,6 +701,19 @@ export default function ServicesPage() {
                         >
                             <option value="all">Todos los grupos</option>
                             {serviceGroupNames.map(g => <option key={g} value={g}>{g}</option>)}
+                            <option value={NO_GROUP}>Sin grupo</option>
+                        </select>
+                    )}
+
+                    {activeTab === 'planes' && hasPlanGroups && (
+                        <select
+                            value={planGroupFilter}
+                            onChange={(e) => setPlanGroupFilter(e.target.value)}
+                            className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl py-1.5 px-3 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none cursor-pointer max-w-[11rem]"
+                            title="Filtrar planes por grupo"
+                        >
+                            <option value="all">Todos los grupos</option>
+                            {planGroupNames.map(g => <option key={g} value={g}>{g}</option>)}
                             <option value={NO_GROUP}>Sin grupo</option>
                         </select>
                     )}
@@ -1046,9 +1104,13 @@ export default function ServicesPage() {
                         )}
                     </div>
                 ) : viewMode === 'grid' ? (
-                    /* Vista Grid de Planes */
+                    /* Vista Grid de Planes (por grupo) */
+                    <div className="space-y-7">
+                    {groupedPlans.map((g) => (
+                    <section key={g.key}>
+                    {hasPlanGroups && renderGroupHeader(g, 'plan')}
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
-                        {filteredAndSortedPlans.map((plan) => {
+                        {g.items.map((plan) => {
                             const isToggling = togglingId === plan.id;
                             const totalItemsIncluded = (plan.services?.length || 0) + (plan.products?.length || 0);
 
@@ -1221,9 +1283,13 @@ export default function ServicesPage() {
                                 </motion.div>
                             );
                         })}
+                    </div>
+                    </section>
+                    ))}
 
                         {/* Card Agregar Nuevo Plan */}
                         {canCreate('servicios') && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
                             <button
                                 type="button"
                                 onClick={() => router.push('/dashboard/gestion-servicios/plan/nuevo')}
@@ -1240,6 +1306,7 @@ export default function ServicesPage() {
                                     Diseña un nuevo paquete integrado
                                 </span>
                             </button>
+                    </div>
                         )}
                     </div>
                 ) : (
@@ -1258,7 +1325,14 @@ export default function ServicesPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                                    {filteredAndSortedPlans.map((plan) => {
+                                    {groupedPlans.map((g) => (
+                                    <React.Fragment key={g.key}>
+                                    {hasPlanGroups && (
+                                        <tr className="bg-slate-50/80 dark:bg-slate-800/30">
+                                            <td colSpan={6} className="pt-3 pb-1 px-4">{renderGroupHeader(g, 'plan')}</td>
+                                        </tr>
+                                    )}
+                                    {g.items.map((plan) => {
                                         const isToggling = togglingId === plan.id;
 
                                         return (
@@ -1337,6 +1411,8 @@ export default function ServicesPage() {
                                             </tr>
                                         );
                                     })}
+                                    </React.Fragment>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
@@ -1565,7 +1641,9 @@ export default function ServicesPage() {
                                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2.5 px-3.5 text-sm font-medium outline-none focus:border-primary transition-all text-slate-900 dark:text-white"
                             />
                             <p className="text-[11px] text-muted-foreground">
-                                Cambia el grupo de todos sus servicios. Si escribes el nombre de otro grupo, se unen. Vacío = «Sin grupo».
+                                {groupToRename.kind === 'plan'
+                                    ? 'Cambia el grupo de todos sus planes; los enlaces del catálogo que lo mostraban lo siguen mostrando. Vacío = «Sin grupo».'
+                                    : 'Cambia el grupo de todos sus servicios. Si escribes el nombre de otro grupo, se unen. Vacío = «Sin grupo».'}
                             </p>
                         </div>
                         <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
@@ -1637,11 +1715,24 @@ export default function ServicesPage() {
                                 />
                                 <span>Mostrar Imágenes</span>
                             </label>
+
+                            {hasPlanGroups && (
+                                <select
+                                    value={catalogPlansGroup}
+                                    onChange={(e) => setCatalogPlansGroup(e.target.value)}
+                                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl py-1.5 px-3 text-xs font-bold text-slate-700 dark:text-slate-300 outline-none cursor-pointer"
+                                    title="Grupo de planes del PDF"
+                                >
+                                    <option value="all">Todos los grupos</option>
+                                    {planGroupNames.map(g => <option key={g} value={g}>{g}</option>)}
+                                    <option value={NO_GROUP}>Sin grupo</option>
+                                </select>
+                            )}
                         </div>
 
                         <div className="shrink-0">
                             <PlansDownloadLink
-                                plans={plans.filter((p: any) => !catalogPlansOnlyActive || p.is_active)}
+                                plans={catalogPdfPlans}
                                 showPrices={catalogPlansShowPrices}
                                 showImages={catalogPlansShowImages}
                                 contact={{ phone: tenantData?.phone, email: tenantData?.email, address: tenantData?.address, city: tenantData?.city }}
@@ -1673,13 +1764,13 @@ export default function ServicesPage() {
 
                         {/* Listado de Planes */}
                         <div className="p-6">
-                            {plans.filter((p: any) => !catalogPlansOnlyActive || p.is_active).length === 0 ? (
+                            {catalogPdfPlans.length === 0 ? (
                                 <div className="py-12 text-center text-muted-foreground text-sm font-medium">
                                     No hay planes para mostrar con los filtros seleccionados.
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {sortPlansForCatalog(plans.filter((p: any) => !catalogPlansOnlyActive || p.is_active)).map((plan: any) => (
+                                    {sortPlansForCatalog(catalogPdfPlans).map((plan: any) => (
                                         <div
                                             key={plan.id}
                                             className="bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-4 flex gap-4"
@@ -1736,6 +1827,7 @@ export default function ServicesPage() {
                 onClose={() => setShowSharePlansModal(false)}
                 tenantSlug={tenantData?.slug || ''}
                 tenantName={tenantData?.name || ''}
+                planGroups={planGroupNames}
                 catalogType="plans"
             />
         </div>

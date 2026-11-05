@@ -163,6 +163,9 @@ class PlanBase(BaseModel):
     price_label: Optional[str] = Field(None, max_length=60)
     important_note: Optional[str] = Field(None, max_length=200)
     sort_order: int = 0
+    group_name: Optional[str] = None
+
+    _clean_group = field_validator("group_name", mode="before")(clean_group_name)
 
 class PlanCreate(PlanBase):
     service_ids: List[int] = [] # IDs de servicios a vincular (el orden de la lista es el orden en el catálogo)
@@ -180,9 +183,12 @@ class PlanUpdate(BaseModel):
     price_label: Optional[str] = Field(None, max_length=60)
     important_note: Optional[str] = Field(None, max_length=200)
     sort_order: Optional[int] = None
+    group_name: Optional[str] = None
     service_ids: Optional[List[int]] = None
     product_ids: Optional[List[int]] = None
     optional_service_ids: Optional[List[int]] = None
+
+    _clean_group = field_validator("group_name", mode="before")(clean_group_name)
 
 class PlanInDB(PlanBase):
     id: int
@@ -227,6 +233,11 @@ class CatalogShareTokenCreate(BaseModel):
     catalog_type: CatalogType = "products"
     # Solo catálogo de planes: mensaje visible para la familia
     message: Optional[str] = Field(default=None, max_length=CATALOG_MESSAGE_MAX)
+    # Solo catálogo de planes: grupos que muestra (None = todos; "" = «Sin grupo»)
+    plan_groups: Optional[List[str]] = None
+
+class CatalogShareTokenPlanGroups(BaseModel):
+    plan_groups: Optional[List[str]] = None
 
 class CatalogShareTokenBulkUpdate(BaseModel):
     """Aplica la misma etiqueta y mensaje a todos los enlaces de un tipo (vacío = quitar)."""
@@ -241,6 +252,7 @@ class CatalogShareTokenInDB(BaseModel):
     name: Optional[str] = None
     catalog_type: CatalogType = "products"
     message: Optional[str] = None
+    plan_groups: Optional[List[str]] = None
     expires_at: Optional[datetime] = None
     is_active: bool
     views_count: int = 0

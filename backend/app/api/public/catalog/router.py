@@ -121,7 +121,7 @@ def get_public_catalog(
             catalog_type="plans",
             is_expired=False,
             **tenant_info,
-            plans=_active_plans(db, tenant.id, price_table),
+            plans=_active_plans(db, tenant.id, price_table, share_token.plan_groups),
             catalog_message=share_token.message,
             show_plan_request=normalize_form_config(tenant.form_config)["show_plan_request_button"],
             # Con la tabla por plan los tramos no llevan recargo (el precio va en cada plan).
@@ -217,7 +217,7 @@ def track_catalog_event(
     return Response(status_code=204)
 
 
-def _active_plans(db: Session, tenant_id: int, price_table: bool = False) -> list:
+def _active_plans(db: Session, tenant_id: int, price_table: bool = False, groups: list | None = None) -> list:
     """Planes activos con su portada y los servicios/productos activos que incluyen.
 
     Orden: el definido por el tenant (sort_order), luego precio y nombre. Los
@@ -235,6 +235,9 @@ def _active_plans(db: Session, tenant_id: int, price_table: bool = False) -> lis
         .all()
     )
     tier_ids = {t.id for t in get_weight_tiers(db, tenant_id)} if price_table else set()
+    # Grupos que muestra este enlace (None = todos)
+    from app.services.plan_groups import plan_matches
+    plans = [p for p in plans if plan_matches(p.group_name, groups)]
     result = []
     for p in plans:
         optional_ids = set(p.optional_service_ids)

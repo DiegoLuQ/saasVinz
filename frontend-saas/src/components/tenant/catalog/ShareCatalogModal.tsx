@@ -17,6 +17,7 @@ import {
     RefreshCw,
     X,
     CheckCircle2,
+    Folder,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
@@ -29,6 +30,8 @@ interface CatalogLink {
     token: string;
     name?: string | null;
     message?: string | null;
+    /** Catálogo de planes: grupos que muestra (null = todos; '' = «Sin grupo») */
+    plan_groups?: string[] | null;
     expires_at?: string | null;
     is_active: boolean;
     views_count: number;
@@ -71,6 +74,36 @@ interface ShareCatalogModalProps {
     zIndex?: string;
     /** Qué catálogo comparte el enlace: productos (Inventario) o planes (Gestión de Servicios). */
     catalogType?: CatalogType;
+    /** Catálogo de planes: grupos de planes existentes, para elegir cuáles muestra cada enlace. */
+    planGroups?: string[];
+}
+
+const groupLabel = (g: string) => g || 'Sin grupo';
+
+/** Chips para elegir grupos de planes; lista vacía = todos. */
+function GroupPicker({ groups, value, onChange }: { groups: string[]; value: string[]; onChange: (v: string[]) => void }) {
+    const options = [...groups, ''];
+    const toggle = (g: string) => {
+        const has = value.some(v => v.toLowerCase() === g.toLowerCase());
+        const next = has ? value.filter(v => v.toLowerCase() !== g.toLowerCase()) : [...value, g];
+        onChange(next.length === options.length ? [] : next);
+    };
+    const chip = (active: boolean) => `px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all cursor-pointer ${
+        active
+            ? 'bg-amber-500 border-amber-500 text-white'
+            : 'bg-white border-slate-300 text-slate-600 hover:border-amber-400 dark:bg-slate-950/60 dark:border-white/15 dark:text-slate-300'
+    }`;
+    return (
+        <div className="flex flex-wrap gap-1.5">
+            <button type="button" onClick={() => onChange([])} className={chip(value.length === 0)}>Todos</button>
+            {options.map(g => (
+                <button key={g || '__none__'} type="button" onClick={() => toggle(g)}
+                    className={chip(value.some(v => v.toLowerCase() === g.toLowerCase()))}>
+                    {groupLabel(g)}
+                </button>
+            ))}
+        </div>
+    );
 }
 
 type ExpirationOption = { label: string; value: number | null; badge: string | null };
@@ -101,6 +134,7 @@ export default function ShareCatalogModal({
     tenantName,
     zIndex = 'z-[400]',
     catalogType = 'products',
+    planGroups = [],
 }: ShareCatalogModalProps) {
     const copy = COPY[catalogType];
     const expirationOptions = EXPIRATION_OPTIONS[catalogType];
@@ -115,6 +149,11 @@ export default function ShareCatalogModal({
     const [loadingLinks, setLoadingLinks] = useState(false);
     const [copiedToken, setCopiedToken] = useState<string | null>(null);
     const [recentCreatedUrl, setRecentCreatedUrl] = useState<string | null>(null);
+    // Grupos de planes del enlace nuevo ([] = todos) y edición de los de un enlace existente
+    const [newGroups, setNewGroups] = useState<string[]>([]);
+    const [editingGroups, setEditingGroups] = useState<{ id: number; value: string[] } | null>(null);
+    const [savingGroups, setSavingGroups] = useState(false);
+    const showGroups = isPlans && planGroups.length > 0;
 
     const fetchLinks = async () => {
         try {
@@ -136,6 +175,8 @@ export default function ShareCatalogModal({
             setRecentCreatedUrl(null);
             setLinkLabel('');
             setLinkMessage('');
+            setNewGroups([]);
+            setEditingGroups(null);
             setSelectedHours(EXPIRATION_OPTIONS[catalogType][0].value);
         }
     }, [isOpen, catalogType]);
@@ -153,6 +194,7 @@ export default function ShareCatalogModal({
                     expires_in_hours: selectedHours,
                     catalog_type: catalogType,
                     message: isPlans ? linkMessage.trim() || undefined : undefined,
+                    plan_groups: isPlans && newGroups.length ? newGroups : undefined,
                 }),
             });
 
@@ -167,6 +209,24 @@ export default function ShareCatalogModal({
             showToast(err.message || 'Error al generar el enlace', 'error');
         } finally {
             setIsGenerating(false);
+        }
+    };
+
+    const handleSaveGroups = async () => {
+        if (!editingGroups) return;
+        setSavingGroups(true);
+        try {
+            const res = await apiRequest(`/api/internal/catalog/links/${editingGroups.id}/plan-groups`, {
+                method: 'PATCH',
+                body: JSON.stringify({ plan_groups: editingGroups.value.length ? editingGroups.value : null }),
+            });
+            setLinks(prev => prev.map(l => (l.id === res.id ? { ...l, plan_groups: res.plan_groups } : l)));
+            setEditingGroups(null);
+            showToast('Grupos del enlace actualizados', 'success');
+        } catch (err) {
+            showToast((err as { message?: string })?.message || 'No se pudieron guardar los grupos', 'error');
+        } finally {
+            setSavingGroups(false);
         }
     };
 
@@ -334,6 +394,19 @@ export default function ShareCatalogModal({
                             </div>
                         )}
 
+                        {/* Grupos de planes que muestra el enlace */}
+                        {showGroups && (
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-200 ml-1">
+                                    Planes que muestra este enlace
+                                </label>
+                                <GroupPicker groups={planGroups} value={newGroups} onChange={setNewGroups} />
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 ml-1">
+                                    Elige uno o varios grupos. «Todos» muestra todos los planes activos.
+                                </p>
+                            </div>
+                        )}
+
                         <button
                             type="submit"
                             disabled={isGenerating}
@@ -484,6 +557,40 @@ export default function ShareCatalogModal({
                                                     <p className="text-[11px] text-slate-600 dark:text-slate-300 italic truncate" title={link.message}>
                                                         “{link.message}”
                                                     </p>
+                                                )}
+
+                                                {isPlans && (showGroups || (link.plan_groups?.length ?? 0) > 0) && (
+                                                    editingGroups?.id === link.id ? (
+                                                        <div className="space-y-2 pt-1">
+                                                            <GroupPicker
+                                                                groups={planGroups}
+                                                                value={editingGroups.value}
+                                                                onChange={(v) => setEditingGroups({ id: link.id, value: v })}
+                                                            />
+                                                            <div className="flex items-center gap-2">
+                                                                <button type="button" onClick={handleSaveGroups} disabled={savingGroups}
+                                                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold cursor-pointer disabled:opacity-60">
+                                                                    {savingGroups && <Loader2 size={12} className="animate-spin" />} Guardar
+                                                                </button>
+                                                                <button type="button" onClick={() => setEditingGroups(null)} disabled={savingGroups}
+                                                                    className="px-3 py-1 rounded-lg text-[11px] font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10 cursor-pointer">
+                                                                    Cancelar
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEditingGroups({ id: link.id, value: link.plan_groups || [] })}
+                                                            className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 hover:text-amber-700 dark:text-slate-300 dark:hover:text-amber-300 cursor-pointer"
+                                                            title="Cambiar los grupos de planes que muestra este enlace"
+                                                        >
+                                                            <Folder size={12} className="text-amber-600 dark:text-amber-400" />
+                                                            {link.plan_groups?.length
+                                                                ? `Muestra: ${link.plan_groups.map(groupLabel).join(', ')}`
+                                                                : 'Muestra: todos los planes'}
+                                                        </button>
+                                                    )
                                                 )}
 
                                                 <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-slate-500 dark:text-slate-400 font-mono">

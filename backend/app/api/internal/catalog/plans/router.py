@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
@@ -7,6 +8,9 @@ from app.api.deps import get_tenant_id
 from app.api.internal.admin.rbac.router import check_permission
 from app.api.deps_limits import check_resource_limit
 from app.api.internal.catalog.services import PlanService
+from app.api.internal.catalog.schemas import clean_group_name
+from app import models
+from app.services import plan_groups
 
 router = APIRouter()
 
@@ -45,6 +49,44 @@ def crear_plan(
 ):
     """Crea un nuevo plan y vincula los servicios proporcionados."""
     return service.create(tenant_id, plan_in)
+
+@router.get("/groups", response_model=List[str])
+def listar_grupos(
+    tenant_id: int = Depends(get_tenant_id),
+    db: Session = Depends(get_db),
+    _: bool = Depends(check_permission("servicios", "view"))
+):
+    """Grupos usados por los planes del crematorio (orden alfabético)."""
+    return plan_groups.existing_plan_groups(db, tenant_id)
+
+
+@router.put("/groups/rename")
+def renombrar_grupo(
+    payload: schemas.ServiceGroupRename,
+    tenant_id: int = Depends(get_tenant_id),
+    db: Session = Depends(get_db),
+    _: bool = Depends(check_permission("servicios", "edit"))
+):
+    """Renombra un grupo en todos sus planes y en los enlaces del catálogo que lo muestran."""
+    old = clean_group_name(payload.old_name)
+    try:
+        new = clean_group_name(payload.new_name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not old:
+        raise HTTPException(status_code=400, detail="Indica el grupo a renombrar.")
+    plans = db.query(models.Plan).filter(
+        models.Plan.tenant_id == tenant_id,
+        func.lower(models.Plan.group_name) == old.lower(),
+    ).all()
+    if not plans:
+        raise HTTPException(status_code=404, detail="Grupo no encontrado")
+    for pl in plans:
+        pl.group_name = new
+    plan_groups.rename_in_links(db, tenant_id, old, new)
+    db.commit()
+    return {"updated": len(plans), "group_name": new}
+
 
 @router.get("/{plan_id}", response_model=schemas.PlanInDB)
 def obtener_plan(
