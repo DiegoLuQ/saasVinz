@@ -84,9 +84,15 @@ export default function TrackingPage() {
     const params = useParams();
 
     // Derived values with fallbacks
-    const slug = params?.slug as string || '';
-    const pet_name = params?.pet_name as string || '';
-    const token = params?.token as string || '';
+    // useParams entrega los segmentos aún codificados («Mar%C3%ADa%20…»); sin decodificar,
+    // encodeURIComponent los codificaba dos veces y los nombres con tilde/espacios no se encontraban.
+    const decodeParam = (v: unknown) => {
+        const s = typeof v === 'string' ? v : '';
+        try { return decodeURIComponent(s); } catch { return s; }
+    };
+    const slug = decodeParam(params?.slug);
+    const pet_name = decodeParam(params?.pet_name);
+    const token = decodeParam(params?.token);
 
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);

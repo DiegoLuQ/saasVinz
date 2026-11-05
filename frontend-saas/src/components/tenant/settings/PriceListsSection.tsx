@@ -198,6 +198,32 @@ export default function PriceListsSection({ reloadKey }: {
         }
     };
 
+    /** Reactiva una tabla pausada (mismo contenido; solo cambia is_active). */
+    const activate = async (pl: PriceList) => {
+        setDeleting(pl.id);
+        try {
+            await apiRequest(`/api/internal/price-lists/${pl.id}`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    name: pl.name,
+                    valid_from: pl.valid_from,
+                    valid_until: pl.valid_until,
+                    is_active: true,
+                    tiers: pl.tiers.map(t => ({ label: t.label, min_weight: t.min_weight, max_weight: t.max_weight })),
+                    plan_prices: Object.fromEntries(Object.entries(pl.plan_prices || {}).map(([planId, row]) => [
+                        planId, pl.tiers.map(t => row?.[String(t.id)] ?? null),
+                    ])),
+                }),
+            });
+            showToast('Tabla activada: sus enlaces ya muestran estos precios', 'success');
+            await load();
+        } catch (err) {
+            showToast(errMsg(err, 'No se pudo activar la tabla'), 'error');
+        } finally {
+            setDeleting(null);
+        }
+    };
+
     const remove = async (pl: PriceList) => {
         setDeleting(pl.id);
         try {
@@ -255,6 +281,13 @@ export default function PriceListsSection({ reloadKey }: {
                                 <div key={pl.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
                                     <span className="font-semibold text-sm text-foreground">{pl.name}</span>
                                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${st.cls}`}>{st.label}</span>
+                                    {pl.status === 'pausada' && (
+                                        <button type="button" onClick={() => activate(pl)} disabled={deleting === pl.id}
+                                            title="Mientras está pausada, sus enlaces usan la General"
+                                            className="rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50 cursor-pointer">
+                                            Activar
+                                        </button>
+                                    )}
                                     {(pl.valid_from || pl.valid_until) && (
                                         <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                                             <CalendarRange size={12} />
