@@ -142,7 +142,7 @@ async def finish_cremation(
             ratio="1:1",
             description=f"Evidencia técnica OC {cremation.oc_number}",
             alt_text=f"Técnica {cremation.oc_number}",
-            processing_mode="optimized",
+            processing_mode="evidence",
             custom_prefix=f"tech_{cremation_id}",
             tenant_id=tenant_id
         )
@@ -232,7 +232,7 @@ async def update_task(
         m_item = MediaService.upload_media(
             db=db, local_path=t_path, media_type="image", category="logistics",
             ratio="original", description=f"Evidencia logística tarea {task_id}",
-            processing_mode="optimized", custom_prefix=f"log_ev_{task_id}",
+            processing_mode="evidence", custom_prefix=f"log_ev_{task_id}",
             tenant_id=tenant_id
         )
         if task.evidence_image_url:
@@ -571,7 +571,7 @@ async def upload_evidence(
                 ratio="original", # Preserve aspect ratio for evidence photos
                 description=f"Evidencia OC {cremation.oc_number} - Paso {step.name}",
                 alt_text=f"Evidencia {step.name}",
-                processing_mode="optimized",
+                processing_mode="evidence",
                 custom_prefix=f"wf_{cremation_id}_{step_id}",
                 tenant_id=tenant_id
             )

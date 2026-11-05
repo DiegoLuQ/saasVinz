@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { CheckCircle2, CircleDot, Circle, Images, ChevronDown, X, User, Clock, Camera, Plus, Loader2, Check } from 'lucide-react';
 import { apiRequest, getImageUrl } from '@/lib/tenant/api';
+import { compressEvidencePhoto } from '@/lib/clientImageCompressor';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 
 export type StageEvidence = { photo_url?: string | null; comments: string[]; at?: string | null };
@@ -69,7 +70,7 @@ export default function StageTimeline({ stages, orderId, canEdit = false, onEvid
         setUploading(true);
         try {
             const formData = new FormData();
-            if (photoFile) formData.append('photo', photoFile);
+            if (photoFile) formData.append('photo', await compressEvidencePhoto(photoFile));
             formData.append('comments', JSON.stringify(note.trim() ? [note.trim()] : []));
             await apiRequest(`/api/internal/operations/ops/evidence?cremation_id=${orderId}&step_id=${stepId}`, {
                 method: 'POST',

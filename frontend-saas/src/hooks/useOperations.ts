@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/tenant/api';
-
+import { compressEvidencePhoto } from '@/lib/clientImageCompressor';
 export type OpsTab = 'today' | 'in_progress' | 'not_started' | 'finished';
 
 export interface OrderEvidence {
@@ -117,9 +117,9 @@ export function useOpsOrderActions(showToast: ToastFn, onOrderUpdated: (order: O
                 () => apiRequest(`/api/internal/operations/ops/orders/${orderId}/steps/${stepId}/time?completed_at=${encodeURIComponent(newDate)}`, { method: 'PATCH' }),
                 'Hora actualizada',
             ),
-        uploadEvidence: (orderId: number, stepId: number, photo: File | null, comments: string[]) => {
+        uploadEvidence: async (orderId: number, stepId: number, photo: File | null, comments: string[]) => {
             const formData = new FormData();
-            if (photo) formData.append('photo', photo);
+            if (photo) formData.append('photo', await compressEvidencePhoto(photo));
             formData.append('comments', JSON.stringify(comments.filter(c => c.trim() !== '')));
             return run(
                 'evidence',

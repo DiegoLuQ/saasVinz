@@ -81,3 +81,13 @@ export async function compressImage(
 export async function compressImages(files: File[]): Promise<File[]> {
     return Promise.all(files.map((file) => compressImage(file)));
 }
+
+/**
+ * Foto de evidencia tomada con el celular (3–12 MB): se achica a 1600 px antes de subirla para
+ * no gastar datos ni esperar; el servidor la deja en WebP ≤ 100 KB. Respeta la orientación EXIF
+ * (el navegador ya la aplica al dibujar). Si el navegador no puede leerla (p. ej. HEIC en Android)
+ * se envía tal cual.
+ */
+export function compressEvidencePhoto(file: File): Promise<File> {
+    return compressImage(file, 1600, 1600, 0.8);
+}

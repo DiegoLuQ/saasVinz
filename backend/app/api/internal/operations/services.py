@@ -652,7 +652,7 @@ class CremationService:
                 ratio="original",
                 description=f"Evidencia de cremación {cremation_id}",
                 alt_text=f"Cremación {cremation_id}",
-                processing_mode="optimized",
+                processing_mode="evidence",
                 tenant_id=tenant_id
             )
             image_url = media_item.url
