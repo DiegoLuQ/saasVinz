@@ -327,7 +327,10 @@ def tier_range_text(min_weight: float | None, max_weight: float | None) -> str:
     return f"{_fmt_kg(min_weight or 0)} – {_fmt_kg(max_weight)} kg"
 
 
-def public_weight_tiers(db: Session, tenant_id: int, include_price: bool) -> list[dict]:
+def public_weight_tiers(db: Session, tenant_id: int, include_price: bool, price_list=None) -> list[dict]:
+    """Tramos públicos; con `price_list` (promoción del enlace) el recargo sale de esa tabla."""
+    if price_list is not None:
+        from app.services.price_lists import tier_price
     tiers = []
     for r in get_weight_tiers(db, tenant_id):
         item = {
@@ -338,7 +341,7 @@ def public_weight_tiers(db: Session, tenant_id: int, include_price: bool) -> lis
             "range_text": tier_range_text(r.min_weight, r.max_weight),
         }
         if include_price:
-            item["price"] = r.price or 0
+            item["price"] = tier_price(price_list, r) if price_list is not None else (r.price or 0)
         tiers.append(item)
     return tiers
 

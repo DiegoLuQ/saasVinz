@@ -595,6 +595,13 @@ export default function SubmissionDetailPage() {
                                 </tbody>
                                 {submission.total > 0 && (
                                     <tfoot>
+                                        {submission.pet_data?.priceList?.name && (
+                                            <tr>
+                                                <td colSpan={2} className="px-5 pt-3 text-[11px] text-muted-foreground">
+                                                    Precios de la tabla «{submission.pet_data.priceList.name}» (enlace del catálogo)
+                                                </td>
+                                            </tr>
+                                        )}
                                         <tr className="bg-amber-500/10 font-black border-t-2 border-amber-500/20">
                                             <td className="px-5 py-4 text-amber-600 dark:text-orange-400 uppercase tracking-wider text-xs">Total a Pagar</td>
                                             <td className="px-5 py-4 text-right text-amber-600 dark:text-orange-400 text-base">

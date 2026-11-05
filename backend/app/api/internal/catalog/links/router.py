@@ -10,7 +10,9 @@ from app.api.deps import get_tenant_id, get_current_user
 from app.api.internal.admin.rbac.router import check_permission
 from app.api.deps_features import check_feature
 from app.api.internal.catalog.models import CatalogShareToken
-from app.api.internal.catalog.schemas import CatalogType, CatalogShareTokenBulkUpdate, CatalogShareTokenPlanGroups
+from app.api.internal.catalog.schemas import (
+    CatalogType, CatalogShareTokenBulkUpdate, CatalogShareTokenPlanGroups, CatalogShareTokenPriceList,
+)
 from app.services.plan_groups import clean_plan_groups, existing_plan_groups
 
 GROUP_REQUIRED = "Elige el grupo de planes que mostrará este catálogo."
@@ -37,8 +39,25 @@ def _authorize(db: Session, current_user: models.User, tenant_id: int, catalog_t
         apply_tenant_rls(db, tenant_id)
 
 
-def _to_dto(item: CatalogShareToken, now, stats: dict | None = None) -> schemas.CatalogShareTokenInDB:
+def _price_list(db: Session, tenant_id: int, list_id: int | None):
+    """Valida que la tabla de precios sea del crematorio (None = General)."""
+    if not list_id:
+        return None
+    pl = db.query(models.PriceList).filter(
+        models.PriceList.id == list_id, models.PriceList.tenant_id == tenant_id,
+    ).first()
+    if not pl:
+        raise HTTPException(status_code=404, detail="Tabla de precios no encontrada")
+    return pl
+
+
+def _to_dto(item: CatalogShareToken, now, stats: dict | None = None, price_lists: dict | None = None) -> schemas.CatalogShareTokenInDB:
+    from app.services.price_lists import status_of
+    pl = (price_lists or {}).get(item.price_list_id) if item.price_list_id else None
     return schemas.CatalogShareTokenInDB(
+        price_list_id=item.price_list_id if pl else None,
+        price_list_name=pl.name if pl else None,
+        price_list_status=status_of(pl) if pl else None,
         id=item.id,
         tenant_id=item.tenant_id,
         token=item.token,
@@ -82,7 +101,9 @@ def list_catalog_share_links(
         stats = link_stats(db, [t.id for t in tokens])
 
     now = tz.get_now()
-    return [_to_dto(item, now, stats.get(item.id)) for item in tokens]
+    lists = {pl.id: pl for pl in db.query(models.PriceList).filter(models.PriceList.tenant_id == tenant_id)} \
+        if catalog_type == "plans" else {}
+    return [_to_dto(item, now, stats.get(item.id), lists) for item in tokens]
 
 
 @router.post("", response_model=schemas.CatalogShareTokenInDB, status_code=status.HTTP_201_CREATED)
@@ -115,6 +136,7 @@ def create_catalog_share_link(
         raise HTTPException(status_code=400, detail=str(e))
     if data.catalog_type == "plans" and not groups and existing_plan_groups(db, tenant_id):
         raise HTTPException(status_code=400, detail=GROUP_REQUIRED)
+    price_list = _price_list(db, tenant_id, data.price_list_id) if data.catalog_type == "plans" else None
 
     # Genera token aleatorio URL-safe de 16 bytes (~22 chars)
     token_str = secrets.token_urlsafe(16)
@@ -126,6 +148,7 @@ def create_catalog_share_link(
         catalog_type=data.catalog_type,
         message=message,
         plan_groups=groups,
+        price_list_id=price_list.id if price_list else None,
         expires_at=expires_at,
         is_active=True,
         views_count=0,
@@ -136,7 +159,7 @@ def create_catalog_share_link(
     db.commit()
     db.refresh(new_token)
 
-    return _to_dto(new_token, now)
+    return _to_dto(new_token, now, None, {price_list.id: price_list} if price_list else None)
 
 
 @router.put("/bulk", response_model=List[schemas.CatalogShareTokenInDB])
@@ -168,7 +191,8 @@ def bulk_update_catalog_share_links(
     db.commit()
 
     now = tz.get_now()
-    return [_to_dto(item, now) for item in tokens]
+    lists = {pl.id: pl for pl in db.query(models.PriceList).filter(models.PriceList.tenant_id == tenant_id)}         if data.catalog_type == "plans" else {}
+    return [_to_dto(item, now, None, lists) for item in tokens]
 
 
 @router.patch("/{token_id}/plan-groups", response_model=schemas.CatalogShareTokenInDB)
@@ -201,7 +225,36 @@ def update_catalog_link_plan_groups(
     item.plan_groups = groups
     db.commit()
     db.refresh(item)
-    return _to_dto(item, tz.get_now())
+    pl = _price_list(db, tenant_id, item.price_list_id) if item.price_list_id else None
+    return _to_dto(item, tz.get_now(), None, {pl.id: pl} if pl else None)
+
+
+@router.patch("/{token_id}/price-list", response_model=schemas.CatalogShareTokenInDB)
+def update_catalog_link_price_list(
+    token_id: int,
+    data: CatalogShareTokenPriceList,
+    tenant_id: int = Depends(get_tenant_id),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Elige la tabla de precios de un enlace del catálogo de planes (None = General)."""
+    _authorize(db, current_user, tenant_id, "plans", "edit")
+    item = (
+        db.query(CatalogShareToken)
+        .filter(
+            CatalogShareToken.id == token_id,
+            CatalogShareToken.tenant_id == tenant_id,
+            CatalogShareToken.catalog_type == "plans",
+        )
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Enlace no encontrado")
+    pl = _price_list(db, tenant_id, data.price_list_id)
+    item.price_list_id = pl.id if pl else None
+    db.commit()
+    db.refresh(item)
+    return _to_dto(item, tz.get_now(), None, {pl.id: pl} if pl else None)
 
 
 @router.delete("/{token_id}", status_code=status.HTTP_204_NO_CONTENT)

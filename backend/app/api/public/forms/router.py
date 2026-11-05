@@ -315,6 +315,32 @@ async def submit_public_form(
     from app.services.public_form_config import uses_price_table, plan_price_for_tier, submission_tier_id
     price_table = uses_price_table(tenant)
     sub_tier_id = submission_tier_id(db, tenant_id, pet_dict) if price_table else None
+    # Promoción del enlace del catálogo (tabla de precios vigente): se congela en la solicitud.
+    from app.services import price_lists as _pl
+    price_list = None
+    if catalog_token_id:
+        _tok = db.query(CatalogShareToken).filter(CatalogShareToken.id == catalog_token_id).first()
+        price_list = _pl.effective_for_token(db, _tok) if _tok else None
+    if price_list is not None:
+        pet_dict["priceList"] = {"id": price_list.id, "name": price_list.name}
+        if not price_table:
+            from app.services.public_form_config import get_weight_tiers, tier_for_weight
+            snap = pet_dict.get("weightTier") if isinstance(pet_dict.get("weightTier"), dict) else None
+            tier = None
+            if snap and snap.get("id"):
+                tier = db.query(models.WeightPricing).filter(
+                    models.WeightPricing.id == snap["id"], models.WeightPricing.tenant_id == tenant_id,
+                ).first()
+            elif pet_dict.get("weightKg") not in (None, ""):
+                try:
+                    tier = tier_for_weight(get_weight_tiers(db, tenant_id), float(str(pet_dict["weightKg"]).replace(",", ".")))
+                except ValueError:
+                    tier = None
+            if tier is not None:
+                snap = snap or {"id": tier.id, "label": tier.label,
+                                "min_weight": tier.min_weight or 0, "max_weight": tier.max_weight}
+                snap["price"] = _pl.tier_price(price_list, tier)
+                pet_dict["weightTier"] = snap
     
     # Pre-fetch lookup to avoid N+1 queries ideally, but for now simple loop is fine for small forms
     from sqlalchemy.orm import joinedload
@@ -335,7 +361,7 @@ async def submit_public_form(
                         "type": "plan",
                         "id": plan.id,
                         "name": plan.name,
-                        "price": plan_price_for_tier(plan, sub_tier_id, price_table),
+                        "price": _pl.plan_price(price_list, plan, sub_tier_id, price_table),
                         "cost": plan.cost or 0.0,
                         # Congelamosla imagen en el momento de la selección: si el
                         # crematorio luego la cambia/borra, el registro histórico

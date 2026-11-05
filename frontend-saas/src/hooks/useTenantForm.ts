@@ -233,6 +233,8 @@ export function useTenantForm(
             return;
         }
 
+        // Token del enlace (si es de un catálogo con tabla de precios, el backend aplica esos precios)
+        const tokenQs = token ? `?token=${encodeURIComponent(token)}` : '';
         const fetchData = async () => {
             try {
                 const requests: [
@@ -241,8 +243,8 @@ export function useTenantForm(
                     Promise<any>,
                     Promise<any>?
                 ] = [
-                    apiRequest<Tenant>(`/api/public/tenant/${slug}`),
-                    apiRequest<Service[]>(`/api/public/tenant/${slug}/services`),
+                    apiRequest<Tenant>(`/api/public/tenant/${slug}${tokenQs}`),
+                    apiRequest<Service[]>(`/api/public/tenant/${slug}/services${tokenQs}`),
                     apiRequest<any>(`/api/public/tenant/${slug}/farewell-template`).catch(() => null),
                 ];
 

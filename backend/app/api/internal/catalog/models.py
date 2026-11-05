@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Float, JSON, UniqueConstraint, Text
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Date, Boolean, Float, JSON, UniqueConstraint, Text
 from sqlalchemy.orm import relationship, backref
 from app.database import Base
 from datetime import datetime
@@ -140,6 +140,23 @@ class WeightPricing(Base):
     price = Column(Float)
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
 
+class PriceList(Base):
+    """Tabla de precios por peso con nombre (promoción / plantilla). Usa los mismos
+    rangos que la General y solo cambia precios; vacío = precio de la General.
+    Lógica en app/services/price_lists.py (migración d2a4c6e8f795)."""
+    __tablename__ = "srv_price_lists"
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("sys_tenants.id"), nullable=False, index=True)
+    name = Column(String(60), nullable=False)
+    tier_prices = Column(JSON, nullable=True)   # {"<id tramo>": recargo}
+    plan_prices = Column(JSON, nullable=True)   # {"<id plan>": {"<id tramo>": precio}}
+    valid_from = Column(Date, nullable=True)
+    valid_until = Column(Date, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+    created_at = Column(DateTime(timezone=True), default=tz.get_now)
+    updated_at = Column(DateTime(timezone=True), nullable=True, onupdate=tz.get_now)
+
+
 class CatalogShareToken(Base):
     __tablename__ = "inv_catalog_tokens"
     id = Column(Integer, primary_key=True, index=True)
@@ -151,6 +168,8 @@ class CatalogShareToken(Base):
     catalog_type = Column(String(20), nullable=False, default="products", server_default="products")  # 'products' | 'plans'
     # Catálogo de planes: grupos de planes que muestra (NULL = todos; "" = «Sin grupo»)
     plan_groups = Column(JSON, nullable=True)
+    # Catálogo de planes: tabla de precios que usa (NULL = General)
+    price_list_id = Column(Integer, ForeignKey("srv_price_lists.id", ondelete="SET NULL"), nullable=True)
     expires_at = Column(DateTime(timezone=True), nullable=True) # None = sin vencimiento
     is_active = Column(Boolean, default=True)
     views_count = Column(Integer, default=0)

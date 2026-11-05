@@ -308,6 +308,8 @@ app.include_router(partners_router)
 # Convenios con empresas (descuentos para sus clientes; distinto de veterinarias)
 from app.api.internal.agreements.router import router as agreements_router
 app.include_router(agreements_router)
+from app.api.internal.catalog.price_lists.router import router as price_lists_router
+app.include_router(price_lists_router)
 
 # Integrations Module (Widget embebible / API keys públicas) — gestionado por SuperAdmin
 from app.api.internal.creator.widgets.router import router as creator_widgets_router

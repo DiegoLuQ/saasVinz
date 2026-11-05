@@ -116,18 +116,21 @@ def get_public_catalog(
 
     # 5a. Catálogo de planes (compartido desde Gestión de Servicios)
     if catalog_type == "plans":
+        from app.services.price_lists import effective_for_token
         price_table = uses_price_table(tenant)
+        price_list = effective_for_token(db, share_token)  # promoción del enlace (None = General)
         return schemas.PublicCatalogResponse(
             catalog_type="plans",
             is_expired=False,
             **tenant_info,
-            plans=_active_plans(db, tenant.id, price_table, share_token.plan_groups),
+            plans=_active_plans(db, tenant.id, price_table, share_token.plan_groups, price_list),
             catalog_message=share_token.message,
             show_plan_request=normalize_form_config(tenant.form_config)["show_plan_request_button"],
             # Con la tabla por plan los tramos no llevan recargo (el precio va en cada plan).
             weight_tiers=public_weight_tiers(
                 db, tenant.id,
                 include_price=not price_table,
+                price_list=price_list,
             ),
         )
 
@@ -217,7 +220,8 @@ def track_catalog_event(
     return Response(status_code=204)
 
 
-def _active_plans(db: Session, tenant_id: int, price_table: bool = False, groups: list | None = None) -> list:
+def _active_plans(db: Session, tenant_id: int, price_table: bool = False, groups: list | None = None,
+                  price_list=None) -> list:
     """Planes activos con su portada y los servicios/productos activos que incluyen.
 
     Orden: el definido por el tenant (sort_order), luego precio y nombre. Los
@@ -237,6 +241,7 @@ def _active_plans(db: Session, tenant_id: int, price_table: bool = False, groups
     tier_ids = {t.id for t in get_weight_tiers(db, tenant_id)} if price_table else set()
     # Grupos que muestra este enlace (None = todos)
     from app.services.plan_groups import plan_matches
+    from app.services.price_lists import plan_weight_prices
     plans = [p for p in plans if plan_matches(p.group_name, groups)]
     result = []
     for p in plans:
@@ -251,7 +256,7 @@ def _active_plans(db: Session, tenant_id: int, price_table: bool = False, groups
                 important_note=p.important_note,
                 is_featured=bool(p.is_featured),
                 image_url=p.image_url,
-                weight_prices=clean_weight_prices(p.weight_prices, tier_ids) if price_table else None,
+                weight_prices=clean_weight_prices(plan_weight_prices(price_list, p), tier_ids) if price_table else None,
                 services=[
                     schemas.PublicCatalogPlanItem(
                         name=s.name or "", description=s.description, is_optional=s.id in optional_ids

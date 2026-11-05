@@ -42,6 +42,7 @@ import { apiRequest } from '@/lib/tenant/api';
 import CondolenceModal from '@/components/public/CondolenceModal';
 import WelcomeVideoField, { uploadPendingVideo } from './WelcomeVideoField';
 import PlanWeightPriceTable, { type PlanWeightRow } from './PlanWeightPriceTable';
+import PriceListsSection from './PriceListsSection';
 import {
     formatCLP,
     MAX_FIELD_LABEL,
@@ -280,6 +281,7 @@ export function PublicFormTab() {
     const [tablePlans, setTablePlans] = useState<PlanWeightRow[]>([]);
     // Precio por plan, en el orden de los rangos ('' = precio base del plan)
     const [tableValues, setTableValues] = useState<Record<number, string[]>>({});
+    const [priceListsKey, setPriceListsKey] = useState(0);
     const [specials, setSpecials] = useState<SpecialService[]>([]);
     const [savedSpecialVisibility, setSavedSpecialVisibility] = useState<Record<number, boolean>>({});
     const [newSpecial, setNewSpecial] = useState<typeof EMPTY_SPECIAL | null>(null);
@@ -564,6 +566,7 @@ export function PublicFormTab() {
             })));
             setSavedSpecialVisibility(Object.fromEntries(specials.map(sv => [sv.id, sv.show_in_form !== false])));
             showToast('Configuración del formulario guardada con éxito', 'success');
+            setPriceListsKey(k => k + 1);
         } catch (err: unknown) {
             showToast((err as Error)?.message || 'Error al guardar la configuración', 'error');
         } finally {
@@ -1372,6 +1375,7 @@ export function PublicFormTab() {
                                 />
                             </div>
                         )}
+                        <PriceListsSection reloadKey={priceListsKey} />
                         {/* Precios visibles en el formulario */}
                         <div className="glass-card p-5 sm:p-6 rounded-3xl space-y-4">
                             <div>

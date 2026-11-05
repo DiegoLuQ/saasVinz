@@ -26,7 +26,7 @@ from app.api.internal.crm.models import (
 
 # 3. Catalog
 from app.api.internal.catalog.models import (
-    Category, Provider, Product, Service, Plan, PlanProduct, PlanService, WeightPricing
+    Category, Provider, Product, Service, Plan, PlanProduct, PlanService, WeightPricing, PriceList
 )
 
 # 4. Operations

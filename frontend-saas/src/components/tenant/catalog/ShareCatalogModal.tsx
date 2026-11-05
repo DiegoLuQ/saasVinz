@@ -18,6 +18,7 @@ import {
     X,
     CheckCircle2,
     Folder,
+    BadgePercent,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
@@ -32,6 +33,10 @@ interface CatalogLink {
     message?: string | null;
     /** Catálogo de planes: grupos que muestra (null = todos; '' = «Sin grupo») */
     plan_groups?: string[] | null;
+    /** Catálogo de planes: tabla de precios (null = General) */
+    price_list_id?: number | null;
+    price_list_name?: string | null;
+    price_list_status?: 'activa' | 'programada' | 'vencida' | 'pausada' | null;
     expires_at?: string | null;
     is_active: boolean;
     views_count: number;
@@ -152,6 +157,10 @@ export default function ShareCatalogModal({
     const [editingGroups, setEditingGroups] = useState<{ id: number; value: string[] } | null>(null);
     const [savingGroups, setSavingGroups] = useState(false);
     const showGroups = isPlans && planGroups.length > 0;
+    // Tablas de precios (promociones): la del enlace nuevo y la edición de uno existente
+    const [priceLists, setPriceLists] = useState<{ id: number; name: string; status: string }[]>([]);
+    const [newPriceList, setNewPriceList] = useState<number | null>(null);
+    const [savingPriceList, setSavingPriceList] = useState<number | null>(null);
 
     const fetchLinks = async () => {
         try {
@@ -159,6 +168,10 @@ export default function ShareCatalogModal({
             const res = await apiRequest(`/api/internal/catalog/links?type=${catalogType}`);
             if (Array.isArray(res)) {
                 setLinks(res);
+            }
+            if (catalogType === 'plans') {
+                const pls = await apiRequest('/api/internal/price-lists').catch(() => []);
+                setPriceLists(Array.isArray(pls) ? pls : []);
             }
         } catch (err: any) {
             console.error('Error fetching catalog links:', err);
@@ -174,6 +187,7 @@ export default function ShareCatalogModal({
             setLinkLabel('');
             setLinkMessage('');
             setNewGroups([]);
+            setNewPriceList(null);
             setEditingGroups(null);
             setSelectedHours(EXPIRATION_OPTIONS[catalogType][0].value);
         }
@@ -197,6 +211,7 @@ export default function ShareCatalogModal({
                     catalog_type: catalogType,
                     message: isPlans ? linkMessage.trim() || undefined : undefined,
                     plan_groups: isPlans && newGroups.length ? newGroups : undefined,
+                    price_list_id: isPlans && newPriceList ? newPriceList : undefined,
                 }),
             });
 
@@ -229,6 +244,24 @@ export default function ShareCatalogModal({
             showToast((err as { message?: string })?.message || 'No se pudieron guardar los grupos', 'error');
         } finally {
             setSavingGroups(false);
+        }
+    };
+
+    const handleChangePriceList = async (linkId: number, value: number | null) => {
+        setSavingPriceList(linkId);
+        try {
+            const res = await apiRequest(`/api/internal/catalog/links/${linkId}/price-list`, {
+                method: 'PATCH',
+                body: JSON.stringify({ price_list_id: value }),
+            });
+            setLinks(prev => prev.map(l => (l.id === res.id ? {
+                ...l, price_list_id: res.price_list_id, price_list_name: res.price_list_name, price_list_status: res.price_list_status,
+            } : l)));
+            showToast('Tabla de precios del enlace actualizada', 'success');
+        } catch (err) {
+            showToast((err as { message?: string })?.message || 'No se pudo cambiar la tabla de precios', 'error');
+        } finally {
+            setSavingPriceList(null);
         }
     };
 
@@ -405,6 +438,29 @@ export default function ShareCatalogModal({
                                 <GroupPicker groups={planGroups} value={newGroups} onChange={setNewGroups} />
                                 <p className="text-[10px] text-slate-500 dark:text-slate-400 ml-1">
                                     Elige uno o varios grupos. La familia solo verá los planes activos de esos grupos.
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Tabla de precios (promoción) del enlace */}
+                        {isPlans && priceLists.length > 0 && (
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-200 ml-1" htmlFor="new-price-list">
+                                    Tabla de precios
+                                </label>
+                                <select
+                                    id="new-price-list"
+                                    value={newPriceList ?? ''}
+                                    onChange={e => setNewPriceList(e.target.value ? Number(e.target.value) : null)}
+                                    className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-800 dark:text-slate-100"
+                                >
+                                    <option value="">General</option>
+                                    {priceLists.map(pl => (
+                                        <option key={pl.id} value={pl.id}>{pl.name}{pl.status !== 'activa' ? ` (${pl.status})` : ''}</option>
+                                    ))}
+                                </select>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 ml-1">
+                                    Las tablas se crean en Configuración → Formulario y Pesos → Pesos y precios. Fuera de su vigencia el enlace usa la General.
                                 </p>
                             </div>
                         )}
@@ -593,6 +649,31 @@ export default function ShareCatalogModal({
                                                                 : 'Muestra: todos los planes'}
                                                         </button>
                                                     )
+                                                )}
+
+                                                {isPlans && (priceLists.length > 0 || !!link.price_list_id) && (
+                                                    <label className="inline-flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                                                        <BadgePercent size={12} className="text-fuchsia-600 dark:text-fuchsia-400" />
+                                                        Precios:
+                                                        <select
+                                                            value={link.price_list_id ?? ''}
+                                                            disabled={savingPriceList === link.id}
+                                                            onChange={e => handleChangePriceList(link.id, e.target.value ? Number(e.target.value) : null)}
+                                                            className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-1.5 py-0.5 text-[11px] text-slate-800 dark:text-slate-100 cursor-pointer disabled:opacity-60"
+                                                            title="Tabla de precios que usa este enlace"
+                                                        >
+                                                            <option value="">General</option>
+                                                            {priceLists.map(pl => (
+                                                                <option key={pl.id} value={pl.id}>{pl.name}</option>
+                                                            ))}
+                                                        </select>
+                                                        {link.price_list_status && link.price_list_status !== 'activa' && (
+                                                            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400" title="Mientras tanto el enlace usa la General">
+                                                                {link.price_list_status} · usa la General
+                                                            </span>
+                                                        )}
+                                                        {savingPriceList === link.id && <Loader2 size={12} className="animate-spin" />}
+                                                    </label>
                                                 )}
 
                                                 <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-slate-500 dark:text-slate-400 font-mono">

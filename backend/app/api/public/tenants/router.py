@@ -30,7 +30,8 @@ class TenantPublicInfo(BaseModel):
         from_attributes = True
 
 @router.get("/tenant/{slug}", response_model=TenantPublicInfo)
-def get_tenant_by_slug(slug: str, db: Session = Depends(get_db)):
+def get_tenant_by_slug(slug: str, token: str | None = None, db: Session = Depends(get_db)):
+    """`token`: el del enlace del catálogo que abrió el formulario (sus precios de promoción)."""
     tenant = db.query(models.Tenant).filter(models.Tenant.slug == slug).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
@@ -47,9 +48,11 @@ def get_tenant_by_slug(slug: str, db: Session = Depends(get_db)):
     info.show_vinzer_brand = show_vinzer_brand(tenant)
     info.form_config = form_config
     # Con la tabla por plan los tramos no llevan recargo (el precio va en cada plan).
+    from app.services.price_lists import effective_for_token_str
     info.weight_tiers = public_weight_tiers(
         db, tenant.id,
         include_price=form_config["show_weight_prices"] and form_config["weight_pricing_mode"] != "table",
+        price_list=effective_for_token_str(db, tenant.id, token),
     )
     return info
 
@@ -69,7 +72,7 @@ class ServicePublicInfo(BaseModel):
         from_attributes = True
 
 @router.get("/tenant/{slug}/services", response_model=list[ServicePublicInfo])
-def get_tenant_services(slug: str, db: Session = Depends(get_db)):
+def get_tenant_services(slug: str, token: str | None = None, db: Session = Depends(get_db)):
     tenant = db.query(models.Tenant).filter(models.Tenant.slug == slug).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
@@ -112,8 +115,10 @@ def get_tenant_services(slug: str, db: Session = Depends(get_db)):
     ).all()
     
     from app.services.public_form_config import clean_weight_prices, get_weight_tiers, uses_price_table
+    from app.services.price_lists import effective_for_token_str, plan_weight_prices
     price_table = uses_price_table(tenant)
     tier_ids = {t.id for t in get_weight_tiers(db, tenant.id)} if price_table else set()
+    price_list = effective_for_token_str(db, tenant.id, token) if price_table else None
 
     for p in plans:
         # Load associated items (services + products)
@@ -131,7 +136,7 @@ def get_tenant_services(slug: str, db: Session = Depends(get_db)):
             "category": "plan",
             "image_url": p.image_url,
             "sub_items": plan_items,
-            "weight_prices": clean_weight_prices(p.weight_prices, tier_ids) if price_table else None,
+            "weight_prices": clean_weight_prices(plan_weight_prices(price_list, p), tier_ids) if price_table else None,
         })
         
     # Fetch Products

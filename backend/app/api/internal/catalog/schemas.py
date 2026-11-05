@@ -235,9 +235,14 @@ class CatalogShareTokenCreate(BaseModel):
     message: Optional[str] = Field(default=None, max_length=CATALOG_MESSAGE_MAX)
     # Solo catálogo de planes: grupos que muestra (None = todos; "" = «Sin grupo»)
     plan_groups: Optional[List[str]] = None
+    # Solo catálogo de planes: tabla de precios (None = General)
+    price_list_id: Optional[int] = None
 
 class CatalogShareTokenPlanGroups(BaseModel):
     plan_groups: Optional[List[str]] = None
+
+class CatalogShareTokenPriceList(BaseModel):
+    price_list_id: Optional[int] = None  # None = General
 
 class CatalogShareTokenBulkUpdate(BaseModel):
     """Aplica la misma etiqueta y mensaje a todos los enlaces de un tipo (vacío = quitar)."""
@@ -253,6 +258,9 @@ class CatalogShareTokenInDB(BaseModel):
     catalog_type: CatalogType = "products"
     message: Optional[str] = None
     plan_groups: Optional[List[str]] = None
+    price_list_id: Optional[int] = None
+    price_list_name: Optional[str] = None
+    price_list_status: Optional[str] = None  # activa | programada | vencida | pausada
     expires_at: Optional[datetime] = None
     is_active: bool
     views_count: int = 0
