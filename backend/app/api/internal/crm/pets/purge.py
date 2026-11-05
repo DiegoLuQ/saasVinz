@@ -53,8 +53,12 @@ def _collect(db: Session, tenant_id: int, pet: models.Pet) -> dict:
         models.AiGeneration.media_url.isnot(None),
     ).all()
 
-    urls: list[str] = [pet.image_url] if pet.image_url else []
-    urls += _as_list(pet.images)
+    # Fotos de la mascota (las de su ficha y las que subió la familia en el formulario):
+    # al eliminar se puede elegir conservarlas en la nube.
+    photos: list[str] = ([pet.image_url] if pet.image_url else []) + _as_list(pet.images)
+    for s in submissions:
+        photos += _as_list(s.images)
+    urls: list[str] = list(photos)
     evidence = certificates = paid_commissions = 0
     for o in orders:
         if o.details:
@@ -71,8 +75,6 @@ def _collect(db: Session, tenant_id: int, pet: models.Pet) -> dict:
             paid_commissions += 1
     for m in memorials:
         urls += _as_list(m.main_image_url) + _as_list(m.lista_imagenes) + _as_list(m.imagen_ia)
-    for s in submissions:
-        urls += _as_list(s.images)
     for e in exports:
         urls += _as_list(e.media_url)
     for g in generations:
@@ -86,6 +88,7 @@ def _collect(db: Session, tenant_id: int, pet: models.Pet) -> dict:
 
     return {
         "orders": orders, "memorials": memorials, "submissions": submissions,
+        "photos": [u for u in uniq if u in photos],
         "exports": exports, "generations": generations, "urls": uniq, "evidence": evidence, "certificates": certificates,
         "paid_commissions": paid_commissions,
     }
@@ -107,6 +110,7 @@ def preview(db: Session, tenant_id: int, pet: models.Pet) -> dict:
         "evidence": g["evidence"],
         "certificates": g["certificates"],
         "images": len(g["urls"]),
+        "photos": len(g["photos"]),
         "paid_commissions": g["paid_commissions"],
     }
 
@@ -137,9 +141,11 @@ def _still_referenced(db: Session, url: str) -> bool:
     return False
 
 
-def purge(db: Session, tenant_id: int, pet: models.Pet, customer: models.Customer | None = None) -> dict:
+def purge(db: Session, tenant_id: int, pet: models.Pet, customer: models.Customer | None = None,
+          keep_photos: bool = False) -> dict:
     """Borra todo en una transacción y luego los archivos que quedaron sin uso.
-    Con `customer`, también borra al cliente (debe quedar sin otras mascotas)."""
+    Con `customer`, también borra al cliente (debe quedar sin otras mascotas).
+    Con `keep_photos`, las fotos de la mascota no se borran de la nube."""
     from app.api.internal.common.media_service import MediaService
 
     g = _collect(db, tenant_id, pet)
@@ -184,7 +190,11 @@ def purge(db: Session, tenant_id: int, pet: models.Pet, customer: models.Custome
     db.commit()               # si algo falla antes, no se tocó ningún archivo
 
     deleted = kept = failed = 0
+    keep = set(g["photos"]) if keep_photos else set()
+    summary["photos_kept"] = len(keep)
     for url in g["urls"]:
+        if url in keep:
+            continue
         try:
             if _still_referenced(db, url):
                 kept += 1

@@ -44,3 +44,21 @@ def test_cliente_con_otra_mascota_se_conserva(client, auth):
     assert r.status_code == 200 and r.json()["customer_deleted"] is False
     assert client.get(f"/api/internal/customers/{c['id']}", headers=h).status_code == 200
     client.delete(f"/api/internal/pets/{p2['id']}", headers=h)
+
+
+def test_elegir_conservar_fotos(client, auth, db, monkeypatch):
+    from app import models
+    from app.api.internal.common.media_service import MediaService
+    borradas = []
+    monkeypatch.setattr(MediaService, "delete_media_by_url", classmethod(lambda cls, _db, url: borradas.append(url) or True))
+    h = auth("a")
+    for keep, nombre in ((True, "Foto Conserva"), (False, "Foto Borra")):
+        c, p = _cliente_mascota(client, h, nombre)
+        foto = f"/storage/pets/{nombre.replace(' ', '_')}.webp"
+        pet = db.query(models.Pet).get(p["id"])
+        pet.image_url, pet.images = foto, [foto]
+        db.commit()
+        assert client.get(f"/api/internal/pets/{p['id']}/delete-preview", headers=h).json()["photos"] == 1
+        r = client.delete(f"/api/internal/pets/{p['id']}" + ("?keep_photos=true" if keep else ""), headers=h)
+        assert r.status_code == 200, r.text
+        assert (foto in borradas) is (not keep)

@@ -12,6 +12,8 @@ type Preview = {
     evidence: number;
     certificates: number;
     images: number;
+    /** Fotos de la mascota (ficha + formulario): se puede elegir conservarlas */
+    photos: number;
     paid_commissions: number;
     /** Cliente de la mascota; `deleted` = se borra con ella (no tiene otras mascotas) */
     customer: { id: number; name: string; deleted: boolean } | null;
@@ -20,7 +22,8 @@ type Preview = {
 interface Props {
     pet: { id: number; name: string } | null;
     onClose: () => void;
-    onConfirm: () => Promise<void> | void;
+    /** keepPhotos = conservar las fotos de la mascota en la nube */
+    onConfirm: (keepPhotos: boolean) => Promise<void> | void;
     isDeleting?: boolean;
 }
 
@@ -33,10 +36,10 @@ export default function PetDeleteModal({ pet, onClose, onConfirm, isDeleting }: 
     const [preview, setPreview] = useState<Preview | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
+    const [deletePhotos, setDeletePhotos] = useState(true);
     useEffect(() => {
         if (!pet) return;
-        setPreview(null); setError(null); setLoading(true);
+        setPreview(null); setError(null); setDeletePhotos(true); setLoading(true);
         apiRequest(`/api/internal/pets/${pet.id}/delete-preview`)
             .then((d: Preview) => setPreview(d))
             .catch((e: unknown) => setError(e instanceof Error ? e.message : 'No se pudo calcular qué se eliminará'))
@@ -116,6 +119,24 @@ export default function PetDeleteModal({ pet, onClose, onConfirm, isDeleting }: 
                                     El cliente se conserva porque tiene otras mascotas o no tienes permiso para eliminar clientes.
                                 </p>
                             )}
+                            {preview.photos > 0 && (
+                                <label className="flex items-start gap-2.5 rounded-xl border border-slate-200 dark:border-white/10 px-3.5 py-2.5 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={deletePhotos}
+                                        onChange={(e) => setDeletePhotos(e.target.checked)}
+                                        className="mt-0.5 h-4 w-4 accent-red-600 cursor-pointer"
+                                    />
+                                    <span className="text-sm">
+                                        Eliminar también las fotos de la mascota ({preview.photos})
+                                        <span className="block text-[11px] text-slate-500 dark:text-slate-400">
+                                            {deletePhotos
+                                                ? 'Se borran de la nube y no se pueden recuperar.'
+                                                : 'Las fotos se conservan guardadas en la nube.'}
+                                        </span>
+                                    </span>
+                                </label>
+                            )}
                             {preview.images > 0 && (
                                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
                                     Las imágenes se borran de Cloudflare después de confirmar la eliminación, salvo las que use otro registro.
@@ -130,7 +151,7 @@ export default function PetDeleteModal({ pet, onClose, onConfirm, isDeleting }: 
                         {hasOrders ? 'Entendido' : 'Cancelar'}
                     </button>
                     {!hasOrders && <button
-                        onClick={() => onConfirm()}
+                        onClick={() => onConfirm(!deletePhotos)}
                         disabled={!canDelete}
                         className="flex-1 py-3 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-bold transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >

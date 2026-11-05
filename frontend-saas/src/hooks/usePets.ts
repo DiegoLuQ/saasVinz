@@ -55,7 +55,10 @@ export const useDeletePet = () => {
     const { showToast } = useToast();
 
     return useMutation({
-        mutationFn: (id: number) => apiRequest(`/api/internal/pets/${id}`, { method: 'DELETE' }),
+        mutationFn: (arg: number | { id: number; keepPhotos?: boolean }) => {
+            const { id, keepPhotos } = typeof arg === 'number' ? { id: arg, keepPhotos: false } : arg;
+            return apiRequest(`/api/internal/pets/${id}${keepPhotos ? '?keep_photos=true' : ''}`, { method: 'DELETE' });
+        },
         onSuccess: (res: { orders?: number; images_deleted?: number } | undefined) => {
             // Se borran también sus órdenes: refrescar listados que las muestran
             ['pets', 'session-bootstrap', 'cremations', 'cremations-simple', 'dashboard-summary', 'customers']

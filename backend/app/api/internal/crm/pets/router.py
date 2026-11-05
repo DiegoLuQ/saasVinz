@@ -250,6 +250,7 @@ def preview_delete_pet(
 @router.delete("/{pet_id}")
 def delete_pet(
     pet_id: int,
+    keep_photos: bool = False,
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
     current_user: models.User = Depends(get_current_user),
@@ -274,5 +275,6 @@ def delete_pet(
         )
 
     name = db_pet.name
-    summary = purge.purge(db, tenant_id, db_pet, customer=_customer_to_delete(db, tenant_id, db_pet, current_user))
+    summary = purge.purge(db, tenant_id, db_pet, customer=_customer_to_delete(db, tenant_id, db_pet, current_user),
+                          keep_photos=keep_photos)
     return {"status": "deleted", "message": f"Mascota {name} eliminada correctamente", **summary}

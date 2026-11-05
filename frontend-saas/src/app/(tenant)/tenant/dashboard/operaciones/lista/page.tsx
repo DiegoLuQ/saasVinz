@@ -10,9 +10,10 @@ import { OPS_PAGE_SIZE, searchOpsOrders, useOpsBoard, type OpsOrder, type OpsTab
 import OpsOrderCard, { type OpsStep } from '@/components/tenant/operations/board/OpsOrderCard';
 import OpsOrderPanel from '@/components/tenant/operations/board/OpsOrderPanel';
 
-const TABS: { key: OpsTab; label: string; empty: string }[] = [
-    { key: 'today', label: 'Hoy', empty: 'No hay órdenes programadas para hoy ni atrasadas.' },
+const TABS: { key: OpsTab; label: string; empty: string; title?: string }[] = [
     { key: 'in_progress', label: 'En proceso', empty: 'No hay órdenes en proceso.' },
+    // «Agenda hoy»: órdenes activas con fecha agendada hoy o ya atrasada (las sin fecha no aparecen)
+    { key: 'today', label: 'Agenda hoy', title: 'Órdenes activas agendadas para hoy o atrasadas', empty: 'No hay órdenes agendadas para hoy ni atrasadas. Las órdenes sin fecha en la agenda están en «En proceso» o «Por iniciar».' },
     { key: 'not_started', label: 'Por iniciar', empty: 'No hay órdenes por iniciar.' },
     { key: 'finished', label: 'Finalizadas', empty: 'Aún no hay órdenes finalizadas.' },
 ];
@@ -26,7 +27,7 @@ export default function OperationsPanelPage() {
     const currentTenant = useCurrentTenant();
     const timezone = currentTenant?.timezone || 'America/Santiago';
 
-    const [tab, setTab] = useState<OpsTab>('today');
+    const [tab, setTab] = useState<OpsTab>('in_progress');
     const [searchInput, setSearchInput] = useState('');
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
@@ -97,6 +98,7 @@ export default function OperationsPanelPage() {
                             <button
                                 key={t.key}
                                 onClick={() => changeTab(t.key)}
+                                title={t.title}
                                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${
                                     active ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-foreground'
                                 }`}

@@ -293,10 +293,10 @@ export default function PetsPage() {
         }
     };
 
-    const handleConfirmDeletePet = async () => {
+    const handleConfirmDeletePet = async (keepPhotos = false) => {
         if (!petToDelete) return;
         try {
-            await deletePetMutation.mutateAsync(petToDelete.id);
+            await deletePetMutation.mutateAsync({ id: petToDelete.id, keepPhotos });
             setPetToDelete(null);
         } catch {
             // El hook ya muestra el error; el modal queda abierto para reintentar
