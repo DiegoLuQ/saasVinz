@@ -19,6 +19,7 @@ import {
     CheckCircle2,
     Folder,
     BadgePercent,
+    Pencil,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
@@ -130,6 +131,19 @@ const EXPIRATION_OPTIONS: Record<CatalogType, ExpirationOption[]> = {
 // Mensaje del crematorio en el catálogo de planes (backend: CATALOG_MESSAGE_MAX)
 const MESSAGE_MAX = 300;
 
+/** Edición de un enlace existente (PATCH /api/internal/catalog/links/{id}); la URL no cambia. */
+interface LinkEdit {
+    id: number;
+    name: string;
+    message: string;
+    groups: string[];
+    priceList: number | null;
+    /** null = mantener la vigencia actual; si no, horas desde ahora (0 = permanente) */
+    renewHours: number | null;
+}
+
+const editInputCls = 'w-full bg-white border border-slate-300 dark:bg-slate-950/60 dark:border-white/15 rounded-xl py-2 px-3 text-xs text-slate-900 dark:text-slate-50 placeholder:text-slate-400 outline-none focus:border-amber-500';
+
 export default function ShareCatalogModal({
     isOpen,
     onClose,
@@ -161,7 +175,8 @@ export default function ShareCatalogModal({
     const [priceLists, setPriceLists] = useState<{ id: number; name: string; status: string }[]>([]);
     const [newPriceList, setNewPriceList] = useState<number | null>(null);
     const [savingPriceList, setSavingPriceList] = useState<number | null>(null);
-
+    const [editing, setEditing] = useState<LinkEdit | null>(null);
+    const [savingEdit, setSavingEdit] = useState(false);
     const fetchLinks = async () => {
         try {
             setLoadingLinks(true);
@@ -189,6 +204,7 @@ export default function ShareCatalogModal({
             setNewGroups([]);
             setNewPriceList(null);
             setEditingGroups(null);
+            setEditing(null);
             setSelectedHours(EXPIRATION_OPTIONS[catalogType][0].value);
         }
     }, [isOpen, catalogType]);
@@ -262,6 +278,50 @@ export default function ShareCatalogModal({
             showToast((err as { message?: string })?.message || 'No se pudo cambiar la tabla de precios', 'error');
         } finally {
             setSavingPriceList(null);
+        }
+    };
+
+    const startEdit = (link: CatalogLink) => {
+        setEditingGroups(null);
+        setEditing({
+            id: link.id,
+            name: link.name || '',
+            message: link.message || '',
+            groups: link.plan_groups || [],
+            priceList: link.price_list_id ?? null,
+            renewHours: null,
+        });
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editing) return;
+        if (showGroups && editing.groups.length === 0) {
+            showToast('Elige el grupo de planes que mostrará este catálogo', 'error');
+            return;
+        }
+        setSavingEdit(true);
+        try {
+            const body: Record<string, unknown> = { name: editing.name.trim() || null };
+            if (isPlans) {
+                body.message = editing.message.trim() || null;
+                body.price_list_id = editing.priceList;
+                if (showGroups) body.plan_groups = editing.groups;
+            }
+            if (editing.renewHours !== null) {
+                body.renew_expiration = true;
+                body.expires_in_hours = editing.renewHours || null;
+            }
+            const res = await apiRequest(`/api/internal/catalog/links/${editing.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify(body),
+            });
+            setLinks(prev => prev.map(l => (l.id === res.id ? { ...l, ...res } : l)));
+            setEditing(null);
+            showToast('Enlace actualizado', 'success');
+        } catch (err) {
+            showToast((err as { message?: string })?.message || 'No se pudo actualizar el enlace', 'error');
+        } finally {
+            setSavingEdit(false);
         }
     };
 
@@ -577,7 +637,7 @@ export default function ShareCatalogModal({
                                 {copy.empty}
                             </div>
                         ) : (
-                            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                            <div className={`space-y-2 overflow-y-auto pr-1 ${editing ? 'max-h-[28rem]' : 'max-h-60'}`}>
                                 {links.map((link) => {
                                     const fullUrl = buildCatalogUrl(tenantSlug, link.token);
                                     const isCopied = copiedToken === link.token;
@@ -591,6 +651,73 @@ export default function ShareCatalogModal({
                                                     : 'bg-white border-slate-200 hover:border-slate-300 dark:bg-white/[0.04] dark:border-white/10 dark:hover:border-white/20'
                                             }`}
                                         >
+                                            {editing?.id === link.id ? (
+                                            <div className="min-w-0 flex-1 space-y-2.5">
+                                                <p className="text-[11px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-300">Editar enlace</p>
+                                                <label className="block space-y-1">
+                                                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Etiqueta de referencia</span>
+                                                    <input value={editing.name} maxLength={100} placeholder={copy.defaultName}
+                                                        onChange={e => setEditing({ ...editing, name: e.target.value })} className={editInputCls} />
+                                                </label>
+                                                {isPlans && (
+                                                    <label className="block space-y-1">
+                                                        <span className="flex justify-between text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                                                            Mensaje para la familia
+                                                            <span className="font-mono font-normal text-slate-500">{editing.message.length}/{MESSAGE_MAX}</span>
+                                                        </span>
+                                                        <textarea rows={2} value={editing.message} maxLength={MESSAGE_MAX}
+                                                            onChange={e => setEditing({ ...editing, message: e.target.value.slice(0, MESSAGE_MAX) })}
+                                                            className={`${editInputCls} resize-none`} />
+                                                    </label>
+                                                )}
+                                                {showGroups && (
+                                                    <div className="space-y-1">
+                                                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Grupo de planes *</span>
+                                                        <GroupPicker groups={planGroups} value={editing.groups} onChange={v => setEditing({ ...editing, groups: v })} />
+                                                    </div>
+                                                )}
+                                                {isPlans && (priceLists.length > 0 || editing.priceList !== null) && (
+                                                    <label className="block space-y-1">
+                                                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Tabla de precios</span>
+                                                        <select value={editing.priceList ?? ''} className={editInputCls}
+                                                            onChange={e => setEditing({ ...editing, priceList: e.target.value ? Number(e.target.value) : null })}>
+                                                            <option value="">General</option>
+                                                            {priceLists.map(pl => (
+                                                                <option key={pl.id} value={pl.id}>{pl.name}{pl.status !== 'activa' ? ` (${pl.status})` : ''}</option>
+                                                            ))}
+                                                        </select>
+                                                    </label>
+                                                )}
+                                                <label className="block space-y-1">
+                                                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Vigencia</span>
+                                                    <select value={editing.renewHours === null ? 'keep' : String(editing.renewHours)} className={editInputCls}
+                                                        onChange={e => setEditing({ ...editing, renewHours: e.target.value === 'keep' ? null : Number(e.target.value) })}>
+                                                        <option value="keep">
+                                                            Mantener ({link.expires_at
+                                                                ? `${link.is_expired ? 'venció' : 'vence'} ${new Date(link.expires_at).toLocaleDateString('es-CL')}`
+                                                                : 'sin vencimiento'})
+                                                        </option>
+                                                        {expirationOptions.map(opt => (
+                                                            <option key={opt.label} value={opt.value ?? 0}>
+                                                                {opt.value ? `Renovar: ${opt.label} desde hoy` : 'Permanente'}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </label>
+                                                <div className="flex items-center gap-2 pt-0.5">
+                                                    <button type="button" onClick={handleSaveEdit}
+                                                        disabled={savingEdit || (showGroups && editing.groups.length === 0)}
+                                                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold cursor-pointer disabled:opacity-60">
+                                                        {savingEdit && <Loader2 size={12} className="animate-spin" />} Guardar cambios
+                                                    </button>
+                                                    <button type="button" onClick={() => setEditing(null)} disabled={savingEdit}
+                                                        className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10 cursor-pointer">
+                                                        Cancelar
+                                                    </button>
+                                                    <span className="text-[10px] text-slate-500 dark:text-slate-400">La URL no cambia.</span>
+                                                </div>
+                                            </div>
+                                            ) : (
                                             <div className="min-w-0 flex-1 space-y-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-xs font-bold text-slate-900 dark:text-slate-50 truncate">
@@ -724,8 +851,20 @@ export default function ShareCatalogModal({
                                                     )}
                                                 </div>
                                             </div>
+                                            )}
 
-                                            <div className="flex items-center gap-1.5 shrink-0">
+                                            <div className={`flex items-center gap-1.5 shrink-0 ${editing?.id === link.id ? 'self-start' : ''}`}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => (editing?.id === link.id ? setEditing(null) : startEdit(link))}
+                                                    className={`p-2 rounded-xl transition-colors cursor-pointer ${editing?.id === link.id
+                                                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+                                                        : 'bg-slate-100 hover:bg-amber-100 text-slate-600 hover:text-amber-700 dark:bg-white/10 dark:hover:bg-amber-500/20 dark:text-slate-200 dark:hover:text-amber-300'}`}
+                                                    title="Editar enlace"
+                                                    aria-label="Editar enlace"
+                                                >
+                                                    <Pencil size={14} />
+                                                </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleCopy(fullUrl, link.token)}

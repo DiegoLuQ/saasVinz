@@ -512,16 +512,25 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                         )}
                     </ul>
                 </div>
-                {showVinzerBrand && (
-                    <div className="border-t border-[var(--cat-line)]">
-                        <p className="max-w-6xl mx-auto px-4 sm:px-6 py-4 text-center text-[12px] text-[var(--cat-muted)]">
-                            Crematorio potenciado por{' '}
-                            <a href={vinzerPromoUrl('catalogo_planes')} target="_blank" rel="noopener" className="font-semibold text-[var(--cat-gold-deep)] hover:underline">
-                                vinzer.cl
-                            </a>
-                        </p>
+                {/* Firma de Vinzer: leve en todos los planes (FREE la muestra un poco más visible) */}
+                <div className="border-t border-[var(--cat-line)]">
+                    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex justify-center">
+                        <a
+                            href={vinzerPromoUrl('catalogo_planes')}
+                            target="_blank"
+                            rel="noopener"
+                            aria-label="Potenciado por Vinzer, software para crematorios"
+                            className={`group inline-flex items-baseline gap-1.5 transition-colors duration-300 ${
+                                showVinzerBrand ? 'text-[var(--cat-muted)] hover:text-[var(--cat-ink)]' : 'text-[var(--cat-muted)]/60 hover:text-[var(--cat-muted)]'
+                            }`}
+                        >
+                            <span className="text-[9px] uppercase tracking-[0.28em] font-medium">Potenciado por</span>
+                            <span className="text-[12px] font-semibold tracking-[0.06em]">
+                                vinzer<span className="text-[var(--cat-gold)]/70 group-hover:text-[var(--cat-gold)]">.</span>cl
+                            </span>
+                        </a>
                     </div>
-                )}
+                </div>
             </footer>
         </div>
     );

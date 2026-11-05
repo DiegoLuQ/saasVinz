@@ -27,7 +27,9 @@ import RevertOrderModal, { canRevertStatus } from './RevertOrderModal';
 import CertificateTextsModal, { DATE_LABELS, ISSUE_TEMPLATE_QUERY_KEY, issueDateFields, issueTextFields, loadIssueTemplate, missingPetDates, usePetDates, type CertOverrides } from './CertificateTextsModal';
 import { useIsOwner } from '@/hooks/useSessionBootstrap';
 import { usePermissions } from '@/app/(tenant)/tenant/context/PermissionContext';
-
+import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
+import { useFeatures } from '@/hooks/useFeatures';
+import { isProOrUltraCrematoryPlan } from '@/lib/memorialDesign';
 // --- Tipos de GET /api/internal/cremations/{id}/expediente ---------------------
 interface Expediente {
     order: {
@@ -132,6 +134,11 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
     const [showCertTexts, setShowCertTexts] = useState(false);
     const [showEditWeight, setShowEditWeight] = useState(false);
     const isOwner = useIsOwner();
+    const { tenantData } = useTenant();
+    const { hasFeature } = useFeatures();
+    // Memorial online: misma regla que Mascotas (feature del plan + PRO/ULTRA)
+    const canUseMemorial = hasFeature('mascotas:memorial')
+        && isProOrUltraCrematoryPlan(tenantData?.subscription_plan?.name || tenantData?.plan || 'PRO');
 
     const orderId = cremation?.id;
     const { data: exp, isLoading, isError } = useQuery<Expediente>({
@@ -742,8 +749,8 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                 {/* Imágenes generadas (con modal de confirmación) */}
                                 <GeneratedImagesSection orderId={exp.order.id} petId={exp.pet.id} petName={petName} />
 
-                                {/* Memorial online conmemorativo */}
-                                <MemorialOrderSection
+                                {/* Memorial online conmemorativo (solo si el plan lo incluye) */}
+                                {canUseMemorial && <MemorialOrderSection
                                     orderId={exp.order.id}
                                     pet={{
                                         id: exp.pet.id,
@@ -754,7 +761,7 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                     customer={exp.customer}
                                     deliverableMemorial={exp.deliverables.memorial}
                                     onUpdated={() => queryClient.invalidateQueries({ queryKey: ['expediente', orderId] })}
-                                />
+                                />}
                             </div>
                         )}
 

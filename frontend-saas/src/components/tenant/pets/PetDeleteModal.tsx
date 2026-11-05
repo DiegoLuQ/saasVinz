@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, Loader2, Trash2, X, Flame, Image as ImageIcon, FileText, Heart, Inbox, Camera } from 'lucide-react';
+import { AlertTriangle, Loader2, Trash2, X, Flame, Image as ImageIcon, Heart, Inbox, User } from 'lucide-react';
 import { apiRequest } from '@/lib/tenant/api';
 
 type Preview = {
@@ -13,6 +13,8 @@ type Preview = {
     certificates: number;
     images: number;
     paid_commissions: number;
+    /** Cliente de la mascota; `deleted` = se borra con ella (no tiene otras mascotas) */
+    customer: { id: number; name: string; deleted: boolean } | null;
 };
 
 interface Props {
@@ -23,19 +25,18 @@ interface Props {
 }
 
 /**
- * Confirmación de eliminación total de una mascota: muestra todo lo que se
- * borrará (órdenes, evidencias, certificados, memoriales, solicitudes e imágenes
- * en Cloudflare). Con órdenes asociadas exige escribir el nombre.
+ * Eliminar una mascota: con órdenes asociadas NO se puede (se avisa y se listan; se borran desde
+ * Recepción de pedidos). Sin órdenes se borran la mascota, sus fotos, memoriales, solicitudes web
+ * e imágenes en Cloudflare, y su cliente si no tiene otras mascotas.
  */
 export default function PetDeleteModal({ pet, onClose, onConfirm, isDeleting }: Props) {
     const [preview, setPreview] = useState<Preview | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [typed, setTyped] = useState('');
 
     useEffect(() => {
         if (!pet) return;
-        setPreview(null); setError(null); setTyped(''); setLoading(true);
+        setPreview(null); setError(null); setLoading(true);
         apiRequest(`/api/internal/pets/${pet.id}/delete-preview`)
             .then((d: Preview) => setPreview(d))
             .catch((e: unknown) => setError(e instanceof Error ? e.message : 'No se pudo calcular qué se eliminará'))
@@ -45,14 +46,9 @@ export default function PetDeleteModal({ pet, onClose, onConfirm, isDeleting }: 
     if (!pet) return null;
 
     const hasOrders = (preview?.orders.length || 0) > 0;
-    const needsTyping = hasOrders;
-    const nameOk = typed.trim().toLowerCase() === pet.name.trim().toLowerCase();
-    const canDelete = !!preview && !loading && !isDeleting && (!needsTyping || nameOk);
+    const canDelete = !!preview && !loading && !isDeleting && !hasOrders;
 
     const rows: { icon: React.ElementType; label: string; count: number }[] = preview ? [
-        { icon: Flame, label: 'Órdenes de cremación (con logística, cobros y seguimiento)', count: preview.orders.length },
-        { icon: Camera, label: 'Evidencias de las etapas', count: preview.evidence },
-        { icon: FileText, label: 'Certificados emitidos', count: preview.certificates },
         { icon: Heart, label: 'Memoriales (con dedicatorias)', count: preview.memorials },
         { icon: Inbox, label: 'Solicitudes web vinculadas', count: preview.submissions },
         { icon: ImageIcon, label: 'Imágenes en Cloudflare (fotos y evidencias)', count: preview.images },
@@ -68,7 +64,11 @@ export default function PetDeleteModal({ pet, onClose, onConfirm, isDeleting }: 
                     </div>
                     <div className="min-w-0 flex-1">
                         <h3 id="pet-delete-title" className="text-lg font-black text-slate-900 dark:text-white">Eliminar a {pet.name}</h3>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">Se eliminará la mascota y <strong>todo lo asociado</strong>. Esta acción no se puede deshacer.</p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                            {hasOrders
+                                ? 'Esta mascota tiene órdenes asociadas, por eso no se puede eliminar.'
+                                : <>Se eliminará la mascota con sus fotos y <strong>todo lo asociado</strong>. Esta acción no se puede deshacer.</>}
+                        </p>
                     </div>
                     <button onClick={onClose} disabled={isDeleting} className="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1" aria-label="Cerrar"><X size={18} /></button>
                 </div>
@@ -78,6 +78,19 @@ export default function PetDeleteModal({ pet, onClose, onConfirm, isDeleting }: 
                         <div className="flex items-center gap-2 text-sm text-slate-500 py-6 justify-center"><Loader2 size={16} className="animate-spin" /> Revisando qué se eliminará…</div>
                     ) : error ? (
                         <p className="text-sm text-red-700 dark:text-red-400 py-4">{error}</p>
+                    ) : preview && hasOrders ? (
+                        <div className="flex gap-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 dark:bg-amber-500/10 dark:border-amber-500/25 dark:text-amber-200 p-4 text-sm">
+                            <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+                            <div className="space-y-1.5">
+                                <p className="font-bold">Tiene {preview.orders.length === 1 ? '1 orden asociada' : `${preview.orders.length} órdenes asociadas`}:</p>
+                                <ul className="space-y-0.5">
+                                    {preview.orders.map((o) => (
+                                        <li key={o.id} className="flex items-center gap-1.5"><Flame size={12} /> OC {o.oc_number ?? o.id} · {o.status}</li>
+                                    ))}
+                                </ul>
+                                <p className="text-xs">Si quieres eliminarla, primero elimina sus órdenes desde Recepción de pedidos.</p>
+                            </div>
+                        </div>
                     ) : preview && (
                         <>
                             <ul className="rounded-2xl border border-slate-200 dark:border-white/10 divide-y divide-slate-100 dark:divide-white/5">
@@ -88,40 +101,25 @@ export default function PetDeleteModal({ pet, onClose, onConfirm, isDeleting }: 
                                         <span className={`font-black tabular-nums ${count > 0 ? 'text-red-700 dark:text-red-400' : 'text-slate-400'}`}>{count}</span>
                                     </li>
                                 ))}
+                                {preview.customer && (
+                                    <li className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                                        <User size={15} className="text-slate-500 dark:text-slate-400 shrink-0" />
+                                        <span className="flex-1">Cliente: <strong>{preview.customer.name}</strong></span>
+                                        <span className={`text-xs font-bold ${preview.customer.deleted ? 'text-red-700 dark:text-red-400' : 'text-slate-500'}`}>
+                                            {preview.customer.deleted ? 'Se elimina' : 'Se conserva'}
+                                        </span>
+                                    </li>
+                                )}
                             </ul>
-
-                            {hasOrders && (
-                                <div className="text-xs text-slate-600 dark:text-slate-400">
-                                    Órdenes: {preview.orders.map((o) => `OC ${o.oc_number ?? o.id} (${o.status})`).join(' · ')}
-                                </div>
+                            {preview.customer && !preview.customer.deleted && (
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                    El cliente se conserva porque tiene otras mascotas o no tienes permiso para eliminar clientes.
+                                </p>
                             )}
-
-                            {preview.paid_commissions > 0 && (
-                                <div className="flex gap-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 dark:bg-amber-500/10 dark:border-amber-500/25 dark:text-amber-200 p-3 text-xs">
-                                    <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-                                    Hay {preview.paid_commissions} comisión(es) ya pagada(s) a veterinarias: también se borrará su registro.
-                                </div>
-                            )}
-
                             {preview.images > 0 && (
                                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
                                     Las imágenes se borran de Cloudflare después de confirmar la eliminación, salvo las que use otro registro.
                                 </p>
-                            )}
-
-                            {needsTyping && (
-                                <label className="block space-y-1.5 pt-1">
-                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                        Para confirmar, escribe <span className="font-black">{pet.name}</span>
-                                    </span>
-                                    <input
-                                        value={typed}
-                                        onChange={(e) => setTyped(e.target.value)}
-                                        autoFocus
-                                        className="w-full rounded-xl px-3 py-2.5 text-sm bg-white border border-slate-300 text-slate-900 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 dark:bg-black/20 dark:border-white/10 dark:text-white dark:focus:ring-red-500/20"
-                                        placeholder={pet.name}
-                                    />
-                                </label>
                             )}
                         </>
                     )}
@@ -129,16 +127,16 @@ export default function PetDeleteModal({ pet, onClose, onConfirm, isDeleting }: 
 
                 <div className="flex gap-3 p-6 pt-5">
                     <button onClick={onClose} disabled={isDeleting} className="flex-1 py-3 rounded-2xl border border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5 font-bold transition">
-                        Cancelar
+                        {hasOrders ? 'Entendido' : 'Cancelar'}
                     </button>
-                    <button
+                    {!hasOrders && <button
                         onClick={() => onConfirm()}
                         disabled={!canDelete}
                         className="flex-1 py-3 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-bold transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                         {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                        {isDeleting ? 'Eliminando…' : 'Eliminar todo'}
-                    </button>
+                        {isDeleting ? 'Eliminando…' : 'Eliminar'}
+                    </button>}
                 </div>
             </div>
         </div>

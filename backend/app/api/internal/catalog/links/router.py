@@ -12,6 +12,7 @@ from app.api.deps_features import check_feature
 from app.api.internal.catalog.models import CatalogShareToken
 from app.api.internal.catalog.schemas import (
     CatalogType, CatalogShareTokenBulkUpdate, CatalogShareTokenPlanGroups, CatalogShareTokenPriceList,
+    CatalogShareTokenUpdate,
 )
 from app.services.plan_groups import clean_plan_groups, existing_plan_groups
 
@@ -193,6 +194,62 @@ def bulk_update_catalog_share_links(
     now = tz.get_now()
     lists = {pl.id: pl for pl in db.query(models.PriceList).filter(models.PriceList.tenant_id == tenant_id)}         if data.catalog_type == "plans" else {}
     return [_to_dto(item, now, None, lists) for item in tokens]
+
+
+@router.patch("/{token_id}", response_model=schemas.CatalogShareTokenInDB)
+def update_catalog_share_link(
+    token_id: int,
+    data: CatalogShareTokenUpdate,
+    tenant_id: int = Depends(get_tenant_id),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Edita un enlace: etiqueta, mensaje, grupos, tabla de precios y (opcional) renovar la vigencia.
+    Solo cambia los campos enviados; el token (la URL) se mantiene."""
+    from app.core.tenant_context import apply_tenant_rls, apply_bypass_rls
+    if current_user.role in ("creator", models.UserRole.creator):
+        apply_bypass_rls(db)
+    else:
+        apply_tenant_rls(db, tenant_id)
+    item = db.query(CatalogShareToken).filter(
+        CatalogShareToken.id == token_id, CatalogShareToken.tenant_id == tenant_id,
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Enlace no encontrado")
+    # Permiso del módulo según el tipo del enlace (Inventario o Servicios)
+    _authorize(db, current_user, tenant_id, item.catalog_type, "edit")
+    is_plans = item.catalog_type == "plans"
+    sent = data.model_fields_set
+
+    if "name" in sent:
+        item.name = (data.name or "").strip() or None
+    if "message" in sent and is_plans:
+        item.message = (data.message or "").strip() or None
+    if "plan_groups" in sent and is_plans:
+        try:
+            groups = clean_plan_groups(data.plan_groups)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        if not groups and existing_plan_groups(db, tenant_id):
+            raise HTTPException(status_code=400, detail=GROUP_REQUIRED)
+        item.plan_groups = groups
+    if "price_list_id" in sent and is_plans:
+        pl = _price_list(db, tenant_id, data.price_list_id)
+        item.price_list_id = pl.id if pl else None
+    if data.renew_expiration:
+        hours = data.expires_in_hours or 0
+        if is_plans and hours and hours not in PLANS_EXPIRATION_HOURS:
+            raise HTTPException(status_code=400, detail="La vigencia del catálogo de planes debe ser 10 días, 1 año o permanente.")
+        if hours < 0:
+            raise HTTPException(status_code=400, detail="Vigencia inválida")
+        item.expires_at = tz.get_now() + timedelta(hours=hours) if hours else None
+
+    db.commit()
+    db.refresh(item)
+    pl = _price_list(db, tenant_id, item.price_list_id) if item.price_list_id else None
+    from app.services.catalog_funnel import link_stats
+    stats = link_stats(db, [item.id]) if is_plans else {}
+    return _to_dto(item, tz.get_now(), stats.get(item.id), {pl.id: pl} if pl else None)
 
 
 @router.patch("/{token_id}/plan-groups", response_model=schemas.CatalogShareTokenInDB)

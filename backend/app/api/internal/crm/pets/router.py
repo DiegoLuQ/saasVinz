@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 import os
 from sqlalchemy.orm import Session
@@ -204,11 +205,32 @@ def delete_image(
 
     return {"status": "deleted"}
 
+def _customer_to_delete(db: Session, tenant_id: int, pet: models.Pet, current_user) -> Optional[models.Customer]:
+    """El cliente de la mascota se borra con ella si no tiene otras mascotas y el usuario
+    puede eliminar clientes (p. ej. un cliente duplicado creado junto a una mascota repetida)."""
+    customer = db.query(models.Customer).filter(
+        models.Customer.id == pet.customer_id, models.Customer.tenant_id == tenant_id
+    ).first()
+    if not customer:
+        return None
+    others = db.query(models.Pet.id).filter(
+        models.Pet.customer_id == customer.id, models.Pet.tenant_id == tenant_id, models.Pet.id != pet.id
+    ).first()
+    if others is not None:
+        return None
+    try:
+        check_permission("clientes", "delete")(db=db, current_user=current_user)
+    except HTTPException:
+        return None
+    return customer
+
+
 @router.get("/{pet_id}/delete-preview")
 def preview_delete_pet(
     pet_id: int,
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
+    current_user: models.User = Depends(get_current_user),
     _: bool = Depends(check_permission("mascotas", "delete"))
 ):
     """Qué se eliminará junto con la mascota (para el modal de confirmación)."""
@@ -216,7 +238,13 @@ def preview_delete_pet(
     db_pet = db.query(models.Pet).filter(models.Pet.id == pet_id, models.Pet.tenant_id == tenant_id).first()
     if not db_pet:
         raise HTTPException(status_code=404, detail="Mascota no encontrada")
-    return purge.preview(db, tenant_id, db_pet)
+    data = purge.preview(db, tenant_id, db_pet)
+    customer = db.query(models.Customer).filter(
+        models.Customer.id == db_pet.customer_id, models.Customer.tenant_id == tenant_id
+    ).first()
+    to_delete = _customer_to_delete(db, tenant_id, db_pet, current_user)
+    data["customer"] = {"id": customer.id, "name": customer.name, "deleted": to_delete is not None} if customer else None
+    return data
 
 
 @router.delete("/{pet_id}")
@@ -227,9 +255,9 @@ def delete_pet(
     current_user: models.User = Depends(get_current_user),
     _: bool = Depends(check_permission("mascotas", "delete"))
 ):
-    """Elimina la mascota y TODO lo asociado: órdenes (con evidencias, certificados,
-    comisión, etc.), memoriales, solicitudes web e imágenes en Cloudflare R2.
-    Si tiene órdenes, además exige permiso para eliminar órdenes."""
+    """Elimina una mascota SIN órdenes: sus fotos, memoriales, solicitudes web e imágenes en
+    Cloudflare R2, y su cliente si no tiene otras mascotas. Con órdenes responde 409: se
+    eliminan desde Recepción de pedidos (borrar la orden con alcance «mascota»)."""
     from app.api.internal.crm.pets import purge
     db_pet = db.query(models.Pet).filter(models.Pet.id == pet_id, models.Pet.tenant_id == tenant_id).first()
     if not db_pet:
@@ -239,9 +267,12 @@ def delete_pet(
         models.Cremation.pet_id == pet_id, models.Cremation.tenant_id == tenant_id
     ).first() is not None
     if has_orders:
-        # Misma regla que el resto de la app para borrar órdenes
-        check_permission("ordenes", "delete")(db=db, current_user=current_user)
+        raise HTTPException(
+            status_code=409,
+            detail=f"{db_pet.name} tiene órdenes asociadas y no se puede eliminar. "
+                   "Elimina primero sus órdenes desde Recepción de pedidos.",
+        )
 
     name = db_pet.name
-    summary = purge.purge(db, tenant_id, db_pet)
+    summary = purge.purge(db, tenant_id, db_pet, customer=_customer_to_delete(db, tenant_id, db_pet, current_user))
     return {"status": "deleted", "message": f"Mascota {name} eliminada correctamente", **summary}

@@ -250,6 +250,16 @@ class CatalogShareTokenPlanGroups(BaseModel):
 class CatalogShareTokenPriceList(BaseModel):
     price_list_id: Optional[int] = None  # None = General
 
+class CatalogShareTokenUpdate(BaseModel):
+    """Editar un enlace: los campos enviados se cambian (vacío = quitar etiqueta/mensaje).
+    `expires_in_hours` solo se aplica con `renew_expiration` (cuenta desde ahora; None/0 = permanente)."""
+    name: Optional[str] = Field(default=None, max_length=100)
+    message: Optional[str] = Field(default=None, max_length=CATALOG_MESSAGE_MAX)
+    plan_groups: Optional[List[str]] = None
+    price_list_id: Optional[int] = None
+    renew_expiration: bool = False
+    expires_in_hours: Optional[int] = None
+
 class CatalogShareTokenBulkUpdate(BaseModel):
     """Aplica la misma etiqueta y mensaje a todos los enlaces de un tipo (vacío = quitar)."""
     catalog_type: CatalogType = "products"
