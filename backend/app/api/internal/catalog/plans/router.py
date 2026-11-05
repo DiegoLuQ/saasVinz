@@ -50,6 +50,27 @@ def crear_plan(
     """Crea un nuevo plan y vincula los servicios proporcionados."""
     return service.create(tenant_id, plan_in)
 
+@router.get("/images")
+def listar_imagenes(
+    tenant_id: int = Depends(get_tenant_id),
+    service: PlanService = Depends(get_plan_service),
+    _: bool = Depends(check_permission("servicios", "view"))
+):
+    """Imágenes ya subidas por el crematorio, para reutilizarlas en un plan."""
+    return service.list_images(tenant_id)
+
+
+@router.delete("/images/{media_id}", status_code=204)
+def eliminar_imagen(
+    media_id: int,
+    tenant_id: int = Depends(get_tenant_id),
+    service: PlanService = Depends(get_plan_service),
+    _: bool = Depends(check_permission("servicios", "edit"))
+):
+    """Elimina una imagen de plan que ya no usa ningún plan."""
+    service.delete_image(tenant_id, media_id)
+
+
 @router.get("/groups", response_model=List[str])
 def listar_grupos(
     tenant_id: int = Depends(get_tenant_id),

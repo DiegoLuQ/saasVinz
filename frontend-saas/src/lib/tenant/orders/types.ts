@@ -113,6 +113,8 @@ export interface Plan {
     description?: string;
     unit_price?: number;
     unit_cost?: number;
+    /** Grupo del plan (el mismo nombre puede existir en otro grupo) */
+    group_name?: string | null;
     services: Service[];
     products: any[];
 }

@@ -182,7 +182,7 @@ def _plan_weight_prices_payload(db: Session, tenant_id: int) -> dict:
     return {
         "mode": "table" if uses_price_table(tenant) else "surcharge",
         "plans": [
-            {"plan_id": p.id, "name": p.name, "price": p.price or 0, "is_active": bool(p.is_active),
+            {"plan_id": p.id, "name": p.name, "group_name": p.group_name, "price": p.price or 0, "is_active": bool(p.is_active),
              "prices": clean_weight_prices(p.weight_prices, tier_ids) or {}}
             for p in plans
         ],

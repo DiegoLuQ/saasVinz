@@ -11,7 +11,9 @@ from app.api.internal.admin.rbac.router import check_permission
 from app.api.deps_features import check_feature
 from app.api.internal.catalog.models import CatalogShareToken
 from app.api.internal.catalog.schemas import CatalogType, CatalogShareTokenBulkUpdate, CatalogShareTokenPlanGroups
-from app.services.plan_groups import clean_plan_groups
+from app.services.plan_groups import clean_plan_groups, existing_plan_groups
+
+GROUP_REQUIRED = "Elige el grupo de planes que mostrará este catálogo."
 
 # Catálogo de planes: vigencias permitidas (10 días, 1 año; sin valor = permanente)
 PLANS_EXPIRATION_HOURS = {240, 8760}
@@ -111,6 +113,8 @@ def create_catalog_share_link(
         groups = clean_plan_groups(data.plan_groups) if data.catalog_type == "plans" else None
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    if data.catalog_type == "plans" and not groups and existing_plan_groups(db, tenant_id):
+        raise HTTPException(status_code=400, detail=GROUP_REQUIRED)
 
     # Genera token aleatorio URL-safe de 16 bytes (~22 chars)
     token_str = secrets.token_urlsafe(16)
@@ -189,9 +193,12 @@ def update_catalog_link_plan_groups(
     if not item:
         raise HTTPException(status_code=404, detail="Enlace no encontrado")
     try:
-        item.plan_groups = clean_plan_groups(data.plan_groups)
+        groups = clean_plan_groups(data.plan_groups)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    if not groups and existing_plan_groups(db, tenant_id):
+        raise HTTPException(status_code=400, detail=GROUP_REQUIRED)
+    item.plan_groups = groups
     db.commit()
     db.refresh(item)
     return _to_dto(item, tz.get_now())

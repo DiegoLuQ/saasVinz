@@ -101,7 +101,7 @@ export default function CrearSeguimientoPage() {
         customers.map(c => ({ value: c.id, label: c.name })), [customers]);
 
     const itemOptions = useMemo(() => [
-        ...plans.map(p => ({ value: `plan:${p.id}`, label: `Plan · ${p.name} — $${(p.price ?? 0).toLocaleString()}` })),
+        ...plans.map(p => ({ value: `plan:${p.id}`, label: `Plan · ${p.name}${p.group_name ? ` (${p.group_name})` : ''} — $${(p.price ?? 0).toLocaleString()}` })),
         ...services.map(s => ({ value: `service:${s.id}`, label: `Servicio · ${s.name} — $${(s.price ?? 0).toLocaleString()}` })),
     ], [plans, services]);
 

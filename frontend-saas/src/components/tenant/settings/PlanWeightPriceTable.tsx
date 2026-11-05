@@ -9,6 +9,7 @@
 export interface PlanWeightRow {
     plan_id: number;
     name: string;
+    group_name?: string | null;
     price: number;
     is_active?: boolean;
 }
@@ -78,6 +79,9 @@ export default function PlanWeightPriceTable({ tiers, plans, values, onChange, o
                             <tr key={plan.plan_id}>
                                 <th scope="row" className="sticky left-0 z-10 bg-card px-3 py-2 text-left align-top">
                                     <span className="block max-w-[11rem] truncate text-sm font-bold text-foreground" title={plan.name}>{plan.name}</span>
+                                    {plan.group_name && (
+                                        <span className="block max-w-[11rem] truncate text-[10px] font-semibold text-primary" title={plan.group_name}>{plan.group_name}</span>
+                                    )}
                                     <span className="block text-[10px] text-muted-foreground">Base {formatCLP(plan.price || 0)}</span>
                                     {empty && (
                                         <button

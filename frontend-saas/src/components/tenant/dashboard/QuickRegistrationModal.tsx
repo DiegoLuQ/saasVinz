@@ -931,7 +931,10 @@ export default function QuickRegistrationModal({ isOpen, onClose, onSuccess }: Q
                                                         }`}
                                                     >
                                                         <div className="flex items-center justify-between">
-                                                            <p className="font-bold text-sm text-foreground">{plan.name}</p>
+                                                            <p className="font-bold text-sm text-foreground">
+                                                                {plan.name}
+                                                                {plan.group_name && <span className="ml-1.5 text-[10px] font-semibold text-muted-foreground">· {plan.group_name}</span>}
+                                                            </p>
                                                             {isSelected && <CheckCircle2 size={16} className="text-primary" />}
                                                         </div>
                                                         <p className="text-xs font-black text-emerald-400 mt-1">

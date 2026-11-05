@@ -114,7 +114,8 @@ export default function SalesCatalogDrawer({
 /* ========== PLAN LIST ========== */
 function PlanList({ plans, search, selectedIds, onSelect }: { plans: Plan[]; search: string; selectedIds: number[]; onSelect: (id: number) => void }) {
     const filtered = useMemo(() =>
-        plans.filter(p => p.name.toLowerCase().includes(search.toLowerCase())),
+        plans.filter(p => p.name.toLowerCase().includes(search.toLowerCase())
+            || (p.group_name || '').toLowerCase().includes(search.toLowerCase())),
         [plans, search]
     );
 
@@ -148,7 +149,14 @@ function PlanList({ plans, search, selectedIds, onSelect }: { plans: Plan[]; sea
                             <div className="flex-1 min-w-0">
                                 {/* Header with title and badge aligned cleanly to prevent overlaps */}
                                 <div className="flex items-start justify-between gap-3">
-                                    <h3 className="text-sm font-black text-foreground uppercase tracking-tight leading-snug">{plan.name}</h3>
+                                    <div className="min-w-0">
+                                        <h3 className="text-sm font-black text-foreground uppercase tracking-tight leading-snug">{plan.name}</h3>
+                                        {plan.group_name && (
+                                            <span className="inline-block mt-0.5 text-[10px] font-bold text-sky-700 bg-sky-50 border border-sky-200 dark:text-sky-300 dark:bg-sky-500/10 dark:border-sky-500/20 px-1.5 py-0.5 rounded-md">
+                                                {plan.group_name}
+                                            </span>
+                                        )}
+                                    </div>
                                     {isSelected && (
                                         <div className="flex items-center gap-1.5 shrink-0">
                                             <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded-full border border-emerald-400/20">

@@ -1,14 +1,17 @@
 "use client";
 
 import React, { useRef, useState, useCallback } from 'react';
-import { ImagePlus, Loader2, Trash2, AlertCircle, Crop } from 'lucide-react';
+import { ImagePlus, Loader2, Trash2, AlertCircle, Crop, Images } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import { getImageUrl } from '@/lib/tenant/api';
+import PlanImageLibraryModal from './PlanImageLibraryModal';
 
 interface PlanImageUploaderProps {
     imageUrl?: string | null;
     onChange: (file: File | null) => void;
     onClearUrl: () => void;
+    /** Reutilizar una imagen ya subida por el crematorio (no se vuelve a subir). */
+    onPickExisting?: (url: string) => void;
 }
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8MB
@@ -56,8 +59,10 @@ const getCroppedImg = (imageSrc: string, pixelCrop: any, fileName: string): Prom
     });
 };
 
-export default function PlanImageUploader({ imageUrl, onChange, onClearUrl }: PlanImageUploaderProps) {
+export default function PlanImageUploader({ imageUrl, onChange, onClearUrl, onPickExisting }: PlanImageUploaderProps) {
     const inputRef = useRef<HTMLInputElement>(null);
+    const [libraryOpen, setLibraryOpen] = useState(false);
+
     const [error, setError] = useState<string | null>(null);
 
     // Crop State
@@ -122,6 +127,12 @@ export default function PlanImageUploader({ imageUrl, onChange, onClearUrl }: Pl
         }
     };
 
+    const handlePickExisting = (url: string) => {
+        setLocalPreviewUrl(null);
+        onChange(null); // descarta un archivo recortado pendiente
+        onPickExisting?.(url);
+    };
+
     const handleRemoveImage = () => {
         setLocalPreviewUrl(null);
         onClearUrl();
@@ -180,10 +191,29 @@ export default function PlanImageUploader({ imageUrl, onChange, onClearUrl }: Pl
                 )}
             </div>
 
+            {onPickExisting && (
+                <button
+                    type="button"
+                    onClick={() => setLibraryOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-slate-700 hover:border-amber-500 hover:text-amber-700 dark:border-white/10 dark:bg-black/20 dark:text-slate-300 dark:hover:text-amber-300 text-xs font-bold transition-all"
+                >
+                    <Images size={13} /> Elegir de mis imágenes
+                </button>
+            )}
+
             {error && (
                 <p className="text-[10px] text-red-400 flex items-center gap-1.5">
                     <AlertCircle size={11} /> {error}
                 </p>
+            )}
+
+            {onPickExisting && (
+                <PlanImageLibraryModal
+                    isOpen={libraryOpen}
+                    onClose={() => setLibraryOpen(false)}
+                    currentUrl={localPreviewUrl ? null : imageUrl}
+                    onPick={handlePickExisting}
+                />
             )}
 
             {/* Modal para Recortar Imagen */}

@@ -80,13 +80,12 @@ interface ShareCatalogModalProps {
 
 const groupLabel = (g: string) => g || 'Sin grupo';
 
-/** Chips para elegir grupos de planes; lista vacía = todos. */
+/** Chips para elegir uno o varios grupos de planes (obligatorio elegir al menos uno). */
 function GroupPicker({ groups, value, onChange }: { groups: string[]; value: string[]; onChange: (v: string[]) => void }) {
     const options = [...groups, ''];
     const toggle = (g: string) => {
         const has = value.some(v => v.toLowerCase() === g.toLowerCase());
-        const next = has ? value.filter(v => v.toLowerCase() !== g.toLowerCase()) : [...value, g];
-        onChange(next.length === options.length ? [] : next);
+        onChange(has ? value.filter(v => v.toLowerCase() !== g.toLowerCase()) : [...value, g]);
     };
     const chip = (active: boolean) => `px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all cursor-pointer ${
         active
@@ -95,7 +94,6 @@ function GroupPicker({ groups, value, onChange }: { groups: string[]; value: str
     }`;
     return (
         <div className="flex flex-wrap gap-1.5">
-            <button type="button" onClick={() => onChange([])} className={chip(value.length === 0)}>Todos</button>
             {options.map(g => (
                 <button key={g || '__none__'} type="button" onClick={() => toggle(g)}
                     className={chip(value.some(v => v.toLowerCase() === g.toLowerCase()))}>
@@ -185,6 +183,10 @@ export default function ShareCatalogModal({
 
     const handleCreateLink = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (showGroups && newGroups.length === 0) {
+            showToast('Elige el grupo de planes que mostrará este catálogo', 'error');
+            return;
+        }
         setIsGenerating(true);
         try {
             const res = await apiRequest('/api/internal/catalog/links', {
@@ -398,18 +400,18 @@ export default function ShareCatalogModal({
                         {showGroups && (
                             <div className="space-y-1.5">
                                 <label className="text-xs font-bold text-slate-700 dark:text-slate-200 ml-1">
-                                    Planes que muestra este enlace
+                                    Grupo de planes que muestra este catálogo *
                                 </label>
                                 <GroupPicker groups={planGroups} value={newGroups} onChange={setNewGroups} />
                                 <p className="text-[10px] text-slate-500 dark:text-slate-400 ml-1">
-                                    Elige uno o varios grupos. «Todos» muestra todos los planes activos.
+                                    Elige uno o varios grupos. La familia solo verá los planes activos de esos grupos.
                                 </p>
                             </div>
                         )}
 
                         <button
                             type="submit"
-                            disabled={isGenerating}
+                            disabled={isGenerating || (showGroups && newGroups.length === 0)}
                             className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
                         >
                             {isGenerating ? (
@@ -568,7 +570,7 @@ export default function ShareCatalogModal({
                                                                 onChange={(v) => setEditingGroups({ id: link.id, value: v })}
                                                             />
                                                             <div className="flex items-center gap-2">
-                                                                <button type="button" onClick={handleSaveGroups} disabled={savingGroups}
+                                                                <button type="button" onClick={handleSaveGroups} disabled={savingGroups || editingGroups.value.length === 0}
                                                                     className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold cursor-pointer disabled:opacity-60">
                                                                     {savingGroups && <Loader2 size={12} className="animate-spin" />} Guardar
                                                                 </button>

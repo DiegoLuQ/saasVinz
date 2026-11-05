@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 from fastapi import HTTPException, UploadFile
 from typing import List, Optional
@@ -267,16 +268,28 @@ class PlanService:
             raise HTTPException(status_code=404, detail="Plan no encontrado")
         return plan
 
-    def create(self, tenant_id: int, plan_in: schemas.PlanCreate) -> models.Plan:
-        existing = self.db.query(models.Plan).filter(
+    def _duplicate(self, tenant_id: int, name: str, group_name, exclude_id: int = None):
+        """Plan con el mismo nombre en el mismo grupo (sin distinguir mayúsculas)."""
+        q = self.db.query(models.Plan).filter(
             models.Plan.tenant_id == tenant_id,
-            models.Plan.name == plan_in.name
-        ).first()
-        if existing:
-            raise HTTPException(status_code=400, detail=f"El plan '{plan_in.name}' ya existe.")
+            func.lower(models.Plan.name) == (name or "").strip().lower(),
+            func.lower(func.coalesce(models.Plan.group_name, "")) == (group_name or "").lower(),
+        )
+        if exclude_id is not None:
+            q = q.filter(models.Plan.id != exclude_id)
+        return q.first()
+
+    @staticmethod
+    def _duplicate_message(name: str, group_name) -> str:
+        where = f"en el grupo «{group_name}»" if group_name else "sin grupo"
+        return f"Ya existe un plan '{name}' {where}."
+
+    def create(self, tenant_id: int, plan_in: schemas.PlanCreate) -> models.Plan:
+        if self._duplicate(tenant_id, plan_in.name, plan_in.group_name):
+            raise HTTPException(status_code=400, detail=self._duplicate_message(plan_in.name, plan_in.group_name))
 
         if plan_in.is_featured:
-            self._clear_featured(tenant_id)
+            self._clear_featured(tenant_id, group_name=plan_in.group_name)
 
         db_plan = models.Plan(
             name=plan_in.name,
@@ -316,14 +329,11 @@ class PlanService:
         
         update_data = plan_update.model_dump(exclude_unset=True)
 
-        if "name" in update_data and update_data["name"] != db_plan.name:
-            existing = self.db.query(models.Plan).filter(
-                models.Plan.tenant_id == tenant_id,
-                models.Plan.name == update_data["name"],
-                models.Plan.id != plan_id
-            ).first()
-            if existing:
-                raise HTTPException(status_code=400, detail=f"Ya existe otro plan con el nombre '{update_data['name']}'.")
+        new_group = update_data["group_name"] if "group_name" in update_data else db_plan.group_name
+        if "name" in update_data or "group_name" in update_data:
+            new_name = update_data.get("name", db_plan.name)
+            if self._duplicate(tenant_id, new_name, new_group, exclude_id=plan_id):
+                raise HTTPException(status_code=400, detail=self._duplicate_message(new_name, new_group))
         
         optional_ids = update_data.pop("optional_service_ids", None)
         if "service_ids" in update_data:
@@ -345,8 +355,10 @@ class PlanService:
             if key in update_data:
                 update_data[key] = (update_data[key] or "").strip() or None
 
-        if update_data.get("is_featured"):
-            self._clear_featured(tenant_id, exclude_plan_id=plan_id)
+        # «Más solicitado»: uno por grupo (cada enlace del catálogo muestra un grupo)
+        if update_data.get("is_featured") or (db_plan.is_featured and "group_name" in update_data
+                                              and update_data.get("is_featured") is not False):
+            self._clear_featured(tenant_id, exclude_plan_id=plan_id, group_name=new_group)
 
         if "product_ids" in update_data:
             product_ids = update_data.pop("product_ids")
@@ -365,11 +377,8 @@ class PlanService:
         # Si se reemplaza/borra la imagen, eliminar el objeto anterior de R2 para
         # no acumular huérfanos (el gemelo de productos solo limpia al borrar el
         # producto; aquí lo hacemos también al reemplazar).
-        if "image_url" in update_data:
-            old_url = db_plan.image_url
-            new_url = update_data.get("image_url")
-            if old_url and old_url != new_url:
-                self._delete_image_from_storage(old_url)
+        # La imagen anterior NO se borra: queda en las imágenes del crematorio para
+        # reutilizarla en otro plan (se elimina desde el selector cuando nadie la usa).
 
         for key, value in update_data.items():
             setattr(db_plan, key, value)
@@ -398,15 +407,60 @@ class PlanService:
                 ))
                 position += 1
 
-    def _clear_featured(self, tenant_id: int, exclude_plan_id: int = None):
-        """Solo un plan destacado por tenant: desmarca los demás."""
+    def _clear_featured(self, tenant_id: int, exclude_plan_id: int = None, group_name=None):
+        """Un plan destacado por grupo: desmarca los demás del mismo grupo."""
         q = self.db.query(models.Plan).filter(
             models.Plan.tenant_id == tenant_id,
             models.Plan.is_featured == True,
+            func.lower(func.coalesce(models.Plan.group_name, "")) == (group_name or "").lower(),
         )
         if exclude_plan_id is not None:
             q = q.filter(models.Plan.id != exclude_plan_id)
         q.update({models.Plan.is_featured: False}, synchronize_session=False)
+
+    # --- Imágenes del crematorio para planes (reutilizables) ---
+    # Solo las subidas como imagen de plan: las de productos se borran al borrar
+    # el producto, y un plan que las reutilizara quedaría sin imagen.
+
+    def list_images(self, tenant_id: int) -> list:
+        """Imágenes de plan ya subidas por el crematorio, las más nuevas primero."""
+        from app.api.internal.common.models import MediaLibrary
+        items = (
+            self.db.query(MediaLibrary)
+            .filter(MediaLibrary.tenant_id == tenant_id,
+                    MediaLibrary.media_type == "image",
+                    MediaLibrary.category == "plans")
+            .order_by(MediaLibrary.created_at.desc())
+            .limit(300)
+            .all()
+        )
+        used = {}
+        for p in self.db.query(models.Plan).filter(models.Plan.tenant_id == tenant_id, models.Plan.image_url.isnot(None)):
+            used.setdefault(p.image_url, []).append(p.name)
+        return [{
+            "id": m.id,
+            "url": m.url,
+            "thumbnail_url": m.thumbnail_url,
+            "created_at": m.created_at,
+            "used_by_plans": used.get(m.url, []),
+        } for m in items]
+
+    def delete_image(self, tenant_id: int, media_id: int) -> None:
+        """Borra una imagen de plan que ya no usa ningún plan."""
+        from app.api.internal.common.models import MediaLibrary
+        item = self.db.query(MediaLibrary).filter(
+            MediaLibrary.id == media_id,
+            MediaLibrary.tenant_id == tenant_id,
+            MediaLibrary.category == "plans",
+        ).first()
+        if not item:
+            raise HTTPException(status_code=404, detail="Imagen no encontrada")
+        in_use = self.db.query(models.Plan.id).filter(
+            models.Plan.tenant_id == tenant_id, models.Plan.image_url == item.url
+        ).first()
+        if in_use:
+            raise HTTPException(status_code=409, detail="La imagen la usa un plan: quítasela antes de eliminarla.")
+        MediaService.delete_media(self.db, item)
 
     def _delete_image_from_storage(self, url: str):
         """Borra una imagen de plan de R2/biblioteca de medios (mismo patrón que productos)."""
@@ -433,9 +487,7 @@ class PlanService:
                 detail="No se puede eliminar el plan porque ha sido utilizado en asignaciones de servicio (OC)."
             )
         
-        # Limpiar la imagen de catálogo en R2 antes de borrar el plan.
-        if db_plan.image_url:
-            self._delete_image_from_storage(db_plan.image_url)
+        # La imagen se conserva en las imágenes del crematorio (puede usarla otro plan).
 
         # self.db.query(models.PlanService).filter(...) is done by cascade usually, or manual
         self.db.query(models.PlanService).filter(

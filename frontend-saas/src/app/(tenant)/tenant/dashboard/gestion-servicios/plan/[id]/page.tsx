@@ -315,6 +315,7 @@ export default function EditPlanPage() {
                                 imageUrl={currentPlan?.image_url}
                                 onChange={(file) => setSelectedImageFile(file)}
                                 onClearUrl={() => setCurrentPlan({ ...currentPlan, image_url: null })}
+                                onPickExisting={(url) => { setSelectedImageFile(null); setCurrentPlan({ ...currentPlan, image_url: url }); }}
                             />
                         </div>
                     </div>
@@ -372,7 +373,7 @@ export default function EditPlanPage() {
                                 <Star size={15} className={currentPlan?.is_featured ? 'fill-amber-400 text-amber-400' : ''} />
                                 {currentPlan?.is_featured ? 'Más solicitado' : 'No destacado'}
                             </button>
-                            <p className="text-[10px] text-muted-foreground/60 ml-1">Solo un plan a la vez; marcar este desmarca el anterior.</p>
+                            <p className="text-[10px] text-muted-foreground/60 ml-1">Uno por grupo; marcar este desmarca el anterior del mismo grupo.</p>
                         </div>
                     </div>
 
@@ -391,7 +392,7 @@ export default function EditPlanPage() {
                             {planGroupNames.map(g => <option key={g} value={g} />)}
                         </datalist>
                         <p className="text-[10px] text-muted-foreground/60 ml-1">
-                            Al compartir el catálogo eliges qué grupos muestra cada enlace. Vacío = «Sin grupo».
+                            Al compartir el catálogo eliges qué grupos muestra cada enlace. El nombre del plan puede repetirse en otro grupo. Vacío = «Sin grupo».
                         </p>
                     </div>
 

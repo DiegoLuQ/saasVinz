@@ -106,9 +106,7 @@ class Plan(Base):
     def optional_service_ids(self) -> list:
         return [link.service_id for link in self.plan_links if link.is_optional]
 
-    __table_args__ = (
-        UniqueConstraint('tenant_id', 'name', name='uix_plan_name_tenant'),
-    )
+    # Unicidad: (tenant, nombre, grupo) vía índice uix_plan_name_group_tenant (migración c0f2b4d6e683).
 
 class PlanProduct(Base):
     __tablename__ = "srv_plan_products"
