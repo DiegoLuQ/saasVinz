@@ -413,8 +413,10 @@ def create_pet_from_submission(
             age = 0
 
         # Safer date conversion using helper
-        birth_date = parse_date(pet_data.get("birthDate") or pet_data.get("birth_date"))
-        death_date = parse_date(pet_data.get("deathDate") or pet_data.get("death_date"))
+        # La familia puede mandar fecha completa, mes y año («2015-03») o solo el año («2015»)
+        from app.utils.partial_dates import parse_partial_date
+        birth_date, birth_precision = parse_partial_date(pet_data.get("birthDate") or pet_data.get("birth_date"))
+        death_date, death_precision = parse_partial_date(pet_data.get("deathDate") or pet_data.get("death_date"))
 
         # Species mapping for legacy/human-readable values
         species_map = {
@@ -445,6 +447,8 @@ def create_pet_from_submission(
             age=age,
             birth_date=birth_date,
             death_date=death_date,
+            birth_date_precision=birth_precision if birth_date else "day",
+            death_date_precision=death_precision if death_date else "day",
             image_url=image_urls[0] if image_urls else None,
             images=image_urls,
             status="received"

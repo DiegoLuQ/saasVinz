@@ -6,17 +6,17 @@ import { apiRequest } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import type { Pet } from '@/lib/tenant/orders/types';
 import PetDateInput from '@/components/tenant/crm/PetDateInput';
-import { toApiDate, toDateInput } from '@/lib/petDates';
+import { asPrecision, toApiDate, toDateInput, type DatePrecision } from '@/lib/petDates';
 
 type Field = 'birth' | 'death';
 
-/** Nacimiento y fallecimiento editables desde la orden (exacta o «solo año»); se guardan en la mascota al cambiar. */
+/** Nacimiento y fallecimiento editables desde la orden (completa, mes y año o solo año); se guardan en la mascota al cambiar. */
 export default function PetDatesEditor({ pet, onSaved }: { pet: Pet; onSaved: (pet: Pet) => void }) {
     const { showToast } = useToast();
     const [birth, setBirth] = useState(toDateInput(pet.birth_date));
     const [death, setDeath] = useState(toDateInput(pet.death_date));
-    const [birthYear, setBirthYear] = useState(!!pet.birth_date_year_only);
-    const [deathYear, setDeathYear] = useState(!!pet.death_date_year_only);
+    const [birthPrec, setBirthPrec] = useState<DatePrecision>(asPrecision(pet.birth_date_precision));
+    const [deathPrec, setDeathPrec] = useState<DatePrecision>(asPrecision(pet.death_date_precision));
     const [saving, setSaving] = useState<Field | null>(null);
     const [saved, setSaved] = useState<Field | null>(null);
     const today = new Date().toISOString().split('T')[0];
@@ -24,12 +24,12 @@ export default function PetDatesEditor({ pet, onSaved }: { pet: Pet; onSaved: (p
     const reset = () => {
         setBirth(toDateInput(pet.birth_date));
         setDeath(toDateInput(pet.death_date));
-        setBirthYear(!!pet.birth_date_year_only);
-        setDeathYear(!!pet.death_date_year_only);
+        setBirthPrec(asPrecision(pet.birth_date_precision));
+        setDeathPrec(asPrecision(pet.death_date_precision));
     };
-    useEffect(reset, [pet.id, pet.birth_date, pet.death_date, pet.birth_date_year_only, pet.death_date_year_only]);
+    useEffect(reset, [pet.id, pet.birth_date, pet.death_date, pet.birth_date_precision, pet.death_date_precision]);
 
-    const save = async (field: Field, value: string, yearOnly: boolean) => {
+    const save = async (field: Field, value: string, precision: DatePrecision) => {
         const nextBirth = field === 'birth' ? value : birth;
         const nextDeath = field === 'death' ? value : death;
         if (value && value > today) {
@@ -41,12 +41,12 @@ export default function PetDatesEditor({ pet, onSaved }: { pet: Pet; onSaved: (p
             return reset();
         }
         const key = field === 'birth' ? 'birth_date' : 'death_date';
-        const flag = !!value && yearOnly;
-        if (value === toDateInput(pet[key]) && flag === !!pet[`${key}_year_only`]) return;
+        const prec: DatePrecision = value ? precision : 'day';
+        if (value === toDateInput(pet[key]) && prec === asPrecision(pet[`${key}_precision`])) return;
 
         setSaving(field);
         try {
-            const body = { [key]: toApiDate(value), [`${key}_year_only`]: flag };
+            const body = { [key]: toApiDate(value), [`${key}_precision`]: prec };
             const updated = await apiRequest(`/api/internal/pets/${pet.id}`, { method: 'PATCH', body: JSON.stringify(body) });
             onSaved({ ...pet, ...updated });
             setSaved(field);
@@ -65,20 +65,20 @@ export default function PetDatesEditor({ pet, onSaved }: { pet: Pet; onSaved: (p
 
     return (
         <>
-            <div>
+            <div className="col-span-2">
                 <dt className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">Nacimiento {status('birth')}</dt>
                 <dd>
-                    <PetDateInput value={birth} yearOnly={birthYear} max={death || today} className={input} ariaLabel="Fecha de nacimiento"
-                        onChange={(v, y) => { setBirth(v); setBirthYear(y); }}
-                        onCommit={(v, y) => save('birth', v, y)} />
+                    <PetDateInput value={birth} precision={birthPrec} max={death || today} className={input} ariaLabel="Fecha de nacimiento"
+                        onChange={(v, p) => { setBirth(v); setBirthPrec(p); }}
+                        onCommit={(v, p) => save('birth', v, p)} />
                 </dd>
             </div>
-            <div>
+            <div className="col-span-2">
                 <dt className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">Fallecimiento {status('death')}</dt>
                 <dd>
-                    <PetDateInput value={death} yearOnly={deathYear} min={birth || undefined} max={today} className={input} ariaLabel="Fecha de fallecimiento"
-                        onChange={(v, y) => { setDeath(v); setDeathYear(y); }}
-                        onCommit={(v, y) => save('death', v, y)} />
+                    <PetDateInput value={death} precision={deathPrec} min={birth || undefined} max={today} className={input} ariaLabel="Fecha de fallecimiento"
+                        onChange={(v, p) => { setDeath(v); setDeathPrec(p); }}
+                        onCommit={(v, p) => save('death', v, p)} />
                 </dd>
             </div>
         </>

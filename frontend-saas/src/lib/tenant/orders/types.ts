@@ -90,8 +90,8 @@ export interface Pet {
     customer_id: number;
     birth_date?: string;
     death_date?: string;
-    birth_date_year_only?: boolean;
-    death_date_year_only?: boolean;
+    birth_date_precision?: 'day' | 'month' | 'year';
+    death_date_precision?: 'day' | 'month' | 'year';
     image_url?: string | null;
     images?: string[];
 }

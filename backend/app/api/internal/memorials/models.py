@@ -166,8 +166,8 @@ class Memorial(Base):
             "images": [normalize_image_url(i) for i in (p.images or [])],
             "birth_date": p.birth_date,
             "death_date": p.death_date,
-            "birth_date_year_only": bool(p.birth_date_year_only),
-            "death_date_year_only": bool(p.death_date_year_only),
+            "birth_date_precision": p.birth_date_precision or "day",
+            "death_date_precision": p.death_date_precision or "day",
         }
 
     @property

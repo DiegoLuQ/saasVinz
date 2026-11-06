@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Check } from 'lucide-react';
+import PartialDateInput from './PartialDateInput';
 import { DEFAULT_FORM_CONFIG, fieldLabel, fieldSuffix, formatCLP, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
 
 export interface PetData {
@@ -281,10 +282,10 @@ export default function PetInfoStep({ data, updateData, errors, formConfig = DEF
                         {f.birthDate.visible && (
                             <div>
                                 <label className={LABEL}>{fieldLabel(f.birthDate, 'Nacimiento')}{fieldSuffix(f.birthDate)}</label>
-                                <input
-                                    type="date"
+                                <PartialDateInput
                                     value={data.birthDate || ''}
-                                    onChange={(e) => updateData({ birthDate: e.target.value })}
+                                    onChange={(v) => updateData({ birthDate: v })}
+                                    ariaLabel={fieldLabel(f.birthDate, 'Nacimiento')}
                                     className={`input-emotional ${errClass(errors.birthDate)}`}
                                 />
                                 {errors.birthDate && <p className={ERROR}>! {errors.birthDate}</p>}
@@ -293,10 +294,10 @@ export default function PetInfoStep({ data, updateData, errors, formConfig = DEF
                         {f.deathDate.visible && (
                             <div>
                                 <label className={LABEL}>{fieldLabel(f.deathDate, 'Fallecimiento')}{fieldSuffix(f.deathDate)}</label>
-                                <input
-                                    type="date"
+                                <PartialDateInput
                                     value={data.deathDate || ''}
-                                    onChange={(e) => updateData({ deathDate: e.target.value })}
+                                    onChange={(v) => updateData({ deathDate: v })}
+                                    ariaLabel={fieldLabel(f.deathDate, 'Fallecimiento')}
                                     className={`input-emotional ${errClass(errors.deathDate)}`}
                                 />
                                 {errors.deathDate && <p className={ERROR}>! {errors.deathDate}</p>}

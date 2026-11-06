@@ -996,6 +996,21 @@ def _img_format_date(dt, fmt):
     return dt.strftime("%d/%m/%Y")
 
 
+# Precisión de la fecha de la ficha → formato de _img_format_date
+PRECISION_FORMAT = {"year": "year", "month": "month_year"}
+
+
+def pet_date_text(value, precision: str = "day") -> str:
+    """Fecha de la mascota en texto: «2015», «marzo de 2015» o DD/MM/AAAA."""
+    if not value:
+        return ""
+    if precision == "year":
+        return str(value.year)
+    if precision == "month":
+        return _img_format_date(value, "month_year")
+    return value.strftime("%d/%m/%Y")
+
+
 def _ov_date(ov: dict):
     """Fecha escrita al emitir (override "date", AAAA-MM-DD) cuando la ficha no la tiene."""
     raw = str(ov.get("date") or "")[:10]
@@ -1015,8 +1030,8 @@ def generate_image_certificate_html(
     current_date=None,
     pet_images: list = None,
     tenant_logo_url: str = None,
-    birth_year_only: bool = False,
-    death_year_only: bool = False,
+    birth_precision: str = "day",
+    death_precision: str = "day",
     tenant_name: str = "",
     tenant_rut: str = "",
     tenant_manager: str = "",
@@ -1211,11 +1226,12 @@ def generate_image_certificate_html(
             value = pet_name or ""
         elif ftype == "fecha_nacimiento":
             # Ficha con «solo año» → el año, aunque el diseño pida la fecha completa
-            year_fmt = "year" if birth_year_only and not _ov_date(ov) else None
-            value = _img_format_date(_ov_date(ov) or birth_date, ov.get("format") or year_fmt or field.get("format"))
+            # Ficha con «solo año» / «mes y año» → solo eso, aunque el diseño pida la fecha completa
+            prec_fmt = None if _ov_date(ov) else PRECISION_FORMAT.get(birth_precision)
+            value = _img_format_date(_ov_date(ov) or birth_date, ov.get("format") or prec_fmt or field.get("format"))
         elif ftype == "fecha_fallecimiento":
-            year_fmt = "year" if death_year_only and not _ov_date(ov) else None
-            value = _img_format_date(_ov_date(ov) or death_date, ov.get("format") or year_fmt or field.get("format"))
+            prec_fmt = None if _ov_date(ov) else PRECISION_FORMAT.get(death_precision)
+            value = _img_format_date(_ov_date(ov) or death_date, ov.get("format") or prec_fmt or field.get("format"))
         elif ftype == "fecha_actual":
             value = _img_format_date(current_date, ov.get("format") or field.get("format"))
         elif ftype == "texto_fijo":

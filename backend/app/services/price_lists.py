@@ -62,6 +62,46 @@ def effective_for_token(db: Session, token) -> Optional[models.PriceList]:
     return pl if is_effective(pl) else None
 
 
+def effective_for_form(db: Session, tenant, form_id: Optional[str] = None) -> Optional[models.PriceList]:
+    """Tabla vigente elegida en Configuración para el formulario (None = General)."""
+    from app.services.public_form_config import form_price_list_id
+    pl_id = form_price_list_id(getattr(tenant, "form_config", None), form_id)
+    if not pl_id:
+        return None
+    pl = db.query(models.PriceList).filter(
+        models.PriceList.id == pl_id, models.PriceList.tenant_id == tenant.id,
+    ).first()
+    return pl if is_effective(pl) else None
+
+
+def effective_for_request(db: Session, tenant, token: Optional[str] = None, form_id: Optional[str] = None) -> Optional[models.PriceList]:
+    """La tabla del enlace del catálogo manda; si no, la del formulario."""
+    return effective_for_token_str(db, tenant.id, token) or effective_for_form(db, tenant, form_id)
+
+
+def remove_from_form_config(tenant, list_id: int) -> None:
+    """Al borrar una tabla, los formularios que la usaban vuelven a la General."""
+    from sqlalchemy.orm.attributes import flag_modified
+    cfg = tenant.form_config if isinstance(tenant.form_config, dict) else None
+    if not cfg:
+        return
+    changed = False
+    new = dict(cfg)
+    if new.get("price_list_id") == list_id:
+        new["price_list_id"] = None
+        changed = True
+    forms = []
+    for cf in new.get("custom_forms") or []:
+        if isinstance(cf, dict) and cf.get("price_list_id") == list_id:
+            cf = {**cf, "price_list_id": None}
+            changed = True
+        forms.append(cf)
+    if changed:
+        new["custom_forms"] = forms
+        tenant.form_config = new
+        flag_modified(tenant, "form_config")
+
+
 def effective_for_token_str(db: Session, tenant_id: int, token: Optional[str]) -> Optional[models.PriceList]:
     """Tabla vigente del enlace del catálogo cuyo token abrió el formulario (None = General)."""
     if not token:

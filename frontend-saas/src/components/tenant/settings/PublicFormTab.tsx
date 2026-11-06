@@ -42,7 +42,7 @@ import { apiRequest } from '@/lib/tenant/api';
 import CondolenceModal from '@/components/public/CondolenceModal';
 import WelcomeVideoField, { uploadPendingVideo } from './WelcomeVideoField';
 import PlanWeightPriceTable, { type PlanWeightRow } from './PlanWeightPriceTable';
-import PriceListsSection from './PriceListsSection';
+import PriceListsSection, { PRICE_LIST_STATUS, type PriceList } from './PriceListsSection';
 import TierIconField from './TierIconField';
 import {
     formatCLP,
@@ -270,6 +270,8 @@ export function PublicFormTab() {
     const [presetVideoPosition, setPresetVideoPosition] = useState<'inherit' | 'start' | 'end'>('inherit');
     const [savingPreset, setSavingPreset] = useState(false);
     const [presetAssociatedServiceId, setPresetAssociatedServiceId] = useState<string>('');
+    // Tabla de precios (rangos de peso) del formulario personalizado: '' = la del principal
+    const [presetPriceListId, setPresetPriceListId] = useState<string>('');
     const [allCatalogServices, setAllCatalogServices] = useState<SpecialService[]>([]);
     const [allCatalogPlans, setAllCatalogPlans] = useState<{ id: number; name: string; price: number; is_active?: boolean }[]>([]);
 
@@ -289,6 +291,19 @@ export function PublicFormTab() {
     // Precio por plan, en el orden de los rangos ('' = precio base del plan)
     const [tableValues, setTableValues] = useState<Record<number, string[]>>({});
     const [priceListsKey, setPriceListsKey] = useState(0);
+    // Tabla de precios del formulario principal (null = General)
+    const [formPriceListId, setFormPriceListId] = useState<number | null>(null);
+    const [priceListOptions, setPriceListOptions] = useState<PriceList[]>([]);
+    useEffect(() => {
+        apiRequest('/api/internal/price-lists')
+            .then((ls: PriceList[]) => setPriceListOptions(Array.isArray(ls) ? ls : []))
+            .catch(() => setPriceListOptions([]));
+    }, [priceListsKey]);
+    const priceListName = (id?: number | null) => {
+        if (!id) return 'General';
+        const pl = priceListOptions.find(p => p.id === id);
+        return pl ? pl.name : 'Tabla eliminada (General)';
+    };
     const [specials, setSpecials] = useState<SpecialService[]>([]);
     const [savedSpecialVisibility, setSavedSpecialVisibility] = useState<Record<number, boolean>>({});
     const [newSpecial, setNewSpecial] = useState<typeof EMPTY_SPECIAL | null>(null);
@@ -327,6 +342,7 @@ export function PublicFormTab() {
                 }
                 setTiers(toTierRows(rules as SavedTier[]));
                 setWeightMode(cfg.weight_pricing_mode === 'table' ? 'table' : 'surcharge');
+                setFormPriceListId(typeof cfg.price_list_id === 'number' ? cfg.price_list_id : null);
                 if (weightTable) {
                     const rows = ((weightTable.plans || []) as (PlanWeightRow & { prices: Record<string, number> })[])
                         .filter(p => p.is_active !== false);
@@ -500,6 +516,7 @@ export function PublicFormTab() {
                 show_service_prices: showServicePrices,
                 show_plan_request_button: showPlanRequest,
                 weight_pricing_mode: weightMode,
+                price_list_id: formPriceListId,
                 delivery_notice: deliveryNotice.trim() || null,
                 welcome_modal: wm,
                 custom_forms: forms,
@@ -655,6 +672,7 @@ export function PublicFormTab() {
         setPresetName('');
         setPresetDescription('');
         setPresetAssociatedServiceId('');
+        setPresetPriceListId('');
         setPresetPhases({ familia: true, angel: true, camino: true, recuerdos: true });
         setPresetIncludeHealth(false);
         setPresetDeliveryNotice('');
@@ -675,6 +693,7 @@ export function PublicFormTab() {
         setPresetName(preset.name);
         setPresetDescription(preset.description || '');
         setPresetAssociatedServiceId(preset.associated_service_id || '');
+        setPresetPriceListId(preset.price_list_id ? String(preset.price_list_id) : '');
         setPresetPhases({ familia: true, angel: true, camino: true, recuerdos: true, ...(preset.phases || {}) });
         setPresetIncludeHealth(Boolean(preset.include_health_status));
         setPresetDeliveryNotice(preset.delivery_notice || '');
@@ -780,6 +799,7 @@ export function PublicFormTab() {
             name,
             description: presetDescription.trim() || undefined,
             associated_service_id: presetAssociatedServiceId.trim() || null,
+            price_list_id: presetPriceListId ? Number(presetPriceListId) : null,
             phases: presetPhases,
             include_health_status: presetIncludeHealth || Boolean(presetFields.find(f => f.key === 'healthStatus')?.visible),
             delivery_notice: presetDeliveryNotice.trim() || undefined,
@@ -810,6 +830,7 @@ export function PublicFormTab() {
         setPresetName('');
         setPresetDescription('');
         setPresetAssociatedServiceId('');
+        setPresetPriceListId('');
         setPresetPhases({ familia: true, angel: true, camino: true, recuerdos: true });
         setPresetIncludeHealth(false);
         setPresetDeliveryNotice('');
@@ -1397,7 +1418,41 @@ export function PublicFormTab() {
                                 />
                             </div>
                         )}
-                        <PriceListsSection reloadKey={priceListsKey} />
+                        <PriceListsSection reloadKey={priceListsKey} onChanged={() => setPriceListsKey(k => k + 1)} />
+                        {/* Rangos de peso / precios que usa el formulario principal */}
+                        <div className="glass-card p-5 sm:p-6 rounded-3xl space-y-3">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <Layers size={18} className="text-sky-400" />
+                                    <h4 className="font-bold text-white">Rangos y precios del formulario</h4>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1 max-w-xl">
+                                    Elige qué rangos de peso y precios ve la familia en el formulario principal. Los formularios personalizados usan esta misma, salvo que elijan otra en «Enlaces».
+                                    Un enlace del catálogo de planes con su propia tabla siempre usa la suya.
+                                </p>
+                            </div>
+                            <select
+                                value={formPriceListId ?? ''}
+                                onChange={e => setFormPriceListId(e.target.value ? Number(e.target.value) : null)}
+                                className="w-full sm:max-w-md bg-white/5 border border-white/10 rounded-2xl py-3 px-4 text-sm font-semibold outline-none focus:border-primary/50"
+                            >
+                                <option value="">General (los rangos de arriba)</option>
+                                {priceListOptions.map(pl => (
+                                    <option key={pl.id} value={pl.id}>{pl.name} · {PRICE_LIST_STATUS[pl.status]?.label || pl.status}</option>
+                                ))}
+                                {formPriceListId && !priceListOptions.some(p => p.id === formPriceListId) && (
+                                    <option value={formPriceListId}>Tabla eliminada (se usa la General)</option>
+                                )}
+                            </select>
+                            {formPriceListId && (() => {
+                                const pl = priceListOptions.find(p => p.id === formPriceListId);
+                                return pl && pl.status !== 'activa' ? (
+                                    <p className="text-xs font-semibold text-amber-500">
+                                        «{pl.name}» está {PRICE_LIST_STATUS[pl.status]?.label.toLowerCase() || pl.status}: mientras no esté vigente el formulario usa la General.
+                                    </p>
+                                ) : null;
+                            })()}
+                        </div>
                         {/* Precios visibles en el formulario */}
                         <div className="glass-card p-5 sm:p-6 rounded-3xl space-y-4">
                             <div>
@@ -2168,6 +2223,26 @@ export function PublicFormTab() {
                                         ) : (
                                             'Si este enlace es para un servicio específico (ej: Eutanasia o Exhumación), elígelo aquí para asociarlo directamente al formulario.'
                                         )}
+                                    </p>
+                                </div>
+
+                                {/* Rangos de peso / tabla de precios del formulario personalizado */}
+                                <div>
+                                    <label className="block text-xs font-black uppercase tracking-wider text-slate-900 dark:text-slate-200 mb-1.5">
+                                        Rangos de peso y precios
+                                    </label>
+                                    <select
+                                        value={presetPriceListId}
+                                        onChange={e => setPresetPriceListId(e.target.value)}
+                                        className="w-full bg-white dark:bg-slate-950 border-2 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-2xl py-3 px-4 text-sm font-semibold outline-none focus:border-violet-600 dark:focus:border-violet-500 focus:ring-4 focus:ring-violet-600/15 transition-all shadow-sm cursor-pointer"
+                                    >
+                                        <option value="">Igual que el formulario principal ({priceListName(formPriceListId)})</option>
+                                        {priceListOptions.map(pl => (
+                                            <option key={pl.id} value={pl.id}>{pl.name} · {PRICE_LIST_STATUS[pl.status]?.label || pl.status}</option>
+                                        ))}
+                                    </select>
+                                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1.5 font-medium leading-relaxed">
+                                        Los rangos de peso y precios que verá la familia en este formulario. Se crean en «Pesos y precios» → Tablas de precios.
                                     </p>
                                 </div>
 

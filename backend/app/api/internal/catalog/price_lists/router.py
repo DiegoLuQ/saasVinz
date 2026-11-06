@@ -197,5 +197,9 @@ def delete_price_list(
     db.query(models.WeightPricing).filter(
         models.WeightPricing.tenant_id == tenant_id, models.WeightPricing.price_list_id == pl.id,
     ).delete(synchronize_session=False)
+    from app.services.price_lists import remove_from_form_config
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if tenant:
+        remove_from_form_config(tenant, pl.id)
     db.delete(pl)
     db.commit()

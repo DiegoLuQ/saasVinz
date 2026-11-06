@@ -47,9 +47,10 @@ class Pet(Base):
     size = Column(String) # pequeño, mediano, normal, grande, muy grande
     birth_date = Column(DateTime)
     death_date = Column(DateTime)
-    # Solo se sabe el año: la fecha queda el 1 de enero y los documentos muestran el año
-    birth_date_year_only = Column(Boolean, nullable=False, default=False, server_default='false')
-    death_date_year_only = Column(Boolean, nullable=False, default=False, server_default='false')
+    # Qué se sabe de la fecha: 'day' completa · 'month' mes y año · 'year' solo el año
+    # (la fecha se guarda en el día 1 / 1 de enero; documentos y pantallas muestran solo eso)
+    birth_date_precision = Column(String(5), nullable=False, default='day', server_default='day')
+    death_date_precision = Column(String(5), nullable=False, default='day', server_default='day')
     age = Column(Integer)
     image_url = Column(String)
     images = Column(JSON, default=[])

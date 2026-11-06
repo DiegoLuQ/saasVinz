@@ -234,7 +234,12 @@ export function useTenantForm(
         }
 
         // Token del enlace (si es de un catálogo con tabla de precios, el backend aplica esos precios)
-        const tokenQs = token ? `?token=${encodeURIComponent(token)}` : '';
+        // + formulario personalizado (?form=): usa la tabla de precios elegida para él en Configuración
+        const formParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('form') : null;
+        const qs = new URLSearchParams();
+        if (token) qs.set('token', token);
+        if (formParam) qs.set('form', formParam);
+        const tokenQs = qs.toString() ? `?${qs.toString()}` : '';
         const fetchData = async () => {
             try {
                 const requests: [
@@ -493,6 +498,8 @@ export function useTenantForm(
         }
         if (petData.deathDate && petData.deathDate > todayStr) {
             errors.deathDate = 'La fecha de fallecimiento no puede ser futura';
+        } else if (petData.birthDate && petData.deathDate && petData.deathDate.slice(0, 4) < petData.birthDate.slice(0, 4)) {
+            errors.deathDate = 'El fallecimiento no puede ser anterior al nacimiento';
         }
         if (petData.birthDate && petData.deathDate && petData.birthDate > petData.deathDate) {
             errors.deathDate = 'No puede ser anterior a la fecha de nacimiento';

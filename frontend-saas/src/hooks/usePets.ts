@@ -10,8 +10,8 @@ export interface Pet {
     size?: string;
     birth_date: string;
     death_date?: string;
-    birth_date_year_only?: boolean;
-    death_date_year_only?: boolean;
+    birth_date_precision?: 'day' | 'month' | 'year';
+    death_date_precision?: 'day' | 'month' | 'year';
     age: number;
     status: string;
     customer_id: number;

@@ -30,7 +30,7 @@ class TenantPublicInfo(BaseModel):
         from_attributes = True
 
 @router.get("/tenant/{slug}", response_model=TenantPublicInfo)
-def get_tenant_by_slug(slug: str, token: str | None = None, db: Session = Depends(get_db)):
+def get_tenant_by_slug(slug: str, token: str | None = None, form: str | None = None, db: Session = Depends(get_db)):
     """`token`: el del enlace del catálogo que abrió el formulario (sus precios de promoción)."""
     tenant = db.query(models.Tenant).filter(models.Tenant.slug == slug).first()
     if not tenant:
@@ -48,8 +48,9 @@ def get_tenant_by_slug(slug: str, token: str | None = None, db: Session = Depend
     info.show_vinzer_brand = show_vinzer_brand(tenant)
     info.form_config = form_config
     # Con la tabla por plan los tramos no llevan recargo (el precio va en cada plan).
-    from app.services.price_lists import effective_for_token_str
-    price_list = effective_for_token_str(db, tenant.id, token)
+    from app.services.price_lists import effective_for_request
+    # Tabla del enlace del catálogo, o la elegida para este formulario en Configuración
+    price_list = effective_for_request(db, tenant, token, form)
     info.weight_tiers = public_weight_tiers(
         db, tenant.id,
         include_price=form_config["show_weight_prices"] and form_config["weight_pricing_mode"] != "table",
@@ -79,7 +80,7 @@ class ServicePublicInfo(BaseModel):
         from_attributes = True
 
 @router.get("/tenant/{slug}/services", response_model=list[ServicePublicInfo])
-def get_tenant_services(slug: str, token: str | None = None, db: Session = Depends(get_db)):
+def get_tenant_services(slug: str, token: str | None = None, form: str | None = None, db: Session = Depends(get_db)):
     tenant = db.query(models.Tenant).filter(models.Tenant.slug == slug).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
@@ -124,8 +125,8 @@ def get_tenant_services(slug: str, token: str | None = None, db: Session = Depen
     ).all()
     
     from app.services.public_form_config import clean_weight_prices, get_weight_tiers, uses_price_table
-    from app.services.price_lists import effective_for_token_str, plan_weight_prices
-    price_list = effective_for_token_str(db, tenant.id, token)  # promoción del enlace del catálogo
+    from app.services.price_lists import effective_for_request, plan_weight_prices
+    price_list = effective_for_request(db, tenant, token, form)  # enlace del catálogo o tabla del formulario
     price_table = uses_price_table(tenant) or price_list is not None
     tier_ids = {t.id for t in get_weight_tiers(db, tenant.id, price_list.id if price_list else None)} if price_table else set()
 

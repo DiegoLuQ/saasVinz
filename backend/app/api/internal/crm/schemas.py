@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Literal
 from datetime import datetime
 from app.models import PetStatus
 
@@ -52,8 +52,8 @@ class PetBase(BaseModel):
     size: Optional[str] = None # pequeño, mediano, normal, grande, muy grande
     birth_date: Optional[datetime] = None
     death_date: Optional[datetime] = None
-    birth_date_year_only: bool = False
-    death_date_year_only: bool = False
+    birth_date_precision: Literal["day", "month", "year"] = "day"
+    death_date_precision: Literal["day", "month", "year"] = "day"
     age: Optional[int] = None
     image_url: Optional[str] = None
     images: Optional[List[str]] = []
@@ -68,8 +68,8 @@ class PetUpdate(BaseModel):
     size: Optional[str] = None
     birth_date: Optional[datetime] = None
     death_date: Optional[datetime] = None
-    birth_date_year_only: Optional[bool] = None
-    death_date_year_only: Optional[bool] = None
+    birth_date_precision: Optional[Literal["day", "month", "year"]] = None
+    death_date_precision: Optional[Literal["day", "month", "year"]] = None
     age: Optional[int] = None
     image_url: Optional[str] = None
     images: Optional[List[str]] = None

@@ -214,6 +214,7 @@ class FormConfigUpdate(BaseModel):
     show_service_prices: bool = False
     show_plan_request_button: bool = True  # catálogo de planes: botón «Solicitar este plan»
     weight_pricing_mode: str = "surcharge"  # "surcharge" (recargo por tramo) | "table" (precio por plan y peso)
+    price_list_id: Optional[int] = None  # tabla de precios (rangos de peso) del formulario; None = General
     memories: Dict[str, bool] = Field(default_factory=dict)
     delivery_notice: Optional[str] = None
     welcome_modal: Optional[Dict[str, Any]] = None
@@ -257,11 +258,19 @@ def update_form_config(
         "show_service_prices": payload.show_service_prices,
         "show_plan_request_button": payload.show_plan_request_button,
         "weight_pricing_mode": payload.weight_pricing_mode,
+        "price_list_id": payload.price_list_id,
         "memories": payload.memories,
         "delivery_notice": payload.delivery_notice,
         "welcome_modal": payload.welcome_modal,
         "custom_forms": payload.custom_forms,
     })
+    # Tablas de precios elegidas: deben ser de este crematorio
+    wanted = {new_cfg["price_list_id"], *(cf.get("price_list_id") for cf in new_cfg["custom_forms"])} - {None}
+    if wanted:
+        own = {pid for (pid,) in db.query(models.PriceList.id).filter(
+            models.PriceList.tenant_id == tenant_id, models.PriceList.id.in_(wanted)).all()}
+        if wanted - own:
+            raise HTTPException(status_code=400, detail="Tabla de precios no encontrada")
     # Videos nuevos: plan PRO/ULTRA y duración comprobada; los subidos que ya no se usan se borran.
     unused_keys = form_video.validate_new_config(tenant, old_cfg, new_cfg)
     tenant.form_config = new_cfg

@@ -305,27 +305,31 @@ export function getLifeDates(
     birth?: string | null,
     death?: string | null,
     locale: 'es' | 'en' = 'es',
-    /** La mascota: con «solo año» (birth/death_date_year_only) se muestra solo el año */
-    flags?: { birth_date_year_only?: boolean; death_date_year_only?: boolean } | null,
+    /** La mascota: con «mes y año» / «solo año» (birth/death_date_precision) se muestra solo eso */
+    flags?: { birth_date_precision?: string | null; death_date_precision?: string | null } | null,
 ): LifeDates {
     const b = parseDate(birth);
     const d = parseDate(death);
-    const bYear = !!flags?.birth_date_year_only;
-    const dYear = !!flags?.death_date_year_only;
+    const bPrec = flags?.birth_date_precision || 'day';
+    const dPrec = flags?.death_date_precision || 'day';
     if (!b && !d) return { years: null, full: null, yearsOfLove: null };
 
     const fmt = new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'es-CL', {
         day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
     });
     const y = (x: Date | null) => (x ? String(x.getUTCFullYear()) : '…');
-    const f = (x: Date | null, yearOnly = false) => (x ? (yearOnly ? String(x.getUTCFullYear()) : fmt.format(x)) : '…');
+    const fmtMonth = new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'es-CL', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+    const f = (x: Date | null, prec = 'day') => (!x ? '…'
+        : prec === 'year' ? String(x.getUTCFullYear())
+        : prec === 'month' ? fmtMonth.format(x)
+        : fmt.format(x));
 
     let yearsOfLove: string | null = null;
     if (b && d && d > b) {
         let n = d.getUTCFullYear() - b.getUTCFullYear();
         // Con solo el año de alguna fecha no se sabe el mes: se cuentan años calendario
-        if (!bYear && !dYear && (d.getUTCMonth() < b.getUTCMonth()
-            || (d.getUTCMonth() === b.getUTCMonth() && d.getUTCDate() < b.getUTCDate()))) n--;
+        if (bPrec !== 'year' && dPrec !== 'year' && (d.getUTCMonth() < b.getUTCMonth()
+            || (bPrec === 'day' && dPrec === 'day' && d.getUTCMonth() === b.getUTCMonth() && d.getUTCDate() < b.getUTCDate()))) n--;
         if (n >= 1) {
             yearsOfLove = locale === 'en'
                 ? `${n} ${n === 1 ? 'year' : 'years'} of love`
@@ -333,7 +337,7 @@ export function getLifeDates(
         }
     }
 
-    return { years: `${y(b)} — ${y(d)}`, full: `${f(b, bYear)} — ${f(d, dYear)}`, yearsOfLove };
+    return { years: `${y(b)} — ${y(d)}`, full: `${f(b, bPrec)} — ${f(d, dPrec)}`, yearsOfLove };
 }
 
 /**

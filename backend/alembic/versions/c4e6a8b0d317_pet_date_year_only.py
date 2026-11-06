@@ -1,8 +1,12 @@
-"""pet_date_year_only
+"""pet_date_precision
 
-crm_pets.birth_date_year_only / death_date_year_only: la familia solo sabe el año.
-La fecha se guarda como 1 de enero de ese año y los documentos (certificado,
-diseños, memorial) muestran solo el año.
+crm_pets.birth_date_precision / death_date_precision: qué tanto se sabe de la
+fecha — 'day' (fecha completa), 'month' (mes y año) o 'year' (solo el año).
+La fecha se guarda en el día 1 (y enero con solo año) y los documentos
+(certificado, diseños, memorial) muestran solo lo que se sabe.
+
+(El archivo conserva el nombre de su primera versión «year_only», que nunca
+llegó a producción.)
 
 Revision ID: c4e6a8b0d317
 Revises: a3c5e7f9b218
@@ -19,10 +23,19 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute("ALTER TABLE crm_pets ADD COLUMN IF NOT EXISTS birth_date_year_only BOOLEAN NOT NULL DEFAULT false")
-    op.execute("ALTER TABLE crm_pets ADD COLUMN IF NOT EXISTS death_date_year_only BOOLEAN NOT NULL DEFAULT false")
+    for col in ("birth_date_precision", "death_date_precision"):
+        op.execute(f"ALTER TABLE crm_pets ADD COLUMN IF NOT EXISTS {col} VARCHAR(5) NOT NULL DEFAULT 'day'")
+        op.execute(f"""
+            DO $$ BEGIN
+                ALTER TABLE crm_pets ADD CONSTRAINT ck_crm_pets_{col} CHECK ({col} IN ('day', 'month', 'year'));
+            EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+        """)
 
 
 def downgrade() -> None:
-    op.execute("ALTER TABLE crm_pets DROP COLUMN IF EXISTS death_date_year_only")
+    for col in ("birth_date_precision", "death_date_precision"):
+        op.execute(f"ALTER TABLE crm_pets DROP CONSTRAINT IF EXISTS ck_crm_pets_{col}")
+        op.execute(f"ALTER TABLE crm_pets DROP COLUMN IF EXISTS {col}")
+    # Primera versión local (booleans), por si quedó aplicada en una base de desarrollo
     op.execute("ALTER TABLE crm_pets DROP COLUMN IF EXISTS birth_date_year_only")
+    op.execute("ALTER TABLE crm_pets DROP COLUMN IF EXISTS death_date_year_only")

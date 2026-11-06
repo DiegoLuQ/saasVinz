@@ -92,6 +92,8 @@ export interface CustomFormPreset {
     fields?: Partial<Record<FormFieldKey, FormFieldSetting>>;
     welcome_modal?: WelcomeModalConfig | null;
     associated_service_id?: string | null;
+    /** Tabla de precios (rangos de peso) de este formulario; null = la del formulario principal. */
+    price_list_id?: number | null;
     created_at?: string;
 }
 

@@ -136,11 +136,11 @@ export default function ProfileCard({
                                     <>
                                         <div>
                                             <dt className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Nacimiento</dt>
-                                            <dd className="text-[11px] font-mono text-slate-900 dark:text-white mt-0.5">{formatPetDate(selectedPet.birth_date, selectedPet.birth_date_year_only, true) || '—'}</dd>
+                                            <dd className="text-[11px] font-mono text-slate-900 dark:text-white mt-0.5">{formatPetDate(selectedPet.birth_date, selectedPet.birth_date_precision, true) || '—'}</dd>
                                         </div>
                                         <div>
                                             <dt className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Fallecimiento</dt>
-                                            <dd className="text-[11px] font-mono text-red-700 dark:text-red-400/80 mt-0.5">{formatPetDate(selectedPet.death_date, selectedPet.death_date_year_only, true) || '—'}</dd>
+                                            <dd className="text-[11px] font-mono text-red-700 dark:text-red-400/80 mt-0.5">{formatPetDate(selectedPet.death_date, selectedPet.death_date_precision, true) || '—'}</dd>
                                         </div>
                                     </>
                                 )}

@@ -320,6 +320,9 @@ async def submit_public_form(
     if catalog_token_id:
         _tok = db.query(CatalogShareToken).filter(CatalogShareToken.id == catalog_token_id).first()
         price_list = _pl.effective_for_token(db, _tok) if _tok else None
+    if price_list is None:
+        # Tabla elegida en Configuración para este formulario (personalizado o principal)
+        price_list = _pl.effective_for_form(db, tenant, form_preset_id)
     price_table = uses_price_table(tenant) or price_list is not None
     list_tiers = _pl.list_tiers(db, price_list) if price_list is not None else None
     if price_list is not None:

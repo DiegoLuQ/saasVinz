@@ -75,6 +75,27 @@ DEFAULT_WELCOME_MODAL: dict[str, Any] = {
 VIDEO_POSITIONS = ("start", "end")
 
 
+def _int_or_none(v) -> int | None:
+    try:
+        n = int(v)
+        return n if n > 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def form_price_list_id(raw: Any, form_id: str | None = None) -> int | None:
+    """Tabla de precios elegida para el formulario (personalizado o principal)."""
+    cfg = raw if isinstance(raw, dict) else {}
+    if form_id:
+        for cf in cfg.get("custom_forms") or []:
+            if isinstance(cf, dict) and str(cf.get("id") or "") == form_id:
+                own = _int_or_none(cf.get("price_list_id"))
+                if own:
+                    return own
+                break
+    return _int_or_none(cfg.get("price_list_id"))
+
+
 def normalize_form_config(raw: Any) -> dict:
     """Mezcla lo guardado con los valores por defecto. Obligatorio implica visible."""
     raw = raw if isinstance(raw, dict) else {}
@@ -160,6 +181,8 @@ def normalize_form_config(raw: Any) -> dict:
                 "fields": cf_fields,
                 "welcome_modal": cf_welcome,
                 "associated_service_id": str(cf.get("associated_service_id") or "").strip() or None,
+                # Tabla de precios (rangos de peso) de este formulario; None = la del formulario principal
+                "price_list_id": _int_or_none(cf.get("price_list_id")),
                 "created_at": cf.get("created_at"),
             })
 
@@ -173,6 +196,8 @@ def normalize_form_config(raw: Any) -> dict:
         # Precio por peso: "surcharge" = recargo del tramo que se suma al plan/servicio;
         # "table" = cada plan tiene su precio por tramo (srv_plans.weight_prices), sin recargo.
         "weight_pricing_mode": raw.get("weight_pricing_mode") if raw.get("weight_pricing_mode") in WEIGHT_PRICING_MODES else "surcharge",
+        # Tabla de precios (con sus rangos de peso) del formulario principal; None = General
+        "price_list_id": _int_or_none(raw.get("price_list_id")),
         "memories": memories,
         "delivery_notice": delivery_notice,
         "welcome_modal": welcome_modal,
@@ -193,6 +218,7 @@ def form_config_with_meta(raw: Any) -> dict:
         "show_service_prices": cfg["show_service_prices"],
         "show_plan_request_button": cfg["show_plan_request_button"],
         "weight_pricing_mode": cfg["weight_pricing_mode"],
+        "price_list_id": cfg["price_list_id"],
         "memories": cfg["memories"],
         "delivery_notice": cfg["delivery_notice"],
         "welcome_modal": cfg["welcome_modal"],
@@ -437,6 +463,18 @@ def apply_form_config_to_submission(
     norm = normalize_form_config(tenant.form_config)
     phases = norm["phases"]
     cfg = norm["fields"]
+
+    # Fechas: completa, mes y año o solo el año (se guardan normalizadas)
+    from app.utils.partial_dates import validate_partial_date
+    for key, label in (("birthDate", "Fecha de nacimiento"), ("deathDate", "Fecha de fallecimiento")):
+        try:
+            norm_value = validate_partial_date(pet.get(key), label)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        if norm_value is None:
+            pet.pop(key, None)
+        else:
+            pet[key] = norm_value
 
     if form_preset_id:
         for cf in norm.get("custom_forms", []):

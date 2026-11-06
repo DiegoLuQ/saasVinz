@@ -41,7 +41,7 @@ import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
 import QuickCustomerModal from '@/components/tenant/crm/QuickCustomerModal';
 import PetDateInput from '@/components/tenant/crm/PetDateInput';
 import PetPhotosDownload from '@/components/tenant/crm/PetPhotosDownload';
-import { formatPetDate } from '@/lib/petDates';
+import { asPrecision, formatPetDate } from '@/lib/petDates';
 
 interface Pet {
     id: number;
@@ -51,8 +51,8 @@ interface Pet {
     size?: string;
     birth_date: string;
     death_date?: string;
-    birth_date_year_only?: boolean;
-    death_date_year_only?: boolean;
+    birth_date_precision?: 'day' | 'month' | 'year';
+    death_date_precision?: 'day' | 'month' | 'year';
     age: number;
     status: string;
     customer_id: number;
@@ -237,8 +237,8 @@ export default function PetsPage() {
                 ...currentPet,
                 birth_date: currentPet?.birth_date && currentPet.birth_date !== '' ? currentPet.birth_date : null,
                 death_date: currentPet?.death_date && currentPet.death_date !== '' ? currentPet.death_date : null,
-                birth_date_year_only: !!(currentPet?.birth_date && currentPet.birth_date_year_only),
-                death_date_year_only: !!(currentPet?.death_date && currentPet.death_date_year_only),
+                birth_date_precision: currentPet?.birth_date ? (currentPet.birth_date_precision || 'day') : 'day',
+                death_date_precision: currentPet?.death_date ? (currentPet.death_date_precision || 'day') : 'day',
                 breed: currentPet?.breed && currentPet.breed.trim() !== '' ? currentPet.breed.trim() : null,
                 images: imageUrls,
                 image_url: imageUrls[0] || undefined,
@@ -524,7 +524,13 @@ export default function PetsPage() {
 
                         <div className="space-y-2">
                             <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Fecha Nacimiento (Opcional)</label>
-                            <PetDateInput                                value={currentPet?.birth_date?.split('T')[0] || ''}                                yearOnly={!!currentPet?.birth_date_year_only}                                max={new Date().toISOString().slice(0, 10)}                                onChange={(v, y) => setCurrentPet({ ...currentPet, birth_date: v, birth_date_year_only: y })}                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-primary/50 text-sm"                            />
+                            <PetDateInput
+                                value={currentPet?.birth_date?.split('T')[0] || ''}
+                                precision={asPrecision(currentPet?.birth_date_precision)}
+                                max={new Date().toISOString().slice(0, 10)}
+                                onChange={(v, p) => setCurrentPet({ ...currentPet, birth_date: v, birth_date_precision: p })}
+                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-primary/50 text-sm"
+                            />
                         </div>
                     </div>
 
@@ -727,8 +733,8 @@ export default function PetsPage() {
                                         <div className="bg-white/5 p-3 rounded-2xl space-y-1">
                                             <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Fechas</p>
                                             <div className="text-[10px] font-bold">
-                                                <p><span className="text-primary/70 mr-1">Nac:</span> {formatPetDate(pet.birth_date, pet.birth_date_year_only, true) || 'N/A'}</p>
-                                                <p><span className="text-primary/70 mr-1">Fall:</span> {formatPetDate(pet.death_date, pet.death_date_year_only, true) || 'N/A'}</p>
+                                                <p><span className="text-primary/70 mr-1">Nac:</span> {formatPetDate(pet.birth_date, pet.birth_date_precision, true) || 'N/A'}</p>
+                                                <p><span className="text-primary/70 mr-1">Fall:</span> {formatPetDate(pet.death_date, pet.death_date_precision, true) || 'N/A'}</p>
                                             </div>
                                         </div>
                                         <div className="bg-white/5 p-3 rounded-2xl space-y-1">
@@ -1014,11 +1020,23 @@ export default function PetsPage() {
 
                         <div className="space-y-2">
                             <label className="text-sm font-bold text-muted-foreground ml-1">Fecha de Nacimiento (Opcional)</label>
-                            <PetDateInput                                value={currentPet?.birth_date?.split('T')[0] || ''}                                yearOnly={!!currentPet?.birth_date_year_only}                                max={new Date().toISOString().slice(0, 10)}                                onChange={(v, y) => setCurrentPet({ ...currentPet, birth_date: v, birth_date_year_only: y })}                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-primary/50"                            />
+                            <PetDateInput
+                                value={currentPet?.birth_date?.split('T')[0] || ''}
+                                precision={asPrecision(currentPet?.birth_date_precision)}
+                                max={new Date().toISOString().slice(0, 10)}
+                                onChange={(v, p) => setCurrentPet({ ...currentPet, birth_date: v, birth_date_precision: p })}
+                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-primary/50"
+                            />
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-bold text-muted-foreground ml-1">Fecha de Fallecimiento (Opcional)</label>
-                            <PetDateInput                                value={currentPet?.death_date?.split('T')[0] || ''}                                yearOnly={!!currentPet?.death_date_year_only}                                max={new Date().toISOString().slice(0, 10)}                                onChange={(v, y) => setCurrentPet({ ...currentPet, death_date: v, death_date_year_only: y })}                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-primary/50"                            />
+                            <PetDateInput
+                                value={currentPet?.death_date?.split('T')[0] || ''}
+                                precision={asPrecision(currentPet?.death_date_precision)}
+                                max={new Date().toISOString().slice(0, 10)}
+                                onChange={(v, p) => setCurrentPet({ ...currentPet, death_date: v, death_date_precision: p })}
+                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-primary/50"
+                            />
                         </div>
                         {currentPet?.id && (
                             <div className="space-y-2">

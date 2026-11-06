@@ -34,6 +34,7 @@ import { buildTrackingUrl } from '@/lib/publicUrls';
 import { PlanLimitModal } from '@/components/tenant/PlanLimitModal';
 import Modal from '@/components/tenant/Modal';
 import GenerateAllPanel, { type ProcessResult, type StepKey } from '@/components/tenant/registros/GenerateAllPanel';
+import { formatPartialDate } from '@/lib/petDates';
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
     <svg
@@ -465,12 +466,12 @@ export default function SubmissionDetailPage() {
                                     </div>
                                     <div>
                                         <p className="text-[10px] text-muted-foreground uppercase font-black">Nacimiento</p>
-                                        <p className="text-sm font-semibold text-foreground/90 mt-1">{submission.pet_data?.birthDate || 'N/A'}</p>
+                                        <p className="text-sm font-semibold text-foreground/90 mt-1">{formatPartialDate(submission.pet_data?.birthDate) || 'N/A'}</p>
                                     </div>
                                 </div>
                                 <div>
                                     <p className="text-[10px] text-muted-foreground uppercase font-black">{submission.owner_data?.formLabels?.deathDate || 'Fallecimiento'}</p>
-                                    <p className="text-sm font-semibold text-foreground/90 mt-1">{submission.pet_data?.deathDate || 'N/A'}</p>
+                                    <p className="text-sm font-semibold text-foreground/90 mt-1">{formatPartialDate(submission.pet_data?.deathDate) || 'N/A'}</p>
                                 </div>
                             </div>
                         </div>

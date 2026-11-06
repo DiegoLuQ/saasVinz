@@ -61,8 +61,8 @@ class MascotaPublic(BaseModel):
     images: List[str] = []
     birth_date: Optional[datetime] = None
     death_date: Optional[datetime] = None
-    birth_date_year_only: bool = False
-    death_date_year_only: bool = False
+    birth_date_precision: str = "day"
+    death_date_precision: str = "day"
 
 class SubscriptionPlanPublic(BaseModel):
     name: str

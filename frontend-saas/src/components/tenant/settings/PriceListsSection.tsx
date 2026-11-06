@@ -69,9 +69,11 @@ const fmtDate = (d: string) => d.split('-').reverse().join('-');
 const errMsg = (err: unknown, fallback: string) => (err as { message?: string })?.message || fallback;
 const inputCls = 'w-full rounded-xl border border-foreground/10 bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary';
 
-export default function PriceListsSection({ reloadKey }: {
+export default function PriceListsSection({ reloadKey, onChanged }: {
     /** Cambia después de guardar la configuración (recarga los planes). */
     reloadKey: number;
+    /** Tras crear / editar / borrar una tabla (el selector del formulario se refresca). */
+    onChanged?: () => void;
 }) {
     const { showToast } = useToast();
     const [loading, setLoading] = useState(true);
@@ -200,6 +202,7 @@ export default function PriceListsSection({ reloadKey }: {
             showToast(draft.id ? 'Tabla de precios actualizada' : 'Tabla de precios creada', 'success');
             setDraft(null);
             await load();
+            onChanged?.();
         } catch (err) {
             showToast(errMsg(err, 'No se pudo guardar la tabla'), 'error');
         } finally {
@@ -226,6 +229,7 @@ export default function PriceListsSection({ reloadKey }: {
             });
             showToast('Tabla activada: sus enlaces ya muestran estos precios', 'success');
             await load();
+            onChanged?.();
         } catch (err) {
             showToast(errMsg(err, 'No se pudo activar la tabla'), 'error');
         } finally {
@@ -240,6 +244,7 @@ export default function PriceListsSection({ reloadKey }: {
             showToast(pl.links ? 'Tabla eliminada: sus enlaces vuelven a la General' : 'Tabla eliminada', 'success');
             if (draft?.id === pl.id) setDraft(null);
             await load();
+            onChanged?.();
         } catch (err) {
             showToast(errMsg(err, 'No se pudo eliminar la tabla'), 'error');
         } finally {

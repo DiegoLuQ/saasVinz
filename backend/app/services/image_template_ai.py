@@ -68,8 +68,10 @@ def _fmt_date(value) -> str:
 def _pet_date(pet, which: str) -> str:
     """Fecha de la mascota en texto; solo el año si la ficha la marca «solo año»."""
     value = getattr(pet, f"{which}_date", None)
-    if value and getattr(pet, f"{which}_date_year_only", False):
-        return str(value.year)
+    precision = getattr(pet, f"{which}_date_precision", None) or "day"
+    if value and precision != "day":
+        from app.utils.certificates import pet_date_text
+        return pet_date_text(value, precision)
     return _fmt_date(value)
 
 

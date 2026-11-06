@@ -160,3 +160,54 @@ def test_borrar_tabla_deja_el_enlace_en_general(client, promo, db):
     tok = db.query(CatalogShareToken).filter(CatalogShareToken.id == promo["link"]["id"]).one()
     assert tok.price_list_id is None
     assert db.query(models.WeightPricing).filter(models.WeightPricing.id.in_(promo["ptiers"])).count() == 0
+
+
+def _form_config(client, h, **changes):
+    cfg = client.get("/api/internal/maintenance/form-config", headers=h).json()
+    body = {
+        "phases": cfg["phases"],
+        "fields": {f["key"]: {"visible": f["visible"], "required": f["required"]} for f in cfg["fields"]},
+        "show_weight_prices": cfg["show_weight_prices"], "show_service_prices": cfg["show_service_prices"],
+        "show_plan_request_button": cfg["show_plan_request_button"], "weight_pricing_mode": cfg["weight_pricing_mode"],
+        "price_list_id": cfg.get("price_list_id"), "memories": cfg["memories"], "delivery_notice": cfg["delivery_notice"],
+        "welcome_modal": None, "custom_forms": cfg["custom_forms"],
+    }
+    body.update(changes)
+    return client.put("/api/internal/maintenance/form-config", headers=h, json=body)
+
+
+def test_formulario_elige_su_tabla(client, promo, db):
+    h, mini, resto = promo["h"], *promo["ptiers"]
+    _modo(db, promo["tid"], "surcharge")
+    try:
+        # Formulario principal con la tabla: sin token ya usa sus rangos y precios
+        r = _form_config(client, h, price_list_id=promo["list"]["id"])
+        assert r.status_code == 200, r.text
+        assert r.json()["price_list_id"] == promo["list"]["id"]
+        info = client.get("/api/public/tenant/crematorio-a").json()
+        assert info["form_config"]["weight_pricing_mode"] == "table"
+        assert [t["id"] for t in info["weight_tiers"]] == [mini, resto]
+
+        # Formulario personalizado: hereda la del principal o usa la General si elige otra
+        r = _form_config(client, h, price_list_id=None, custom_forms=[
+            {"id": "pf-promo", "name": "Promo", "price_list_id": promo["list"]["id"]},
+            {"id": "pf-normal", "name": "Normal"},
+        ])
+        assert r.status_code == 200, r.text
+        assert [t["id"] for t in client.get("/api/public/tenant/crematorio-a?form=pf-promo").json()["weight_tiers"]] == [mini, resto]
+        assert [t["id"] for t in client.get("/api/public/tenant/crematorio-a?form=pf-normal").json()["weight_tiers"]] == promo["tiers"]
+        svc = client.get("/api/public/tenant/crematorio-a/services?form=pf-promo").json()
+        assert next(s for s in svc if s["id"] == f"plan_{promo['plan_id']}")["weight_prices"] == {str(mini): 40000}
+
+        # Una tabla de otro crematorio no se acepta
+        assert _form_config(client, h, price_list_id=999999).status_code == 400
+
+        # Borrar la tabla devuelve los formularios a la General
+        assert client.delete(f"/api/internal/price-lists/{promo['list']['id']}", headers=h).status_code == 204
+        cfg = client.get("/api/internal/maintenance/form-config", headers=h).json()
+        assert next(cf for cf in cfg["custom_forms"] if cf["id"] == "pf-promo")["price_list_id"] is None
+    finally:
+        db.rollback()
+        t = db.query(models.Tenant).get(promo["tid"])
+        t.form_config = {k: v for k, v in (t.form_config or {}).items() if k not in ("price_list_id", "custom_forms")}
+        db.commit()

@@ -46,6 +46,7 @@ import CondolenceModal from '@/components/public/CondolenceModal';
 import FormVideoPlayer from '@/components/public/FormVideoPlayer';
 import SkyBackground from '@/components/public/SkyBackground';
 import FarewellPreview from '@/app/(tenant)/tenant/dashboard/documentos/disenos/components/FarewellPreview';
+import { formatPartialDate } from '@/lib/petDates';
 
 // Frases empáticas por paso
 const STEP_PHRASES: Record<number, string> = {
@@ -282,7 +283,8 @@ export default function TenantFormPage() {
             line('Especie', petData.type ? `${petData.type}${petData.breed ? ` (${petData.breed})` : ''}` : ''),
             line(fieldLabel(formConfig.fields.age, 'Edad'), petData.age ? `${petData.age} años` : ''),
             line(fieldLabel(formConfig.fields.weight, 'Peso'), tierDisplayWithPrice),
-            line(fieldLabel(formConfig.fields.deathDate, 'Fecha de fallecimiento'), petData.deathDate),
+            line(fieldLabel(formConfig.fields.birthDate, 'Fecha de nacimiento'), formatPartialDate(petData.birthDate)),
+            line(fieldLabel(formConfig.fields.deathDate, 'Fecha de fallecimiento'), formatPartialDate(petData.deathDate)),
             '',
             '📍 *DIRECCIONES*',
             formConfig.fields.pickup.visible ? line(fieldLabel(formConfig.fields.pickup, 'Retiro'), pickupAddr || 'Por coordinar') : null,
