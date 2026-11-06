@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request, File, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Request, File, UploadFile, Form
 from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from app import models, auth
@@ -185,46 +185,16 @@ def list_public_crematoria(limit: int = 24, db: Session = Depends(get_db)):
     ]
 
 
-# Planes de la landing del memorial (USD, venta asistida). Sus límites se leen
-# de rec_plans por name_db; los planes previos mantienen su mapeo heredado.
-LANDING_MEMORIAL_PLANS = {"mensual", "anual", "eterno"}
-MAX_MEMORIAL_DEDICATIONS = 20
-
-
 def _is_pro_or_ultra_plan(plan_name: str | None) -> bool:
     pn = (plan_name or "").upper().strip()
-    return any(k in pn for k in ("PRO", "ULTRA", "VINCULO", "VÍNCULO", "PARAISO", "PARAÍSO", "MENSUAL", "ANUAL", "ETERNO"))
-
-
-def _landing_plan(memorial: mem_models.Memorial, db: Session):
-    """rec_plans del plan Mensual/Anual/Eterno asignado al memorial, si aplica."""
-    name = (memorial.plan or "").strip().lower()
-    if name not in LANDING_MEMORIAL_PLANS:
-        return None
-    return db.query(mem_models.MemorialPlan).filter(mem_models.MemorialPlan.name_db == name).first()
+    return any(k in pn for k in ("PRO", "ULTRA", "VINCULO", "VÍNCULO", "PARAISO", "PARAÍSO", "MENSUAL", "ANUAL", "ETERNO", "RECUERDO", "INFINITO", "PARTNER"))
 
 
 def _get_memorial_limit(memorial: mem_models.Memorial, db: Session) -> int:
-    """Tope máximo de comentarios/dedicatorias por memorial: máximo 20 comentarios."""
-    if memorial.memorial_plan:
-        features = memorial.memorial_plan.features or {}
-        raw = features.get("velas", features.get("max_dedications", MAX_MEMORIAL_DEDICATIONS))
-        return min(int(raw), MAX_MEMORIAL_DEDICATIONS) if raw else MAX_MEMORIAL_DEDICATIONS
+    """Mensajes publicados que permite el plan del memorial (app/services/memorial_plans.py)."""
+    from app.services import memorial_plans
+    return memorial_plans.limits(db, memorial)["max_dedications"]
 
-    landing = _landing_plan(memorial, db)
-    if landing:
-        features = landing.features or {}
-        raw = features.get("velas", features.get("max_dedications", MAX_MEMORIAL_DEDICATIONS))
-        return min(int(raw), MAX_MEMORIAL_DEDICATIONS) if raw else MAX_MEMORIAL_DEDICATIONS
-
-    plan_name = memorial.plan or (memorial.tenant.subscription_plan.name if memorial.tenant and memorial.tenant.subscription_plan else "PRO")
-    if _is_pro_or_ultra_plan(plan_name):
-        return MAX_MEMORIAL_DEDICATIONS
-
-    pn = plan_name.upper().strip()
-    if "NORMAL" in pn or "HUELLA" in pn:
-        return min(9, MAX_MEMORIAL_DEDICATIONS)
-    return MAX_MEMORIAL_DEDICATIONS
 
 # Clave de `diseno` con la que la familia publica los mensajes sin aprobarlos uno a uno.
 AUTO_PUBLISH_KEY = "auto_publicar_mensajes"
@@ -238,10 +208,8 @@ def _get_memorial_img_limit(memorial: mem_models.Memorial, db: Session) -> int:
     - con un plan de memorial vendido por Vinzer (Mensual / Anual / Eterno, `rec_plans.features.max_images`;
       hoy 3 / 5 / 8) manda ese plan, aunque el memorial sea de un crematorio;
     - memorial de un crematorio sin plan vendido: TENANT_MEMORIAL_MAX_IMAGES (3), sea cual sea el plan del crematorio."""
-    landing = _landing_plan(memorial, db)
-    if landing:
-        return int((landing.features or {}).get("max_images", TENANT_MEMORIAL_MAX_IMAGES))
-    return TENANT_MEMORIAL_MAX_IMAGES
+    from app.services import memorial_plans
+    return memorial_plans.limits(db, memorial)["max_images"]
 
 
 _MAX_LIT_STARS = 60          # estrellas con nombre que se dibujan en Constelación
@@ -269,6 +237,18 @@ def _apply_memorial_limit(memorial: mem_models.Memorial, db: Session):
     setattr(memorial, "dedication_limit", limit)
     # Fotos permitidas por el plan (el frontend ya no infiere límites por nombre)
     setattr(memorial, "img_limit", _get_memorial_img_limit(memorial, db))
+    from app.services import memorial_plans
+    plan = memorial_plans.plan_of(db, memorial)
+    setattr(memorial, "plan_features", memorial_plans.features_of(plan))
+    setattr(memorial, "is_vinzer_plan", bool(plan and plan.kind == memorial_plans.KIND_VINZER))
+    from app.services import memorial_expiry
+    setattr(memorial, "expired", memorial_expiry.is_expired(memorial))
+    from app.services import memorial_timeline
+    setattr(memorial, "timeline", memorial_timeline.public_list(db, memorial))
+    from app.services import memorial_media
+    videos, voices = memorial_media.public_lists(db, memorial)
+    setattr(memorial, "videos", videos)
+    setattr(memorial, "voices", voices)
     # Contadores de rituales (velas, flores, estrellas, besos) para la prueba social
     state = _ritual_state(memorial.id, db)
     setattr(memorial, "ritual_counts", state["counts"])
@@ -288,10 +268,9 @@ def _apply_memorial_limit(memorial: mem_models.Memorial, db: Session):
     if portada_url:
         from app.api.internal.common.models import MediaLibrary
         filename = portada_url.split("/")[-1]
-        media_item = db.query(MediaLibrary).filter(
-            (MediaLibrary.url == portada_url) |
-            (MediaLibrary.url.endswith("/" + filename))
-        ).first()
+        # Igualdad exacta primero; el «termina en /archivo» (LIKE sin índice) solo como respaldo
+        media_item = db.query(MediaLibrary).filter(MediaLibrary.url == portada_url).first() or \
+            db.query(MediaLibrary).filter(MediaLibrary.url.endswith("/" + filename)).first()
         if media_item and media_item.theme_config:
             diseno_copy = dict(diseno)
             diseno_copy["theme_config"] = media_item.theme_config
@@ -372,7 +351,7 @@ def create_memorial(
     now = datetime.now()
     valid_until = now + timedelta(days=365)
 
-    # 5. Fotos: memorial del crematorio = 3 (un plan Mensual/Anual/Eterno lo sube después)
+    # 5. Fotos: plan Partner (un plan Vinzer lo sube después)
     img_limit = TENANT_MEMORIAL_MAX_IMAGES
 
     db_memorial = mem_models.Memorial(
@@ -387,6 +366,12 @@ def create_memorial(
         valid_until=valid_until,
         plan=plan_name # Snapshot feature tier
     )
+    # Plan Partner (límites del memorial de crematorio, editables en Admin); la familia puede subir a un plan Vinzer
+    from app.services import memorial_plans
+    partner = memorial_plans.partner_plan(db)
+    if partner:
+        db_memorial.plan_id = partner.id
+        db_memorial.plan_price, db_memorial.plan_currency, db_memorial.plan_billing = 0, partner.currency or "USD", memorial_plans.BILLING_INCLUDED
     db.add(db_memorial)
     db.commit()
     db.refresh(db_memorial)
@@ -399,6 +384,18 @@ def create_memorial(
     ).filter(mem_models.Memorial.id == db_memorial.id).first()
 
     return _apply_memorial_limit(memorial, db)
+
+@router.get("/code/{code}")
+def resolve_memorial_code(code: str, db: Session = Depends(get_db)):
+    """Enlace corto → UUID del memorial (la página pública sigue usando el UUID para la API).
+    Público: el código ya está en el enlace compartido; los privados siguen pidiendo su PIN."""
+    row = db.query(mem_models.Memorial.id_recuerdo).filter(
+        mem_models.Memorial.short_code == (code or "").strip().lower()[:12]
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Memorial no encontrado.")
+    return {"id_recuerdo": str(row[0])}
+
 
 @router.get("/{recuerdo_uuid}", response_model=mem_schemas.MemorialPublicResponse)
 def get_public_memorial(
@@ -430,6 +427,16 @@ def get_public_memorial(
     # Al público solo se le entrega la melodía si el crematorio la dejó activa.
     if not (result.melody or {}).get("activa"):
         result.melody = None
+    if getattr(result, "expired", False):
+        # Vencido: el memorial sigue en línea con solo algunas fotos y mensajes.
+        # Se recorta la respuesta (nunca las relaciones ORM, que borrarían datos).
+        from app.services import memorial_expiry
+        resp = mem_schemas.MemorialPublicResponse.model_validate(result)
+        memorial_expiry.reduce_public_view(resp, result.plan_features or {})
+        # JSONResponse: devolver el modelo haría que FastAPI lo re-valide y perdería los alias
+        from fastapi.encoders import jsonable_encoder
+        from fastapi.responses import JSONResponse
+        return JSONResponse(jsonable_encoder(resp, by_alias=True))
     return result
 
 
@@ -521,6 +528,256 @@ def create_ritual(
     return _ritual_state(memorial.id, db)
 
 
+def _check_message_length(db: Session, memorial: mem_models.Memorial, text: str) -> None:
+    from app.services import memorial_plans
+    max_chars = memorial_plans.limits(db, memorial)["max_dedication_chars"]
+    if len((text or "").strip()) > max_chars:
+        raise HTTPException(status_code=400, detail=f"El mensaje puede tener hasta {max_chars} caracteres.")
+
+
+def _family_memorial(db: Session, recuerdo_uuid: UUID, request: Request) -> mem_models.Memorial:
+    """Memorial de la gestión familiar, autenticado con su PIN (cabecera access-key)."""
+    memorial = _load_memorial_scoped(db, recuerdo_uuid, with_dedications=True)
+    access_key = (request.headers.get("access-key") or "").strip()
+    if not memorial.access_key or memorial.access_key.strip() != access_key:
+        raise HTTPException(status_code=401, detail="No autorizado.")
+    return memorial
+
+
+@router.get("/{recuerdo_uuid}/manage/melodies")
+def family_melody_options(recuerdo_uuid: UUID, request: Request, db: Session = Depends(get_db)):
+    """Melodías de la biblioteca + las guardadas por la familia (planes Vinzer)."""
+    from app.services import memorial_plans
+    memorial = _family_memorial(db, recuerdo_uuid, request)
+    from app.core.tenant_context import apply_bypass_rls
+    apply_bypass_rls(db)
+    cfg = (memorial.diseno or {}).get(melodies.DISENO_KEY) or {}
+    return {
+        "enabled": memorial_plans.is_vinzer(db, memorial),
+        "max": memorial_plans.limits(db, memorial)["max_melodies"],
+        "favorites": melodies.favorite_ids(memorial.diseno),
+        "media_id": cfg.get("media_id") if isinstance(cfg, dict) else None,
+        "activa": bool(cfg.get("activa")) if isinstance(cfg, dict) else False,
+        "melodies": melodies.list_melodies(db),
+    }
+
+
+@router.put("/{recuerdo_uuid}/manage/melody", response_model=mem_schemas.MemorialManageResponse)
+@limiter.limit("30/minute")
+def family_set_melody(
+    request: Request,
+    recuerdo_uuid: UUID,
+    body: mem_schemas.FamilyMelodyUpdate,
+    db: Session = Depends(get_db),
+):
+    """La familia de un memorial Vinzer guarda hasta N melodías (según su plan) y elige cuál suena.
+    En los memoriales de crematorios la melodía la sigue eligiendo el crematorio."""
+    from app.services import memorial_plans
+    memorial = _family_memorial(db, recuerdo_uuid, request)
+    if not memorial_plans.is_vinzer(db, memorial):
+        raise HTTPException(status_code=403, detail="La melodía de este memorial la elige el crematorio.")
+    max_m = memorial_plans.limits(db, memorial)["max_melodies"]
+    favs: list[int] = []
+    for i in body.favorites + ([body.media_id] if body.media_id else []):
+        if i not in favs:
+            favs.append(i)
+    if len(favs) > max_m:
+        raise HTTPException(status_code=400, detail=f"Tu plan permite guardar hasta {max_m} melodía{'s' if max_m != 1 else ''}.")
+    from app.core.tenant_context import apply_bypass_rls, apply_tenant_rls
+    apply_bypass_rls(db)
+    for i in favs:
+        if not melodies.get_melody(db, i):
+            raise HTTPException(status_code=404, detail="Una de las melodías ya no está disponible.")
+    apply_tenant_rls(db, memorial.id_tenant)
+    value = ({"media_id": body.media_id, "activa": bool(body.activa), "favoritas": favs} if body.media_id
+             else ({"media_id": None, "activa": False, "favoritas": favs} if favs else None))
+    memorial.diseno = merge_diseno(memorial.diseno, {melodies.DISENO_KEY: value})
+    db.commit()
+    db.refresh(memorial)
+    memorial.lista_imagenes = [normalize_image_url(img) for img in (memorial.lista_imagenes or [])]
+    memorial.main_image_url = normalize_image_url(memorial.main_image_url)
+    return _apply_memorial_limit(memorial, db)
+
+
+# ---------------- Línea de tiempo (Eterno / Infinito) ----------------
+
+def _upload_timeline_photo(db: Session, memorial: mem_models.Memorial, file: UploadFile) -> str:
+    """Foto propia del momento (no cuenta para la galería). WebP optimizado, proporción original."""
+    if not (file.content_type or "").startswith("image/"):
+        raise HTTPException(400, "La foto debe ser una imagen.")
+    temp_dir = "temp_uploads"
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_path = os.path.join(temp_dir, f"{uuid4()}_{os.path.basename(file.filename or 'foto')}")
+    with open(temp_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    try:
+        pet = memorial.pet.name if memorial.pet else "Mascota"
+        item = MediaService.upload_media(
+            db=db, local_path=temp_path, media_type="image", category="recuerdos", ratio="original",
+            description=f"Momento de la línea de tiempo de {pet}", alt_text=f"Momento de {pet}",
+            processing_mode="optimized", custom_prefix="timeline", tenant_id=memorial.id_tenant,
+        )
+        return normalize_image_url(item.url)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+def _drop_timeline_photo(db: Session, url: str | None) -> None:
+    if not url:
+        return
+    try:
+        MediaService.delete_media_by_url(db, url)
+    except Exception as e:  # noqa: BLE001 — el momento se borra igual
+        print(f"No se pudo borrar la foto del momento: {e}")
+
+
+def _timeline_out(db: Session, memorial: mem_models.Memorial) -> dict:
+    from app.services import memorial_timeline as tl
+    enabled, cap = tl.settings(db, memorial)
+    return {"enabled": enabled, "max": cap, "max_text": tl.MAX_TEXT, "max_title": tl.MAX_TITLE,
+            "moments": [tl.serialize(m) for m in tl.moments(db, memorial.id)]}
+
+
+@router.get("/{recuerdo_uuid}/manage/timeline")
+def family_timeline(recuerdo_uuid: UUID, request: Request, db: Session = Depends(get_db)):
+    memorial = _family_memorial(db, recuerdo_uuid, request)
+    return _timeline_out(db, memorial)
+
+
+@router.post("/{recuerdo_uuid}/manage/timeline")
+@limiter.limit("30/minute")
+def add_timeline_moment(
+    recuerdo_uuid: UUID,
+    request: Request,
+    titulo: str = Form(...),
+    texto: str | None = Form(None),
+    fecha: str | None = Form(None),
+    file: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
+):
+    from app.services import memorial_timeline as tl
+    memorial = _family_memorial(db, recuerdo_uuid, request)
+    tl.check_can_add(db, memorial)
+    data = tl.clean(titulo, texto, fecha)
+    image_url = _upload_timeline_photo(db, memorial, file) if file and file.filename else None
+    db.add(mem_models.TimelineMoment(id_recuerdo=memorial.id, image_url=image_url, **data))
+    db.commit()
+    return _timeline_out(db, memorial)
+
+
+@router.patch("/{recuerdo_uuid}/manage/timeline/{moment_id}")
+@limiter.limit("60/minute")
+def update_timeline_moment(
+    recuerdo_uuid: UUID,
+    moment_id: int,
+    request: Request,
+    titulo: str = Form(...),
+    texto: str | None = Form(None),
+    fecha: str | None = Form(None),
+    remove_photo: bool = Form(False),
+    file: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
+):
+    from app.services import memorial_timeline as tl
+    memorial = _family_memorial(db, recuerdo_uuid, request)
+    m = db.query(mem_models.TimelineMoment).filter(
+        mem_models.TimelineMoment.id == moment_id, mem_models.TimelineMoment.id_recuerdo == memorial.id).first()
+    if not m:
+        raise HTTPException(404, "Momento no encontrado.")
+    data = tl.clean(titulo, texto, fecha)
+    m.titulo, m.texto, m.fecha = data["titulo"], data["texto"], data["fecha"]
+    old = m.image_url
+    if file and file.filename:
+        m.image_url = _upload_timeline_photo(db, memorial, file)
+    elif remove_photo:
+        m.image_url = None
+    db.commit()
+    if old and old != m.image_url:
+        _drop_timeline_photo(db, old)
+        db.commit()
+    return _timeline_out(db, memorial)
+
+
+@router.delete("/{recuerdo_uuid}/manage/timeline/{moment_id}")
+def delete_timeline_moment(recuerdo_uuid: UUID, moment_id: int, request: Request, db: Session = Depends(get_db)):
+    memorial = _family_memorial(db, recuerdo_uuid, request)
+    m = db.query(mem_models.TimelineMoment).filter(
+        mem_models.TimelineMoment.id == moment_id, mem_models.TimelineMoment.id_recuerdo == memorial.id).first()
+    if not m:
+        raise HTTPException(404, "Momento no encontrado.")
+    url = m.image_url
+    db.delete(m)
+    db.commit()
+    _drop_timeline_photo(db, url)
+    db.commit()
+    return _timeline_out(db, memorial)
+
+
+@router.post("/{recuerdo_uuid}/manage/upgrade-request")
+@limiter.limit("5/hour")
+def family_upgrade_request(
+    recuerdo_uuid: UUID,
+    body: mem_schemas.UpgradeRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """La familia pide mejorar el plan (p. ej. memorial de cortesía Partner → Eterno).
+    Avisa al SuperAdmin; el pago y el cambio de plan se hacen desde Admin."""
+    from app.services import memorial_upgrade
+    memorial = _family_memorial(db, recuerdo_uuid, request)
+    out = memorial_upgrade.request_upgrade(db, memorial, body.plan)
+    if not out["duplicated"]:
+        background_tasks.add_task(memorial_upgrade.notify_admin_in_background, memorial.id, body.plan.strip().lower())
+    return out
+
+
+# ---------------- Video y voz (Infinito) ----------------
+
+def _media_out(db: Session, memorial: mem_models.Memorial) -> dict:
+    from app.services import memorial_media as mm
+    c = mm.caps(db, memorial)
+    rows = [mm.serialize(r) for r in mm.items(db, memorial.id)]
+    return {"max_videos": c[mm.KIND_VIDEO], "max_voice": c[mm.KIND_VOICE], "max_seconds": mm.MAX_SECONDS,
+            "videos": [r for r in rows if r["kind"] == mm.KIND_VIDEO],
+            "voices": [r for r in rows if r["kind"] == mm.KIND_VOICE]}
+
+
+@router.get("/{recuerdo_uuid}/manage/media")
+def family_media(recuerdo_uuid: UUID, request: Request, db: Session = Depends(get_db)):
+    memorial = _family_memorial(db, recuerdo_uuid, request)
+    return _media_out(db, memorial)
+
+
+@router.post("/{recuerdo_uuid}/manage/media")
+@limiter.limit("10/minute")
+def add_family_media(
+    recuerdo_uuid: UUID,
+    request: Request,
+    kind: str = Form(...),
+    titulo: str | None = Form(None),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    from app.services import memorial_media as mm
+    memorial = _family_memorial(db, recuerdo_uuid, request)
+    mm.add(db, memorial, kind, file, titulo)
+    return _media_out(db, memorial)
+
+
+@router.delete("/{recuerdo_uuid}/manage/media/{media_id}")
+def delete_family_media(recuerdo_uuid: UUID, media_id: int, request: Request, db: Session = Depends(get_db)):
+    from app.services import memorial_media as mm
+    memorial = _family_memorial(db, recuerdo_uuid, request)
+    row = db.query(mem_models.MemorialMedia).filter(
+        mem_models.MemorialMedia.id == media_id, mem_models.MemorialMedia.id_recuerdo == memorial.id).first()
+    if not row:
+        raise HTTPException(404, "Archivo no encontrado.")
+    mm.remove(db, row)
+    return _media_out(db, memorial)
+
+
 @router.post("/{recuerdo_uuid}/dedicatorias", response_model=mem_schemas.DedicationResponse)
 def create_dedication(
     recuerdo_uuid: UUID,
@@ -534,8 +791,8 @@ def create_dedication(
     if not memorial:
         raise HTTPException(status_code=404, detail="Memorial no encontrado.")
 
-    # Check limits (Tope máximo de 20 comentarios por memorial)
-    max_dedications = min(_get_memorial_limit(memorial, db), MAX_MEMORIAL_DEDICATIONS)
+    # Mensajes que permite el plan del memorial (Partner 20, Recuerdo 30, Eterno 50, Infinito 100)
+    max_dedications = _get_memorial_limit(memorial, db)
     
     approved_count = db.query(mem_models.Dedication).filter(
         mem_models.Dedication.id_recuerdo == memorial.id,
@@ -545,10 +802,13 @@ def create_dedication(
     
     if approved_count >= max_dedications:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail=f"Este memorial ha alcanzado el límite máximo de {max_dedications} comentarios."
         )
-
+    _check_message_length(db, memorial, dedication_in.mensaje)
+    from app.services import memorial_expiry
+    if memorial_expiry.is_expired(memorial):
+        raise HTTPException(status_code=400, detail="El periodo de este memorial venció: por ahora no recibe mensajes nuevos.")
     # La familia puede elegir publicar los mensajes sin revisarlos (gestión → «Publicar automáticamente»)
     auto_publish = (memorial.diseno or {}).get(AUTO_PUBLISH_KEY) is True
     db_dedication = mem_models.Dedication(
@@ -764,6 +1024,8 @@ def update_dedication(
         raise HTTPException(status_code=401, detail="No autorizado.")
 
     update_data = dedication_up.model_dump(exclude_unset=True)
+    if update_data.get("mensaje"):
+        _check_message_length(db, dedication.memorial, update_data["mensaje"])
     for key, value in update_data.items():
         if key == "estado":
             setattr(dedication, "estado", value)

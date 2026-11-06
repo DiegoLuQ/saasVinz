@@ -60,7 +60,9 @@ def build_memorial_urls(memorial: mem_models.Memorial, tenant: models.Tenant) ->
     pet_name = slugify(memorial.pet.name if memorial.pet else "mascota")
     id_recuerdo = str(memorial.id_recuerdo)
 
-    public_url = f"{base}/memorials/v/{tenant_slug}/{pet_name}/{id_recuerdo}"
+    # Enlace corto (con el largo como respaldo para memoriales sin código)
+    public_url = (f"{base}/{tenant_slug}/{pet_name}-{memorial.short_code}" if memorial.short_code
+                  else f"{base}/memorials/v/{tenant_slug}/{pet_name}/{id_recuerdo}")
     portal_url = f"{base}/memorials/m/{id_recuerdo}/login"
 
     return {
@@ -433,6 +435,8 @@ async def memorial_anniversary_scheduler_loop() -> None:
                 try:
                     apply_bypass_rls(db)
                     await check_and_send_anniversary_reminders(db)
+                    from app.services.memorial_expiry import send_expiry_notices
+                    await send_expiry_notices(db)
                 finally:
                     db.close()
         except Exception as e:

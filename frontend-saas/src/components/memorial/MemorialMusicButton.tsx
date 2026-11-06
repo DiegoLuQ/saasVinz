@@ -11,6 +11,9 @@ interface Props {
 
 const TARGET_VOLUME = 0.6;
 
+/** Evento de ventana que pausa la melodía (lo emite la voz/video del memorial). */
+export const PAUSE_MUSIC_EVENT = 'memorial:pause-music';
+
 export interface MemorialMusicHandle {
     /** Empieza a sonar (no hace nada si ya suena). */
     play: () => void;
@@ -31,6 +34,17 @@ const MemorialMusicButton = forwardRef<MemorialMusicHandle, Props>(function Memo
     useEffect(() => () => {
         if (fadeRef.current) clearInterval(fadeRef.current);
         audioRef.current?.pause();
+    }, []);
+
+    // Al escuchar la voz o ver el video del memorial (MemorialVoiceVideo) la melodía se pausa
+    useEffect(() => {
+        const pause = () => {
+            if (fadeRef.current) clearInterval(fadeRef.current);
+            audioRef.current?.pause();
+            setPlaying(false);
+        };
+        window.addEventListener(PAUSE_MUSIC_EVENT, pause);
+        return () => window.removeEventListener(PAUSE_MUSIC_EVENT, pause);
     }, []);
 
     const start = () => {

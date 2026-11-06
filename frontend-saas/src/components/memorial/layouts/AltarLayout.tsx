@@ -236,10 +236,13 @@ export default function AltarLayout(props: any) {
                         </div>
                     </div>
 
-                    {/* Velitas de los visitantes, bajo el altar, sobre una nube */}
-                    <div className="relative mt-6 px-6 pb-2">
-                        <MemorialCandleRow count={candleCount} isDark={isDarkTheme} locale={locale} className="" />
-                        <MemorialCloud className="absolute -bottom-2 -inset-x-2 h-10" tone={isDarkTheme ? 'night' : 'day'} delay={1.2} intensity={0.55} />
+                    {/* Velitas de los visitantes, bajo el altar, sobre una nube: la nube va DETRÁS y
+                        bajo la última fila (con 2 filas de velas antes tapaba la segunda) */}
+                    <div className="relative mt-6 px-6 pb-5">
+                        <MemorialCloud className="absolute -bottom-1 -inset-x-4 h-7 !z-0" tone={isDarkTheme ? 'night' : 'day'} delay={1.2} intensity={0.35} />
+                        <div className="relative z-30">
+                            <MemorialCandleRow count={candleCount} isDark={isDarkTheme} locale={locale} className="" />
+                        </div>
                     </div>
                 </div>
 

@@ -119,3 +119,19 @@ def resolve(db: Session, diseno: dict | None) -> dict | None:
     if not item:
         return None
     return {**serialize(item), "activa": bool(cfg.get("activa"))}
+
+
+def favorite_ids(diseno: dict | None) -> list[int]:
+    """Melodías guardadas por la familia (incluye la que suena)."""
+    cfg = (diseno or {}).get(DISENO_KEY)
+    if not isinstance(cfg, dict):
+        return []
+    out: list[int] = []
+    for v in (cfg.get("favoritas") or []) + ([cfg["media_id"]] if cfg.get("media_id") else []):
+        try:
+            i = int(v)
+        except (TypeError, ValueError):
+            continue
+        if i not in out:
+            out.append(i)
+    return out

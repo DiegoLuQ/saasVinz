@@ -20,6 +20,10 @@ class AdminMemorialResponse(BaseModel):
     tenant_name: str
     tenant_slug: str
     tenant_id: int
+    short_code: Optional[str] = None
+    plan_price: Optional[float] = None
+    plan_currency: Optional[str] = None
+    plan_billing: Optional[str] = None
     plan: Optional[str] = None
     status: MemorialStatus
     valid_until: Optional[datetime] = None

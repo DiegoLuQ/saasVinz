@@ -62,6 +62,10 @@ const formatCLP = (value: number) => `$${Math.round(value).toLocaleString('es-CL
 
 type StatusTone = { label: string; className: string };
 
+/** Mismos estados que cuenta el backend como «En Planta / Horno» (pipeline_counts.en_planta). */
+const IN_PLANT_STATUSES = ['en_proceso', 'processing', 'in_progress', 'ready'];
+const isInPlant = (status: string) => IN_PLANT_STATUSES.includes((status || '').toLowerCase());
+
 function statusTone(status: string): StatusTone {
     const s = (status || '').toLowerCase();
     if (['entregado', 'delivered', 'completado', 'completed'].includes(s)) {
@@ -121,7 +125,11 @@ export default function DashboardPage() {
     const [showQuickTrackingModal, setShowQuickTrackingModal] = useState(false);
     const [showShareModal, setShowShareModal] = useState(false);
     const [showAllSubmissions, setShowAllSubmissions] = useState(false);
-    const [processTab, setProcessTab] = useState<'today' | 'active' | 'overdue'>('today');
+    // null = pestaña automática (la primera con órdenes); al hacer clic queda la elegida
+    const [pickedTab, setPickedTab] = useState<'today' | 'active' | 'overdue' | null>(null);
+    // Filtro del embudo (por etapa); elegir una pestaña lo quita
+    const [stage, setStage] = useState<'por_iniciar' | 'en_planta' | null>(null);
+    const setProcessTab = (tab: 'today' | 'active' | 'overdue') => { setStage(null); setPickedTab(tab); };
     const [copiedCodeId, setCopiedCodeId] = useState<number | null>(null);
 
     const role = currentUser?.role ?? '';
@@ -182,12 +190,25 @@ export default function DashboardPage() {
     const todayItems = data.today_cremations ?? [];
     const otherActive = data.recent_cremations ?? [];
     const overdueItems = data.overdue_cremations ?? [];
+    // Prioridad: lo que está en proceso; si no hay, la agenda de hoy; si no, las atrasadas
+    const processTab = pickedTab ?? (
+        otherActive.length > 0 ? 'active'
+            : todayItems.length > 0 ? 'today'
+            : overdueItems.length > 0 ? 'overdue'
+            : 'active'
+    );
     const pipeline = data.pipeline_counts ?? { por_iniciar: 0, en_planta: 0, atrasadas: overdueItems.length };
     const lowStockProducts = data.low_stock_products ?? [];
 
     // Selección de órdenes según pestaña
     let displayedOrders: DashboardOrder[] = [];
-    if (processTab === 'today') {
+    if (stage) {
+        // Embudo: todas las abiertas (agenda de hoy + en proceso) de esa etapa
+        displayedOrders = [...todayItems, ...otherActive].filter(
+            (o) => !['entregado', 'delivered', 'completado', 'completed'].includes((o.status || '').toLowerCase())
+                && (stage === 'en_planta' ? isInPlant(o.status) : !isInPlant(o.status)),
+        );
+    } else if (processTab === 'today') {
         displayedOrders = todayItems;
     } else if (processTab === 'active') {
         displayedOrders = otherActive;
@@ -459,9 +480,10 @@ export default function DashboardPage() {
                 <div className="flex flex-wrap items-center gap-2">
                     <button
                         type="button"
-                        onClick={() => setProcessTab('active')}
+                        onClick={() => setStage(stage === 'por_iniciar' ? null : 'por_iniciar')}
+                        aria-pressed={stage === 'por_iniciar'}
                         className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                            processTab === 'active'
+                            stage === 'por_iniciar'
                                 ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30'
                                 : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                         }`}
@@ -473,9 +495,10 @@ export default function DashboardPage() {
 
                     <button
                         type="button"
-                        onClick={() => setProcessTab('today')}
+                        onClick={() => setStage(stage === 'en_planta' ? null : 'en_planta')}
+                        aria-pressed={stage === 'en_planta'}
                         className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                            processTab === 'today'
+                            stage === 'en_planta'
                                 ? 'bg-sky-500/20 text-sky-800 dark:text-sky-300 border border-sky-500/30'
                                 : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                         }`}
@@ -490,10 +513,10 @@ export default function DashboardPage() {
                         onClick={() => setProcessTab('overdue')}
                         className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                             pipeline.atrasadas > 0
-                                ? (processTab === 'overdue'
+                                ? (processTab === 'overdue' && !stage
                                     ? 'bg-rose-600 text-white shadow-xs'
                                     : 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-500/25')
-                                : (processTab === 'overdue'
+                                : (processTab === 'overdue' && !stage
                                     ? 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200'
                                     : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700')
                         }`}
@@ -598,25 +621,9 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-2">
                             <button
                                 type="button"
-                                onClick={() => setProcessTab('today')}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                                    processTab === 'today'
-                                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
-                                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                                }`}
-                            >
-                                <CalendarDays size={14} />
-                                Agenda de Hoy
-                                <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-extrabold">
-                                    {todayItems.length}
-                                </span>
-                            </button>
-
-                            <button
-                                type="button"
                                 onClick={() => setProcessTab('active')}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                                    processTab === 'active'
+                                    processTab === 'active' && !stage
                                         ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
                                         : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                                 }`}
@@ -630,9 +637,25 @@ export default function DashboardPage() {
 
                             <button
                                 type="button"
+                                onClick={() => setProcessTab('today')}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                                    processTab === 'today' && !stage
+                                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
+                                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                                }`}
+                            >
+                                <CalendarDays size={14} />
+                                Agenda de Hoy
+                                <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-extrabold">
+                                    {todayItems.length}
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
                                 onClick={() => setProcessTab('overdue')}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                                    processTab === 'overdue'
+                                    processTab === 'overdue' && !stage
                                         ? 'bg-rose-600 text-white shadow-xs'
                                         : overdueItems.length > 0
                                         ? 'text-rose-600 dark:text-rose-400 font-black'
@@ -656,6 +679,17 @@ export default function DashboardPage() {
                             Ver todas <ArrowRight size={12} />
                         </button>
                     </div>
+
+                    {stage && (
+                        <div className={`mb-3 flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs font-bold ${stage === 'en_planta' ? 'bg-sky-500/10 text-sky-800 dark:text-sky-300' : 'bg-amber-500/10 text-amber-800 dark:text-amber-300'}`}>
+                            <span>
+                                Mostrando: {stage === 'en_planta' ? 'En Planta / Horno' : 'Por iniciar / Recepción'} ({displayedOrders.length})
+                            </span>
+                            <button type="button" onClick={() => setStage(null)} className="underline underline-offset-2 hover:opacity-80">
+                                Quitar filtro
+                            </button>
+                        </div>
+                    )}
 
                     {/* Tabla de procesos */}
                     <div className="flex-1 overflow-x-auto">
@@ -719,7 +753,7 @@ export default function DashboardPage() {
                                                 </td>
                                                 <td className="py-3 text-right text-slate-500 dark:text-slate-400 tabular-nums text-[11px]">
                                                     <span className={item.is_overdue ? 'text-rose-600 dark:text-rose-400 font-bold' : ''}>
-                                                        {item.time && item.time !== 'N/A' ? item.time : 'Hoy'}
+                                                        {item.time && item.time !== 'N/A' ? item.time : 'Sin programar'}
                                                     </span>
                                                 </td>
                                                 <td className="py-3 text-center" onClick={(e) => e.stopPropagation()}>
@@ -754,7 +788,9 @@ export default function DashboardPage() {
                                 ) : (
                                     <tr>
                                         <td colSpan={5} className="py-10 text-center text-slate-400 italic">
-                                            {processTab === 'today'
+                                            {stage
+                                                ? 'No hay órdenes en esta etapa'
+                                                : processTab === 'today'
                                                 ? 'No hay cremaciones programadas para hoy'
                                                 : processTab === 'overdue'
                                                 ? '¡Excelente! No hay procesos atrasados'

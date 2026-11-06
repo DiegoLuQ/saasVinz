@@ -34,6 +34,8 @@ import DedicationModal from '@/components/memorial/DedicationModal';
 import Snowflakes from '@/components/memorial/Snowflakes';
 import TwinklingStars from '@/components/memorial/TwinklingStars';
 import { ExpirationModal } from '@/components/memorial/ExpirationModal';
+import MemorialTimeline from '@/components/memorial/MemorialTimeline';
+import MemorialVoiceVideo from '@/components/memorial/MemorialVoiceVideo';
 import MemorialMusicButton, { type MemorialMusicHandle } from '@/components/memorial/MemorialMusicButton';
 import RitualSummary from '@/components/memorial/RitualSummary';
 import FloatingPetals from '@/components/memorial/FloatingPetals';
@@ -60,14 +62,29 @@ const CinematicoLayout = dynamic(() => import('@/components/memorial/layouts/Cin
 const ConstelacionLayout = dynamic(() => import('@/components/memorial/layouts/ConstelacionLayout'), { loading: () => <div className="min-h-[60vh] opacity-0" /> });
 const GaleriaLayout = dynamic(() => import('@/components/memorial/layouts/GaleriaLayout'), { loading: () => <div className="min-h-[60vh] opacity-0" /> });
 
-export default function MemorialClientPage({ initialData }: { initialData?: any }) {
+/** Mensajes que se muestran de una vez; el resto con «Ver más». */
+const FEED_PAGE = 12;
+
+export default function MemorialClientPage({ initialData, uuid: uuidProp }: { initialData?: any; uuid?: string }) {
     const params = useParams();
     const router = useRouter();
     const searchParams = useSearchParams();
-    const uuid = params.uuid as string;
+    // Enlace corto (/<crematorio>/<mascota>-<código>): el UUID llega como prop; enlace largo: de la URL
+    const uuid = (uuidProp || params.uuid) as string;
 
     const [loading, setLoading] = useState(!initialData);
     const [memorial, setMemorial] = useState<any>(initialData);
+
+    // Enlace largo antiguo → se muestra el corto en la barra (sin recargar). La previsualización
+    // del SuperAdmin (?preview_layout) conserva el largo.
+    useEffect(() => {
+        const code = memorial?.short_code;
+        if (!code || typeof window === 'undefined') return;
+        if (!window.location.pathname.startsWith('/memorials/v/') || searchParams.has('preview_layout')) return;
+        const cliente = String(params.cliente || 'memorial');
+        const mascota = String(params.mascota || 'mascota');
+        window.history.replaceState(window.history.state, '', `/${cliente}/${mascota}-${code}${window.location.search}${window.location.hash}`);
+    }, [memorial?.short_code, params.cliente, params.mascota, searchParams]);
 
     const computedDiseno = useMemo(() => {
         if (!memorial) return {};
@@ -93,6 +110,8 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
     }, [memorial, computedDiseno]);
     const [dedicatorias, setDedicatorias] = useState<any[]>(initialData?.dedicatorias || []);
     const [newDedication, setNewDedication] = useState({ nombre: '', mensaje: '' });
+    // Gesto opcional que acompaña al mensaje (la vela va aparte, con su botón)
+    const [dedGesture, setDedGesture] = useState<'flor' | 'estrella' | 'beso' | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<{ message: string; status?: number } | null>(null);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -106,6 +125,10 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
     const [showScrollTop, setShowScrollTop] = useState(false);
     const [locale, setLocale] = useState<Locale>('es');
     const [showExpirationModal, setShowExpirationModal] = useState(false);
+    // Mensajes y línea de tiempo van en pestañas para no recargar la página
+    const [section, setSection] = useState<'mensajes' | 'historia'>('mensajes');
+    // Mensajes de a FEED_PAGE para no dibujar (ni cargar fotos de) 100 tarjetas de una vez
+    const [feedVisible, setFeedVisible] = useState(FEED_PAGE);
     const [expirationStatus, setExpirationStatus] = useState<string>('expired');
 
     useEffect(() => {
@@ -159,12 +182,13 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
             // Normalize status if needed (e.g. 'expirado' -> 'expired')
             const status = rawStatus === 'expirado' ? 'expired' : rawStatus;
 
-            const isExpired = status === 'expired';
+            // `expired` lo calcula el backend (los de pago único nunca vencen)
+            const isExpired = memorial.expired === true || status === 'expired';
             const isPending = status === 'pending';
             const isArchived = status === 'archived';
 
             let isValidityPast = false;
-            if (memorial.valid_until) {
+            if (memorial.valid_until && memorial.plan_billing !== 'one_time') {
                 const validUntilDate = new Date(memorial.valid_until);
                 const now = new Date();
                 isValidityPast = validUntilDate < now;
@@ -235,7 +259,10 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 return;
             }
 
+            // El gesto elegido suma a los contadores; la estrella lleva el nombre de quien escribe
+            if (dedGesture) sendRitual(dedGesture, dedGesture === 'estrella' ? newDedication.nombre : undefined);
             setNewDedication({ nombre: '', mensaje: '' });
+            setDedGesture(null);
             setShowSuccessModal(true);
             // Con publicación automática el mensaje ya está visible: recargar la lista
             if (response?.estado === 'aprobado') fetchData();
@@ -516,12 +543,14 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
     }, [dedicatorias, galleryImages, layoutShowsGallery]);
 
     const formRef = useRef<HTMLDivElement>(null);
-    const scrollToForm = () => formRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const scrollToForm = () => {
+        // El formulario vive en la pestaña «Mensajes»
+        setSection('mensajes');
+        setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
+    };
 
-    const dedicationLimit = Math.min(
-        memorial?.dedication_limit !== undefined ? memorial.dedication_limit : MAX_MEMORIAL_COMMENTS,
-        MAX_MEMORIAL_COMMENTS
-    );
+    // Mensajes que permite el plan del memorial (Partner 20, Recuerdo 30, Eterno 50, Infinito 100)
+    const dedicationLimit: number = memorial?.dedication_limit ?? MAX_MEMORIAL_COMMENTS;
 
     const canAddMore = dedicatorias.length < dedicationLimit;
 
@@ -909,6 +938,49 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                         isDarkMode={isDarkMode}
                     />
 
+                    {/* Voz y video (Infinito) */}
+                    <MemorialVoiceVideo
+                        videos={memorial?.videos || []}
+                        voices={memorial?.voices || []}
+                        petName={mascota?.name || ''}
+                        locale={locale}
+                        isDarkMode={isDarkMode}
+                    />
+
+                    {/* Pestañas: Mensajes | Su historia (solo si hay línea de tiempo) */}
+                    {(memorial?.timeline?.length ?? 0) > 0 && (
+                        <div role="tablist" aria-label={locale === 'en' ? 'Sections' : 'Secciones'}
+                            className={`mb-12 inline-flex rounded-full border p-1 backdrop-blur-md ${isDarkMode ? 'border-white/10 bg-black/30' : 'border-slate-200 bg-white/80 shadow-sm'}`}>
+                            {([
+                                ['mensajes', locale === 'en' ? 'Messages' : 'Mensajes', dedicatorias.length],
+                                ['historia', locale === 'en' ? 'Their story' : 'Su historia', memorial.timeline.length],
+                            ] as const).map(([key, label, n]) => {
+                                const active = section === key;
+                                return (
+                                    <button key={key} type="button" role="tab" aria-selected={active}
+                                        onClick={() => setSection(key)}
+                                        className={`flex items-center gap-2 rounded-full px-5 sm:px-7 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-widest transition-colors ${active
+                                            ? (isDarkMode ? 'bg-amber-400 text-slate-950' : 'bg-slate-900 text-white')
+                                            : (isDarkMode ? 'text-white/70 hover:text-white' : 'text-slate-600 hover:text-slate-900')}`}>
+                                        {label}
+                                        <span className={`rounded-full px-2 py-0.5 text-[10px] ${active ? 'bg-black/15' : (isDarkMode ? 'bg-white/10' : 'bg-slate-100')}`}>{n}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* Línea de tiempo (Eterno / Infinito): la historia que armó la familia */}
+                    {section === 'historia' && (memorial?.timeline?.length ?? 0) > 0 && (
+                        <MemorialTimeline
+                            moments={memorial?.timeline || []}
+                            petName={mascota?.name || ''}
+                            locale={locale}
+                            isDarkMode={isDarkMode}
+                        />
+                    )}
+
+                    {(section === 'mensajes' || !(memorial?.timeline?.length)) && (<>
                     {/* Encabezado Conmemorativo de Comentarios y Gestión Familiar */}
                     <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-4 mb-10 pb-6 border-b border-current/10">
                         <div className="text-center sm:text-left">
@@ -922,13 +994,13 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                                         ? 'bg-white/10 border-white/15 text-amber-200'
                                         : 'bg-amber-500/10 border-amber-500/25 text-amber-800'
                                 }`}>
-                                    {dedicatorias.length} / {MAX_MEMORIAL_COMMENTS}
+                                    {memorial?.expired ? dedicatorias.length : `${dedicatorias.length} / ${dedicationLimit}`}
                                 </span>
                             </h2>
                         </div>
 
                         <div className="flex flex-wrap items-center justify-center gap-2.5">
-                            {approvedOrPendingCount < MAX_MEMORIAL_COMMENTS && (
+                            {approvedOrPendingCount < dedicationLimit && !memorial?.expired && (
                                 <button
                                     type="button"
                                     onClick={scrollToForm}
@@ -949,7 +1021,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                     {mixedItems.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 items-stretch w-full">
                             <AnimatePresence mode="popLayout">
-                                {mixedItems.map((item: any, idx: number) => (
+                                {mixedItems.slice(0, feedVisible).map((item: any, idx: number) => (
                                     <motion.div
                                         key={`${item.type}-${item.data.id || item.data._id || idx}`}
                                         initial={{ opacity: 0, y: 30 }}
@@ -1016,6 +1088,8 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                                                 <img
                                                     src={item.data}
                                                     alt={`Memory ${idx}`}
+                                                    loading="lazy"
+                                                    decoding="async"
                                                     className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
                                                 />
                                                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -1027,6 +1101,16 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                                     </motion.div>
                                 ))}
                             </AnimatePresence>
+                            {mixedItems.length > feedVisible && (
+                                <div className="col-span-full mt-4 flex justify-center">
+                                    <button type="button" onClick={() => setFeedVisible((v) => v + FEED_PAGE)}
+                                        className={`rounded-full border px-6 py-3 text-xs font-bold uppercase tracking-widest transition-colors ${isDarkMode ? 'border-white/15 bg-white/5 text-white/80 hover:bg-white/10' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
+                                        {locale === 'en'
+                                            ? `Show more messages (${mixedItems.length - feedVisible})`
+                                            : `Ver más mensajes (${mixedItems.length - feedVisible})`}
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div className={`w-full max-w-xl mx-auto p-8 rounded-3xl border text-center ${
@@ -1041,17 +1125,32 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                         </div>
                     )}
 
-                    {/* 3. Dedication Form (Shared - Max 20 comments) */}
+                    {/* 3. Dedication Form (tope según el plan) */}
                     {(() => {
-                        const maxDedications = Math.min(
-                            memorial?.dedication_limit !== undefined ? memorial.dedication_limit : MAX_MEMORIAL_COMMENTS,
-                            MAX_MEMORIAL_COMMENTS
-                        );
+                        const maxDedications = dedicationLimit;
 
                         const approvedCount = memorial.dedications_count !== undefined
                             ? memorial.dedications_count
                             : ((memorial.dedicatorias || memorial.dedications)?.filter((d: any) => d.estado === 'aprobado' || d.estado === 'pendiente').length || 0);
                         const canSubmitMore = approvedCount < maxDedications;
+
+                        // Vencido: no recibe mensajes nuevos hasta renovarse (el backend responde 400)
+                        if (memorial.expired) {
+                            return (
+                                <div className="mt-20 text-center max-w-xl mx-auto px-6">
+                                    <div className={`p-8 rounded-2xl backdrop-blur-sm border ${isDarkMode ? 'bg-black/30 border-white/10' : 'bg-white/80 border-slate-200'}`}>
+                                        <h3 className="text-xl font-serif italic opacity-90 mb-2">
+                                            {locale === 'en' ? 'This memorial is waiting to be renewed' : 'Este memorial está esperando su renovación'}
+                                        </h3>
+                                        <p className="text-sm opacity-70">
+                                            {locale === 'en'
+                                                ? 'For now it shows only some photos and messages and does not receive new ones. You can still light a candle.'
+                                                : 'Por ahora muestra solo algunas fotos y mensajes, y no recibe mensajes nuevos. Puedes seguir encendiendo una vela.'}
+                                        </p>
+                                    </div>
+                                </div>
+                            );
+                        }
 
                         if (!canSubmitMore) {
                             return (
@@ -1063,7 +1162,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                                 >
                                     <div className={`p-8 rounded-2xl backdrop-blur-sm border ${isDarkMode ? 'bg-black/30 border-white/10' : 'bg-white/80 border-slate-200'}`}>
                                         <h3 className="text-xl font-serif italic opacity-90 mb-2">
-                                            {t.mem_limit_full || `Se ha alcanzado el máximo de ${MAX_MEMORIAL_COMMENTS} comentarios conmemorativos`}
+                                            {t.mem_limit_full || `Se ha alcanzado el máximo de ${dedicationLimit} comentarios conmemorativos`}
                                         </h3>
                                         <p className="text-sm opacity-60 uppercase tracking-widest">{t.mem_limit_reached}</p>
                                     </div>
@@ -1113,19 +1212,44 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                                             <div className="space-y-1">
                                                 <div className="flex justify-between items-center mr-4">
                                                     <label className="text-xs uppercase tracking-[0.2em] opacity-60 ml-4 font-bold">Tu Mensaje</label>
-                                                    <span className={`text-[10px] uppercase tracking-widest font-bold ${newDedication.mensaje.length >= 300 ? 'text-red-500' : (newDedication.mensaje.length >= 250 ? 'text-amber-500' : 'opacity-40')}`}>
-                                                        {newDedication.mensaje.length}/300
-                                                    </span>
                                                 </div>
                                                 <textarea
                                                     value={newDedication.mensaje}
                                                     onChange={e => setNewDedication({ ...newDedication, mensaje: e.target.value })}
                                                     placeholder={t.form_msg_placeholder}
                                                     rows={5}
-                                                    maxLength={300}
+                                                    maxLength={memorial?.plan_features?.max_dedication_chars || 500}
                                                     className={`w-full px-5 sm:px-6 py-4 rounded-xl border-b-2 border-transparent bg-black/10 focus:bg-black/20 focus:border-current/30 transition-all outline-none font-serif text-base sm:text-lg resize-none ${isDarkMode ? (themeConfig.input || '') : 'border-slate-300 text-slate-900 placeholder:text-slate-400'}`}
                                                     required
                                                 />
+                                                <p className={`mt-1 text-right text-xs ${isDarkMode ? 'text-white/50' : 'text-slate-400'}`}>
+                                                    {newDedication.mensaje.length} / {memorial?.plan_features?.max_dedication_chars || 500}
+                                                </p>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <label className="text-xs uppercase tracking-[0.2em] opacity-60 ml-4 font-bold">
+                                                    {locale === 'en' ? 'Add a gesture (optional)' : 'Acompaña tu mensaje (opcional)'}
+                                                </label>
+                                                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                                                    {([
+                                                        ['flor', '🌹', locale === 'en' ? 'A flower' : 'Una flor'],
+                                                        ['estrella', '⭐', locale === 'en' ? 'A star' : 'Una estrella'],
+                                                        ['beso', '💙', locale === 'en' ? 'A kiss' : 'Un beso al cielo'],
+                                                    ] as const).map(([kind, icon, label]) => {
+                                                        const on = dedGesture === kind;
+                                                        return (
+                                                            <button key={kind} type="button" aria-pressed={on}
+                                                                onClick={() => setDedGesture(on ? null : kind)}
+                                                                className={`flex min-h-[64px] flex-col items-center justify-center gap-1 rounded-xl border px-2 py-3 text-xs font-semibold transition-all ${on
+                                                                    ? (isDarkMode ? 'border-white/60 bg-white/15 text-white' : 'border-slate-900 bg-slate-900 text-white')
+                                                                    : (isDarkMode ? 'border-white/10 bg-black/10 text-white/70 hover:bg-white/10' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50')}`}>
+                                                                <span className="text-xl leading-none" aria-hidden>{icon}</span>
+                                                                <span>{label}</span>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
 
                                             <div className="pt-4">
@@ -1143,7 +1267,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                                                     </span>
                                                 </button>
                                                 <p className="text-center text-[10px] uppercase tracking-widest opacity-50 mt-4">
-                                                    {t.mem_moderated_by_family} · Máximo {MAX_MEMORIAL_COMMENTS} comentarios
+                                                    {t.mem_moderated_by_family} · Máximo {dedicationLimit} comentarios
                                                 </p>
                                             </div>
                                         </form>
@@ -1152,6 +1276,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                             </motion.div>
                         );
                     })()}
+                    </>)}
 
                     {/* Tenant Attribution Section (Only for active tenants) */}
                     {tenant_status === 'active' && (
@@ -1225,6 +1350,11 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                 memorialId={uuid}
                 locale={locale}
                 status={expirationStatus}
+                planName={memorial?.plan}
+                planPrice={memorial?.plan_price}
+                planCurrency={memorial?.plan_currency}
+                planBilling={memorial?.plan_billing}
+                validUntil={memorial?.valid_until}
                 onClose={() => setShowExpirationModal(false)}
             />
 
@@ -1272,7 +1402,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
             <LimitReachedModal
                 isOpen={showLimitModal}
                 onClose={() => setShowLimitModal(false)}
-                limit={Math.min(memorial?.dedication_limit || MAX_MEMORIAL_COMMENTS, MAX_MEMORIAL_COMMENTS)}
+                limit={dedicationLimit}
                 planName={(memorial?.plan || memorial?.tenant?.subscription_plan?.name || 'PRO').toUpperCase()}
             />
 

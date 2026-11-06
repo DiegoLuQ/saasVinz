@@ -282,7 +282,7 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
 
                         {/* Botón CTA (Estilo Nomad Gear) */}
                         <Link
-                            href="/#planes"
+                            href="/crear"
                             className={`px-6 py-2.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all duration-300 shadow-md
                             ${effectiveIsDark
                                 ? 'bg-white text-black hover:bg-[#c5a059] hover:text-white hover:shadow-[#c5a059]/25 hover:shadow-lg'
@@ -397,7 +397,7 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                                     {lc.nav_login}
                                 </Link>
                                 <Link
-                                    href="/#planes"
+                                    href="/crear"
                                     onClick={() => setIsMobileMenuOpen(false)}
                                     className="px-8 py-3.5 bg-[#c5a059] text-white rounded-full text-xs font-black uppercase tracking-widest shadow-lg shadow-[#c5a059]/20 hover:bg-[#b38f4d] hover:shadow-xl transition-all text-center"
                                 >

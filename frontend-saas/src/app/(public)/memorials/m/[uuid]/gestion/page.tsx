@@ -21,6 +21,10 @@ import ManageHeader, { type SaveState } from '@/components/memorial/manage/Manag
 import MemorialSummaryCard from '@/components/memorial/manage/MemorialSummaryCard';
 import PendingMessages from '@/components/memorial/manage/PendingMessages';
 import ShareBlock from '@/components/memorial/manage/ShareBlock';
+import MelodyCard from '@/components/memorial/manage/MelodyCard';
+import QrCard from '@/components/memorial/manage/QrCard';
+import TimelineCard from '@/components/memorial/manage/TimelineCard';
+import MediaCard from '@/components/memorial/manage/MediaCard';
 import AppearanceSheet from '@/components/memorial/manage/AppearanceSheet';
 import {
     cardClass,
@@ -391,12 +395,12 @@ export default function GestionMemorialPage() {
     );
 
     const imgLimit: number = memorial.img_limit || (isUltra ? 5 : 3);
-    const commentLimit: number = Math.min(memorial.dedication_limit ?? MAX_MEMORIAL_COMMENTS, MAX_MEMORIAL_COMMENTS);
+    const commentLimit: number = memorial.dedication_limit ?? MAX_MEMORIAL_COMMENTS;
     const images = validImages(memorial.lista_imagenes);
     const approved = dedicatorias.filter(d => d.estado === 'aprobado').length;
     const pendingCount = dedicatorias.filter(d => d.estado === 'pendiente').length;
 
-    const publicPath = publicMemorialPath(tenant?.name, petName, uuid);
+    const publicPath = publicMemorialPath(tenant?.slug || tenant?.name, petName, uuid, memorial.short_code);
     const publicUrl = typeof window !== 'undefined' ? `${window.location.origin}${publicPath}` : publicPath;
     const scenario = getScenarioConfig(form.diseno.tipo_diseno);
 
@@ -429,6 +433,18 @@ export default function GestionMemorialPage() {
                 />
 
                 <main className="max-w-2xl mx-auto px-4 py-6 pb-16 space-y-4">
+                    {/* Vencido: las visitas ven la vista reducida hasta renovar (nada se borró) */}
+                    {memorial.expired && (
+                        <div role="status" className={`rounded-2xl border px-4 py-3 text-sm ${isDark ? 'border-amber-400/40 bg-amber-500/10 text-amber-100' : 'border-amber-300 bg-amber-50 text-amber-900'}`}>
+                            <p className="font-semibold">{locale === 'en' ? 'The memorial’s period has ended' : 'El periodo del memorial venció'}</p>
+                            <p className="mt-0.5 opacity-80">
+                                {locale === 'en'
+                                    ? 'Visitors see only some photos and messages and cannot leave new ones. Nothing was deleted: renew to bring everything back.'
+                                    : 'Las visitas ven solo algunas fotos y mensajes, y no pueden dejar mensajes nuevos. No se borró nada: al renovar vuelve todo.'}
+                            </p>
+                        </div>
+                    )}
+
                     {/* Lo urgente primero: si hay mensajes esperando, van arriba */}
                     {pendingCount > 0 && messagesBlock}
 
@@ -453,6 +469,26 @@ export default function GestionMemorialPage() {
                     {pendingCount === 0 && messagesBlock}
 
                     <ShareBlock url={publicUrl} petName={petName} isDark={isDark} locale={locale} />
+
+                    {/* Línea de tiempo (Eterno, Infinito): momentos con foto propia */}
+                    {memorial.plan_features?.timeline && (
+                        <TimelineCard uuid={uuid} accessKey={getPin()} isDark={isDark} locale={locale} petName={petName} />
+                    )}
+
+                    {/* Video y voz (Infinito): 1 + 1 de 30 s */}
+                    {((memorial.plan_features?.max_videos ?? 0) > 0 || (memorial.plan_features?.max_voice ?? 0) > 0) && (
+                        <MediaCard uuid={uuid} accessKey={getPin()} isDark={isDark} locale={locale} petName={petName} />
+                    )}
+
+                    {/* Plan con QR (Eterno, Infinito): tarjeta para imprimir */}
+                    {memorial.plan_features?.qr && (
+                        <QrCard url={publicUrl} petName={petName} isDark={isDark} locale={locale} />
+                    )}
+
+                    {/* Memoriales Vinzer: la familia elige la música (hasta N melodías según el plan) */}
+                    {memorial.is_vinzer_plan && (
+                        <MelodyCard uuid={uuid} accessKey={getPin()} isDark={isDark} locale={locale} onSaved={(data) => setMemorial(data)} />
+                    )}
 
                     <button
                         type="button"
@@ -481,20 +517,24 @@ export default function GestionMemorialPage() {
                     )}
                 </main>
 
-                {!isFromCrematorium && (
+                {(!isFromCrematorium || memorial.plan_features) && (
                     <MemorialPlanUpgrade
                         plan={memorial.plan}
                         validUntil={memorial.valid_until}
+                        contract={{ price: memorial.plan_price, currency: memorial.plan_currency, billing: memorial.plan_billing }}
                         photosUsed={images.length}
                         photoLimit={imgLimit}
                         dedicationsUsed={approved}
-                        dedicationLimit={MAX_MEMORIAL_COMMENTS}
+                        dedicationLimit={commentLimit}
                         gestures={Object.values(memorial?.ritual_counts || {}).reduce((acc: number, n: any) => acc + (Number(n) || 0), 0)}
                         petName={petName}
                         uuid={uuid}
                         locale={locale}
                         isDark={isDark}
                         isFromCrematorium={isFromCrematorium}
+                        currentFeatures={memorial.plan_features}
+                        crematoriumName={tenant?.name}
+                        accessKey={getPin()}
                     />
                 )}
 

@@ -16,9 +16,9 @@ interface Props {
 
 /**
  * Fila de velitas bajo la foto. Por defecto están apagadas; cada vela que
- * encienden los visitantes («Encender una velita») prende una más. Solo visual.
+ * encienden los visitantes («Encender una velita») prende una más, hasta 20; el resto como «+N». Solo visual.
  */
-export default function MemorialCandleRow({ count, isDark = false, locale = 'es', slots = 5, max = 12, className = 'mt-6' }: Props) {
+export default function MemorialCandleRow({ count, isDark = false, locale = 'es', slots = 5, max = 20, className = 'mt-6' }: Props) {
     const lit = Math.max(0, count);
     const total = Math.min(Math.max(lit, slots), max);
     const extra = lit - Math.min(lit, total);
@@ -29,7 +29,9 @@ export default function MemorialCandleRow({ count, isDark = false, locale = 'es'
             className={`flex flex-col items-center ${className}`}
             aria-label={en ? `${lit} candles lit` : `${lit} ${lit === 1 ? 'vela encendida' : 'velas encendidas'}`}
         >
-            <div className="flex flex-wrap items-end justify-center gap-x-3 gap-y-4 max-w-[340px]">
+            <div className="flex items-end justify-center gap-2">
+            {/* Hasta 10 por fila (20 = dos filas parejas) */}
+            <div className="grid items-end justify-items-center gap-x-3 gap-y-4" style={{ gridTemplateColumns: `repeat(${Math.min(total, 10)}, minmax(0, 1fr))` }}>
                 {Array.from({ length: total }).map((_, i) => {
                     const on = i < lit;
                     return (
@@ -56,6 +58,7 @@ export default function MemorialCandleRow({ count, isDark = false, locale = 'es'
                         </div>
                     );
                 })}
+            </div>
                 {extra > 0 && (
                     <span className={`self-center text-xs font-semibold ${isDark ? 'text-amber-100/80' : 'text-amber-900/80'}`}>+{extra}</span>
                 )}

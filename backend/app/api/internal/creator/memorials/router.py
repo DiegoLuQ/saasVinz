@@ -1,7 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+import json
+import secrets
+from datetime import datetime, timedelta, timezone
+
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
-from app.api.internal.memorials.models import Memorial, MemorialPlan
+from app.api.internal.memorials.models import Memorial, MemorialPlan, MemorialInvite, MemorialStatus
+from app.services import memorial_plans, memorial_signup
+from app.services.memorial_notifications import _memorial_base_url
 from app.api.internal.memorials.services import merge_diseno
 from app.api.internal.crm.models import Pet, Customer
 from app.api.internal.admin.models import Tenant
@@ -16,8 +23,74 @@ def list_memorial_plans(
     db: Session = Depends(get_db),
     current_creator: models.User = Depends(auth.get_current_creator)
 ):
-    """List all available memorial plans for superadmins."""
-    return db.query(MemorialPlan).filter(MemorialPlan.is_active == True).all()
+    """Planes asignables a un memorial: los de Vinzer activos + Partner."""
+    rows = memorial_plans.vinzer_plans(db)
+    partner = memorial_plans.partner_plan(db)
+    return rows + ([partner] if partner else [])
+
+
+class PlanCatalogUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=60)
+    price: Optional[float] = Field(None, ge=0, le=100000)
+    currency: Optional[str] = Field(None, min_length=3, max_length=3)
+    billing: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=300)
+    highlight: Optional[bool] = None
+    sort_order: Optional[int] = Field(None, ge=0, le=100)
+    is_active: Optional[bool] = None
+    features: Optional[dict] = None
+
+
+@router.get("/plan-catalog")
+def plan_catalog(db: Session = Depends(get_db), current_creator: models.User = Depends(auth.get_current_creator)):
+    """Planes Vinzer (todos, también inactivos) + Partner, con precio y límites editables."""
+    rows = memorial_plans.vinzer_plans(db, only_active=False)
+    partner = memorial_plans.partner_plan(db)
+    out = [memorial_plans.serialize(p) for p in ([partner] if partner else []) + rows]
+    from sqlalchemy import func
+    counts = dict(db.query(Memorial.plan_id, func.count(Memorial.id)).group_by(Memorial.plan_id).all())
+    for p in out:
+        p["memorials"] = counts.get(p["id"], 0)
+    return out
+
+
+@router.put("/plan-catalog/{plan_id}")
+def update_plan_catalog(
+    plan_id: int,
+    body: PlanCatalogUpdate,
+    db: Session = Depends(get_db),
+    current_creator: models.User = Depends(auth.get_current_creator),
+):
+    """Edita precio, cobro y límites. El precio nuevo solo aplica a contratos nuevos."""
+    plan = db.query(MemorialPlan).filter(MemorialPlan.id == plan_id,
+                                          MemorialPlan.kind.in_([memorial_plans.KIND_VINZER, memorial_plans.KIND_PARTNER])).first()
+    if not plan:
+        raise HTTPException(404, "Plan no encontrado.")
+    is_partner = plan.kind == memorial_plans.KIND_PARTNER
+    if body.name is not None:
+        plan.name = body.name.strip()
+    if body.description is not None:
+        plan.description = body.description.strip() or None
+    if not is_partner:
+        if body.price is not None:
+            plan.price = round(body.price, 2)
+        if body.currency is not None:
+            plan.currency = body.currency.upper()
+        if body.billing is not None:
+            if body.billing not in (memorial_plans.BILLING_YEARLY, memorial_plans.BILLING_ONE_TIME):
+                raise HTTPException(400, "Cobro no válido: anual o pago único.")
+            plan.billing = body.billing
+        if body.highlight is not None:
+            plan.highlight = body.highlight
+        if body.sort_order is not None:
+            plan.sort_order = body.sort_order
+        if body.is_active is not None:
+            plan.is_active = body.is_active
+    if body.features is not None:
+        plan.features = memorial_plans.clean_features(body.features, base=memorial_plans.features_of(plan))
+    db.commit()
+    db.refresh(plan)
+    return memorial_plans.serialize(plan)
 
 @router.get("", response_model=List[schemas.AdminMemorialResponse])
 def list_all_memorials(
@@ -50,6 +123,10 @@ def list_all_memorials(
             customer_name=m.pet.customer.name if m.pet and m.pet.customer else "Desconocido",
             tenant_name=m.tenant.name if m.tenant else "Desconocido",
             tenant_slug=m.tenant.slug if m.tenant else "default",
+            short_code=m.short_code,
+            plan_price=m.plan_price,
+            plan_currency=m.plan_currency,
+            plan_billing=m.plan_billing,
             tenant_id=m.tenant.id if m.tenant else 0,
             plan=m.plan,
             status=m.status,
@@ -68,6 +145,7 @@ def list_all_memorials(
 def update_memorial_admin(
     memorial_id: int,
     update_data: schemas.AdminMemorialUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_creator: models.User = Depends(auth.get_current_creator)
 ):
@@ -78,16 +156,27 @@ def update_memorial_admin(
 
     if not memorial:
         raise HTTPException(status_code=404, detail="Memorial not found")
+    was_pending = memorial.status == MemorialStatus.pending
 
-    if update_data.plan is not None:
-        memorial.plan = update_data.plan
-    
     if update_data.valid_until is not None:
         memorial.valid_until = update_data.valid_until
+        memorial.expiry_notice_for = None  # nueva vigencia: vuelve a avisar 1 mes antes
 
-    # Plan Eterno = pago único, sin vencimiento
-    if update_data.plan is not None and update_data.plan.strip().lower() == "eterno":
-        memorial.valid_until = None
+    # Cambio de plan = contrato nuevo: se congela el precio actual de ese plan
+    new_key = (update_data.plan or "").strip().lower()
+    upgraded_from = None  # Partner/otro → plan Vinzer: correo «tu memorial ahora es Plan X»
+    if new_key and new_key != (memorial.plan or "").strip().lower():
+        new_plan = (memorial_plans.get_vinzer_plan(db, new_key)
+                    or (memorial_plans.partner_plan(db) if new_key == "partner" else None))
+        if new_plan is not None:
+            old_plan = memorial_plans.plan_of(db, memorial)
+            if (new_plan.kind == memorial_plans.KIND_VINZER and memorial.status == MemorialStatus.active
+                    and not was_pending):
+                upgraded_from = old_plan.name if old_plan else (memorial.plan or "Partner")
+            memorial_plans.assign(memorial, new_plan, start_period=memorial.status == MemorialStatus.active
+                                  and update_data.valid_until is None)
+        else:
+            memorial.plan = update_data.plan
         
     if update_data.status is not None:
         memorial.status = update_data.status
@@ -110,9 +199,20 @@ def update_memorial_admin(
     if update_data.access_key is not None:
         memorial.access_key = update_data.access_key
 
+    # Pago confirmado (pendiente → activo): vigencia según el plan y correo con enlace + PIN
+    # Solo memoriales vendidos por Vinzer (creados con este flujo: diseno.origen); los de crematorios no cambian.
+    activated = (was_pending and memorial.status == MemorialStatus.active
+                 and bool((memorial.diseno or {}).get("origen")))
+    if activated and update_data.valid_until is None:
+        memorial_signup.activate_memorial(memorial)
+
     db.commit()
     db.refresh(memorial)
-
+    if activated:
+        background_tasks.add_task(memorial_signup.send_welcome_in_background, memorial.id)
+    elif upgraded_from and memorial.status == MemorialStatus.active:
+        from app.services import memorial_upgrade
+        background_tasks.add_task(memorial_upgrade.send_upgraded_email, memorial.id, upgraded_from)
     return schemas.AdminMemorialResponse(
         id=memorial.id,
         id_recuerdo=str(memorial.id_recuerdo),
@@ -121,6 +221,10 @@ def update_memorial_admin(
         customer_name=memorial.pet.customer.name if memorial.pet and memorial.pet.customer else "Desconocido",
         tenant_name=memorial.tenant.name if memorial.tenant else "Desconocido",
         tenant_slug=memorial.tenant.slug if memorial.tenant else "default",
+        short_code=memorial.short_code,
+        plan_price=memorial.plan_price,
+        plan_currency=memorial.plan_currency,
+        plan_billing=memorial.plan_billing,
         tenant_id=memorial.tenant.id if memorial.tenant else 0,
         plan=memorial.plan,
         status=memorial.status,
@@ -132,3 +236,124 @@ def update_memorial_admin(
         access_key=memorial.access_key,
         created_at=memorial.fecha
     )
+
+
+
+# ------------------- Memoriales de Vinzer (creados por el SuperAdmin o por la familia) -------------------
+
+@router.get("/signup-options")
+def signup_options(db: Session = Depends(get_db), current_creator: models.User = Depends(auth.get_current_creator)):
+    return memorial_signup.options(db)
+
+
+@router.post("/new")
+async def create_memorial_admin(
+    background_tasks: BackgroundTasks,
+    data: str = Form(...),
+    photos: List[UploadFile] = File(default=[]),
+    activate: bool = Form(False),
+    db: Session = Depends(get_db),
+    current_creator: models.User = Depends(auth.get_current_creator),
+):
+    try:
+        payload = json.loads(data)
+    except ValueError:
+        raise HTTPException(400, "Datos inválidos.")
+    if not isinstance(payload, dict):
+        raise HTTPException(400, "Datos inválidos.")
+    values = memorial_signup.validate(db, payload, photos)
+    memorial = memorial_signup.create(db, values, source="admin", activate=activate)
+    background_tasks.add_task(memorial_signup.after_create, memorial.id, activate)
+    return {
+        "id": memorial.id,
+        "id_recuerdo": str(memorial.id_recuerdo),
+        "short_code": memorial.short_code,
+        "pin": memorial.access_key,
+        "plan": memorial.plan,
+        "status": "active" if activate else "pending",
+    }
+
+
+class InviteCreate(BaseModel):
+    plan: Optional[str] = None
+    note: Optional[str] = Field(None, max_length=200)
+    expires_in_days: int = Field(7, ge=1, le=60)
+
+
+def _invite_out(inv: MemorialInvite) -> dict:
+    now = datetime.now(timezone.utc)
+    exp = inv.expires_at if inv.expires_at.tzinfo else inv.expires_at.replace(tzinfo=timezone.utc)
+    return {
+        "id": inv.id,
+        "url": f"{_memorial_base_url()}/crear?i={inv.token}",
+        "plan": inv.plan,
+        "note": inv.note,
+        "created_at": inv.created_at,
+        "expires_at": inv.expires_at,
+        "used_at": inv.used_at,
+        "memorial_id": inv.memorial_id,
+        "status": "usado" if inv.used_at else ("vencido" if exp < now else "activo"),
+    }
+
+
+@router.get("/invites")
+def list_invites(db: Session = Depends(get_db), current_creator: models.User = Depends(auth.get_current_creator)):
+    rows = db.query(MemorialInvite).order_by(MemorialInvite.created_at.desc()).limit(100).all()
+    return [_invite_out(i) for i in rows]
+
+
+@router.post("/invites")
+def create_invite(
+    body: InviteCreate,
+    db: Session = Depends(get_db),
+    current_creator: models.User = Depends(auth.get_current_creator),
+):
+    plan = (body.plan or "").strip().lower() or None
+    if plan and not memorial_plans.get_vinzer_plan(db, plan):
+        raise HTTPException(400, "Plan no válido.")
+    inv = MemorialInvite(
+        token=secrets.token_urlsafe(24),
+        plan=plan,
+        note=(body.note or "").strip() or None,
+        created_by=current_creator.id,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=body.expires_in_days),
+    )
+    db.add(inv)
+    db.commit()
+    db.refresh(inv)
+    return _invite_out(inv)
+
+
+@router.post("/{memorial_id}/renew")
+def renew_memorial(
+    memorial_id: int,
+    background_tasks: BackgroundTasks,
+    notify: bool = True,
+    db: Session = Depends(get_db),
+    current_creator: models.User = Depends(auth.get_current_creator),
+):
+    """Renueva 1 año al precio congelado (pago confirmado por el SuperAdmin)."""
+    from app.services import memorial_expiry
+    memorial = db.query(Memorial).filter(Memorial.id == memorial_id).first()
+    if not memorial:
+        raise HTTPException(404, "Memorial no encontrado.")
+    if memorial.plan_billing != memorial_plans.BILLING_YEARLY:
+        raise HTTPException(400, "Solo se renuevan los planes anuales.")
+    if memorial.status == MemorialStatus.archived:
+        raise HTTPException(400, "El memorial está archivado.")
+    valid_until = memorial_expiry.renew(memorial)
+    db.commit()
+    if notify:
+        background_tasks.add_task(memorial_expiry.send_renewed_email, memorial.id)
+    return {"ok": True, "valid_until": valid_until.isoformat(), "status": "active",
+            "plan_price": memorial.plan_price, "plan_currency": memorial.plan_currency}
+
+
+@router.delete("/invites/{invite_id}")
+def delete_invite(invite_id: int, db: Session = Depends(get_db), current_creator: models.User = Depends(auth.get_current_creator)):
+    inv = db.query(MemorialInvite).filter(MemorialInvite.id == invite_id).first()
+    if not inv:
+        raise HTTPException(404, "Enlace no encontrado.")
+    db.delete(inv)
+    db.commit()
+    return {"ok": True}

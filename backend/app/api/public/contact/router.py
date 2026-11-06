@@ -194,9 +194,9 @@ async def submit_contact_form(
     tenant_slug = tenant.slug if tenant else "paraiso-de-mascotas"
     pet_slug = payload.nombre_mascota.lower().replace(' ', '-')
     
-    # http://domain/memorials/v/{tenant_slug}/{pet_slug}/{id_recuerdo}
-    base_url = settings.FRONTEND_URL.rstrip('/')
-    memorial_url = f"{base_url}/memorials/v/{tenant_slug}/{pet_slug}/{memorial.id_recuerdo}"
+    # Enlace corto en el subdominio de memoriales: memorial.<dominio>/<crematorio>/<mascota>-<código>
+    from app.services.memorial_notifications import _memorial_base_url, slugify
+    memorial_url = f"{_memorial_base_url()}/{slugify(tenant_slug)}/{slugify(payload.nombre_mascota)}-{memorial.short_code}"
 
     return {
         "success": True,

@@ -6,14 +6,15 @@ from .models import MemorialStatus, DedicationStatus, RitualKind
 
 class DedicationBase(BaseModel):
     mensajero: str = Field(..., max_length=100)
-    mensaje: str = Field(..., max_length=300)
+    # El tope real lo pone el plan (max_dedication_chars, 500 por defecto); aquí solo un techo duro
+    mensaje: str = Field(..., max_length=2000)
 
 class DedicationCreate(DedicationBase):
     pass
 
 class DedicationUpdate(BaseModel):
     mensajero: Optional[str] = None
-    mensaje: Optional[str] = None
+    mensaje: Optional[str] = Field(None, max_length=2000)
     estado: Optional[DedicationStatus] = None
 
 class DedicationResponse(DedicationBase):
@@ -66,6 +67,7 @@ class SubscriptionPlanPublic(BaseModel):
 
 class TenantPublic(BaseModel):
     name: str
+    slug: Optional[str] = None  # para el enlace corto del memorial
     logo: Optional[str] = None
     plan: str
     subscription_plan: Optional[SubscriptionPlanPublic] = None
@@ -79,8 +81,19 @@ class MemorialMelodyUpdate(BaseModel):
     activa: bool = False
 
 
+class UpgradeRequest(BaseModel):
+    """La familia pide pasar a un plan Vinzer superior (gestión)."""
+    plan: str = Field(..., min_length=2, max_length=30)
+
+
+class FamilyMelodyUpdate(BaseModel):
+    """Melodías de la familia (planes Vinzer): hasta `max_melodies` guardadas y cuál suena."""
+    favorites: List[int] = Field(default_factory=list, max_length=10)
+    media_id: Optional[int] = None
+    activa: bool = True
 class MemorialPublicResponse(BaseModel):
     id_recuerdo: UUID
+    short_code: Optional[str] = None
     id_mascota: int
     msg_despedida: str
     diseno: dict
@@ -94,6 +107,10 @@ class MemorialPublicResponse(BaseModel):
     mascota: MascotaPublic
     tenant: TenantPublic = Field(alias="tenant_info")
     plan: Optional[str] = None
+    # Precio congelado del plan contratado (renovaciones al mismo precio)
+    plan_price: Optional[float] = None
+    plan_currency: Optional[str] = None
+    plan_billing: Optional[str] = None
     dedication_limit: int = 0
     img_limit: int = 0
     ritual_counts: dict = {}
@@ -105,12 +122,23 @@ class MemorialPublicResponse(BaseModel):
     owner_dedication: Optional[str] = None
     # Melodía elegida por el crematorio: {id, name, url, duration, activa}.
     melody: Optional[dict] = None
+    # Límites y funciones del plan del memorial (app/services/memorial_plans.py)
+    plan_features: dict = {}
+    is_vinzer_plan: bool = False
+    # Vencido (plan anual sin renovar): vista reducida, sin mensajes nuevos
+    expired: bool = False
+    valid_until: Optional[datetime] = None
+    # Línea de tiempo (planes con `timeline`): [{id, fecha, titulo, texto, image_url}]
+    timeline: List[dict] = []
+    # Video y voz (Infinito): [{id, kind, url, thumbnail_url, duration, titulo}]
+    videos: List[dict] = []
+    voices: List[dict] = []
 
     @computed_field
     @property
     def is_from_crematorium(self) -> bool:
         p = (self.plan or "").strip().lower()
-        if p in {"mensual", "anual", "eterno", "free", "landing", "recuerdo"}:
+        if p in {"mensual", "anual", "eterno", "infinito", "free", "landing", "recuerdo"}:
             return False
         if self.tenant and getattr(self.tenant, "name", None):
             return True
@@ -131,6 +159,7 @@ class MemorialPublicResponse(BaseModel):
 class MemorialManageResponse(BaseModel):
     """Response for memorial management - shows ALL dedications"""
     id_recuerdo: UUID
+    short_code: Optional[str] = None
     id_mascota: int
     msg_despedida: str
     diseno: dict
@@ -153,7 +182,7 @@ class MemorialManageResponse(BaseModel):
     @property
     def is_from_crematorium(self) -> bool:
         p = (self.plan or "").strip().lower()
-        if p in {"mensual", "anual", "eterno", "free", "landing", "recuerdo"}:
+        if p in {"mensual", "anual", "eterno", "infinito", "free", "landing", "recuerdo"}:
             return False
         if self.tenant and getattr(self.tenant, "name", None):
             return True
@@ -162,6 +191,10 @@ class MemorialManageResponse(BaseModel):
     mascota: MascotaPublic
     tenant: TenantPublic = Field(alias="tenant_info")
     plan: Optional[str] = None
+    # Precio congelado del plan contratado (renovaciones al mismo precio)
+    plan_price: Optional[float] = None
+    plan_currency: Optional[str] = None
+    plan_billing: Optional[str] = None
     dedication_limit: int = 0
     img_limit: int = 0
     ritual_counts: dict = {}
@@ -173,6 +206,17 @@ class MemorialManageResponse(BaseModel):
     owner_dedication: Optional[str] = None
     # Melodía elegida por el crematorio: {id, name, url, duration, activa}.
     melody: Optional[dict] = None
+    # Límites y funciones del plan del memorial (app/services/memorial_plans.py)
+    plan_features: dict = {}
+    is_vinzer_plan: bool = False
+    # Vencido (plan anual sin renovar): vista reducida, sin mensajes nuevos
+    expired: bool = False
+    valid_until: Optional[datetime] = None
+    # Línea de tiempo (planes con `timeline`): [{id, fecha, titulo, texto, image_url}]
+    timeline: List[dict] = []
+    # Video y voz (Infinito): [{id, kind, url, thumbnail_url, duration, titulo}]
+    videos: List[dict] = []
+    voices: List[dict] = []
     customer_email: Optional[str] = None
     customer_name: Optional[str] = None
     customer_phone: Optional[str] = None
@@ -187,6 +231,7 @@ class PinLoginRequest(BaseModel):
 class MemorialCardResponse(BaseModel):
     """Schema for memorial cards in the gallery"""
     id_recuerdo: UUID
+    short_code: Optional[str] = None
     pet_name: str
     pet_image_url: Optional[str] = None
     pet_birth_date: Optional[datetime] = None

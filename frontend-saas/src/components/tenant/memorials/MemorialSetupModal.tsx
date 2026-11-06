@@ -31,6 +31,7 @@ import {
 import { apiRequest, getImageUrl } from "@/lib/tenant/api";
 import { useTenant } from "@/app/(tenant)/tenant/context/TenantContext";
 import { getPublicMemorialPath } from "@/lib/memorialUrls";
+import { getMemorialBaseUrl } from "@/lib/publicUrls";
 import {
     MEMORIAL_SCENARIOS,
     MAX_MEMORIAL_COMMENTS,
@@ -293,23 +294,19 @@ export default function MemorialSetupModal({
 
     const getMemorialUrl = () => {
         if (!memorial) return "";
-        const isLocal = window.location.hostname.includes("lvh.me");
-        const baseDomain = isLocal ? "lvh.me:3000" : "mascotas.com";
-        const protocol = window.location.protocol;
+        // memorial.<dominio actual> (vinzer.cl en producción, lvh.me en local)
         const path = getPublicMemorialPath({
             id_recuerdo: memorial.id_recuerdo,
             tenantSlug: tenant?.slug || tenant?.name || "memorial",
             petName: pet?.name || "mascota",
+            shortCode: memorial.short_code,
         });
-        return `${protocol}//memorial.${baseDomain}${path}`;
+        return `${getMemorialBaseUrl()}${path}`;
     };
 
     const getFamilyPortalUrl = () => {
         if (!memorial) return "";
-        const isLocal = window.location.hostname.includes("lvh.me");
-        const baseDomain = isLocal ? "lvh.me:3000" : "mascotas.com";
-        const protocol = window.location.protocol;
-        return `${protocol}//memorial.${baseDomain}/memorials/m/${memorial.id_recuerdo}/login`;
+        return `${getMemorialBaseUrl()}/memorials/m/${memorial.id_recuerdo}/login`;
     };
 
     const handleCopyLink = () => {
@@ -357,11 +354,8 @@ export default function MemorialSetupModal({
                 localStorage.setItem(`memorial_pin_${memorial.id_recuerdo}`, currentPin);
             } catch (_) {}
         }
-        const isLocal = window.location.hostname.includes("lvh.me");
-        const baseDomain = isLocal ? "lvh.me:3000" : "mascotas.com";
-        const protocol = window.location.protocol;
         const pinParam = currentPin ? `?pin=${encodeURIComponent(currentPin)}` : "";
-        window.open(`${protocol}//memorial.${baseDomain}/memorials/m/${memorial.id_recuerdo}/gestion${pinParam}`, "_blank");
+        window.open(`${getMemorialBaseUrl()}/memorials/m/${memorial.id_recuerdo}/gestion${pinParam}`, "_blank");
     };
 
     const handleSendCredentialsEmail = async () => {

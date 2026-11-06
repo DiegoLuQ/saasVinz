@@ -338,6 +338,7 @@ def obtener_expediente(
             },
             "memorial": {
                 "uuid": str(memorial.id_recuerdo),
+                "short_code": memorial.short_code,
                 "status": str(getattr(memorial.status, "value", memorial.status)),
                 "access_key": memorial.access_key,
                 "scenario": (memorial.diseno or {}).get("tipo_diseno", "normal") if isinstance(memorial.diseno, dict) else "normal",

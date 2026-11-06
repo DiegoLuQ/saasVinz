@@ -2,19 +2,27 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Check, Infinity as InfinityIcon, MessageCircle, Sparkles } from 'lucide-react';
+import { Check, Crown, Heart, Infinity as InfinityIcon, MessageCircle, Minus, Sparkles } from 'lucide-react';
 import type { Locale } from '@/lib/translations';
-import { getLandingContent, whatsappLink, type CompareValue } from '@/lib/memorialLanding';
+import { getLandingContent, whatsappLink } from '@/lib/memorialLanding';
+import { compareRows, formatPrice, planHighlights, planPeriod, useMemorialPlans, type CompareValue } from '@/lib/memorialPlans';
 
-/** Planes en USD de la landing del memorial: tarjetas + comparación. Venta por WhatsApp. */
+/** Planes de memorial de Vinzer (precio y límites desde Admin): tarjetas + comparación. */
 export function MemorialLandingPlans({ locale }: { locale: Locale }) {
     const c = getLandingContent(locale);
     const p = c.plans;
+    const en = locale === 'en';
+    const plans = useMemorialPlans();
+    const rows = compareRows(plans, en);
 
     const renderValue = (v: CompareValue, highlight: boolean) =>
         v === true
-            ? <Check size={18} className={`mx-auto ${highlight ? 'text-amber-400' : 'text-emerald-400'}`} aria-label="Incluido" />
-            : <span className={highlight ? 'font-semibold text-amber-200' : 'text-slate-300'}>{v}</span>;
+            ? <Check size={18} className={`mx-auto ${highlight ? 'text-amber-400' : 'text-emerald-400'}`} aria-label={en ? 'Included' : 'Incluido'} />
+            : v === false
+                ? <Minus size={16} className="mx-auto text-slate-600" aria-label={en ? 'Not included' : 'No incluido'} />
+                : <span className={highlight ? 'font-semibold text-amber-200' : 'text-slate-300'}>{v}</span>;
+
+    const icon = (key: string) => key === 'infinito' ? <InfinityIcon size={24} /> : key === 'eterno' ? <Crown size={22} /> : <Heart size={22} />;
 
     return (
         <section id="planes" className="scroll-mt-28 relative py-24 md:py-32 px-4 sm:px-6 bg-[#0A0D14] border-t border-white/10">
@@ -31,10 +39,10 @@ export function MemorialLandingPlans({ locale }: { locale: Locale }) {
                 </div>
 
                 {/* Tarjetas */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-                    {p.list.map((plan, i) => (
+                <div className={`grid grid-cols-1 gap-6 items-stretch ${plans.length >= 3 ? 'md:grid-cols-3' : 'md:grid-cols-2 max-w-4xl mx-auto'}`}>
+                    {plans.map((plan, i) => (
                         <motion.div
-                            key={plan.id}
+                            key={plan.key}
                             initial={{ opacity: 0, y: 20 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
@@ -43,50 +51,53 @@ export function MemorialLandingPlans({ locale }: { locale: Locale }) {
                                 ? 'border-2 border-amber-500 bg-gradient-to-b from-slate-900 via-slate-900 to-amber-950/30 shadow-[0_0_50px_rgba(251,191,36,0.25)] md:-translate-y-2'
                                 : 'border border-white/10 bg-slate-900/70 shadow-xl hover:border-white/20'}`}
                         >
-                            {plan.tag && (
-                                <span className={`absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-md whitespace-nowrap ${plan.highlight ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-amber-300 border border-amber-500/30'}`}>
-                                    {plan.tag}
+                            {plan.highlight && (
+                                <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-md whitespace-nowrap bg-amber-500 text-slate-950">
+                                    {en ? 'Recommended' : 'Recomendado'}
                                 </span>
                             )}
 
                             <div className="flex justify-center mb-5">
                                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${plan.highlight ? 'bg-amber-500/15 border border-amber-500/40 text-amber-400' : 'bg-white/5 border border-white/10 text-slate-300'}`}>
-                                    {plan.id === 'eterno' ? <InfinityIcon size={24} /> : <Sparkles size={22} strokeWidth={1.5} />}
+                                    {icon(plan.key)}
                                 </div>
                             </div>
 
                             <h3 className="text-center text-2xl font-serif font-bold text-white">{plan.name}</h3>
 
                             <div className="text-center mt-5 mb-2">
-                                <span className={`text-5xl font-serif font-bold ${plan.highlight ? 'text-amber-300' : 'text-white'}`}>${plan.price}</span>
-                                <span className="ml-1.5 text-xs font-bold text-slate-400">{p.usd}</span>
-                                <div className="text-xs text-slate-400 mt-1">{plan.period}</div>
+                                <span className={`text-5xl font-serif font-bold ${plan.highlight ? 'text-amber-300' : 'text-white'}`}>${formatPrice(plan.price)}</span>
+                                <span className="ml-1.5 text-xs font-bold text-slate-400">{plan.currency}</span>
+                                <div className="text-xs text-slate-400 mt-1">{planPeriod(plan.billing, en)}</div>
                             </div>
-                            <p className="text-center text-xs text-slate-400 mb-6 font-light">{plan.note}</p>
+                            {plan.description && <p className="text-center text-xs text-slate-400 mb-6 font-light">{plan.description}</p>}
 
                             <ul className="space-y-3 mb-8 flex-1">
-                                {p.rows.slice(1, 3).map(row => (
-                                    <li key={row.label} className="flex items-start gap-3 text-sm text-slate-300">
+                                {planHighlights(plan, en).map((h) => (
+                                    <li key={h} className="flex items-start gap-3 text-sm text-slate-300">
                                         <Check size={16} className={`mt-0.5 shrink-0 ${plan.highlight ? 'text-amber-400' : 'text-emerald-400'}`} />
-                                        <span>{row.label}: <strong className="font-semibold text-white">{row.values[i] as string}</strong></span>
+                                        <span>{h}</span>
                                     </li>
                                 ))}
-                                <li className="flex items-start gap-3 text-sm text-slate-300">
-                                    <Check size={16} className={`mt-0.5 shrink-0 ${plan.highlight ? 'text-amber-400' : 'text-emerald-400'}`} />
-                                    <span>{p.rows[6].values[i] as string}</span>
-                                </li>
                             </ul>
 
                             <a
-                                href={whatsappLink(plan.whatsapp)}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                                href={`/crear?plan=${plan.key}`}
                                 className={`w-full inline-flex items-center justify-center gap-2 py-4 rounded-xl font-bold uppercase text-[11px] tracking-[0.2em] transition-all duration-300 shadow-lg hover:-translate-y-0.5 ${plan.highlight
                                     ? 'bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 shadow-amber-500/25 font-black'
                                     : 'bg-white/10 hover:bg-white/15 active:scale-95 text-white border border-white/10'}`}
                             >
-                                <MessageCircle size={15} />
-                                {plan.cta}
+                                {en ? `Choose ${plan.name}` : `Elegir ${plan.name}`}
+                            </a>
+                            <a
+                                href={whatsappLink(en
+                                    ? `Hi, I have a question about the ${plan.name} memorial plan (${formatPrice(plan.price)} ${plan.currency} ${planPeriod(plan.billing, true)}).`
+                                    : `Hola, tengo una consulta sobre el Plan ${plan.name} del memorial (${formatPrice(plan.price)} ${plan.currency} ${planPeriod(plan.billing)}).`)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-3 inline-flex w-full items-center justify-center gap-1.5 text-[11px] font-semibold text-slate-400 hover:text-white"
+                            >
+                                <MessageCircle size={13} /> {en ? 'Questions? Write to us' : '¿Dudas? Escríbenos'}
                             </a>
                         </motion.div>
                     ))}
@@ -100,21 +111,21 @@ export function MemorialLandingPlans({ locale }: { locale: Locale }) {
                             <thead>
                                 <tr className="border-b border-white/10">
                                     <th scope="col" className="text-left font-semibold text-slate-400 text-xs uppercase tracking-wider px-5 py-4">{p.feature}</th>
-                                    {p.list.map(plan => (
-                                        <th key={plan.id} scope="col" className={`px-4 py-4 text-center font-serif text-base ${plan.highlight ? 'text-amber-300 bg-amber-500/5' : 'text-white'}`}>
+                                    {plans.map(plan => (
+                                        <th key={plan.key} scope="col" className={`px-4 py-4 text-center font-serif text-base ${plan.highlight ? 'text-amber-300 bg-amber-500/5' : 'text-white'}`}>
                                             {plan.name}
-                                            <div className="text-xs font-sans font-semibold text-slate-400 mt-0.5">${plan.price} {p.usd}</div>
+                                            <div className="text-xs font-sans font-semibold text-slate-400 mt-0.5">${formatPrice(plan.price)} {plan.currency}</div>
                                         </th>
                                     ))}
                                 </tr>
                             </thead>
                             <tbody>
-                                {p.rows.map(row => (
+                                {rows.map(row => (
                                     <tr key={row.label} className="border-b border-white/5 last:border-0">
                                         <th scope="row" className="text-left font-medium text-slate-300 px-5 py-3.5 text-xs sm:text-sm">{row.label}</th>
                                         {row.values.map((v, i) => (
-                                            <td key={i} className={`px-4 py-3.5 text-center text-xs sm:text-sm ${p.list[i].highlight ? 'bg-amber-500/5' : ''}`}>
-                                                {renderValue(v, !!p.list[i].highlight)}
+                                            <td key={i} className={`px-4 py-3.5 text-center text-xs sm:text-sm ${plans[i]?.highlight ? 'bg-amber-500/5' : ''}`}>
+                                                {renderValue(v, !!plans[i]?.highlight)}
                                             </td>
                                         ))}
                                     </tr>

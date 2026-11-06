@@ -23,6 +23,7 @@ import { apiRequest } from '@/lib/tenant/api';
 import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { getPublicMemorialPath } from '@/lib/memorialUrls';
+import { getMemorialBaseUrl } from '@/lib/publicUrls';
 import {
     MEMORIAL_SCENARIOS,
     normalizeScenarioId,
@@ -51,6 +52,7 @@ interface Props {
         status: string;
         access_key?: string;
         scenario?: string;
+        short_code?: string | null;
     } | null;
     onUpdated?: () => void;
 }
@@ -121,19 +123,19 @@ export default function MemorialOrderSection({
     const scenarioConfig = MEMORIAL_SCENARIOS.find((s) => s.id === currentScenarioId) || MEMORIAL_SCENARIOS[0];
 
     // Construcción de URLs públicas y privadas
-    const isLocal = typeof window !== 'undefined' && window.location.hostname.includes('lvh.me');
-    const baseDomain = isLocal ? 'lvh.me:3000' : (process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'mascotas.com');
-    const protocol = typeof window !== 'undefined' ? window.location.protocol : 'http:';
+    // memorial.<dominio actual> (vinzer.cl en producción, lvh.me en local)
+    const memorialBase = getMemorialBaseUrl();
 
     const publicPath = activeUuid
         ? getPublicMemorialPath({
               id_recuerdo: activeUuid,
               tenantSlug: tenant?.slug || tenant?.name || 'memorial',
               petName: petName,
+              shortCode: memorial?.short_code || deliverableMemorial?.short_code,
           })
         : '';
-    const publicUrl = activeUuid ? `${protocol}//memorial.${baseDomain}${publicPath}` : '';
-    const gestionUrl = activeUuid ? `${protocol}//memorial.${baseDomain}/memorials/m/${activeUuid}/gestion` : '';
+    const publicUrl = activeUuid ? `${memorialBase}${publicPath}` : '';
+    const gestionUrl = activeUuid ? `${memorialBase}/memorials/m/${activeUuid}/gestion` : '';
 
     const handleCopy = (text: string, type: 'link' | 'pin' | 'gestion') => {
         if (!text) return;

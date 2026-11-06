@@ -201,6 +201,35 @@ def probe_duration(path: str) -> float:
     return int(h) * 3600 + int(mi) * 60 + float(s)
 
 
+def transcode(src_path: str, max_seconds: int = MAX_SECONDS) -> tuple[str, float]:
+    """Valida la duración y recomprime a MP4 (lado largo ≤ 1280 px, H.264 + AAC, faststart).
+    Devuelve (ruta temporal del MP4, duración). Quien llama borra el archivo.
+    También lo usa el video de los memoriales Infinito (app/services/memorial_media.py)."""
+    duration = probe_duration(src_path)
+    if duration <= 0:
+        raise HTTPException(status_code=400, detail="El archivo no parece ser un video válido.")
+    if duration > max_seconds + DURATION_TOLERANCE:
+        raise HTTPException(status_code=400, detail=(
+            f"El video dura {duration:.0f} s y el máximo es {max_seconds} s. Recórtalo e inténtalo de nuevo."))
+
+    out_path = os.path.join(tempfile.gettempdir(), f"formvideo_{uuid.uuid4().hex}.mp4")
+    proc = subprocess.run([
+        _ffmpeg(), "-hide_banner", "-loglevel", "error", "-y", "-i", src_path,
+        "-t", str(max_seconds + 1),
+        # Lado largo máx. 1280 px (720p horizontal o vertical), dimensiones pares.
+        "-vf", "scale='if(gt(ih,iw),-2,min(1280,iw))':'if(gt(ih,iw),min(1280,ih),-2)',scale=trunc(iw/2)*2:trunc(ih/2)*2",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "27", "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart",
+        out_path,
+    ], capture_output=True, text=True, timeout=300)
+    if proc.returncode != 0 or not os.path.exists(out_path):
+        logger.warning("ffmpeg no pudo convertir el video: %s", (proc.stderr or "")[-800:])
+        if os.path.exists(out_path):
+            os.remove(out_path)
+        raise HTTPException(status_code=400, detail="No se pudo procesar el video. Prueba con otro archivo (MP4 o MOV).")
+    return out_path, round(min(duration, max_seconds), 2)
+
+
 def process_upload(src_path: str, tenant_id: int) -> dict:
     """Valida la duración, recomprime a MP4 720p y sube a R2."""
     from app.utils.r2 import upload_file_to_r2
@@ -211,25 +240,13 @@ def process_upload(src_path: str, tenant_id: int) -> dict:
     if _too_long(duration):
         raise _too_long_error(duration)
 
-    out_path = os.path.join(tempfile.gettempdir(), f"formvideo_{uuid.uuid4().hex}.mp4")
+    out_path, duration = transcode(src_path)
     try:
-        proc = subprocess.run([
-            _ffmpeg(), "-hide_banner", "-loglevel", "error", "-y", "-i", src_path,
-            "-t", str(MAX_SECONDS + 1),
-            # Lado largo máx. 1280 px (720p horizontal o vertical), dimensiones pares.
-            "-vf", "scale='if(gt(ih,iw),-2,min(1280,iw))':'if(gt(ih,iw),min(1280,ih),-2)',scale=trunc(iw/2)*2:trunc(ih/2)*2",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "27", "-pix_fmt", "yuv420p",
-            "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart",
-            out_path,
-        ], capture_output=True, text=True, timeout=300)
-        if proc.returncode != 0 or not os.path.exists(out_path):
-            logger.warning("ffmpeg no pudo convertir el video de bienvenida: %s", (proc.stderr or "")[-800:])
-            raise HTTPException(status_code=400, detail="No se pudo procesar el video. Prueba con otro archivo (MP4 o MOV).")
         key = f"tenant_{tenant_id}/form-video/{uuid.uuid4().hex}.mp4"
         url = upload_file_to_r2(out_path, settings.R2_BUCKET_NAME, key)
         if not url:
             raise HTTPException(status_code=502, detail="No se pudo guardar el video. Inténtalo de nuevo.")
-        return {"source": "upload", "url": url, "duration": round(min(duration, MAX_SECONDS), 2)}
+        return {"source": "upload", "url": url, "duration": duration}
     finally:
         if os.path.exists(out_path):
             os.remove(out_path)

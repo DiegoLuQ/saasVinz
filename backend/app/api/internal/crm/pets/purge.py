@@ -75,6 +75,16 @@ def _collect(db: Session, tenant_id: int, pet: models.Pet) -> dict:
             paid_commissions += 1
     for m in memorials:
         urls += _as_list(m.main_image_url) + _as_list(m.lista_imagenes) + _as_list(m.imagen_ia)
+    if memorials:
+        # Fotos propias de la línea de tiempo (las filas caen por ON DELETE CASCADE)
+        from app.api.internal.memorials.models import TimelineMoment
+        urls += [u for (u,) in db.query(TimelineMoment.image_url).filter(
+            TimelineMoment.id_recuerdo.in_([m.id for m in memorials]), TimelineMoment.image_url.isnot(None)).all()]
+        # Video y voz (Infinito) + miniatura del video
+        from app.api.internal.memorials.models import MemorialMedia
+        for u, th in db.query(MemorialMedia.url, MemorialMedia.thumbnail_url).filter(
+                MemorialMedia.id_recuerdo.in_([m.id for m in memorials])).all():
+            urls += _as_list(u) + _as_list(th)
     for e in exports:
         urls += _as_list(e.media_url)
     for g in generations:
@@ -128,6 +138,8 @@ def _still_referenced(db: Session, url: str) -> bool:
         "SELECT 1 FROM ops_order_evidence WHERE photo_url LIKE :l",
         "SELECT 1 FROM oc_cremation_technical WHERE evidence_url LIKE :l",
         "SELECT 1 FROM rec_recuerdos WHERE main_image_url LIKE :l OR lista_imagenes::text LIKE :l OR imagen_ia LIKE :l",
+        "SELECT 1 FROM rec_timeline WHERE image_url LIKE :l",
+        "SELECT 1 FROM rec_media WHERE url LIKE :l OR thumbnail_url LIKE :l",
         "SELECT 1 FROM web_form_submissions WHERE images::text LIKE :l",
         "SELECT 1 FROM sys_template_exports WHERE media_url LIKE :l OR meta::text LIKE :l",
         "SELECT 1 FROM sys_ai_generations WHERE media_url LIKE :l",

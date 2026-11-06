@@ -361,6 +361,8 @@ from app.api.public.catalog.router import router as public_catalog_router
 app.include_router(public_catalog_router, prefix="/api/public/catalog", tags=["Público - Catálogo"])
 from app.api.public.diagnostic.router import router as public_diagnostic_router
 app.include_router(public_diagnostic_router, prefix="/api/public/diagnostic", tags=["Público - Diagnóstico 360"])
+from app.api.public.memorial_signup.router import router as public_memorial_signup_router
+app.include_router(public_memorial_signup_router, prefix="/api/public", tags=["Público - Crear memorial"])
 
 @app.get("/")
 def read_root():

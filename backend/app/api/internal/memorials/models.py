@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Enum, JSON, Boolean, Text, Float
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Enum, JSON, Boolean, Text, Float, Date
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 import enum
@@ -7,6 +7,7 @@ from app.database import Base
 from app.utils import tz
 from sqlalchemy.orm import relationship
 from app.utils.r2 import normalize_image_url
+from app.utils.generators import generate_memorial_code
 
 class MemorialStatus(str, enum.Enum):
     active = "active"
@@ -29,11 +30,20 @@ class MemorialPlan(Base):
     default_config = Column(JSON, default=dict) # {"tema": "editorial"}
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
+    # Planes de memorial (app/services/memorial_plans.py): vinzer | partner | legacy
+    kind = Column(String(20), nullable=False, default="legacy", server_default="legacy")
+    currency = Column(String(3), nullable=False, default="USD", server_default="USD")
+    billing = Column(String(20), nullable=True)  # yearly | one_time | included
+    description = Column(String(300), nullable=True)
+    highlight = Column(Boolean, nullable=False, default=False, server_default="false")
+    sort_order = Column(Integer, nullable=False, default=0, server_default="0")
 
 class Memorial(Base):
     __tablename__ = "rec_recuerdos"
     id = Column(Integer, primary_key=True, index=True)
     id_recuerdo = Column(UUID(as_uuid=True), default=uuid.uuid4, unique=True, index=True)
+    # Código del enlace corto: memorial.<dominio>/<crematorio>/<mascota>-<short_code>
+    short_code = Column(String(12), unique=True, index=True, default=generate_memorial_code)
     id_mascota = Column(Integer, ForeignKey("crm_pets.id"), nullable=False)
     id_tenant = Column(Integer, ForeignKey("sys_tenants.id"), nullable=False, index=True)
     
@@ -51,6 +61,12 @@ class Memorial(Base):
     status = Column(Enum(MemorialStatus, native_enum=False), default=MemorialStatus.active)
     es_privado = Column(Boolean, default=False)
     valid_until = Column(DateTime, nullable=True) # Expiration date
+    # Precio congelado al contratar (subir precios no afecta a los clientes actuales)
+    plan_price = Column(Float, nullable=True)
+    plan_currency = Column(String(3), nullable=True)
+    plan_billing = Column(String(20), nullable=True)
+    # valid_until para el que ya se envió el aviso «vence en 1 mes» (uno por vigencia)
+    expiry_notice_for = Column(DateTime, nullable=True)
     
     # --- Polar.sh Integration ---
     polar_customer_id = Column(String, nullable=True)
@@ -181,7 +197,7 @@ class Dedication(Base):
     id_dedicatoria = Column(Integer, primary_key=True, index=True)
     id_recuerdo = Column(Integer, ForeignKey("rec_recuerdos.id"), nullable=False)
     mensajero = Column(String(100))
-    mensaje = Column(String(300))
+    mensaje = Column(String(2000))  # el tope real es del plan (max_dedication_chars)
     estado = Column(Enum(DedicationStatus, native_enum=False), default=DedicationStatus.pendiente)
     fecha = Column(DateTime(timezone=True), default=tz.get_now)
 
@@ -204,4 +220,48 @@ class Ritual(Base):
     kind = Column(String(20), nullable=False)
     name = Column(String(60), nullable=True)  # solo estrellas: "Encendida por …"
     ip_hash = Column(String(64), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=tz.get_now)
+
+
+class MemorialInvite(Base):
+    """Enlace para que una familia cree su memorial en memorial.<dominio>/crear?i=<token>
+    (Admin → Memoriales → «Enlace para familia»). Un solo uso, con vencimiento."""
+    __tablename__ = "rec_memorial_invites"
+    id = Column(Integer, primary_key=True, index=True)
+    token = Column(String(64), unique=True, index=True, nullable=False)
+    plan = Column(String(20), nullable=True)  # plan sugerido (mensual|anual|eterno); NULL = la familia elige
+    note = Column(String(200), nullable=True)  # p. ej. nombre de la familia, solo para el SuperAdmin
+    created_by = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=tz.get_now)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+    memorial_id = Column(Integer, ForeignKey("rec_recuerdos.id", ondelete="SET NULL"), nullable=True)
+
+
+class TimelineMoment(Base):
+    """Momento de la línea de tiempo del memorial (Eterno/Infinito). Foto propia, aparte de la galería.
+    Sin relationship en Memorial: el borrado lo resuelve el ON DELETE CASCADE."""
+    __tablename__ = "rec_timeline"
+    id = Column(Integer, primary_key=True, index=True)
+    id_recuerdo = Column(Integer, ForeignKey("rec_recuerdos.id", ondelete="CASCADE"), nullable=False, index=True)
+    fecha = Column(Date, nullable=True)
+    titulo = Column(String(80), nullable=False)
+    texto = Column(String(1000), nullable=True)
+    image_url = Column(String(500), nullable=True)
+    orden = Column(Integer, nullable=False, default=0, server_default="0")
+    created_at = Column(DateTime(timezone=True), default=tz.get_now)
+
+
+class MemorialMedia(Base):
+    """Video o audio de voz del memorial (planes con max_videos / max_voice: Infinito 1 + 1, 30 s).
+    Sin relationship en Memorial: el borrado lo resuelve el ON DELETE CASCADE."""
+    __tablename__ = "rec_media"
+    id = Column(Integer, primary_key=True, index=True)
+    id_recuerdo = Column(Integer, ForeignKey("rec_recuerdos.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind = Column(String(10), nullable=False)  # video | voice
+    url = Column(String(500), nullable=False)
+    thumbnail_url = Column(String(500), nullable=True)
+    duration = Column(Float, nullable=True)
+    titulo = Column(String(80), nullable=True)
+    media_id = Column(Integer, nullable=True)  # web_media_library.id
     created_at = Column(DateTime(timezone=True), default=tz.get_now)

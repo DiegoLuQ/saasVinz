@@ -43,8 +43,11 @@ export const primaryBtn =
 export const slugify = (value: string) =>
     (value || '').toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
 
-export const publicMemorialPath = (tenantName: string | undefined, petName: string, uuid: string) =>
-    `/memorials/v/${slugify(tenantName || 'memorial')}/${slugify(petName)}/${uuid}`;
+/** Con `shortCode` da el enlace corto (/<crematorio>/<mascota>-<código>). */
+export const publicMemorialPath = (tenantName: string | undefined, petName: string, uuid: string, shortCode?: string | null) =>
+    shortCode
+        ? `/${slugify(tenantName || 'memorial')}/${slugify(petName)}-${shortCode}`
+        : `/memorials/v/${slugify(tenantName || 'memorial')}/${slugify(petName)}/${uuid}`;
 
 export const validImages = (list: string[] | undefined | null) =>
     (list || []).filter((img) => img && img.startsWith('http'));

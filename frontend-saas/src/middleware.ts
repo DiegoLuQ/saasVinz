@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { MEMORIAL_SHORT_PATH } from '@/lib/memorialUrls';
 
 export const config = {
     matcher: [
@@ -71,6 +72,15 @@ export default async function middleware(req: NextRequest) {
             return NextResponse.rewrite(url);
         }
         return NextResponse.next();
+    }
+
+    // Enlace corto de memorial: memorial.<dominio>/<crematorio>/<mascota>-<código> → /memorials/s/<código>
+    if (currentHost === 'memorial') {
+        const short = url.pathname.match(MEMORIAL_SHORT_PATH);
+        if (short) {
+            url.pathname = `/memorials/s/${short[1]}`;
+            return NextResponse.rewrite(url);
+        }
     }
 
     // Pasar de largo: API, memoriales públicos y portal de veterinaria

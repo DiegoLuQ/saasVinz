@@ -32,7 +32,9 @@ const publicApiRequest = async (path: string, options: any = {}) => {
     });
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || 'Error en la petición');
+        const e = new Error(typeof err.detail === 'string' ? err.detail : 'Error en la petición') as Error & { status?: number };
+        e.status = res.status;
+        throw e;
     }
     return res.json();
 };
@@ -80,11 +82,26 @@ export default function MemorialLoginPage() {
             // Redirect to management panel
             router.push(`/memorials/m/${uuid}/gestion`);
         } catch (err: any) {
-            setError(err.message || t.login_error_invalid);
+            // Solo un 401 es un PIN incorrecto; el resto no debe culpar al PIN
+            const status: number | undefined = err?.status;
+            const en = locale === 'en';
+            if (status === 401) {
+                setError(err.message || t.login_error_invalid);
+            } else if (status === 429) {
+                setError(en ? 'Too many attempts. Please wait a minute and try again.' : 'Demasiados intentos. Espera un minuto e inténtalo de nuevo.');
+            } else if (status === 404) {
+                setError(en ? 'We could not find this memorial. Check the link you received.' : 'No encontramos este memorial. Revisa el enlace que recibiste.');
+            } else if (status === 403) {
+                setError(err.message || (en ? 'This memorial is not available.' : 'Este memorial no está disponible.'));
+            } else {
+                setError(en
+                    ? 'We could not sign you in because of a server problem (your PIN was not checked). Please try again in a moment.'
+                    : 'No pudimos ingresar por un problema del servidor (tu PIN no se verificó). Inténtalo de nuevo en un momento.');
+            }
         } finally {
             setLoading(false);
         }
-    }, [uuid, router, t.login_error_invalid]);
+    }, [uuid, router, t.login_error_invalid, locale]);
 
     // Check if PIN was passed via query parameter (e.g. from crematory dashboard)
     useEffect(() => {

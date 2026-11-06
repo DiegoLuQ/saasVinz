@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { getPublicMemorialPath } from '@/lib/memorialUrls';
 import { apiRequest } from '@/lib/admin/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import FormFileUpload from '@/components/forms/FormFileUpload';
@@ -15,11 +16,12 @@ import {
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select';
-import { Loader2, Search, Edit, Calendar, Sparkles, Smartphone, Monitor } from 'lucide-react';
+import { Loader2, Search, Edit, Calendar, Sparkles, Smartphone, Monitor, Plus, Link2, Tags } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getMemorialBaseUrl } from '@/lib/publicUrls';
 import { normalizeMemorialBg } from '@/lib/memorialDesign';
+import { MemorialInvitesModal, MemorialPlansModal, NewMemorialModal } from '@/components/admin/memorials/VinzerMemorialModals';
 
 interface Memorial {
     id: number;
@@ -30,6 +32,10 @@ interface Memorial {
     tenant_name: string;
     tenant_slug: string;
     tenant_id: number;
+    short_code?: string | null;
+    plan_price?: number | null;
+    plan_currency?: string | null;
+    plan_billing?: string | null;
     plan: string | null;
     status: string;
     valid_until: string | null;
@@ -128,6 +134,10 @@ export default function AdminMemorialsPage() {
         access_key: ''
     });
 
+    const [newOpen, setNewOpen] = useState(false);
+    const [invitesOpen, setInvitesOpen] = useState(false);
+    const [plansOpen, setPlansOpen] = useState(false);
+
     const fetchMemorials = async () => {
         setLoading(true);
         try {
@@ -212,6 +222,25 @@ export default function AdminMemorialsPage() {
         }
     };
 
+    // Pago de renovación confirmado: +1 año al precio congelado y correo a la familia
+    const [renewing, setRenewing] = useState(false);
+    const handleRenew = async () => {
+        if (!editingMemorial) return;
+        setRenewing(true);
+        try {
+            const r = await apiRequest(`/api/internal/creator/memorials/${editingMemorial.id}/renew`, { method: 'POST' });
+            const until = String(r?.valid_until || '').split('T')[0];
+            setFormData((prev) => ({ ...prev, valid_until: until, status: 'active' }));
+            setEditingMemorial({ ...editingMemorial, valid_until: r?.valid_until ?? null, status: 'active' });
+            await fetchMemorials();
+            showToast(`Renovado hasta el ${until} (${r?.plan_price ?? ''} ${r?.plan_currency || 'USD'}). Se avisó a la familia.`, 'success');
+        } catch (error: any) {
+            showToast(error.message || 'No se pudo renovar', 'error');
+        } finally {
+            setRenewing(false);
+        }
+    };
+
     const handleSave = async () => {
         if (!editingMemorial) return;
         setSaving(true);
@@ -255,6 +284,19 @@ export default function AdminMemorialsPage() {
                     <h1 className="text-3xl font-black mb-1 text-white">Recuerdos Globales</h1>
                     <p className="text-white/40">Gestión centralizada de memoriales y suscripciones.</p>
                 </div>
+                <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => setPlansOpen(true)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-bold text-white hover:bg-white/10">
+                    <Tags size={14} /> Planes y precios
+                </button>
+                <button type="button" onClick={() => setInvitesOpen(true)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-bold text-white hover:bg-white/10">
+                    <Link2 size={14} /> Enlace para familia
+                </button>
+                <button type="button" onClick={() => setNewOpen(true)}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-black text-slate-950 hover:bg-amber-400">
+                    <Plus size={14} /> Nuevo memorial
+                </button>
                 <div className="relative">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={16} />
                     <input
@@ -264,7 +306,11 @@ export default function AdminMemorialsPage() {
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
+                </div>
             </header>
+            {newOpen && <NewMemorialModal onClose={() => setNewOpen(false)} onCreated={fetchMemorials} />}
+            {invitesOpen && <MemorialInvitesModal onClose={() => setInvitesOpen(false)} />}
+            {plansOpen && <MemorialPlansModal onClose={() => { setPlansOpen(false); fetchMemorials(); }} />}
 
             <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden backdrop-blur-sm">
                 <Table>
@@ -325,6 +371,11 @@ export default function AdminMemorialsPage() {
                                                 ({memorial.plan?.toLowerCase() || 'N/A'})
                                             </span>
                                         </span>
+                                        {memorial.plan_price != null && memorial.plan_billing !== 'included' && (
+                                            <span className="block mt-1 text-[10px] text-white/40" title="Precio congelado del contrato">
+                                                {memorial.plan_price} {memorial.plan_currency || 'USD'} {memorial.plan_billing === 'one_time' ? 'pago único' : '/ año'}
+                                            </span>
+                                        )}
                                     </TableCell>
                                     <TableCell className="py-4">
                                         {memorial.valid_until ? (
@@ -494,6 +545,13 @@ export default function AdminMemorialsPage() {
                                                 className="bg-black/20 border-white/10 text-white h-11"
                                             />
                                             <p className="text-[9px] text-white/20 italic">Vacío = Perpetuo</p>
+                                            {editingMemorial?.plan_billing === 'yearly' && (
+                                                <button type="button" onClick={handleRenew} disabled={renewing}
+                                                    title="Pago confirmado: suma 1 año desde el vencimiento (o desde hoy si ya venció), al precio congelado, y avisa a la familia"
+                                                    className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-3 py-1.5 text-[11px] font-bold text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50">
+                                                    {renewing ? <Loader2 size={12} className="animate-spin" /> : <Calendar size={12} />} Renovar 1 año
+                                                </button>
+                                            )}
                                         </div>
 
                                         <div className="space-y-2">
@@ -636,7 +694,7 @@ export default function AdminMemorialsPage() {
                                     asChild
                                     className="bg-primary/20 border border-primary/30 hover:bg-primary/40 text-primary-foreground h-10 text-[11px] font-bold uppercase shadow-[0_0_20px_-5px_rgba(0,149,255,0.4)]"
                                 >
-                                    <a href={`${getMemorialBaseUrl()}/memorials/v/${editingMemorial?.tenant_slug}/${editingMemorial?.pet_name.toLowerCase().replace(/\s+/g, '-')}/${editingMemorial?.id_recuerdo}`} target="_blank">
+                                    <a href={`${getMemorialBaseUrl()}${getPublicMemorialPath({ id_recuerdo: editingMemorial?.id_recuerdo || '', tenantSlug: editingMemorial?.tenant_slug, petName: editingMemorial?.pet_name, shortCode: editingMemorial?.short_code })}`} target="_blank">
                                         <svg xmlns="http://www.w3.org/2000/svg" className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" /></svg>
                                         Ver Altar
                                     </a>
