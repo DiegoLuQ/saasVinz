@@ -67,6 +67,10 @@ class Service(Base):
     # Servicio especial (eutanasia, exhumación…): adicional en el formulario público
     is_special = Column(Boolean, nullable=False, default=False, server_default='false')
     show_in_form = Column(Boolean, nullable=False, default=True, server_default='true')
+    # «Precio a cotizar»: se elige sin precio (servicio externo); el valor se pone en la orden
+    price_on_request = Column(Boolean, nullable=False, default=False, server_default='false')
+    # Nota importante para la familia (formulario, resumen y correo de confirmación)
+    important_note = Column(String(300), nullable=True)
     # Grupo (texto libre, solo para ordenar el panel). Unicidad: (tenant, nombre, grupo)
     # vía índice uix_service_name_group_tenant (migración a6c8e0b2d359).
     group_name = Column(String(60), nullable=True)

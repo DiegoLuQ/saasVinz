@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
+from app.utils.certificates import vinzer_logo_url
 from app.database import get_db
 from app import models
 from app import schemas
@@ -228,7 +229,7 @@ def preview_test_admin_template(
             "certificate_type": "Recibo de Suscripción",
             "theme": theme,
             "tenant_id": 0,
-            "logo_url": "https://saascrematorio.com/logo-default.png",
+            "logo_url": vinzer_logo_url(),
             "cert_number": "SAAS-REC-2026-001",
             "pet_name": "Empresa de Prueba SpA",
             "pet_desc": "Plan Profesional (PRO)",
@@ -269,7 +270,7 @@ def preview_test_admin_template(
             "certificate_type": "Certificado SaaS",
             "theme": theme,
             "tenant_id": 0,
-            "logo_url": "https://saascrematorio.com/logo-default.png",
+            "logo_url": vinzer_logo_url(),
             "cert_number": "SAAS-PREVIEW-001",
             "pet_name": "Mascota de Prueba",
             "pet_desc": "Canino - Labrador",
@@ -319,7 +320,7 @@ def preview_admin_template(
             "certificate_type": "Recibo de Suscripción",
             "theme": template.theme or "Clásico",
             "tenant_id": 0,
-            "logo_url": "https://saascrematorio.com/logo-default.png",
+            "logo_url": vinzer_logo_url(),
             "cert_number": "SAAS-REC-2026-001",
             "pet_name": "Empresa de Prueba SpA", # Using pet_name field for Tenant Name in receipts
             "pet_desc": "Plan Profesional (PRO)", # Using pet_desc for Plan Info
@@ -360,7 +361,7 @@ def preview_admin_template(
             "certificate_type": "Certificado SaaS",
             "theme": template.theme or "Clásico",
             "tenant_id": 0,
-            "logo_url": "https://saascrematorio.com/logo-default.png",
+            "logo_url": vinzer_logo_url(),
             "cert_number": "SAAS-PREVIEW-001",
             "pet_name": "Mascota de Prueba",
             "pet_desc": "Canino - Labrador",

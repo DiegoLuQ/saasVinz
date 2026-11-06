@@ -18,7 +18,7 @@ export default function EditorialLayout(props: any) {
     const [roses, setRoses] = useState<any[]>([]);
 
     const petName = mascota?.name || '';
-    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale);
+    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale, mascota);
     const deathYear = mascota?.death_date ? new Date(mascota.death_date).getUTCFullYear() : null;
     const bio: string = memorial?.msg_despedida || '';
     // "Edición especial · 2026" en vez del antiguo "Memorial Issue • Vol. IV"

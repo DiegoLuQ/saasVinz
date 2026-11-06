@@ -104,7 +104,7 @@ export default function ReceiptTemplate({
                     <div className="text-[10px] text-black-60 font-medium space-y-0.5 leading-tight" style={{ color: 'rgba(0,0,0,0.6)' }}>
                         <p>RUT: {issuer?.rut || '77.777.777-7'}</p>
                         <p>{issuer?.address || 'Av. Providencia 1234, Santiago'}</p>
-                        <p>{issuer?.email || 'contacto@saascrematorio.com'}</p>
+                        <p>{issuer?.email || 'info@vinzer.cl'}</p>
                     </div>
                 </div>
                 <div className="text-right">

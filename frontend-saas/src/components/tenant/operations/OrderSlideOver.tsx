@@ -7,7 +7,7 @@ import {
     Activity, User, Dog, Copy, Check, FileText, ExternalLink, Loader2, Edit, Building2,
     MessageCircle, Compass, ArrowRight, CircleDot,
     BookHeart, Receipt, AlertCircle, Lock, Download, Undo2, Calendar,
-    Scale, MapPin, StickyNote, Printer, Phone, Mail, Sparkles, Pencil
+    Scale, MapPin, StickyNote, Printer, Phone, Mail, Sparkles, Pencil, Percent
 } from 'lucide-react';
 import SlideOver from '@/components/tenant/SlideOver';
 import EditWeightModal from '@/components/tenant/EditWeightModal';
@@ -21,6 +21,7 @@ import FarewellCardSection from './expediente/FarewellCardSection';
 import GeneratedImagesSection from './expediente/GeneratedImagesSection';
 import MemorialOrderSection from './expediente/MemorialOrderSection';
 import DedicationSection from './expediente/DedicationSection';
+import OrderDiscountsBox from './expediente/OrderDiscountsBox';
 import FamilyNoticesBox from './FamilyNoticesBox';
 import StageTimeline, { type Stage } from './expediente/StageTimeline';
 import RevertOrderModal, { canRevertStatus } from './RevertOrderModal';
@@ -747,7 +748,17 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                 />
 
                                 {/* Imágenes generadas (con modal de confirmación) */}
-                                <GeneratedImagesSection orderId={exp.order.id} petId={exp.pet.id} petName={petName} />
+                                <GeneratedImagesSection
+                                    orderId={exp.order.id}
+                                    petId={exp.pet.id}
+                                    petName={petName}
+                                    dedication={exp.pet.dedication}
+                                    photoUrl={exp.pet.photos[0]}
+                                    photos={exp.pet.photos}
+                                    farewellTemplateConfig={exp.deliverables.farewell_template?.config}
+                                    certificate={{ enabled: exp.deliverables.certificate.enabled, issued: exp.deliverables.certificate.issued.length }}
+                                    certMissing={missingDates.map((k) => DATE_LABELS[k].toLowerCase())}
+                                />
 
                                 {/* Memorial online conmemorativo (solo si el plan lo incluye) */}
                                 {canUseMemorial && <MemorialOrderSection
@@ -824,6 +835,23 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                             <span className="text-slate-900 dark:text-white tabular-nums">{clp.format(exp.financial.total || 0)}</span>
                                         </div>
                                     </div>
+                                </Section>
+
+                                {/* Descuentos: convenio empresa + % manual (el servidor recalcula total y comisión) */}
+                                <Section title="Descuentos" icon={<Percent size={14} />}>
+                                    <OrderDiscountsBox
+                                        orderId={exp.order.id}
+                                        agreementId={exp.financial.agreement?.id ?? null}
+                                        discount={exp.financial.discount || 0}
+                                        agreementsEnabled={hasFeature('clientes:convenios', true)}
+                                        canEdit={!!(canEditOrder && exp.order.status_group !== 'cancelado' && (exp.order.status_group !== 'entregado' || isOwner))}
+                                        lockedReason={exp.order.status_group === 'cancelado'
+                                            ? 'La orden está cancelada.'
+                                            : exp.order.status_group === 'entregado' && !isOwner
+                                                ? 'La orden ya fue entregada: solo el administrador puede cambiar sus descuentos.'
+                                                : undefined}
+                                        onSaved={refresh}
+                                    />
                                 </Section>
 
                                 {/* Convenio Veterinario detallado */}

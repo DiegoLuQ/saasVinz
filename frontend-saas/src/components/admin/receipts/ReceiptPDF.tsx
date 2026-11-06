@@ -267,7 +267,7 @@ const ReceiptPDF: React.FC<ReceiptPDFProps> = ({ receipt }) => {
                             </Text>
                             <Text style={{ marginTop: 12 }}>RUT: {receipt.issuer_rut || '77.777.777-7'}</Text>
                             <Text>{receipt.issuer_address || 'Av. Providencia 1234, Santiago'}</Text>
-                            <Text>{receipt.issuer_email || 'contacto@saascrematorio.com'}</Text>
+                            <Text>{receipt.issuer_email || 'info@vinzer.cl'}</Text>
                         </View>
                     </View>
                     <View style={styles.headerRight}>

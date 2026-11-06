@@ -75,7 +75,7 @@ export default function SubmissionsTable() {
     };
 
     const handleDeleteFromList = async (id: number) => {
-        if (!confirm('¿Estás seguro de eliminar este registro?')) return;
+        if (!confirm('¿Eliminar este registro? Se borrarán sus datos y sus fotos. No se puede deshacer.')) return;
         try {
             await apiRequest(`/api/internal/submissions/${id}`, { method: 'DELETE' });
             showToast('Registro eliminado', 'success');

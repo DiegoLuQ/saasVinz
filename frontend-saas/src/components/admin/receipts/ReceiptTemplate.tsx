@@ -77,7 +77,7 @@ export default function ReceiptTemplate({
                     <div className="text-[10px] text-black/60 font-medium space-y-0.5 leading-tight">
                         <p>RUT: 77.777.777-7</p>
                         <p>Av. Providencia 1234, Santiago</p>
-                        <p>contacto@saascrematorio.com</p>
+                        <p>info@vinzer.cl</p>
                     </div>
                 </div>
                 <div className="text-right">

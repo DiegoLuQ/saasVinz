@@ -77,10 +77,10 @@ class ReceiptService:
                 tenant_phone=tenant.phone,
                 tenant_address=tenant.address,
                 # Issuer Snapshot
-                issuer_name=saas_config.name if saas_config else "SaaSCrematorio",
+                issuer_name=saas_config.name if saas_config else "Vinzer",
                 issuer_rut=saas_config.rut if saas_config else "77.777.777-7",
                 issuer_address=saas_config.direccion if saas_config else "Av. Providencia 1234, Santiago",
-                issuer_email=saas_config.correo if saas_config else "contacto@saascrematorio.com",
+                issuer_email=saas_config.correo if saas_config else "info@vinzer.cl",
                 issuer_logo_url=(
                     (saas_config.logo if saas_config.logo.startswith('/') or saas_config.logo.startswith('http') else '/' + saas_config.logo)
                     if saas_config and saas_config.logo else None

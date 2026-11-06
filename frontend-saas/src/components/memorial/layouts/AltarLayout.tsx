@@ -53,7 +53,7 @@ export default function AltarLayout(props: any) {
     const isDarkTheme = isDarkSurface(themeConfig, portadaUrl);
     const tema = memorial?.diseno?.tema || 'claro';
     const themeStyles = getMemorialThemeStyles(tema, isDarkTheme);
-    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale);
+    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale, mascota);
 
     return (
         <div

@@ -416,9 +416,12 @@ async def submit_public_form(
                         "type": "service",
                         "id": svc.id,
                         "name": svc.name,
-                        "price": svc.price or 0.0,
+                        "price": 0.0 if svc.price_on_request else (svc.price or 0.0),
                         "cost": svc.cost or 0.0,
-                        "quantity": 1
+                        "quantity": 1,
+                        # Constancia de lo que la familia vio al enviar
+                        "price_on_request": bool(svc.price_on_request),
+                        "important_note": svc.important_note,
                     })
                     
             elif item_id.startswith("prod_"):

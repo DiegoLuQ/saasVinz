@@ -78,8 +78,11 @@ class ServiceBase(BaseModel):
     is_special: bool = False
     show_in_form: bool = True
     group_name: Optional[str] = None
+    price_on_request: bool = False
+    important_note: Optional[str] = Field(None, max_length=300)
 
     _clean_group = field_validator("group_name", mode="before")(clean_group_name)
+    _clean_note = field_validator("important_note", mode="before")(lambda v: (str(v).strip() or None) if v is not None else None)
 
 class ServiceCreate(ServiceBase):
     pass
@@ -93,6 +96,10 @@ class ServiceUpdate(BaseModel):
     is_special: Optional[bool] = None
     show_in_form: Optional[bool] = None
     group_name: Optional[str] = None
+    price_on_request: Optional[bool] = None
+    important_note: Optional[str] = Field(None, max_length=300)
+
+    _clean_note = field_validator("important_note", mode="before")(lambda v: (str(v).strip() or None) if v is not None else None)
 
     _clean_group = field_validator("group_name", mode="before")(clean_group_name)
 

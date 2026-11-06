@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
+from app.utils.certificates import vinzer_logo_url
+from app.services.plan_features import show_vinzer_brand
 from app.database import get_db
 from app import models
 from app import schemas
@@ -111,7 +113,7 @@ def _render_preview(request: Request, tenant: models.Tenant, template: Optional[
     ov = {k: v for k, v in (tenant_overrides or {}).items() if v is not None}
     tenant_name = ov.get("name", tenant.name if tenant else "Crematorio")
     now = tz.get_now()
-    logo_url = tenant.logo_url if tenant and tenant.logo_url else "https://saascrematorio.com/logo-default.png"
+    logo_url = tenant.logo_url if tenant and tenant.logo_url else vinzer_logo_url()
     base_url = str(request.base_url).rstrip('/')
 
     if template and template.category == "certificadoImg":
@@ -322,7 +324,7 @@ def generar_certificado(
 
         # 2. Obtener datos básicos del Tenant
         tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
-        logo_url = tenant.logo_url if tenant and tenant.logo_url else "https://saascrematorio.com/logo-default.png"
+        logo_url = tenant.logo_url if tenant and tenant.logo_url else vinzer_logo_url()
 
         # 2.5 Rama especial: certificado basado en imagen (categoría certificadoImg).
         # Render = imagen de fondo + campos posicionados; el tenant puede ajustar
@@ -369,6 +371,8 @@ def generar_certificado(
                 pet_name=req.pet_name or (pet.name if pet else ""),
                 birth_date=pet.birth_date if pet else None,
                 death_date=pet.death_date if pet else None,
+                birth_year_only=bool(pet and pet.birth_date_year_only),
+                death_year_only=bool(pet and pet.death_date_year_only),
                 current_date=now,
                 pet_images=pet_images,
                 tenant_logo_url=logo_url,
@@ -549,8 +553,9 @@ def generar_recibo(
 
         # Procesar Servicios
         for s_oc in cremation.servicios:
+            pending_quote = bool(s_oc.service and s_oc.service.price_on_request and not s_oc.precio_venta)
             if not first_item_found:
-                service_name = s_oc.service.name if s_oc.service else "Servicio"
+                service_name = (s_oc.service.name if s_oc.service else "Servicio") + (" (precio a cotizar)" if pending_quote else "")
                 service_price = s_oc.precio_venta
                 # Si hay más de 1 cantidad, el resto va a adicionales? 
                 # Por simplicidad aquí, si cantidad > 1, lo dejamos en el principal pero el precio es unitario?
@@ -560,7 +565,8 @@ def generar_recibo(
             else:
                 additional_list.append({
                     "name": f"{s_oc.service.name if s_oc.service else 'Servicio'} x{s_oc.cantidad}", 
-                    "price": s_oc.precio_venta * s_oc.cantidad
+                    "price": s_oc.precio_venta * s_oc.cantidad,
+                    "on_request": pending_quote,  # «A cotizar» en vez de $0
                 })
 
         # Procesar Planes
@@ -610,6 +616,7 @@ def generar_recibo(
             tenant_name=tenant.name,
             tenant_rut=tenant.rut or "N/A",
             tenant_logo=tenant.logo_url,
+            show_vinzer_brand=show_vinzer_brand(tenant),
             client_name=customer.name if customer else "N/A",
             client_rut=customer.rut if customer else "N/A",
             client_phone=customer.phone if customer else "N/A",
@@ -753,6 +760,7 @@ def previsualizar_recibo(
         tenant_name=tenant.name,
         tenant_rut=tenant.rut or "N/A",
         tenant_logo=tenant.logo_url,
+        show_vinzer_brand=show_vinzer_brand(tenant),
         client_name=customer.name if customer else "N/A",
         client_rut=(customer.rut or "N/A") if customer else "N/A",
         client_phone=(customer.phone or "N/A") if customer else "N/A",

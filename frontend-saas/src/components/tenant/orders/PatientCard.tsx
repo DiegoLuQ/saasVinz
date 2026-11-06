@@ -7,6 +7,7 @@ import { API_URL } from '@/lib/tenant/api';
 import SearchableSelect from '@/components/tenant/SearchableSelect';
 import { statusColors, statusOptions, normalizeOrderStatus } from '@/lib/tenant/orders/types';
 import type { Cremation, Pet, Customer, Partner } from '@/lib/tenant/orders/types';
+import { formatPetDate } from '@/lib/petDates';
 
 interface PatientCardProps {
     currentCremation: Partial<Cremation>;
@@ -146,11 +147,11 @@ export default function PatientCard({
                             <div className="flex gap-5 mt-3">
                                 <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground uppercase font-black tracking-wider">
                                     <div className="w-1 h-1 rounded-full bg-primary" aria-hidden="true" />
-                                    Nac: <span className="text-white font-mono">{selectedPet.birth_date?.split('T')[0] || 'N/A'}</span>
+                                    Nac: <span className="text-white font-mono">{formatPetDate(selectedPet.birth_date, selectedPet.birth_date_year_only, true) || 'N/A'}</span>
                                 </div>
                                 <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground uppercase font-black tracking-wider">
                                     <div className="w-1 h-1 rounded-full bg-red-400" aria-hidden="true" />
-                                    Fall: <span className="text-white font-mono">{selectedPet.death_date?.split('T')[0] || 'N/A'}</span>
+                                    Fall: <span className="text-white font-mono">{formatPetDate(selectedPet.death_date, selectedPet.death_date_year_only, true) || 'N/A'}</span>
                                 </div>
                             </div>
                         </div>

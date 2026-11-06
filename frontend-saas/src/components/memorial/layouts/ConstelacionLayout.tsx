@@ -33,7 +33,7 @@ export default function ConstelacionLayout(props: any) {
     const isDarkTheme = isDarkSurface(themeConfig, portadaUrl);
     const themeStyles = getMemorialThemeStyles(tema, isDarkTheme);
     const petName = (mascota?.name || '').trim();
-    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale);
+    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale, mascota);
 
     // Campo estelar de fondo determinista
     const stars = useMemo(() => {

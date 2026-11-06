@@ -65,6 +65,14 @@ def _fmt_date(value) -> str:
     return f"{value.day} de {_MONTHS[value.month - 1]} de {value.year}"
 
 
+def _pet_date(pet, which: str) -> str:
+    """Fecha de la mascota en texto; solo el año si la ficha la marca «solo año»."""
+    value = getattr(pet, f"{which}_date", None)
+    if value and getattr(pet, f"{which}_date_year_only", False):
+        return str(value.year)
+    return _fmt_date(value)
+
+
 def _age_text(pet) -> str:
     years = pet.age
     if years is None and pet.birth_date:
@@ -90,8 +98,8 @@ def build_context(pet: Optional[models.Pet], tenant: Optional[models.Tenant], de
             "raza": pet.breed or "",
             "edad": _age_text(pet),
             "tamano": pet.size or "",
-            "fecha_nacimiento": _fmt_date(pet.birth_date),
-            "fecha_partida": _fmt_date(pet.death_date),
+            "fecha_nacimiento": _pet_date(pet, "birth"),
+            "fecha_partida": _pet_date(pet, "death"),
         })
     ctx["crematorio"] = (tenant.name if tenant else "") or ""
     ctx["detalles"] = (details or "").strip()[:500] or "sin detalles adicionales"
@@ -332,8 +340,8 @@ def template_bindings(pet: Optional[models.Pet], owner: Optional[models.Customer
         "breed": (pet.breed if pet else "") or "",
         "age": _age_text(pet) if pet else "",
         "size": (pet.size if pet else "") or "",
-        "birth_date": _fmt_date(pet.birth_date) if pet else "",
-        "death_date": _fmt_date(pet.death_date) if pet else "",
+        "birth_date": _pet_date(pet, "birth") if pet else "",
+        "death_date": _pet_date(pet, "death") if pet else "",
         "life_range": _life_range(pet),
         # Dueño
         "owner_name": (owner.name if owner else "") or "",

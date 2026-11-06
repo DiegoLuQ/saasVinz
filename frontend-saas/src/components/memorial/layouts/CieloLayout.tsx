@@ -40,7 +40,7 @@ export default function CieloLayout(props: any) {
     const isDarkTheme = isDarkSurface(themeConfig, portadaUrl);
     const themeStyles = getMemorialThemeStyles(tema, isDarkTheme);
     const petName = mascota?.name || '';
-    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale);
+    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale, mascota);
 
     const sparkles = useMemo(() => {
         const rand = seededRandom(20);

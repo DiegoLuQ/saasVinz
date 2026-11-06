@@ -4,12 +4,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Images, Eye, Download, Loader2, X, Sparkles, AlertCircle, RefreshCw, Link2, LayoutTemplate, Trash2 } from 'lucide-react';
+import { Images, Eye, Download, Loader2, X, Sparkles, AlertCircle, RefreshCw, Link2, LayoutTemplate, Trash2, Wand2 } from 'lucide-react';
 import { listTemplateExports, deleteTemplateExport, type TemplateExport } from '@/lib/tenant/imageTemplates';
 import { apiRequest, getImageUrl } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { RecipeDesignView, isRecipeDesign, useDesignDownload } from '@/components/tenant/redes/RecipeDesign';
 import AssignExistingImageModal from './AssignExistingImageModal';
+import GenerateMissingModal from './GenerateMissingModal';
+import RedoFarewellCardModal from './RedoFarewellCardModal';
 
 const KIND_LABEL: Record<TemplateExport['kind'], string> = {
     digital: 'Tarjeta digital',
@@ -54,19 +56,30 @@ interface Props {
     orderId?: number | null;
     petId: number | null | undefined;
     petName: string;
+    /** Para «Generar lo que falta» (certificado + tarjeta + imagen para redes). */
+    dedication?: string | null;
+    photoUrl?: string | null;
+    /** Fotos de la mascota (para elegir al rehacer la tarjeta). */
+    photos?: string[];
+    farewellTemplateConfig?: Record<string, unknown> | null;
+    certificate?: { enabled: boolean; issued: number };
+    certMissing?: string[];
 }
 
 /**
  * Imágenes entregables de la mascota de la orden (tarjeta digital y diseño para
  * redes en segundo plano), con vista previa, descarga y generación con IA.
  */
-export default function GeneratedImagesSection({ orderId, petId, petName }: Props) {
+export default function GeneratedImagesSection({ orderId, petId, petName, dedication, photoUrl, photos, farewellTemplateConfig, certificate, certMissing }: Props) {
     const { showToast } = useToast();
     const queryClient = useQueryClient();
     const [zoom, setZoom] = useState<TemplateExport | null>(null);
     const [isTriggering, setIsTriggering] = useState(false);
     const [assigning, setAssigning] = useState(false);
     const [confirmOpen, setConfirmOpen] = useState(false);
+    const [missingOpen, setMissingOpen] = useState(false);
+    // Rehacer / reemplazar la tarjeta de homenaje
+    const [redo, setRedo] = useState<{ replace: TemplateExport | null } | null>(null);
     const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
 
     // Consulta de imágenes ya generadas
@@ -205,17 +218,17 @@ export default function GeneratedImagesSection({ orderId, petId, petName }: Prop
                     {orderId && (
                         <button
                             type="button"
-                            onClick={() => setConfirmOpen(true)}
-                            disabled={!petId || isJobActive || isTriggering}
-                            className="px-3 py-1.5 rounded-xl bg-fuchsia-500/15 hover:bg-fuchsia-500/25 text-fuchsia-700 dark:text-fuchsia-300 border border-fuchsia-500/30 text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                            title="Generar imagen para redes con IA en segundo plano"
+                            onClick={() => setMissingOpen(true)}
+                            disabled={!petId || isTriggering}
+                            className="px-3 py-1.5 rounded-xl bg-violet-500/15 hover:bg-violet-500/25 text-violet-700 dark:text-violet-300 border border-violet-500/30 text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                            title="Ver qué documentos faltan (certificado, tarjeta, imagen para redes) y generarlos"
                         >
-                            {isJobActive || isTriggering ? (
-                                <Loader2 size={13} className="animate-spin text-fuchsia-600 dark:text-fuchsia-300" />
+                            {isJobActive ? (
+                                <Loader2 size={13} className="animate-spin" />
                             ) : (
-                                <Sparkles size={13} className="text-fuchsia-600 dark:text-fuchsia-300" />
+                                <Wand2 size={13} />
                             )}
-                            <span>{isJobActive ? 'Generando…' : 'Generar imagen redes'}</span>
+                            <span>{isJobActive ? 'Generando imagen…' : 'Generar lo que falta'}</span>
                         </button>
                     )}
                     <Link
@@ -275,12 +288,12 @@ export default function GeneratedImagesSection({ orderId, petId, petName }: Prop
                     {orderId && !isJobActive && (
                         <button
                             type="button"
-                            onClick={() => setConfirmOpen(true)}
+                            onClick={() => setMissingOpen(true)}
                             disabled={isTriggering}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-fuchsia-500/15 hover:bg-fuchsia-500/25 text-fuchsia-700 dark:text-fuchsia-300 border border-fuchsia-500/30 text-xs font-bold transition cursor-pointer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/15 hover:bg-violet-500/25 text-violet-700 dark:text-violet-300 border border-violet-500/30 text-xs font-bold transition cursor-pointer"
                         >
-                            <Sparkles size={13} />
-                            Generar imagen para redes (IA)
+                            <Wand2 size={13} />
+                            Generar tarjeta, imagen para redes y certificado
                         </button>
                     )}
                 </div>
@@ -310,6 +323,20 @@ export default function GeneratedImagesSection({ orderId, petId, petName }: Prop
                                 >
                                     <Trash2 size={12} />
                                 </button>
+                                {it.kind === 'digital' && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setRedo({ replace: it });
+                                        }}
+                                        title="Rehacer o reemplazar la tarjeta"
+                                        aria-label={`Rehacer ${it.title}`}
+                                        className="h-7 w-7 rounded-full bg-black/60 hover:bg-violet-600 text-white/90 hover:text-white shadow flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all cursor-pointer"
+                                    >
+                                        <RefreshCw size={12} />
+                                    </button>
+                                )}
                             </div>
                             <button
                                 type="button"
@@ -325,10 +352,48 @@ export default function GeneratedImagesSection({ orderId, petId, petName }: Prop
                 </div>
             )}
 
+            {redo && petId && (
+                <RedoFarewellCardModal
+                    petId={petId}
+                    petName={petName}
+                    dedication={dedication}
+                    photos={photos?.length ? photos : photoUrl ? [photoUrl] : []}
+                    defaultConfig={farewellTemplateConfig}
+                    replace={redo.replace}
+                    onClose={() => setRedo(null)}
+                    onDone={() => {
+                        queryClient.invalidateQueries({ queryKey: ['tenant', 'template-exports', 'order', petId] });
+                        if (orderId) queryClient.invalidateQueries({ queryKey: ['expediente', orderId] });
+                    }}
+                />
+            )}
+
             {assigning && petId && (
                 <AssignExistingImageModal petId={petId} petName={petName} onClose={() => setAssigning(false)} />
             )}
             {downloadNode}
+
+            {missingOpen && orderId && petId && (
+                <GenerateMissingModal
+                    orderId={orderId}
+                    petId={petId}
+                    petName={petName}
+                    dedication={dedication}
+                    photoUrl={photoUrl}
+                    farewellTemplateConfig={farewellTemplateConfig}
+                    certificate={certificate || { enabled: false, issued: 0 }}
+                    certMissing={certMissing}
+                    existing={items}
+                    socialJobActive={!!isJobActive}
+                    onClose={() => setMissingOpen(false)}
+                    onFinished={() => {
+                        queryClient.invalidateQueries({ queryKey: ['tenant', 'template-exports', 'order', petId] });
+                        queryClient.invalidateQueries({ queryKey: ['tenant', 'image-templates', 'ai-usage'] });
+                        queryClient.invalidateQueries({ queryKey: ['expediente', orderId] });
+                        refetchJobs();
+                    }}
+                />
+            )}
 
             {/* Modal de Confirmación antes de Generar Imagen para Redes */}
             {confirmOpen && createPortal(
@@ -472,6 +537,16 @@ export default function GeneratedImagesSection({ orderId, petId, petName }: Prop
                                 <b>{KIND_LABEL[zoom.kind]}</b> <span className="text-white/60">· {zoom.title} · {fmt(zoom.created_at)}</span>
                             </span>
                             <div className="flex items-center gap-2 shrink-0">
+                                {zoom.kind === 'digital' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => { setRedo({ replace: zoom }); setZoom(null); }}
+                                        className="px-3 py-1.5 rounded-lg bg-violet-600/80 hover:bg-violet-600 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                                    >
+                                        <RefreshCw size={13} />
+                                        Rehacer
+                                    </button>
+                                )}
                                 <button
                                     type="button"
                                     onClick={() => setDeleteTarget(zoom)}

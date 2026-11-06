@@ -284,7 +284,7 @@ function ScaledHtml({ html }: { html: string }) {
 }
 
 /** Tarjeta de homenaje con los datos del registro, escalada al contenedor. */
-function ScaledFarewell({ config }: { config: ReturnType<typeof buildFarewellConfig> }) {
+export function ScaledFarewell({ config }: { config: ReturnType<typeof buildFarewellConfig> }) {
     const [ref, width] = useBoxWidth();
     const dims = farewellCardDims(config.format || '1:1');
     const scale = width / dims.width;

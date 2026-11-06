@@ -80,7 +80,7 @@ const defaultSectionsConfig = {
 const receiptSectionsConfig = {
     header: { show: true, label: "SAASCREMATORIO" },
     subtitle: { show: true, label: "Software Líder en Gestión Funeraria y Crematorios" },
-    issuer_details: { show: true, label: "RUT: 77.777.777-7\nAv. Providencia 1234, Santiago\ncontacto@saascrematorio.com", type: "textarea" },
+    issuer_details: { show: true, label: "RUT: 77.777.777-7\nAv. Providencia 1234, Santiago\ninfo@vinzer.cl", type: "textarea" },
     meta: { show: true, label: "RECIBO" },
     tenant_info: { show: true, label: "Datos del Cliente" },
     plan_info: { show: true, label: "Resumen de Suscripción" },

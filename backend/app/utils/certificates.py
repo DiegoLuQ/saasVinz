@@ -629,6 +629,12 @@ def generate_certificate_json(
         "html_content": full_html
     }
 
+def vinzer_logo_url() -> str:
+    """Logo de Vinzer (archivo público del frontend) para cuando el crematorio no tiene logo."""
+    from app.core.config import settings
+    return f"{settings.FRONTEND_URL.rstrip('/')}/logo-vinzer.webp"
+
+
 def generate_receipt_html(
     tenant_name: str,
     tenant_rut: str,
@@ -654,6 +660,7 @@ def generate_receipt_html(
     weight_price: float = 0.0,
     agreement_name: str = None,
     agreement_discount: float = 0.0,
+    show_vinzer_brand: bool = True,
 ) -> str:
     if not issue_date:
         issue_date = datetime.now()
@@ -691,8 +698,8 @@ def generate_receipt_html(
             <tr>
                 <td style="padding: 10px; border-bottom: 1px solid #eee;">{s['name']}</td>
                 <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">1</td>
-                <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">{format_currency(s['price'])}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">{format_currency(s['price'])}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">{'A cotizar' if s.get('on_request') else format_currency(s['price'])}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">{'A cotizar' if s.get('on_request') else format_currency(s['price'])}</td>
             </tr>
         """
         
@@ -862,7 +869,7 @@ def generate_receipt_html(
 
             <div class="footer">
                 <p>Gracias por confiar en {tenant_name}</p>
-                <p>Powered by SaaSCrematorio.com</p>
+                {'<p>Con tecnología de vinzer.cl</p>' if show_vinzer_brand else ''}
             </div>
         </div>
     </body>
@@ -1008,6 +1015,8 @@ def generate_image_certificate_html(
     current_date=None,
     pet_images: list = None,
     tenant_logo_url: str = None,
+    birth_year_only: bool = False,
+    death_year_only: bool = False,
     tenant_name: str = "",
     tenant_rut: str = "",
     tenant_manager: str = "",
@@ -1201,9 +1210,12 @@ def generate_image_certificate_html(
         if ftype == "nombre_mascota":
             value = pet_name or ""
         elif ftype == "fecha_nacimiento":
-            value = _img_format_date(_ov_date(ov) or birth_date, ov.get("format") or field.get("format"))
+            # Ficha con «solo año» → el año, aunque el diseño pida la fecha completa
+            year_fmt = "year" if birth_year_only and not _ov_date(ov) else None
+            value = _img_format_date(_ov_date(ov) or birth_date, ov.get("format") or year_fmt or field.get("format"))
         elif ftype == "fecha_fallecimiento":
-            value = _img_format_date(_ov_date(ov) or death_date, ov.get("format") or field.get("format"))
+            year_fmt = "year" if death_year_only and not _ov_date(ov) else None
+            value = _img_format_date(_ov_date(ov) or death_date, ov.get("format") or year_fmt or field.get("format"))
         elif ftype == "fecha_actual":
             value = _img_format_date(current_date, ov.get("format") or field.get("format"))
         elif ftype == "texto_fijo":

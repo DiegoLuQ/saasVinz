@@ -69,6 +69,8 @@ class ServicePublicInfo(BaseModel):
     image_url: str | None = None  # Solo planes (catálogo); servicios/productos lo dejan None
     sub_items: list[dict] | None = None
     is_special: bool = False  # adicional ofrecido tras elegir el plan
+    price_on_request: bool = False  # «Precio a cotizar»: el crematorio informa el valor después
+    important_note: str | None = None  # nota que la familia debe conocer
     # Precio del plan por tramo {"<id tramo>": precio} (modo «precio por plan y peso»)
     weight_prices: dict | None = None
     max_weight: float | None = None  # kg (planes): el formulario lo oculta en pesos mayores
@@ -108,6 +110,8 @@ def get_tenant_services(slug: str, token: str | None = None, db: Session = Depen
             "category": "servicio",
             "sub_items": None,
             "is_special": bool(s.is_special),
+            "price_on_request": bool(s.price_on_request),
+            "important_note": s.important_note,
         })
         
     # Fetch Plans

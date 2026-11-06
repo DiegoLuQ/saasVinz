@@ -27,7 +27,7 @@ export default function CinematicoLayout(props: any) {
     const isDarkPage = !!themeConfig?.dark;
     const pageBg = pageBackgroundHex(themeConfig, memorial?.diseno?.color_fondo);
     const petName = mascota?.name || '';
-    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale);
+    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale, mascota);
     const heroImage = memorial?.diseno?.portada_url || randomMainImage;
 
     return (

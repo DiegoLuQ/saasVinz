@@ -391,6 +391,43 @@ def actualizar_cremacion(
             raise HTTPException(status_code=403, detail="Solo el administrador del crematorio puede retroceder el estado de una orden")
     return service.update(tenant_id, cremation_id, cremation_in)
 
+class DiscountsUpdate(BaseModel):
+    # Mandar agreement_id (aunque sea null) = cambiar el convenio; omitirlo = no tocarlo
+    agreement_id: Optional[int] = None
+    discount: Optional[float] = None
+
+
+@router.patch("/{cremation_id}/discounts")
+def actualizar_descuentos(
+    cremation_id: int,
+    payload: DiscountsUpdate,
+    tenant_id: int = Depends(get_tenant_id),
+    service: CremationService = Depends(get_cremation_service),
+    current_user=Depends(get_current_user),
+    _: bool = Depends(check_permission("ordenes", "edit"))
+):
+    """Convenio empresa y descuento % de la orden (vista rápida). El servidor
+    recalcula el total y la comisión de la veterinaria."""
+    if payload.discount is not None and not (0 <= payload.discount <= 100):
+        raise HTTPException(status_code=400, detail="El descuento debe estar entre 0 y 100 %")
+    current = service.get_by_id(tenant_id, cremation_id)
+    if (current.status or "").lower() in ("entregado", "delivered", "completado", "completed") and not board.is_owner(current_user):
+        raise HTTPException(status_code=403, detail="Solo el administrador puede cambiar descuentos de una orden entregada")
+    db_obj = service.update_discounts(
+        tenant_id, cremation_id,
+        set_agreement="agreement_id" in payload.model_fields_set,
+        agreement_id=payload.agreement_id,
+        discount=payload.discount,
+    )
+    fin = db_obj.financial
+    return {
+        "total": fin.total_price if fin else 0.0,
+        "discount": fin.discount if fin else 0.0,
+        "agreement": {"id": fin.agreement_id, "name": fin.agreement_name, "discount": fin.agreement_discount or 0.0} if fin and fin.agreement_id else None,
+        "commission": fin.commission if fin else 0.0,
+    }
+
+
 @router.delete("/{cremation_id}")
 def eliminar_cremacion(
     cremation_id: int,

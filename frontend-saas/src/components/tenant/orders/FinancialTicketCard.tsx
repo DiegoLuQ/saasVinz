@@ -116,6 +116,9 @@ export default function FinancialTicketCard({
     const [showReceipt, setShowReceipt] = useState(false);
     const productsSubtotal = selectedProducts.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
     const hasItems = selectedPlans.length > 0 || selectedServices.length > 0 || selectedProducts.length > 0;
+    // Servicios «a cotizar» que aún no tienen precio en esta orden
+    const pendingQuote = (s: SelectedService) => !s.unit_price && !!services.find(x => x.id === s.service_id)?.price_on_request;
+    const pendingQuotes = selectedServices.filter(pendingQuote);
     const discountValue = currentCremation?.discount || 0;
 
     const currentPartnerId = currentCremation?.partner_link_id || currentCremation?.partner_id;
@@ -264,6 +267,12 @@ export default function FinancialTicketCard({
                                         <Sparkles size={11} className="text-blue-400 shrink-0" aria-hidden="true" />
                                         <div className="min-w-0">
                                             <span className="text-[11px] font-black text-white/80 uppercase tracking-tight truncate block">{s.name}</span>
+                                            {pendingQuote(s) && (
+                                                <span className="mr-1 inline-flex items-center text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full border text-amber-400 bg-amber-400/10 border-amber-400/30"
+                                                    title="Precio a cotizar: escribe el valor cuando lo sepas">
+                                                    Por cotizar
+                                                </span>
+                                            )}
                                             <button
                                                 type="button"
                                                 onClick={() => onSetPrincipalService(idx)}
@@ -409,6 +418,11 @@ export default function FinancialTicketCard({
 
                 {/* === Discount + Total === */}
                 <section className="px-6 py-5 border-t border-dashed border-border/60 space-y-4 bg-muted/20">
+                    {pendingQuotes.length > 0 && (
+                        <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[11px] font-semibold text-amber-500">
+                            Falta cotizar: {pendingQuotes.map(s => s.name).join(', ')}. El total no incluye su valor hasta que lo escribas.
+                        </div>
+                    )}
                     {selectedProducts.length > 0 && (
                         <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider">
                             <span className="text-amber-500 font-semibold">Subtotal Productos ({selectedProducts.length})</span>

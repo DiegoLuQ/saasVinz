@@ -131,6 +131,8 @@ def create_service(
         **service_in.dict(),
         tenant_id=tenant_id
     )
+    if db_service.price_on_request:
+        db_service.price = 0.0  # el valor se pone en cada orden
     db.add(db_service)
     db.commit()
     db.refresh(db_service)
@@ -160,6 +162,8 @@ def actualizar_servicio(
             raise HTTPException(status_code=400, detail=_duplicate_message(name, group))
     for key, value in update_data.items():
         setattr(db_service, key, value)
+    if db_service.price_on_request:
+        db_service.price = 0.0  # el valor se pone en cada orden
 
     db.commit()
     db.refresh(db_service)

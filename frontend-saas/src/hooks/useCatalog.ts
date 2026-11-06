@@ -25,6 +25,10 @@ export interface Service {
     show_in_form?: boolean;
     /** Grupo (solo para ordenar el panel); null = «Sin grupo» */
     group_name?: string | null;
+    /** «Precio a cotizar»: se elige sin precio; el valor se pone en la orden */
+    price_on_request?: boolean;
+    /** Nota importante que ve la familia (formulario, resumen y correo) */
+    important_note?: string | null;
 }
 
 export interface Plan {

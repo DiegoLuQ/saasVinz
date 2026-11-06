@@ -81,7 +81,7 @@ export default function NormalLayout(props: any) {
     };
 
     const petName = mascota?.name || '';
-    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale);
+    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale, mascota);
     const bio = memorial?.msg_despedida || '';
     const isDark = Boolean(memorial?.diseno?.portada_url || themeConfig?.dark);
 

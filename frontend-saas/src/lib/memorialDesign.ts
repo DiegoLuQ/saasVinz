@@ -301,22 +301,31 @@ function parseDate(value?: string | null): Date | null {
  * cliente produzcan el mismo texto (sin desajustes de hidratación ni días
  * corridos por zona horaria).
  */
-export function getLifeDates(birth?: string | null, death?: string | null, locale: 'es' | 'en' = 'es'): LifeDates {
+export function getLifeDates(
+    birth?: string | null,
+    death?: string | null,
+    locale: 'es' | 'en' = 'es',
+    /** La mascota: con «solo año» (birth/death_date_year_only) se muestra solo el año */
+    flags?: { birth_date_year_only?: boolean; death_date_year_only?: boolean } | null,
+): LifeDates {
     const b = parseDate(birth);
     const d = parseDate(death);
+    const bYear = !!flags?.birth_date_year_only;
+    const dYear = !!flags?.death_date_year_only;
     if (!b && !d) return { years: null, full: null, yearsOfLove: null };
 
     const fmt = new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'es-CL', {
         day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
     });
     const y = (x: Date | null) => (x ? String(x.getUTCFullYear()) : '…');
-    const f = (x: Date | null) => (x ? fmt.format(x) : '…');
+    const f = (x: Date | null, yearOnly = false) => (x ? (yearOnly ? String(x.getUTCFullYear()) : fmt.format(x)) : '…');
 
     let yearsOfLove: string | null = null;
     if (b && d && d > b) {
         let n = d.getUTCFullYear() - b.getUTCFullYear();
-        if (d.getUTCMonth() < b.getUTCMonth()
-            || (d.getUTCMonth() === b.getUTCMonth() && d.getUTCDate() < b.getUTCDate())) n--;
+        // Con solo el año de alguna fecha no se sabe el mes: se cuentan años calendario
+        if (!bYear && !dYear && (d.getUTCMonth() < b.getUTCMonth()
+            || (d.getUTCMonth() === b.getUTCMonth() && d.getUTCDate() < b.getUTCDate()))) n--;
         if (n >= 1) {
             yearsOfLove = locale === 'en'
                 ? `${n} ${n === 1 ? 'year' : 'years'} of love`
@@ -324,7 +333,7 @@ export function getLifeDates(birth?: string | null, death?: string | null, local
         }
     }
 
-    return { years: `${y(b)} — ${y(d)}`, full: `${f(b)} — ${f(d)}`, yearsOfLove };
+    return { years: `${y(b)} — ${y(d)}`, full: `${f(b, bYear)} — ${f(d, dYear)}`, yearsOfLove };
 }
 
 /**

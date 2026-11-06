@@ -52,6 +52,8 @@ class PetBase(BaseModel):
     size: Optional[str] = None # pequeño, mediano, normal, grande, muy grande
     birth_date: Optional[datetime] = None
     death_date: Optional[datetime] = None
+    birth_date_year_only: bool = False
+    death_date_year_only: bool = False
     age: Optional[int] = None
     image_url: Optional[str] = None
     images: Optional[List[str]] = []
@@ -66,6 +68,8 @@ class PetUpdate(BaseModel):
     size: Optional[str] = None
     birth_date: Optional[datetime] = None
     death_date: Optional[datetime] = None
+    birth_date_year_only: Optional[bool] = None
+    death_date_year_only: Optional[bool] = None
     age: Optional[int] = None
     image_url: Optional[str] = None
     images: Optional[List[str]] = None

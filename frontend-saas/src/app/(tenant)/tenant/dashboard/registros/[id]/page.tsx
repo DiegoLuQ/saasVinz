@@ -569,9 +569,14 @@ export default function SubmissionDetailPage() {
                                                     <td className="px-5 py-3.5">
                                                         <p className="font-bold text-foreground">{item.name}</p>
                                                         <p className="text-[9px] text-muted-foreground uppercase">{item.type || 'Servicio'}</p>
+                                                        {item.important_note && (
+                                                            <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-300" title="Nota que la familia vio al enviar el formulario">
+                                                                <b>Nota mostrada a la familia:</b> {item.important_note}
+                                                            </p>
+                                                        )}
                                                     </td>
                                                     <td className="px-5 py-3.5 text-right font-black text-amber-600 dark:text-orange-400 text-sm">
-                                                        ${(item.price || 0).toLocaleString()}
+                                                        {item.price_on_request && !item.price ? 'A cotizar' : `$${(item.price || 0).toLocaleString()}`}
                                                     </td>
                                                 </tr>
                                             );
@@ -785,9 +790,21 @@ export default function SubmissionDetailPage() {
                         <AlertCircle className="text-red-400" size={32} />
                     </div>
                     <h3 className="text-xl font-bold mb-2">¿Confirmar eliminación permanente?</h3>
-                    <p className="text-muted-foreground text-sm mb-6">
-                        Esta acción no se puede deshacer. Se eliminarán de forma permanente los datos de este registro y sus fotos asociadas en Cloudflare.
+                    <p className="text-muted-foreground text-sm mb-4">
+                        Esta acción no se puede deshacer. Se eliminarán los datos de este registro (familia, mascota, plan y fechas) y sus fotos en la nube.
                     </p>
+                    {(submission?.order || submission?.pet_id) && (
+                        <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-left text-xs text-amber-800 dark:text-amber-300">
+                            <p className="font-bold">
+                                Este registro ya creó {submission?.order ? `la orden ${submission.order.oc_number || `#${submission.order.id}`}` : 'la ficha de la mascota'}.
+                            </p>
+                            <p className="mt-1">
+                                Solo se borra el registro: el cliente, la mascota, la orden y sus documentos se conservan, igual que las fotos que ya usa la mascota.
+                                Para borrar todo, elimina la orden en Recepción y Pedidos con el alcance «Mascota».
+                            </p>
+                        </div>
+                    )}
+                    {!(submission?.order || submission?.pet_id) && <div className="mb-2" />}
                     <div className="flex gap-3">
                         <button
                             disabled={isDeleting}

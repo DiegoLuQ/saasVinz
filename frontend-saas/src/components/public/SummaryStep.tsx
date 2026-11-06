@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import Image from 'next/image';
-import { User, PawPrint, Package, Heart, Pencil, ImageIcon, Check, Sparkles, Gem, ChevronDown, Camera, Eye, X } from 'lucide-react';
+import { User, PawPrint, Package, Heart, Pencil, ImageIcon, Check, Sparkles, Gem, ChevronDown, Camera, Eye, X, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import FarewellPreview from '@/app/(tenant)/tenant/dashboard/documentos/disenos/components/FarewellPreview';
 import { DEFAULT_FORM_CONFIG, fieldLabel, formatCLP, tierDisplay, tierForWeight, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
@@ -54,6 +54,8 @@ interface ServiceItem {
     category?: string;
     sub_items?: SubItem[] | null;
     is_special?: boolean;
+    price_on_request?: boolean;
+    important_note?: string | null;
 }
 
 interface Props {
@@ -167,7 +169,12 @@ function PlanAccordionItem({ item, showPrice }: { item: ServiceItem; showPrice: 
                     </span>
                 </div>
 
-                {showPrice && item.price != null && item.price > 0 && (
+                {item.price_on_request && (
+                    <span className="ml-auto mr-3 shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
+                        Precio a cotizar
+                    </span>
+                )}
+                {!item.price_on_request && showPrice && item.price != null && item.price > 0 && (
                     <span className="ml-auto mr-3 shrink-0 text-sm font-bold text-emerald-700 dark:text-emerald-400">
                         {formatCLP(item.price)}
                     </span>
@@ -246,6 +253,9 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
             .flatMap(p => (p.sub_items || []).map(i => i.id))
     );
     const selectedItems = services.filter(s => selectedServices.includes(s.id) && !includedInPlan.has(s.id));
+    // Servicios elegidos con precio a cotizar y notas importantes (constancia del aviso)
+    const quoteItems = selectedItems.filter(s => s.price_on_request);
+    const noteItems = services.filter(s => s.important_note && (selectedServices.includes(s.id) || includedInPlan.has(s.id)));
 
     // Total estimado: plan/servicios (si el crematorio muestra sus precios) + recargo
     // por peso (si muestra los de los rangos). Con peso exacto se usa el rango que lo cubre.
@@ -415,6 +425,12 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
                     className="rounded-3xl border border-emerald-200/80 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/20 px-6 py-5 shadow-xs"
                 >
                     <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                        {quoteItems.map(s => (
+                            <div key={s.id} className="flex justify-between gap-3">
+                                <span className="min-w-0 truncate font-medium">Servicio adicional: {s.name}</span>
+                                <span className="shrink-0 font-bold text-amber-700 dark:text-amber-300">A cotizar</span>
+                            </div>
+                        ))}
                         {showServicePrices && selectedItems.filter(s => (s.price || 0) > 0).map(s => (
                             <div key={s.id} className="flex justify-between gap-3">
                                 <span className="min-w-0 truncate font-medium">
@@ -442,6 +458,36 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
                     {!showWeightPrices && f.weight.visible && (
                         <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">El crematorio confirmará el recargo por peso, si corresponde.</p>
                     )}
+                    {quoteItems.length > 0 && (
+                        <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">No incluye {quoteItems.map(s => s.name).join(', ')}: el crematorio te informará su valor.</p>
+                    )}
+                </motion.div>
+            )}
+
+            {(noteItems.length > 0 || (!showTotal && quoteItems.length > 0)) && (
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.35, duration: 0.4 }}
+                    className="rounded-3xl border border-amber-300/80 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-6 py-5 shadow-xs"
+                >
+                    <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
+                        <AlertTriangle size={16} className="shrink-0" />
+                        <span className="text-xs font-bold uppercase tracking-wider">Importante antes de enviar</span>
+                    </div>
+                    <ul className="mt-3 space-y-2 text-sm text-amber-950 dark:text-amber-100">
+                        {!showTotal && quoteItems.map(s => (
+                            <li key={`q-${s.id}`} className="leading-relaxed">
+                                <b>{s.name}:</b> precio a cotizar. El crematorio te informará su valor.
+                            </li>
+                        ))}
+                        {noteItems.map(s => (
+                            <li key={s.id} className="leading-relaxed">
+                                <b>{s.name}:</b> {s.important_note}
+                            </li>
+                        ))}
+                    </ul>
+                    <p className="mt-3 text-[11px] text-amber-800/80 dark:text-amber-200/70">También te lo enviaremos en el correo de confirmación.</p>
                 </motion.div>
             )}
 

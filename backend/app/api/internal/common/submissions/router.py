@@ -298,7 +298,7 @@ def delete_submission(
     if not submission:
         raise HTTPException(status_code=404, detail="Registro no encontrado")
 
-    # 1. Eliminar archivos físicos de imágenes del disco para no dejar basura
+    # 1. Carpeta local antigua (antes de R2) si existiera
     try:
         tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
         if tenant:
@@ -308,21 +308,10 @@ def delete_submission(
     except Exception as e:
         print(f"Error cleaning up submission folder: {e}")
 
-    # 2. Eliminar notificaciones asociadas en la campana
-    try:
-        notifs = db.query(models.Notification).filter(
-            models.Notification.tenant_id == tenant_id,
-            models.Notification.type == "new_submission"
-        ).all()
-        for n in notifs:
-            if n.data and n.data.get("submission_id") == submission_id:
-                db.delete(n)
-    except Exception as e:
-        print(f"Error cleaning up associated notifications: {e}")
-        
-    db.delete(submission)
-    db.commit()
-    return {"status": "success"}
+    # 2. Registro + aviso de la campana + fotos en la nube que nadie más usa
+    from app.api.internal.crm.pets.purge import purge_submission
+    summary = purge_submission(db, tenant_id, submission)
+    return {"status": "success", **summary}
 
 @router.post("/{submission_id}/create-customer")
 def create_customer_from_submission(

@@ -90,6 +90,8 @@ export interface Pet {
     customer_id: number;
     birth_date?: string;
     death_date?: string;
+    birth_date_year_only?: boolean;
+    death_date_year_only?: boolean;
     image_url?: string | null;
     images?: string[];
 }
@@ -103,6 +105,8 @@ export interface Service {
     unit_price?: number;
     unit_cost?: number;
     services?: Service[];
+    /** «Precio a cotizar»: el valor se pone en la orden */
+    price_on_request?: boolean;
 }
 
 export interface Plan {

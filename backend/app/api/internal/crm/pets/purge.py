@@ -220,3 +220,41 @@ def purge(db: Session, tenant_id: int, pet: models.Pet, customer: models.Custome
             failed += 1
     summary.update({"images_deleted": deleted, "images_kept_shared": kept, "images_failed": failed})
     return summary
+
+
+def delete_unused_files(db: Session, urls: Iterable[str], label: str = "") -> dict:
+    """Borra de la nube (y de la biblioteca de medios) los archivos que ya ningún
+    registro usa. Llamar DESPUÉS del commit que borró a su dueño."""
+    from app.api.internal.common.media_service import MediaService
+
+    deleted = kept = failed = 0
+    for url in dict.fromkeys(urls):
+        try:
+            if _still_referenced(db, url):
+                kept += 1
+            elif MediaService.delete_media_by_url(db, url):
+                deleted += 1
+            else:
+                failed += 1
+        except Exception as e:  # un archivo que falle no revierte lo ya borrado
+            print(f"[purge {label}] no se pudo borrar {url}: {e}")
+            failed += 1
+    return {"deleted": deleted, "kept_shared": kept, "failed": failed}
+
+
+def purge_submission(db: Session, tenant_id: int, submission: models.FormSubmission) -> dict:
+    """Elimina una solicitud web: el registro (datos de la familia, mascota, plan,
+    fechas), su aviso en la campana y sus fotos en la nube. Las fotos que ya usa
+    otra cosa (p. ej. la mascota creada al procesarla) se conservan."""
+    urls = _as_list(submission.images)
+    for n in db.query(models.Notification).filter(
+        models.Notification.tenant_id == tenant_id,
+        models.Notification.type == "new_submission",
+    ).all():
+        if isinstance(n.data, dict) and n.data.get("submission_id") == submission.id:
+            db.delete(n)
+    db.delete(submission)
+    db.commit()               # primero la base; recién después los archivos
+    files = delete_unused_files(db, urls, label=f"submission {submission.id}")
+    return {"photos": len(urls), "photos_deleted": files["deleted"],
+            "photos_kept_shared": files["kept_shared"], "photos_failed": files["failed"]}

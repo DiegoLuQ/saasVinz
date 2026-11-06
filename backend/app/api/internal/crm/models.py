@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Enum, JSON, UniqueConstraint
+from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, DateTime, Enum, JSON, UniqueConstraint
 from sqlalchemy.orm import relationship, validates
 from app.database import Base
 from datetime import datetime
@@ -47,6 +47,9 @@ class Pet(Base):
     size = Column(String) # pequeño, mediano, normal, grande, muy grande
     birth_date = Column(DateTime)
     death_date = Column(DateTime)
+    # Solo se sabe el año: la fecha queda el 1 de enero y los documentos muestran el año
+    birth_date_year_only = Column(Boolean, nullable=False, default=False, server_default='false')
+    death_date_year_only = Column(Boolean, nullable=False, default=False, server_default='false')
     age = Column(Integer)
     image_url = Column(String)
     images = Column(JSON, default=[])

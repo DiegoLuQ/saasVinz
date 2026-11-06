@@ -18,11 +18,28 @@ export interface CertTextField {
 }
 
 /** Valor que se manda por campo al emitir: texto libre o fecha (AAAA-MM-DD) que falta en la ficha. */
-export type CertOverrides = Record<string, { value?: string; date?: string }>;
+export type CertOverrides = Record<string, { value?: string; date?: string; format?: string }>;
 
 type DateKind = 'fecha_nacimiento' | 'fecha_fallecimiento';
 export const DATE_LABELS: Record<DateKind, string> = { fecha_nacimiento: 'Nacimiento', fecha_fallecimiento: 'Fallecimiento' };
 const PET_DATE_KEY: Record<DateKind, 'birth_date' | 'death_date'> = { fecha_nacimiento: 'birth_date', fecha_fallecimiento: 'death_date' };
+const PET_YEAR_KEY: Record<DateKind, 'birth_date_year_only' | 'death_date_year_only'> = { fecha_nacimiento: 'birth_date_year_only', fecha_fallecimiento: 'death_date_year_only' };
+const THIS_YEAR = new Date().getFullYear();
+// En «solo año» el campo puede tener un año a medio escribir: solo cuenta una fecha completa.
+const isFullDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+/** «Fecha exacta / Solo año»: con solo año la fecha se guarda el 1 de enero y el certificado imprime el año. */
+export function DateModeToggle({ yearOnly, onChange, light = false }: { yearOnly: boolean; onChange: (v: boolean) => void; light?: boolean }) {
+    const btn = (active: boolean) => `px-2 py-0.5 rounded-md text-[9px] font-bold normal-case tracking-normal transition-colors ${active
+        ? 'bg-primary/20 text-primary'
+        : light ? 'text-slate-500 hover:text-slate-800 dark:text-white/40 dark:hover:text-white/70' : 'text-white/40 hover:text-white/70'}`;
+    return (
+        <span className={`inline-flex rounded-lg p-0.5 border ${light ? 'bg-slate-100 border-slate-200 dark:bg-black/40 dark:border-white/5' : 'bg-black/40 border-white/5'}`}>
+            <button type="button" className={btn(!yearOnly)} onClick={() => onChange(false)}>Fecha exacta</button>
+            <button type="button" className={btn(yearOnly)} onClick={() => onChange(true)}>Solo año</button>
+        </span>
+    );
+}
 
 export interface IssueTemplate {
     template: {
@@ -73,7 +90,12 @@ export function usePetDates(petId: number | null | undefined, enabled = true) {
         queryKey: petDatesQueryKey(petId ?? 0),
         queryFn: async () => {
             const pet = await apiRequest(`/api/internal/pets/${petId}`);
-            return { birth_date: (pet?.birth_date || '').slice(0, 10), death_date: (pet?.death_date || '').slice(0, 10) };
+            return {
+                birth_date: (pet?.birth_date || '').slice(0, 10) as string,
+                death_date: (pet?.death_date || '').slice(0, 10) as string,
+                birth_date_year_only: !!pet?.birth_date_year_only,
+                death_date_year_only: !!pet?.death_date_year_only,
+            };
         },
         enabled: enabled && !!petId,
         staleTime: 30_000,
@@ -126,6 +148,7 @@ export default function CertificateTextsModal({ isOpen, onClose, cremationId, pe
     const dateKinds = [...new Set(issueDateFields(data).map((f) => f.type))];
     const { data: petDates } = usePetDates(petId, isOpen && dateKinds.length > 0);
     const [dates, setDates] = useState<Record<DateKind, string>>({ fecha_nacimiento: '', fecha_fallecimiento: '' });
+    const [yearOnly, setYearOnly] = useState<Record<DateKind, boolean>>({ fecha_nacimiento: false, fecha_fallecimiento: false });
     const aspect = template?.sections_config?.aspect_ratio || '16:9';
 
     // Precarga: texto guardado para el código del campo > texto del diseño.
@@ -147,6 +170,7 @@ export default function CertificateTextsModal({ isOpen, onClose, cremationId, pe
     useEffect(() => {
         if (!isOpen || !petDates) return;
         setDates({ fecha_nacimiento: petDates.birth_date, fecha_fallecimiento: petDates.death_date });
+        setYearOnly({ fecha_nacimiento: petDates.birth_date_year_only, fecha_fallecimiento: petDates.death_date_year_only });
     }, [isOpen, petDates]);
 
     const buildOverrides = () => {
@@ -156,7 +180,8 @@ export default function CertificateTextsModal({ isOpen, onClose, cremationId, pe
             if (v !== undefined) overrides[f.id] = { value: v };
         });
         issueDateFields(data).forEach((f) => {
-            if (dates[f.type]) overrides[f.id] = { date: dates[f.type] };
+            const d = dates[f.type];
+            if (isFullDate(d)) overrides[f.id] = yearOnly[f.type] ? { date: d, format: 'year' } : { date: d };
         });
         return overrides;
     };
@@ -164,10 +189,13 @@ export default function CertificateTextsModal({ isOpen, onClose, cremationId, pe
     // Guarda en la ficha las fechas cambiadas (al mediodía, para que la zona horaria no mueva el día).
     const savePetDates = async (): Promise<boolean> => {
         if (!petId || !petDates) return true;
-        const body: Record<string, string | null> = {};
+        const body: Record<string, string | boolean | null> = {};
         dateKinds.forEach((k) => {
             const key = PET_DATE_KEY[k];
-            if (dates[k] !== petDates[key]) body[key] = dates[k] ? `${dates[k]}T12:00:00` : null;
+            const value = isFullDate(dates[k]) ? dates[k] : '';
+            const flag = !!value && yearOnly[k];
+            if (value !== petDates[key]) body[key] = value ? `${value}T12:00:00` : null;
+            if (flag !== petDates[PET_YEAR_KEY[k]]) body[PET_YEAR_KEY[k]] = flag;
         });
         if (!Object.keys(body).length) return true;
         try {
@@ -210,7 +238,7 @@ export default function CertificateTextsModal({ isOpen, onClose, cremationId, pe
         return () => clearTimeout(timer);
         // buildOverrides se deriva de texts y dates
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen, template?.id, cremationId, texts, dates]);
+    }, [isOpen, template?.id, cremationId, texts, dates, yearOnly]);
 
     // Guarda los textos con código marcados "para próximos certificados".
     // Volver al texto del diseño borra lo guardado (null).
@@ -273,19 +301,47 @@ export default function CertificateTextsModal({ isOpen, onClose, cremationId, pe
                                         <div className="grid grid-cols-2 gap-3">
                                             {dateKinds.map((k) => {
                                                 const missing = !!petDates && !petDates[PET_DATE_KEY[k]];
+                                                const empty = !isFullDate(dates[k]);
                                                 return (
                                                     <div key={k} className="space-y-1.5">
-                                                        <span className="text-[10px] text-white/40 font-bold uppercase flex items-center gap-1.5">
+                                                        <span className="text-[10px] text-white/40 font-bold uppercase flex items-center gap-1.5 flex-wrap">
                                                             {DATE_LABELS[k]}
-                                                            {missing && !dates[k] && <span className="text-amber-400 normal-case">· falta</span>}
+                                                            {missing && empty && <span className="text-amber-400 normal-case">· falta</span>}
+                                                            <span className="ml-auto">
+                                                                <DateModeToggle yearOnly={yearOnly[k]} onChange={(v) => {
+                                                                    setYearOnly((prev) => ({ ...prev, [k]: v }));
+                                                                    // Pasar a «solo año» deja el 1 de enero de ese año
+                                                                    if (v) setDates((prev) => ({ ...prev, [k]: isFullDate(prev[k]) ? `${prev[k].slice(0, 4)}-01-01` : '' }));
+                                                                    else setDates((prev) => ({ ...prev, [k]: isFullDate(prev[k]) ? prev[k] : '' }));
+                                                                }} />
+                                                            </span>
                                                         </span>
-                                                        <input
-                                                            type="date"
-                                                            value={dates[k]}
-                                                            max={new Date().toISOString().slice(0, 10)}
-                                                            onChange={(e) => setDates((prev) => ({ ...prev, [k]: e.target.value }))}
-                                                            className={`w-full bg-black/40 border rounded-xl py-2 px-3 text-xs font-bold text-white outline-none focus:border-primary/50 dark:[color-scheme:dark] ${missing && !dates[k] ? 'border-amber-500/50' : 'border-white/5'}`}
-                                                        />
+                                                        {yearOnly[k] ? (
+                                                            <input
+                                                                type="text"
+                                                                inputMode="numeric"
+                                                                placeholder={`Ej: ${THIS_YEAR - 8}`}
+                                                                maxLength={4}
+                                                                value={dates[k].slice(0, 4)}
+                                                                onChange={(e) => {
+                                                                    const y = e.target.value.replace(/\D/g, '').slice(0, 4);
+                                                                    const ok = y.length === 4 && Number(y) >= 1950 && Number(y) <= THIS_YEAR;
+                                                                    setDates((prev) => ({ ...prev, [k]: ok ? `${y}-01-01` : y }));
+                                                                }}
+                                                                className={`w-full bg-black/40 border rounded-xl py-2 px-3 text-xs font-bold text-white outline-none focus:border-primary/50 ${(missing && empty) || (dates[k] && empty) ? 'border-amber-500/50' : 'border-white/5'}`}
+                                                            />
+                                                        ) : (
+                                                            <input
+                                                                type="date"
+                                                                value={dates[k]}
+                                                                max={new Date().toISOString().slice(0, 10)}
+                                                                onChange={(e) => setDates((prev) => ({ ...prev, [k]: e.target.value }))}
+                                                                className={`w-full bg-black/40 border rounded-xl py-2 px-3 text-xs font-bold text-white outline-none focus:border-primary/50 dark:[color-scheme:dark] ${missing && empty ? 'border-amber-500/50' : 'border-white/5'}`}
+                                                            />
+                                                        )}
+                                                        {yearOnly[k] && dates[k] && empty && (
+                                                            <p className="text-[10px] text-amber-400">Escribe el año con 4 dígitos (1950–{THIS_YEAR}).</p>
+                                                        )}
                                                     </div>
                                                 );
                                             })}

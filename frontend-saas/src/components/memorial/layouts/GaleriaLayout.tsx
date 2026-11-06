@@ -31,7 +31,7 @@ export default function GaleriaLayout(props: any) {
     // Sobre portada hay un velo oscuro: el texto debe ir claro aunque el tema sea claro
     const isDarkTheme = isDarkSurface(themeConfig, portadaUrl);
     const petName = mascota?.name || '';
-    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale);
+    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale, mascota);
     const rituals: RitualProps | undefined = props.rituals;
     const flowerCount = rituals?.counts.flor || 0;
     const [leftFlower, setLeftFlower] = useState(false);

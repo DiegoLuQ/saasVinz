@@ -482,6 +482,19 @@ class CremationService:
             if "end_time" in update_data: db_obj.technical.end_at = update_data["end_time"]
             if "temperature" in update_data: db_obj.technical.temperature = update_data["temperature"]
         
+        self._sync_commission(db_obj)
+
+        self.db.flush()
+        if agreement_change:
+            self._set_agreement(tenant_id, db_obj, new_agreement_id)
+        self._recompute_agreement_discount(db_obj)
+        self._sync_cremation_type(db_obj)
+        self.db.commit()
+        self.db.refresh(db_obj)
+        return db_obj
+
+    def _sync_commission(self, db_obj) -> None:
+        """Comisión de la veterinaria sobre el total final (o se borra la pendiente)."""
         current_status = db_obj.status.lower() if db_obj.status else "pending"
         is_operational_status = current_status not in ['borrador', 'cotizacion', 'cancelado', 'canceled']
 
@@ -531,11 +544,35 @@ class CremationService:
                 PartnerCommission.status == PartnerCommissionStatus.pendiente
             ).delete()
 
+    def update_discounts(self, tenant_id: int, cremation_id: int, *, set_agreement: bool,
+                         agreement_id: Optional[int], discount: Optional[float]) -> models.CremationOC:
+        """Convenio empresa y descuento % desde la vista rápida: el total se recalcula
+        aquí con los ítems guardados (mismo cálculo que lib/tenant/orders/calculations.ts:
+        convenio por ítem primero, luego el % manual; el recargo por peso no se rebaja
+        por convenio) y la comisión de la veterinaria se ajusta al nuevo total."""
+        db_obj = self.get_by_id(tenant_id, cremation_id)
+        fin = db_obj.financial
+        if fin is None:
+            fin = models.CremationFinancial(cremation_id=cremation_id, tenant_id=tenant_id)
+            self.db.add(fin)
+            db_obj.financial = fin
+            self.db.flush()
+        if set_agreement:
+            self._set_agreement(tenant_id, db_obj, agreement_id)
+        if discount is not None:
+            fin.discount = max(0.0, min(100.0, float(discount)))
         self.db.flush()
-        if agreement_change:
-            self._set_agreement(tenant_id, db_obj, new_agreement_id)
         self._recompute_agreement_discount(db_obj)
-        self._sync_cremation_type(db_obj)
+
+        cid = db_obj.id
+        def lines(model):
+            return sum(float(r.precio_venta or 0) * float(r.cantidad or 1)
+                       for r in self.db.query(model).filter(model.cremation_id == cid).all())
+        subtotal = lines(models.ServicioOC) + lines(models.PlanOC) + lines(models.ProductoOC) + float(fin.weight_price or 0)
+        after_agreement = subtotal - float(fin.agreement_discount or 0)
+        fin.total_price = round(after_agreement * (1 - float(fin.discount or 0) / 100), 2)
+        self.db.flush()
+        self._sync_commission(db_obj)
         self.db.commit()
         self.db.refresh(db_obj)
         return db_obj

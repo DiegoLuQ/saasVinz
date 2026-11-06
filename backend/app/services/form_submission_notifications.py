@@ -83,6 +83,14 @@ async def send_submission_notifications(
             extra_items = [s for s in enriched_services if s.get("type") != "plan"]
             extras_total = sum(float(s.get("price") or 0.0) for s in extra_items)
             total_price = plan_price + extras_total + tier_price
+            # «Precio a cotizar» y notas importantes de los servicios (constancia del aviso)
+            on_request = [s.get("name") for s in extra_items if s.get("price_on_request")]
+            notes = [(s.get("name"), s.get("important_note")) for s in extra_items if s.get("important_note")]
+
+            def _extra_label(s: dict, with_price: bool) -> str:
+                if s.get("price_on_request"):
+                    return f"{s.get('name')} (precio a cotizar)"
+                return f"{s.get('name')} ({format_clp(s.get('price'))})" if with_price else str(s.get("name"))
 
             # URLs
             tracking_link = f"{_tracking_base()}/{tenant.slug}/track/{quote(pet_name)}/{submission_code}"
@@ -102,9 +110,11 @@ async def send_submission_notifications(
                 if tier_name:
                     family_rows.append(("Tramo de peso", f"{tier_name} — {format_clp(tier_price)}" if tier_price > 0 else tier_name))
                 if extra_items:
-                    family_rows.append(("Servicios adicionales", ", ".join(f"{s.get('name')}" for s in extra_items)))
+                    family_rows.append(("Servicios adicionales", ", ".join(_extra_label(s, False) for s in extra_items)))
                 if total_price > 0:
-                    family_rows.append(("Total estimado", format_clp(total_price)))
+                    family_rows.append(("Total estimado", format_clp(total_price) + (" + servicios a cotizar" if on_request else "")))
+                for name, note in notes:
+                    family_rows.append((f"Importante · {name}", note))
 
                 try:
                     await send_action_email(
@@ -115,6 +125,7 @@ async def send_submission_notifications(
                             f"Hola {customer_name.split(' ')[0]}:",
                             f"Hemos recibido tu solicitud para acompañar a {pet_name}. En {tenant.name} cuidaremos cada detalle con el máximo cariño y respeto.",
                             "Nuestro equipo revisará la información y se pondrá en contacto contigo a la brevedad para coordinar todos los detalles.",
+                            *([f"El valor de {', '.join(on_request)} no está incluido en el total: {tenant.name} te lo informará antes de realizarlo."] if on_request else []),
                         ],
                         button_label="Ver seguimiento en vivo",
                         button_url=tracking_link,
@@ -146,9 +157,13 @@ async def send_submission_notifications(
                 if plan_name:
                     tenant_rows.append(("Plan elegido", f"{plan_name} ({format_clp(plan_price)})" if plan_price > 0 else plan_name))
                 if extra_items:
-                    tenant_rows.append(("Servicios adicionales", ", ".join(f"{s.get('name')} ({format_clp(s.get('price'))})" for s in extra_items)))
+                    tenant_rows.append(("Servicios adicionales", ", ".join(_extra_label(s, True) for s in extra_items)))
                 if total_price > 0:
-                    tenant_rows.append(("Total estimado", format_clp(total_price)))
+                    tenant_rows.append(("Total estimado", format_clp(total_price) + (" + servicios a cotizar" if on_request else "")))
+                if on_request:
+                    tenant_rows.append(("Por cotizar", "Informa a la familia el valor de: " + ", ".join(on_request)))
+                for name, note in notes:
+                    tenant_rows.append((f"Nota mostrada · {name}", note))
                 if owner_dict.get("veterinary"):
                     tenant_rows.append(("Lugar de retiro", str(owner_dict.get("veterinary"))))
                 if owner_dict.get("address"):

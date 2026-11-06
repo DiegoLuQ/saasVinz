@@ -11,7 +11,7 @@ export default function CartaLayout(props: any) {
 
     const petName = mascota?.nombre || mascota?.name || '';
     // Formato estable (UTC) en vez de toLocaleDateString(), que variaba según el navegador
-    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale);
+    const dates = getLifeDates(mascota?.birth_date, mascota?.death_date, locale, mascota);
     const bio = memorial?.msg_despedida || '';
 
     // Portada o tema oscuro/de color: botones claros sobre el panel de la foto

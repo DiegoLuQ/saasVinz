@@ -851,6 +851,11 @@ export default function ServicesPage() {
                                                     Especial
                                                 </span>
                                             )}
+                                            {service.price_on_request && (
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                                                    A cotizar
+                                                </span>
+                                            )}
                                             {service.show_in_form === false && (
                                                 <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                                                     <EyeOff size={10} />
@@ -876,7 +881,7 @@ export default function ServicesPage() {
                                                     Precio de Venta
                                                 </p>
                                                 <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
-                                                    {formatCLP(service.price)}
+                                                    {service.price_on_request ? <span className="text-amber-600 dark:text-amber-400">A cotizar</span> : formatCLP(service.price)}
                                                 </div>
 
                                                 {/* Barra de Costo y Margen */}
@@ -1008,7 +1013,7 @@ export default function ServicesPage() {
                                                     </div>
                                                 </td>
                                                 <td className="py-3 px-4 text-right font-bold text-slate-900 dark:text-white text-sm">
-                                                    {formatCLP(service.price)}
+                                                    {service.price_on_request ? <span className="text-amber-600 dark:text-amber-400">A cotizar</span> : formatCLP(service.price)}
                                                 </td>
                                                 <td className="py-3 px-4 text-right text-muted-foreground">
                                                     {service.cost > 0 ? formatCLP(service.cost) : '—'}
@@ -1481,15 +1486,16 @@ export default function ServicesPage() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div className="space-y-1.5">
                                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                                        Precio de Venta ($ CLP) *
+                                        Precio de Venta ($ CLP) {currentService?.price_on_request ? '' : '*'}
                                     </label>
                                     <div className="relative">
                                         <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-sm">$</span>
                                         <input
-                                            type="number"
-                                            required
+                                            type={currentService?.price_on_request ? 'text' : 'number'}
+                                            required={!currentService?.price_on_request}
+                                            disabled={!!currentService?.price_on_request}
                                             min={0}
-                                            value={currentService?.price || 0}
+                                            value={currentService?.price_on_request ? 'A cotizar' : (currentService?.price || 0)}
                                             onChange={(e) => setCurrentService({ ...currentService, price: Number(e.target.value) })}
                                             className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2.5 pl-8 pr-3.5 text-sm font-black outline-none focus:border-primary transition-all text-slate-900 dark:text-white"
                                         />
@@ -1584,6 +1590,42 @@ export default function ServicesPage() {
                                     </span>
                                 </div>
                             </label>
+
+                            {currentService?.is_special && (
+                                <div className="space-y-3 p-3.5 rounded-2xl border border-violet-200 dark:border-violet-900/60 bg-violet-50/40 dark:bg-violet-950/20">
+                                    <label className="flex items-start gap-3 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={!!currentService?.price_on_request}
+                                            onChange={(e) => setCurrentService({ ...currentService, price_on_request: e.target.checked, ...(e.target.checked ? { price: 0 } : {}) })}
+                                            className="mt-0.5 w-4 h-4 accent-primary rounded cursor-pointer"
+                                        />
+                                        <div>
+                                            <span className="block text-xs font-bold text-slate-900 dark:text-white">Precio a cotizar</span>
+                                            <span className="block text-[11px] text-muted-foreground mt-0.5">
+                                                Para servicios externos cuyo valor aún no conoces. La familia puede elegirlo sin precio (verá «Precio a cotizar») y tú pones el monto después en la orden.
+                                            </span>
+                                        </div>
+                                    </label>
+                                    <div className="space-y-1.5">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Nota importante para la familia</label>
+                                            <span className="text-[10px] text-muted-foreground">{(currentService?.important_note || '').length}/300</span>
+                                        </div>
+                                        <textarea
+                                            rows={3}
+                                            maxLength={300}
+                                            value={currentService?.important_note || ''}
+                                            onChange={(e) => setCurrentService({ ...currentService, important_note: e.target.value })}
+                                            placeholder="Ej: Este servicio lo realiza un tercero; el valor se informa antes de realizarlo y debe pagarse aparte."
+                                            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2.5 px-3.5 text-xs outline-none focus:border-primary transition-all text-slate-900 dark:text-white resize-none"
+                                        />
+                                        <p className="text-[11px] text-muted-foreground">
+                                            Se muestra al elegir el servicio, en el resumen final del formulario y en el correo de confirmación, como constancia del aviso.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Botones del Modal */}

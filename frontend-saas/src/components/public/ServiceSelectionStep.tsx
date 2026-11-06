@@ -37,6 +37,10 @@ export interface Service {
     weight_prices?: Record<string, number> | null;
     /** Planes: peso máximo de la mascota en kg (null = sin límite) */
     max_weight?: number | null;
+    /** «Precio a cotizar»: el crematorio informa el valor después */
+    price_on_request?: boolean;
+    /** Nota importante que la familia debe conocer */
+    important_note?: string | null;
 }
 
 /** ids de servicios ya incluidos en los planes seleccionados (no se cobran aparte). */
@@ -330,12 +334,19 @@ export default function ServiceSelectionStep({
                                             <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{s.name}</span>
                                             {included ? (
                                                 <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Incluido en tu plan</span>
+                                            ) : s.price_on_request ? (
+                                                <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">Precio a cotizar</span>
                                             ) : showPrices && s.price != null && s.price > 0 && (
                                                 <span className="shrink-0 text-sm font-bold text-emerald-600 dark:text-emerald-400">{formatCLP(s.price)}</span>
                                             )}
                                         </span>
                                         {s.description && (
                                             <span className="block text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{s.description}</span>
+                                        )}
+                                        {s.important_note && (
+                                            <span className="mt-2 block rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] leading-relaxed text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200">
+                                                <b>Importante:</b> {s.important_note}
+                                            </span>
                                         )}
                                     </span>
                                 </button>
