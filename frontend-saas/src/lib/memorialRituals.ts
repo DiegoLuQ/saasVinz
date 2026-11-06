@@ -23,6 +23,9 @@ export interface RitualProps {
     stars: LitStar[];
     send: SendRitual;
     did?: Partial<Record<RitualKind, boolean>>;
+    /** Enciende la melodía del memorial (si tiene). Se llama al tocar la vela, en el mismo clic
+     *  para que el navegador permita el audio. */
+    playMusic?: () => void;
 }
 
 const LABELS: Record<'es' | 'en', Record<RitualKind, [string, string]>> = {

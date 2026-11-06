@@ -2,6 +2,8 @@ import React, { useId, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Star, Compass, Flame } from 'lucide-react';
 import MemorialActionButtons from '@/components/memorial/MemorialActionButtons';
+import MemorialCandleRow from '@/components/memorial/MemorialCandleRow';
+import MemorialCloud from '@/components/memorial/MemorialCloud';
 import { getLifeDates, nameSizeClass, seededRandom, isDarkSurface, getMemorialThemeStyles, getMemorialAtmosphereBg } from '@/lib/memorialDesign';
 import { ritualLabel, type RitualProps } from '@/lib/memorialRituals';
 
@@ -22,6 +24,9 @@ export default function ConstelacionLayout(props: any) {
     const starCount = rituals?.counts?.estrella || 0;
     const candleCount = rituals?.counts?.vela || 0;
     const isCandleLit = candleLitLocal || Boolean(rituals?.did?.vela);
+    // Las velas grandes empiezan apagadas: se prenden cuando este visitante toca
+    // «Encender una velita» y siguen prendidas al volver. La fila bajo la foto muestra las de todos.
+    const flameOn = isCandleLit;
 
     const portadaUrl = memorial?.diseno?.portada_url;
     const tema = memorial?.diseno?.tema || 'nocturno';
@@ -91,6 +96,7 @@ export default function ConstelacionLayout(props: any) {
     };
 
     const handleLightCandle = () => {
+        rituals?.playMusic?.();
         if (isCandleLit) return;
         setCandleLitLocal(true);
         rituals?.send('vela');
@@ -271,6 +277,9 @@ export default function ConstelacionLayout(props: any) {
                     </div>
                 </div>
 
+                {/* Velitas de los visitantes, bajo el retrato */}
+                <MemorialCandleRow count={candleCount} isDark={isDarkTheme} locale={locale} className="-mt-2 mb-6" />
+
                 {/* Nombre */}
                 <h1
                     className={`${nameSizeClass(petName, {
@@ -320,7 +329,7 @@ export default function ConstelacionLayout(props: any) {
 
                 {/* Vela Eterna sobre una nube */}
                 <CelestialCandle
-                    lit={isCandleLit}
+                    lit={flameOn}
                     onLight={handleLightCandle}
                     label={locale === 'en' ? 'Light Eternal Candle' : 'Encender Vela Eterna'}
                 />
@@ -331,13 +340,13 @@ export default function ConstelacionLayout(props: any) {
                         whileHover={{ scale: 1.04 }}
                         whileTap={{ scale: 0.96 }}
                         onClick={handleLightCandle}
-                        className={`${GOLD_PILL} ${isCandleLit ? 'text-[#2a1a05]' : (isDarkTheme ? 'text-amber-100' : 'text-amber-950')}`}
-                        style={isCandleLit ? GOLD_PILL_STYLE : (isDarkTheme ? DARK_PILL_STYLE : LIGHT_PILL_STYLE)}
+                        className={`${GOLD_PILL} ${!isCandleLit ? 'text-[#2a1a05]' : (isDarkTheme ? 'text-amber-100' : 'text-amber-950')}`}
+                        style={!isCandleLit ? GOLD_PILL_STYLE : (isDarkTheme ? DARK_PILL_STYLE : LIGHT_PILL_STYLE)}
                     >
-                        <Flame size={17} className={isCandleLit ? 'fill-[#2a1a05] text-[#2a1a05]' : (isDarkTheme ? 'text-amber-300 fill-amber-300' : 'text-amber-700 fill-amber-700')} />
+                        <Flame size={17} className={!isCandleLit ? 'text-[#2a1a05]' : (isDarkTheme ? 'text-amber-300 fill-amber-300' : 'text-amber-700 fill-amber-700')} />
                         {isCandleLit
-                            ? (locale === 'en' ? 'Eternal Candle Lit' : 'Vela eterna encendida')
-                            : (locale === 'en' ? 'Light Eternal Candle' : 'Encender vela eterna')}
+                            ? (locale === 'en' ? 'Candle lit' : 'Vela encendida')
+                            : (locale === 'en' ? 'Light a candle' : 'Encender una velita')}
                     </motion.button>
 
                     <motion.button
@@ -603,18 +612,7 @@ function CelestialCandle({ lit, onLight, label }: { lit: boolean; onLight: () =>
             </button>
 
             {/* Nube: capas difuminadas que cubren la base del cirio */}
-            <motion.div
-                className="absolute bottom-0 inset-x-0 h-20 z-20"
-                animate={{ x: [-3, 3, -3] }}
-                transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut' }}
-            >
-                <div className="absolute bottom-1 left-6 w-28 h-12 rounded-full bg-white/70 blur-[10px]" />
-                <div className="absolute bottom-0 right-6 w-32 h-12 rounded-full bg-white/65 blur-[10px]" />
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 w-36 h-14 rounded-full bg-white/85 blur-[8px]" />
-                <div className="absolute bottom-6 left-[30%] w-16 h-10 rounded-full bg-white/80 blur-[6px]" />
-                <div className="absolute bottom-6 right-[28%] w-20 h-11 rounded-full bg-white/75 blur-[7px]" />
-                <div className="absolute bottom-0 inset-x-2 h-6 rounded-full bg-indigo-200/40 blur-[12px]" />
-            </motion.div>
+            <MemorialCloud className="absolute bottom-0 inset-x-0 h-20" tone="night" />
         </div>
     );
 }

@@ -36,3 +36,22 @@ def test_tabla_de_precios_guarda_icono_y_ejemplos(client, tabla, db):
     assert (t["icon_url"], t["examples"]) == ("https://cdn.example/mini.webp", "Hámster")
     client.delete(f"/api/internal/price-lists/{r.json()['id']}", headers=tabla["h"])
     assert db.query(models.PriceList).filter(models.PriceList.name == "Con íconos").count() == 0
+
+
+def test_biblioteca_de_iconos_solo_globales(client, auth, db, world):
+    """El tenant ve los íconos globales de la categoría «tamanos», nunca los de otro crematorio."""
+    from app.api.internal.common.models import MediaLibrary, MediaCategory
+    assert db.query(MediaCategory).filter(MediaCategory.key == "tamanos").count() == 1
+    glob = MediaLibrary(url="https://cdn.example/global-perro.webp", media_type="image", category="tamanos", tenant_id=None)
+    otro = MediaLibrary(url="https://cdn.example/ajeno.webp", media_type="image", category="tamanos", tenant_id=world["tenant_b"])
+    db.add_all([glob, otro])
+    db.commit()
+    try:
+        r = client.get("/api/internal/media?category=tamanos&media_type=image&page_size=100", headers=auth("a"))
+        assert r.status_code == 200, r.text
+        urls = [i["url"] for i in r.json()["items"]]
+        assert glob.url in urls and otro.url not in urls
+    finally:
+        db.delete(glob)
+        db.delete(otro)
+        db.commit()

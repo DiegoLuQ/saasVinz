@@ -13,9 +13,12 @@ type Props = {
     onStatus: (id: number, estado: Dedication['estado']) => Promise<void>;
     onEdit: (id: number, data: { mensajero: string; mensaje: string }) => Promise<void>;
     onDelete: (id: number) => Promise<void>;
+    /** Publicar los mensajes nuevos sin revisarlos */
+    autoPublish: boolean;
+    onAutoPublishChange: (on: boolean) => void;
 };
 
-export default function PendingMessages({ dedications, limit, isDark, locale, onStatus, onEdit, onDelete }: Props) {
+export default function PendingMessages({ dedications, limit, isDark, locale, onStatus, onEdit, onDelete, autoPublish, onAutoPublishChange }: Props) {
     const es = locale === 'es';
     const pending = dedications.filter((d) => d.estado === 'pendiente');
     const published = dedications.filter((d) => d.estado === 'aprobado');
@@ -24,7 +27,16 @@ export default function PendingMessages({ dedications, limit, isDark, locale, on
     const [showHidden, setShowHidden] = useState(false);
     const [toDelete, setToDelete] = useState<number | null>(null);
     const [busyId, setBusyId] = useState<number | null>(null);
+    const [publishingAll, setPublishingAll] = useState(false);
 
+    const publishAll = async () => {
+        setPublishingAll(true);
+        try {
+            for (const d of pending) await onStatus(d.id_dedicatoria, 'aprobado');
+        } finally {
+            setPublishingAll(false);
+        }
+    };
     const run = async (id: number, fn: () => Promise<void>) => {
         setBusyId(id);
         try { await fn(); } finally { setBusyId(null); }
@@ -52,6 +64,41 @@ export default function PendingMessages({ dedications, limit, isDark, locale, on
                 )}
             </div>
 
+            {/* Publicar sin aprobar: los mensajes nuevos aparecen en el memorial al instante */}
+            <label className={`mt-4 flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 cursor-pointer ${isDark ? 'border-white/10 bg-white/[0.03]' : 'border-slate-200 bg-slate-50'}`}>
+                <span className="min-w-0">
+                    <span className={`block text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>
+                        {es ? 'Publicar mensajes automáticamente' : 'Publish messages automatically'}
+                    </span>
+                    <span className={`block text-xs mt-0.5 ${mutedClass(isDark)}`}>
+                        {autoPublish
+                            ? (es ? 'Los mensajes nuevos se publican al instante. Puedes ocultarlos después.' : 'New messages are published instantly. You can hide them later.')
+                            : (es ? 'Revisas cada mensaje antes de que aparezca.' : 'You review each message before it appears.')}
+                    </span>
+                </span>
+                <span className="relative shrink-0">
+                    <input
+                        type="checkbox"
+                        role="switch"
+                        aria-checked={autoPublish}
+                        checked={autoPublish}
+                        onChange={(e) => onAutoPublishChange(e.target.checked)}
+                        className="peer sr-only"
+                    />
+                    <span className={`block h-6 w-11 rounded-full transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-amber-400 ${autoPublish ? 'bg-emerald-500' : isDark ? 'bg-white/15' : 'bg-slate-300'}`} />
+                    <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${autoPublish ? 'translate-x-5' : ''}`} />
+                </span>
+            </label>
+
+            {pending.length > 1 && (
+                <button type="button" onClick={publishAll} disabled={publishingAll || busyId !== null}
+                    className={`${primaryBtn} mt-3 w-full disabled:opacity-60`}>
+                    <Check size={16} />
+                    {publishingAll
+                        ? (es ? 'Publicando…' : 'Publishing…')
+                        : (es ? `Publicar todos (${pending.length})` : `Publish all (${pending.length})`)}
+                </button>
+            )}
             {pending.length > 0 && (
                 <ul className="mt-4 space-y-3">
                     {pending.map((d) => (

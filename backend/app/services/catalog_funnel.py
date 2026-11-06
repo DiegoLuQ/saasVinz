@@ -84,8 +84,10 @@ def _event_counts(db: Session, filters: list, group_by=None) -> dict:
     return out
 
 
-def _submission_counts(db: Session, filters: list, group_by=None) -> dict:
-    """Formularios enviados desde catálogos y cuántos llegaron a orden / entrega."""
+def _submission_counts(db: Session, filters: list, group_by=None, catalog_only: bool = True) -> dict:
+    """Formularios enviados y cuántos llegaron a orden / entrega. Por defecto solo los que vienen
+    de un catálogo; con `catalog_only=False`, todos los formularios web (enlace directo, QR,
+    formularios personalizados), para comparar cuánto aporta el catálogo."""
     sub = models.FormSubmission
     oc = models.CremationOC
     has_order = (
@@ -106,7 +108,9 @@ def _submission_counts(db: Session, filters: list, group_by=None) -> dict:
     ]
     if group_by is not None:
         cols.insert(0, group_by)
-    q = db.query(*cols).filter(sub.catalog_token_id.isnot(None), *filters)
+    q = db.query(*cols).filter(*filters)
+    if catalog_only:
+        q = q.filter(sub.catalog_token_id.isnot(None))
     if group_by is not None:
         q = q.group_by(group_by)
     out: dict = {}
@@ -142,6 +146,15 @@ def link_stats(db: Session, token_ids: list[int]) -> dict[int, dict]:
     return result
 
 
+def _all_forms(sb: dict) -> dict:
+    """Todos los formularios web (con o sin catálogo) y sus órdenes."""
+    return {
+        "forms_all": sb.get("form_submit", 0),
+        "orders_all": sb.get("order", 0),
+        "delivered_all": sb.get("delivered", 0),
+    }
+
+
 def _funnel(ev: dict, sb: dict) -> dict:
     return {
         "visitors": ev.get("view", 0),
@@ -171,6 +184,7 @@ def report(db: Session, date_from: datetime | None, date_to: datetime | None, te
         tok_f.append(CatalogShareToken.tenant_id == tenant_id)
 
     totals = _funnel(_event_counts(db, ev_f), _submission_counts(db, sub_f))
+    totals.update(_all_forms(_submission_counts(db, sub_f, catalog_only=False)))
 
     # Por crematorio: enlaces creados (en el periodo y en total) + embudo
     tenants = {t.id: t for t in db.query(models.Tenant).all()}
@@ -193,11 +207,13 @@ def report(db: Session, date_from: datetime | None, date_to: datetime | None, te
     )
     ev_by_tenant = _event_counts(db, ev_f, CatalogEvent.tenant_id)
     sub_by_tenant = _submission_counts(db, sub_f, models.FormSubmission.tenant_id)
+    all_by_tenant = _submission_counts(db, sub_f, models.FormSubmission.tenant_id, catalog_only=False)
 
     by_tenant = []
-    for tid in set(links_total) | set(ev_by_tenant) | set(sub_by_tenant):
+    for tid in set(links_total) | set(ev_by_tenant) | set(sub_by_tenant) | set(all_by_tenant):
         t = tenants.get(tid)
         row = _funnel(ev_by_tenant.get(tid, {}), sub_by_tenant.get(tid, {}))
+        row.update(_all_forms(all_by_tenant.get(tid, {})))
         row.update(
             tenant_id=tid,
             tenant_name=t.name if t else f"#{tid}",
@@ -207,7 +223,7 @@ def report(db: Session, date_from: datetime | None, date_to: datetime | None, te
             views_total=int(legacy_views.get(tid, 0) or 0),
         )
         by_tenant.append(row)
-    by_tenant.sort(key=lambda r: (r["visitors"], r["links_total"]), reverse=True)
+    by_tenant.sort(key=lambda r: (r["visitors"], r["forms_all"], r["links_total"]), reverse=True)
 
     # Planes y tamaños más pedidos («Solicitar este plan» + WhatsApp, sesiones distintas)
     ask_f = ev_f + [CatalogEvent.kind.in_(("plan_request", "whatsapp")), CatalogEvent.plan_id.isnot(None)]
@@ -236,14 +252,23 @@ def report(db: Session, date_from: datetime | None, date_to: datetime | None, te
         key=lambda r: r["total"], reverse=True,
     )[:TOP_LIMIT]
 
+    # Cada crematorio define sus propios rangos: el ranking es por crematorio + tamaño
+    # (con «Todos» se muestra a qué crematorio pertenece cada rango; nunca se suman entre sí).
+    n_sessions = func.count(distinct(CatalogEvent.session_id))
     size_rows = (
-        db.query(CatalogEvent.weight_tier, func.count(distinct(CatalogEvent.session_id)))
+        db.query(CatalogEvent.tenant_id, CatalogEvent.weight_tier, n_sessions)
         .filter(*ev_f, CatalogEvent.kind.in_(("plan_request", "whatsapp")), CatalogEvent.weight_tier.isnot(None))
-        .group_by(CatalogEvent.weight_tier)
-        .order_by(func.count(distinct(CatalogEvent.session_id)).desc())
+        .group_by(CatalogEvent.tenant_id, CatalogEvent.weight_tier)
+        .order_by(n_sessions.desc())
         .limit(TOP_LIMIT).all()
     )
-    top_sizes = [{"weight_tier": w, "count": n} for w, n in size_rows]
+    top_sizes = [
+        {
+            "weight_tier": w, "count": n, "tenant_id": tid,
+            "tenant_name": tenants[tid].name if tid in tenants else f"#{tid}",
+        }
+        for tid, w, n in size_rows
+    ]
 
     return {
         "totals": totals,

@@ -6,11 +6,13 @@ import {
     PawPrint,
     Heart,
     Sparkles,
+    Flame,
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 
 import MemorialActionButtons from '@/components/memorial/MemorialActionButtons';
+import MemorialCandleRow from '@/components/memorial/MemorialCandleRow';
 import { getLifeDates, nameSizeClass } from '@/lib/memorialDesign';
 import { ritualLabel, type RitualProps } from '@/lib/memorialRituals';
 
@@ -25,12 +27,17 @@ export default function NormalLayout(props: any) {
     } = props;
 
     const [showScrollTop, setShowScrollTop] = useState(false);
-    const [lit, setLit] = useState(false);
+    const [litLocal, setLit] = useState(false);
     const rituals: RitualProps | undefined = props.rituals;
+    // La vela queda prendida al volver (el gesto se recuerda en el navegador)
+    const lit = litLocal || Boolean(rituals?.did?.vela);
     const candleCount = rituals?.counts.vela || 0;
-
+    // La vela grande empieza apagada: se prende cuando este visitante toca
+    // «Encender una velita» y sigue prendida al volver. La fila bajo la foto muestra las de todos.
+    const flameOn = lit;
     // Encender la vela registra el gesto (una vez por visita) y suma al contador
     const lightCandle = () => {
+        rituals?.playMusic?.();
         if (lit) return;
         setLit(true);
         rituals?.send('vela');
@@ -165,6 +172,9 @@ export default function NormalLayout(props: any) {
                             {/* Subtle inner shadow to simulate depth */}
                             <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_30px_rgba(0,0,0,0.06)]" />
                         </div>
+
+                        {/* Velitas encendidas por los visitantes, bajo la foto */}
+                        <MemorialCandleRow count={candleCount} isDark={isDark} locale={locale} />
                     </motion.div>
                 </div>
 
@@ -252,10 +262,10 @@ export default function NormalLayout(props: any) {
                             <button
                                 onClick={lightCandle}
                                 className="group relative flex flex-col items-center focus:outline-none"
-                                aria-label={lit ? t?.mem_candle_lit : t?.mem_candle_light}
+                                aria-label={lit ? (locale === 'en' ? 'Candle lit' : 'Vela encendida') : (locale === 'en' ? 'Light a candle' : 'Encender una velita')}
                             >
                                 {/* Glow aura */}
-                                <div className={`absolute -top-8 w-20 h-20 rounded-full transition-all duration-1000 ${lit
+                                <div className={`absolute -top-8 w-20 h-20 rounded-full transition-all duration-1000 ${flameOn
                                     ? 'bg-amber-400/20 blur-2xl scale-100 opacity-100'
                                     : 'bg-amber-400/5 blur-xl scale-75 opacity-0'
                                     }`} />
@@ -263,21 +273,22 @@ export default function NormalLayout(props: any) {
                                 {/* Flame */}
                                 <div className="relative w-4 h-7 mb-0.5">
                                     <AnimatePresence>
-                                        {lit && (
+                                        {flameOn && (
                                             <>
-                                                {/* Outer flame */}
+                                                {/* Llama serena: se enciende una vez y queda quieta (sin parpadeo),
+                                                    solo un leve vaivén muy lento */}
                                                 <motion.div
-                                                    initial={{ scale: 0, opacity: 0 }}
-                                                    animate={{ scale: [1, 1.1, 0.95, 1.05, 1], opacity: 1 }}
-                                                    transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                                                    className="absolute inset-0 bg-gradient-to-t from-orange-500 via-amber-400 to-transparent rounded-[50%_50%_50%_50%_/_60%_60%_40%_40%] blur-[1px]"
+                                                    initial={{ scaleY: 0, opacity: 0 }}
+                                                    animate={{ scaleY: [1, 1.03, 1], opacity: 1 }}
+                                                    transition={{ scaleY: { duration: 4, repeat: Infinity, ease: 'easeInOut' }, opacity: { duration: 0.6 } }}
+                                                    className="absolute inset-0 origin-bottom bg-gradient-to-t from-orange-500 via-amber-400 to-transparent rounded-[50%_50%_50%_50%_/_60%_60%_40%_40%] blur-[1px]"
                                                 />
                                                 {/* Inner flame (white core) */}
                                                 <motion.div
-                                                    initial={{ scale: 0 }}
-                                                    animate={{ scale: [0.8, 1, 0.85, 0.95, 0.8], opacity: [0.9, 1, 0.8, 1, 0.9] }}
-                                                    transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                                                    className="absolute inset-x-[3px] bottom-0 h-[65%] bg-gradient-to-t from-yellow-100 via-white to-transparent rounded-full blur-[0.5px]"
+                                                    initial={{ scaleY: 0, opacity: 0 }}
+                                                    animate={{ scaleY: 1, opacity: 1 }}
+                                                    transition={{ duration: 0.6 }}
+                                                    className="absolute inset-x-[3px] bottom-0 h-[65%] origin-bottom bg-gradient-to-t from-yellow-100 via-white to-transparent rounded-full blur-[0.5px]"
                                                 />
                                             </>
                                         )}
@@ -295,17 +306,26 @@ export default function NormalLayout(props: any) {
                                     <div className="absolute top-0 bottom-0 right-0 w-2 bg-black/[0.03]" />
                                 </div>
 
-                                {/* Label */}
-                                <span
-                                    className={`mt-5 text-[10px] tracking-[0.3em] uppercase transition-opacity ${
-                                        isDark ? 'opacity-50 group-hover:opacity-80 text-white' : 'opacity-80 group-hover:opacity-100 font-bold text-slate-800'
-                                    }`}
-                                    style={{ fontFamily: "'Quicksand', sans-serif" }}
-                                >
-                                    {lit
-                                        ? (t?.mem_candle_lit || 'Luz Perpetua Encendida')
-                                        : (t?.mem_candle_light || 'Encender una Vela')}
-                                </span>
+                                {/* Botón visible (con contraste): apagada → «Encender una velita»; encendida → estado */}
+                                {lit ? (
+                                    <span
+                                        className={`mt-5 inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-xs font-semibold ${
+                                            isDark ? 'border-amber-300/40 bg-amber-300/10 text-amber-100' : 'border-amber-600/30 bg-amber-50 text-amber-900'
+                                        }`}
+                                        style={{ fontFamily: "'Quicksand', sans-serif" }}
+                                    >
+                                        <Flame size={14} className="text-amber-500 fill-amber-400" />
+                                        {locale === 'en' ? 'Candle lit' : 'Vela encendida'}
+                                    </span>
+                                ) : (
+                                    <span
+                                        className="mt-5 inline-flex items-center gap-2 rounded-full bg-amber-400 px-6 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-amber-500/30 ring-1 ring-amber-500/60 transition-all group-hover:bg-amber-300 group-hover:-translate-y-0.5 group-focus-visible:ring-2 group-focus-visible:ring-offset-2"
+                                        style={{ fontFamily: "'Quicksand', sans-serif" }}
+                                    >
+                                        <Flame size={16} />
+                                        {locale === 'en' ? 'Light a candle' : 'Encender una velita'}
+                                    </span>
+                                )}
                                 {candleCount > 0 && (
                                     <span className="mt-1.5 text-sm italic opacity-70">
                                         🕯️ {ritualLabel('vela', candleCount, locale)}

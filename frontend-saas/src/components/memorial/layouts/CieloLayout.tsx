@@ -6,6 +6,7 @@ import {
     Cloud as CloudIcon
 } from 'lucide-react';
 import MemorialActionButtons from '@/components/memorial/MemorialActionButtons';
+import MemorialCandleRow from '@/components/memorial/MemorialCandleRow';
 import { getLifeDates, isDarkSurface, nameSizeClass, seededRandom, getMemorialThemeStyles, getMemorialAtmosphereBg } from '@/lib/memorialDesign';
 import { ritualLabel, type RitualProps } from '@/lib/memorialRituals';
 
@@ -18,6 +19,9 @@ export default function CieloLayout(props: any) {
     const kissCount = rituals?.counts?.beso || 0;
     const candleCount = rituals?.counts?.vela || 0;
     const isCandleLit = candleLitLocal || Boolean(rituals?.did?.vela);
+    // Las velas grandes empiezan apagadas: se prenden cuando este visitante toca
+    // «Encender una velita» y siguen prendidas al volver. La fila bajo la foto muestra las de todos.
+    const flameOn = isCandleLit;
 
     const sendKiss = () => {
         setSentKisses(prev => prev + 1);
@@ -25,6 +29,7 @@ export default function CieloLayout(props: any) {
     };
 
     const lightCandle = () => {
+        rituals?.playMusic?.();
         if (isCandleLit) return;
         setCandleLitLocal(true);
         rituals?.send('vela');
@@ -115,7 +120,7 @@ export default function CieloLayout(props: any) {
                         >
                             <div className="relative h-7 flex items-end justify-center">
                                 <AnimatePresence>
-                                    {isCandleLit && (
+                                    {flameOn && (
                                         <motion.div
                                             initial={{ scale: 0, opacity: 0 }}
                                             animate={{ scale: [1, 1.12, 0.96, 1.06, 1], opacity: 1 }}
@@ -130,10 +135,13 @@ export default function CieloLayout(props: any) {
                                 </AnimatePresence>
                             </div>
                             <div className="w-8 h-10 rounded-t-md rounded-b-lg bg-gradient-to-b from-[#fffdf7] to-[#e7dcc6] border border-[#d4af37]/50 shadow-lg flex items-center justify-center">
-                                <Flame size={13} className={isCandleLit ? 'text-amber-500 fill-amber-400' : 'text-slate-400 group-hover:text-amber-500 transition-colors'} />
+                                <Flame size={13} className={flameOn ? 'text-amber-500 fill-amber-400' : 'text-slate-400 group-hover:text-amber-500 transition-colors'} />
                             </div>
                         </button>
                     </motion.div>
+
+                    {/* Velitas de los visitantes, bajo la foto */}
+                    <MemorialCandleRow count={candleCount} isDark={isDarkTheme} locale={locale} className="mt-12" />
                 </div>
 
                 {/* Content Section */}
@@ -189,17 +197,17 @@ export default function CieloLayout(props: any) {
                         <button
                             onClick={lightCandle}
                             className={`px-6 py-3.5 rounded-full text-xs sm:text-sm font-bold shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-2.5 border ${
-                                isCandleLit
-                                    ? 'bg-amber-500 text-white border-amber-300 shadow-amber-500/30'
+                                !isCandleLit
+                                    ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 border-amber-500/60 shadow-amber-400/30'
                                     : isDarkTheme
                                         ? 'bg-white/15 text-white border-white/25 hover:bg-white/25'
                                         : 'bg-white/95 text-slate-900 border-slate-200/80 hover:bg-white shadow-md'
                             }`}
                         >
-                            <Flame size={18} className={isCandleLit ? 'fill-white text-white animate-pulse' : 'text-amber-500 fill-amber-400'} />
+                            <Flame size={18} className={!isCandleLit ? 'text-slate-950' : 'text-amber-500 fill-amber-400'} />
                             {isCandleLit
-                                ? (locale === 'en' ? 'Candle Lit' : 'Vela Encendida')
-                                : (t?.mem_light_candle || (locale === 'en' ? 'Light a Candle' : 'Encender una Vela'))}
+                                ? (locale === 'en' ? 'Candle lit' : 'Vela encendida')
+                                : (locale === 'en' ? 'Light a candle' : 'Encender una velita')}
                         </button>
 
                         <div className="relative group">

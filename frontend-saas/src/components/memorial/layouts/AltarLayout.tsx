@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import MemorialActionButtons from '@/components/memorial/MemorialActionButtons';
+import MemorialCandleRow from '@/components/memorial/MemorialCandleRow';
+import MemorialCloud from '@/components/memorial/MemorialCloud';
 import { getLifeDates, isDarkSurface, nameSizeClass, getMemorialThemeStyles, getMemorialAtmosphereBg } from '@/lib/memorialDesign';
 import { ritualLabel, type RitualProps } from '@/lib/memorialRituals';
 
@@ -30,12 +32,15 @@ export default function AltarLayout(props: any) {
 
     const [candleLitLocal, setCandleLitLocal] = useState(false);
     const isCandleLit = candleLitLocal || Boolean(rituals?.did?.vela);
+    // Las velas grandes empiezan apagadas: se prenden cuando este visitante toca
+    // «Encender una velita» y siguen prendidas al volver. La fila bajo la foto muestra las de todos.
+    const flameOn = isCandleLit;
 
     const lightCandle = () => {
-        if (!candleLitLocal) {
-            setCandleLitLocal(true);
-            rituals?.send('vela');
-        }
+        rituals?.playMusic?.();
+        if (isCandleLit) return;
+        setCandleLitLocal(true);
+        rituals?.send('vela');
     };
 
     const petName = mascota?.name || '';
@@ -85,7 +90,7 @@ export default function AltarLayout(props: any) {
 
             {/* Resplandor radial de velas vivas */}
             <AnimatePresence>
-                {isCandleLit && (
+                {flameOn && (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: [0.65, 0.85, 0.7] }}
@@ -154,9 +159,10 @@ export default function AltarLayout(props: any) {
                     <div className="relative flex items-end justify-center gap-3 sm:gap-6 z-10 w-full">
                         {/* 🕯️ Cirio Ceremonial Izquierdo */}
                         <CeremonialCandle
-                            isLit={isCandleLit}
+                            isLit={flameOn}
                             onLight={lightCandle}
                             locale={locale}
+                            isDark={isDarkTheme}
                             side="left"
                         />
 
@@ -196,9 +202,10 @@ export default function AltarLayout(props: any) {
 
                         {/* 🕯️ Cirio Ceremonial Derecho */}
                         <CeremonialCandle
-                            isLit={isCandleLit}
+                            isLit={flameOn}
                             onLight={lightCandle}
                             locale={locale}
+                            isDark={isDarkTheme}
                             side="right"
                         />
                     </div>
@@ -228,6 +235,12 @@ export default function AltarLayout(props: any) {
                             </span>
                         </div>
                     </div>
+
+                    {/* Velitas de los visitantes, bajo el altar, sobre una nube */}
+                    <div className="relative mt-6 px-6 pb-2">
+                        <MemorialCandleRow count={candleCount} isDark={isDarkTheme} locale={locale} className="" />
+                        <MemorialCloud className="absolute -bottom-2 -inset-x-2 h-10" tone={isDarkTheme ? 'night' : 'day'} delay={1.2} intensity={0.55} />
+                    </div>
                 </div>
 
                 {/* 3. BOTÓN RITUAL INTERACTIVO & CONTADOR DE VELAS */}
@@ -235,16 +248,16 @@ export default function AltarLayout(props: any) {
                     <button
                         onClick={lightCandle}
                         className={`px-7 py-3 rounded-full text-xs font-sans font-bold tracking-[0.18em] uppercase transition-all flex items-center gap-2.5 shadow-lg ${
-                            isCandleLit
-                                ? 'bg-amber-400 text-slate-950 border border-amber-300 shadow-amber-400/30'
-                                : themeStyles.candleButtonUnlit
+                            !isCandleLit
+                                ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 border border-amber-500/60 shadow-amber-400/30'
+                                : `border ${themeStyles.candleButtonUnlit}`
                         }`}
                     >
                         <Flame
                             size={16}
                             className={
-                                isCandleLit
-                                    ? 'text-slate-950 fill-slate-950 animate-pulse'
+                                !isCandleLit
+                                    ? 'text-slate-950'
                                     : isDarkTheme
                                     ? 'text-amber-400 fill-amber-400'
                                     : 'text-amber-700 fill-amber-700'
@@ -252,12 +265,8 @@ export default function AltarLayout(props: any) {
                         />
                         <span>
                             {isCandleLit
-                                ? locale === 'en'
-                                    ? 'Altar Candles Lit'
-                                    : 'Velas del Altar Encendidas'
-                                : locale === 'en'
-                                ? 'Light the Altar'
-                                : 'Encender Velas del Altar'}
+                                ? locale === 'en' ? 'Candle lit' : 'Vela encendida'
+                                : locale === 'en' ? 'Light a candle' : 'Encender una velita'}
                         </span>
                     </button>
 
@@ -322,11 +331,13 @@ function CeremonialCandle({
     onLight,
     locale,
     side,
+    isDark = false,
 }: {
     isLit: boolean;
     onLight: () => void;
     locale: string;
     side: 'left' | 'right';
+    isDark?: boolean;
 }) {
     return (
         <button
@@ -356,21 +367,36 @@ function CeremonialCandle({
                                 }}
                             />
 
-                            {/* Flama exterior dorada */}
+                            {/* Flama exterior dorada (opacidad plena: antes quedaba en 0 y solo se veía el halo) */}
                             <motion.div
-                                initial={{ scale: 0, opacity: 0 }}
+                                initial={{ scaleY: 0, opacity: 0 }}
                                 animate={{
-                                    scale: [1, 1.12, 0.94, 1.06, 1],
+                                    scaleX: [1, 1.06, 0.96, 1.03, 1],
+                                    scaleY: [1, 1.12, 0.96, 1.08, 1],
                                     rotate: side === 'left' ? [-1, 2, -2, 1] : [1, -2, 2, -1],
+                                    opacity: 1,
                                 }}
-                                transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-                                className="w-4 h-7 rounded-[50%_50%_50%_50%_/_60%_60%_40%_40%]"
+                                transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut', opacity: { duration: 0.4 } }}
+                                className="relative w-[18px] h-8 origin-bottom rounded-[50%_50%_50%_50%_/_60%_60%_40%_40%]"
                                 style={{
                                     background:
-                                        'radial-gradient(circle at 50% 80%, #ffffff 0%, #fef08a 25%, #f59e0b 65%, #ea580c 95%)',
-                                    filter: 'drop-shadow(0 0 10px #fbbf24)',
+                                        'radial-gradient(ellipse at 50% 85%, #ffffff 0%, #fff7c2 22%, #fcd34d 45%, #f59e0b 70%, #ea580c 100%)',
+                                    filter: 'drop-shadow(0 0 6px #fde047) drop-shadow(0 0 16px rgba(245,158,11,0.9))',
                                 }}
-                            />
+                            >
+                                {/* Núcleo blanco brillante */}
+                                <motion.span
+                                    animate={{ opacity: [0.9, 1, 0.85, 1, 0.9], scaleY: [0.9, 1.05, 0.92, 1, 0.9] }}
+                                    transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+                                    className="absolute left-1/2 bottom-[2px] -translate-x-1/2 w-[7px] h-[14px] origin-bottom rounded-full"
+                                    style={{ background: 'radial-gradient(ellipse at 50% 80%, #ffffff 0%, #fffbe6 55%, rgba(255,251,230,0) 100%)' }}
+                                />
+                                {/* Base azulada, como una llama real */}
+                                <span
+                                    className="absolute left-1/2 bottom-0 -translate-x-1/2 w-[6px] h-[4px] rounded-full"
+                                    style={{ background: 'rgba(96,165,250,0.55)', filter: 'blur(1px)' }}
+                                />
+                            </motion.div>
                         </>
                     )}
                 </AnimatePresence>
@@ -384,7 +410,8 @@ function CeremonialCandle({
             {/* Mecha */}
             <div className="w-[2px] h-2 bg-stone-700/80 -mt-1" />
 
-            {/* Cuerpo del cirio de cera */}
+            {/* Cuerpo del cirio de cera, flotando sobre una nube (como en Constelación Eterna) */}
+            <div className="relative">
             <div
                 className="w-10 sm:w-12 h-24 sm:h-28 rounded-t-sm rounded-b-none relative overflow-hidden shadow-lg border border-amber-200/40"
                 style={{
@@ -398,22 +425,13 @@ function CeremonialCandle({
                 <div className="absolute top-1 right-2.5 w-1 h-3 bg-white/60 rounded-full blur-[0.5px]" />
                 <div className="absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-black/10 to-transparent pointer-events-none" />
             </div>
-
-            {/* Base / Candelabro de Bronce y Oro */}
-            <div
-                className="w-14 sm:w-16 h-3 rounded-t-sm shadow-md"
-                style={{
-                    background:
-                        'linear-gradient(90deg, #78350f 0%, #fde68a 25%, #d4af37 50%, #fde68a 75%, #78350f 100%)',
-                }}
+            <MemorialCloud
+                className="absolute bottom-1 left-1/2 -translate-x-1/2 w-24 sm:w-28 h-14"
+                tone={isDark ? 'night' : 'day'}
+                delay={side === 'left' ? 0 : 2.5}
+                intensity={0.55}
             />
-            <div
-                className="w-16 sm:w-20 h-2.5 rounded-b-md shadow-lg"
-                style={{
-                    background:
-                        'linear-gradient(90deg, #92400e 0%, #b45309 40%, #d4af37 50%, #b45309 60%, #92400e 100%)',
-                }}
-            />
+            </div>
         </button>
     );
 }

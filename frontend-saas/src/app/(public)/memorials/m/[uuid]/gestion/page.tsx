@@ -228,6 +228,7 @@ export default function GestionMemorialPage() {
                         tipo_diseno: normalizeScenarioId(design.tipo_diseno),
                         portada_url: design.portada_url || '',
                         captions: (design.captions && typeof design.captions === 'object') ? design.captions : {},
+                        auto_publicar_mensajes: design.auto_publicar_mensajes === true,
                     },
                     private_mode: data.private_mode || false,
                     pin: data.pin || '',
@@ -408,6 +409,8 @@ export default function GestionMemorialPage() {
             onStatus={handleStatusChange}
             onEdit={handleEditDedication}
             onDelete={handleDeleteDedication}
+            autoPublish={!!form.diseno.auto_publicar_mensajes}
+            onAutoPublishChange={(on) => updateForm(prev => ({ ...prev, diseno: { ...prev.diseno, auto_publicar_mensajes: on } }))}
         />
     );
 

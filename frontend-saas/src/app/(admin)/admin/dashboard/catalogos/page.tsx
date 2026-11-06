@@ -11,17 +11,19 @@ interface Funnel {
     visitors: number; size_select: number; plan_request: number; whatsapp: number;
     form_open: number; form_submit: number; pending: number; order: number; delivered: number;
 }
-interface TenantRow extends Funnel {
+/** Todos los formularios web (con o sin catálogo: enlace directo, QR, personalizados) y sus OC */
+interface AllForms { forms_all: number; orders_all: number; delivered_all: number }
+interface TenantRow extends Funnel, AllForms {
     tenant_id: number; tenant_name: string; tenant_slug: string | null;
     links_total: number; links_period: number; views_total: number;
 }
 interface Report {
-    totals: Funnel;
+    totals: Funnel & AllForms;
     links_total: number;
     links_period: number;
     by_tenant: TenantRow[];
     top_plans: { plan_id: number; plan_name: string; tenant_name: string | null; price: number | null; plan_request: number; whatsapp: number; total: number }[];
-    top_sizes: { weight_tier: string; count: number }[];
+    top_sizes: { weight_tier: string; count: number; tenant_id: number; tenant_name: string }[];
     tenants: { id: number; name: string }[];
 }
 
@@ -159,6 +161,28 @@ export default function CatalogFunnelPage() {
                         <Kpi label="Órdenes" value={String(t.order)} hint={`${pct(t.order, t.form_submit)} de los formularios · ${t.pending} pendientes`} />
                     </div>
 
+                    {/* Todos los formularios web: cuánto aporta el catálogo frente al formulario directo */}
+                    <div className={`${cardCls} p-4 sm:p-5 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4`}>
+                        <div className="col-span-2 lg:col-span-1">
+                            <p className="text-white font-bold text-sm">Todos los formularios web</p>
+                            <p className="text-[11px] text-white/40 mt-1">Catálogo + enlace directo, QR y formularios personalizados.</p>
+                        </div>
+                        <div>
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-white/40">Formularios</p>
+                            <p className="text-xl font-black text-white mt-1">{t.forms_all}</p>
+                        </div>
+                        <div>
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-white/40">OC desde formulario</p>
+                            <p className="text-xl font-black text-white mt-1">{t.orders_all}</p>
+                            <p className="text-[11px] text-white/40">{t.delivered_all} entregadas</p>
+                        </div>
+                        <div>
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-white/40">% desde catálogo</p>
+                            <p className="text-xl font-black text-white mt-1">{pct(t.order, t.orders_all)}</p>
+                            <p className="text-[11px] text-white/40">{t.order} de {t.orders_all} OC</p>
+                        </div>
+                    </div>
+
                     <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
                         <div className={`${cardCls} p-5`}>
                             <h2 className="text-white font-bold">Embudo</h2>
@@ -194,6 +218,9 @@ export default function CatalogFunnelPage() {
 
                             <div className={`${cardCls} p-5`}>
                                 <h2 className="text-white font-bold flex items-center gap-2"><Scale size={16} className="text-primary" /> Tamaños más pedidos</h2>
+                                {!tenantId && data.top_sizes.length > 0 && (
+                                    <p className="text-[11px] text-white/40 mt-1">Cada crematorio tiene sus propios rangos: se muestran por crematorio.</p>
+                                )}
                                 {data.top_sizes.length === 0 ? (
                                     <p className="py-3 text-sm text-white/40">Sin datos en el periodo.</p>
                                 ) : (
@@ -201,8 +228,14 @@ export default function CatalogFunnelPage() {
                                         {data.top_sizes.map(s => {
                                             const max = data.top_sizes[0].count || 1;
                                             return (
-                                                <li key={s.weight_tier} className="text-sm">
-                                                    <div className="flex justify-between gap-3 text-white/80"><span className="truncate">{s.weight_tier}</span><span className="font-bold">{s.count}</span></div>
+                                                <li key={`${s.tenant_id}-${s.weight_tier}`} className="text-sm">
+                                                    <div className="flex justify-between gap-3 text-white/80">
+                                                        <span className="min-w-0 truncate">
+                                                            {s.weight_tier}
+                                                            {!tenantId && <span className="text-[11px] text-white/40"> · {s.tenant_name}</span>}
+                                                        </span>
+                                                        <span className="font-bold">{s.count}</span>
+                                                    </div>
                                                     <div className="h-1.5 mt-1 rounded-full bg-white/5"><div className="h-full rounded-full bg-primary/60" style={{ width: `${(s.count / max) * 100}%` }} /></div>
                                                 </li>
                                             );
@@ -217,10 +250,10 @@ export default function CatalogFunnelPage() {
                     <div className={`${cardCls} overflow-hidden`}>
                         <h2 className="px-5 pt-5 text-white font-bold flex items-center gap-2"><Link2 size={16} className="text-primary" /> Por crematorio</h2>
                         {data.by_tenant.length === 0 ? (
-                            <p className="px-5 py-6 text-sm text-white/40">Ningún crematorio ha creado catálogos de planes.</p>
+                            <p className="px-5 py-6 text-sm text-white/40">Sin catálogos ni formularios en el periodo.</p>
                         ) : (
                             <div className="overflow-x-auto mt-3">
-                                <table className="w-full min-w-[820px]">
+                                <table className="w-full min-w-[980px]">
                                     <thead>
                                         <tr className="border-b border-white/10">
                                             <th className={thCls}>Crematorio</th>
@@ -231,6 +264,9 @@ export default function CatalogFunnelPage() {
                                             <th className={`${thCls} text-right`}>Enviados</th>
                                             <th className={`${thCls} text-right`}>Órdenes</th>
                                             <th className={`${thCls} text-right`}>Conversión</th>
+                                            <th className={`${thCls} text-right border-l border-white/10`} title="Todos los formularios web enviados (con o sin catálogo)">Formularios</th>
+                                            <th className={`${thCls} text-right`} title="Formularios web que ya tienen orden de cremación">OC formulario</th>
+                                            <th className={`${thCls} text-right`} title="Parte de las OC desde formulario que vino del catálogo">% catálogo</th>
                                             <th className={thCls} />
                                         </tr>
                                     </thead>
@@ -245,6 +281,9 @@ export default function CatalogFunnelPage() {
                                                 <td className={`${tdCls} text-right`}>{r.form_submit}{r.pending > 0 && <span className="block text-[11px] text-amber-300/80">{r.pending} pend.</span>}</td>
                                                 <td className={`${tdCls} text-right`}>{r.order}{r.delivered > 0 && <span className="block text-[11px] text-emerald-300/80">{r.delivered} entreg.</span>}</td>
                                                 <td className={`${tdCls} text-right font-bold text-white`} title="Formularios enviados ÷ visitas">{pct(r.form_submit, r.visitors)}</td>
+                                                <td className={`${tdCls} text-right border-l border-white/10`}>{r.forms_all}</td>
+                                                <td className={`${tdCls} text-right`}>{r.orders_all}{r.delivered_all > 0 && <span className="block text-[11px] text-emerald-300/80">{r.delivered_all} entreg.</span>}</td>
+                                                <td className={`${tdCls} text-right`} title={`${r.order} de ${r.orders_all} OC vinieron del catálogo`}>{pct(r.order, r.orders_all)}</td>
                                                 <td className={`${tdCls} text-right`}>
                                                     {r.tenant_slug && (
                                                         <Link href={`/dashboard/tenants/${r.tenant_slug}`} title="Ver crematorio"

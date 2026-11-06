@@ -11,7 +11,7 @@ import { ritualLabel, type RitualProps } from '@/lib/memorialRituals';
  * marco clásico y placa de bronce con nombre y fechas. La galería se cuelga
  * como obras enmarcadas.
  */
-// Numeración de las obras (el plan Eterno permite hasta 25 fotos)
+// Numeración de las obras (el plan Eterno permite hasta 8 fotos)
 const toRoman = (n: number) => {
     const map: [number, string][] = [[10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
     let out = '';

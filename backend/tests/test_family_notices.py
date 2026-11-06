@@ -96,3 +96,18 @@ def test_encuesta_una_vez_y_solo_entregada(client, auth, db, order):
     assert resumen["count"] >= 1 and resumen["distribution"]["5"] >= 1
     # El otro crematorio no ve esa respuesta.
     assert client.get("/api/internal/operations/feedback/summary", headers=auth("b")).json()["count"] == 0
+
+
+def test_seguimiento_entrega_hasta_3_fotos(client, db, order):
+    """El seguimiento devuelve las fotos de la mascota (principal primero, sin repetir, máx. 3)."""
+    cr = db.query(models.Cremation).get(order)
+    db.refresh(cr)
+    pet = cr.pet
+    pet.image_url = "https://cdn.example/f1.webp"
+    pet.images = ["https://cdn.example/f1.webp", "https://cdn.example/f2.webp",
+                  "https://cdn.example/f3.webp", "https://cdn.example/f4.webp"]
+    db.commit()
+    url = f"/api/public/tracking/crematorio-a/{pet.name.replace(' ', '-')}/{cr.details.tracking_token}"
+    r = client.get(url)
+    assert r.status_code == 200, r.text
+    assert r.json()["pet_images"] == ["https://cdn.example/f1.webp", "https://cdn.example/f2.webp", "https://cdn.example/f3.webp"]

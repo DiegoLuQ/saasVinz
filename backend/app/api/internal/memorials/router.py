@@ -226,36 +226,22 @@ def _get_memorial_limit(memorial: mem_models.Memorial, db: Session) -> int:
         return min(9, MAX_MEMORIAL_DEDICATIONS)
     return MAX_MEMORIAL_DEDICATIONS
 
-def _get_memorial_img_limit(memorial: mem_models.Memorial, db: Session) -> int:
-    # 1. Check if linked to a specific plan (MemorialPlan in DB)
-    if memorial.memorial_plan:
-         features = memorial.memorial_plan.features or {}
-         result = features.get("max_images", 3)
-         return result
+# Clave de `diseno` con la que la familia publica los mensajes sin aprobarlos uno a uno.
+AUTO_PUBLISH_KEY = "auto_publicar_mensajes"
 
-    # 1b. Planes Mensual / Anual / Eterno
+# Fotos de un memorial creado por un crematorio (incluido en su plan, sin plan de memorial vendido).
+TENANT_MEMORIAL_MAX_IMAGES = 3
+
+
+def _get_memorial_img_limit(memorial: mem_models.Memorial, db: Session) -> int:
+    """Máximo de fotos del memorial (gestión, subida de la familia y vista pública):
+    - con un plan de memorial vendido por Vinzer (Mensual / Anual / Eterno, `rec_plans.features.max_images`;
+      hoy 3 / 5 / 8) manda ese plan, aunque el memorial sea de un crematorio;
+    - memorial de un crematorio sin plan vendido: TENANT_MEMORIAL_MAX_IMAGES (3), sea cual sea el plan del crematorio."""
     landing = _landing_plan(memorial, db)
     if landing:
-         return (landing.features or {}).get("max_images", 3)
-
-    # 2. Fallback to name matching (priority order):
-    #    a) memorial.plan (snapshot at creation)
-    #    b) tenant.subscription_plan.name (new subscription system)
-    #    c) tenant.plan (deprecated legacy field, defaults to "FREE")
-    tenant_sub_plan = (memorial.tenant.subscription_plan.name
-                       if memorial.tenant and memorial.tenant.subscription_plan else None)
-    tenant_legacy_plan = (memorial.tenant.plan
-                          if memorial.tenant and memorial.tenant.plan else None)
-    
-    plan_name = memorial.plan or tenant_sub_plan or tenant_legacy_plan or "FREE"
-    pn = plan_name.upper().strip()
-
-    # Plan Tier mapping: ULTRA/PARAISO=5, PRO/VINCULO=3, NORMAL/HUELLA=2, FREE/RECUERDO=1
-    if "ULTRA" in pn or "PARAISO" in pn: return 5
-    if "PRO" in pn or "VINCULO" in pn: return 3
-    if "NORMAL" in pn or "HUELLA" in pn: return 2
-    if "RECUERDO" in pn or "FREE" in pn: return 1
-    return 3 # Default to PRO/VINCULO tier
+        return int((landing.features or {}).get("max_images", TENANT_MEMORIAL_MAX_IMAGES))
+    return TENANT_MEMORIAL_MAX_IMAGES
 
 
 _MAX_LIT_STARS = 60          # estrellas con nombre que se dibujan en Constelación
@@ -386,12 +372,8 @@ def create_memorial(
     now = datetime.now()
     valid_until = now + timedelta(days=365)
 
-    # 5. Define image limits based on plan
-    pn = plan_name.upper().strip()
-    if "ULTRA" in pn or "PARAISO" in pn: img_limit = 5
-    elif "NORMAL" in pn or "HUELLA" in pn: img_limit = 2
-    elif "FREE" in pn or "RECUERDO" in pn: img_limit = 1
-    else: img_limit = 3 # PRO/VINCULO default
+    # 5. Fotos: memorial del crematorio = 3 (un plan Mensual/Anual/Eterno lo sube después)
+    img_limit = TENANT_MEMORIAL_MAX_IMAGES
 
     db_memorial = mem_models.Memorial(
         id_mascota=memorial_in.id_mascota,
@@ -415,14 +397,6 @@ def create_memorial(
         joinedload(mem_models.Memorial.tenant).joinedload(models.Tenant.subscription_plan),
         joinedload(mem_models.Memorial.dedications),
     ).filter(mem_models.Memorial.id == db_memorial.id).first()
-
-    # Enviar credenciales a la familia si tiene email
-    import asyncio
-    from app.services.memorial_notifications import send_memorial_welcome_email
-    try:
-        asyncio.create_task(send_memorial_welcome_email(db, db_memorial.id))
-    except Exception as _e:
-        pass
 
     return _apply_memorial_limit(memorial, db)
 
@@ -502,7 +476,7 @@ def get_memorial_og_image(
 
 
 @router.post("/{recuerdo_uuid}/rituals", response_model=mem_schemas.RitualStateResponse)
-@limiter.limit("20/minute")
+@limiter.limit("10/minute")
 def create_ritual(
     request: Request,
     recuerdo_uuid: UUID,
@@ -543,16 +517,7 @@ def create_ritual(
     ))
     db.commit()
 
-    # Notificar a la familia por email (con cooldown anti-spam)
-    import asyncio
-    from app.services.memorial_notifications import send_candle_notification_email
-    try:
-        asyncio.create_task(send_candle_notification_email(
-            db, memorial.id, ritual_in.kind.value, name
-        ))
-    except Exception:
-        pass
-
+    # Sin correo a la familia por cada gesto (decisión: no cargar el servidor ni llenar su bandeja)
     return _ritual_state(memorial.id, db)
 
 
@@ -584,25 +549,17 @@ def create_dedication(
             detail=f"Este memorial ha alcanzado el límite máximo de {max_dedications} comentarios."
         )
 
+    # La familia puede elegir publicar los mensajes sin revisarlos (gestión → «Publicar automáticamente»)
+    auto_publish = (memorial.diseno or {}).get(AUTO_PUBLISH_KEY) is True
     db_dedication = mem_models.Dedication(
         id_recuerdo=memorial.id,
         mensajero=sanitize_text(dedication_in.mensajero) or dedication_in.mensajero,
         mensaje=sanitize_text(dedication_in.mensaje) or dedication_in.mensaje,
-        estado=mem_models.DedicationStatus.pendiente
+        estado=mem_models.DedicationStatus.aprobado if auto_publish else mem_models.DedicationStatus.pendiente
     )
     db.add(db_dedication)
     db.commit()
     db.refresh(db_dedication)
-
-    # Notificar a la familia por email sobre la nueva dedicatoria
-    import asyncio
-    from app.services.memorial_notifications import send_dedication_notification_email
-    try:
-        asyncio.create_task(send_dedication_notification_email(
-            db, memorial.id, db_dedication.mensajero, db_dedication.mensaje
-        ))
-    except Exception:
-        pass
 
     return db_dedication
 

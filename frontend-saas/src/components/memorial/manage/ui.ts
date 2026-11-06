@@ -9,6 +9,8 @@ export type ManageForm = {
         tipo_diseno: string;
         portada_url: string;
         captions: Record<string, string>;
+        /** Mensajes nuevos se publican sin aprobación (backend: AUTO_PUBLISH_KEY) */
+        auto_publicar_mensajes?: boolean;
     };
     private_mode: boolean;
     pin: string;

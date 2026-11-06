@@ -149,7 +149,7 @@ export const translations = {
         dedication_in_memory: 'En su memoria siempre',
 
         // Memorial View General
-        mem_download: 'Descargar',
+        mem_download: 'Descargar memorial',
         mem_share: 'Compartir',
         mem_years_love_singular: 'año de amor incondicional',
         mem_years_love_plural: 'años de amor incondicional',
@@ -506,7 +506,7 @@ export const translations = {
         dedication_in_memory: 'In their memory always',
 
         // Memorial View General
-        mem_download: 'Download',
+        mem_download: 'Download memorial',
         mem_share: 'Share',
         mem_years_love_singular: 'year of unconditional love',
         mem_years_love_plural: 'years of unconditional love',

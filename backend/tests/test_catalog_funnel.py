@@ -99,3 +99,39 @@ def test_reporte_superadmin(client, plans_link, world, auth):
     assert data["totals"]["visitors"] >= 1
     row = next(t for t in data["by_tenant"] if t["tenant_id"] == world["tenant_a"])
     assert row["links_total"] >= 1
+
+
+from tests.test_public_form import form_token  # noqa: E402,F401  (fixture)
+
+
+def test_reporte_cuenta_todos_los_formularios_y_tamanos_por_crematorio(client, db, world, plans_link, form_token, auth):
+    """«OC formulario» incluye el formulario directo (sin catálogo); el catálogo solo cuenta lo suyo.
+    Los tamaños más pedidos se agrupan por crematorio."""
+    url = f"/api/internal/creator/catalog-funnel?tenant_id={world['tenant_a']}"
+    before = next(t for t in client.get(url, headers=auth("creator")).json()["by_tenant"] if t["tenant_id"] == world["tenant_a"])
+
+    r = client.post("/api/public/submit-form", data={
+        "tenant_id": world["tenant_a"], "token": form_token, "recaptcha_token": "x",
+        "owner_data": json.dumps({"fullName": "Familia Directa", "phone": "+56912345679",
+                                  "veterinary": "Domicilio", "address": "Calle 1"}),
+        "pet_data": json.dumps({"name": "Directo", "type": "Canino", "species": "Canino", "size": "Pequeño", "age": "3"}),
+    })
+    assert r.status_code == 200, r.text
+    db.expire_all()
+    sub = (db.query(models.FormSubmission)
+           .filter(models.FormSubmission.tenant_id == world["tenant_a"], models.FormSubmission.catalog_token_id.is_(None))
+           .order_by(models.FormSubmission.id.desc()).first())
+    h = auth("a")
+    cust = client.post(f"/api/internal/submissions/{sub.id}/create-customer", headers=h).json()["customer_id"]
+    pet = client.post(f"/api/internal/submissions/{sub.id}/create-pet?customer_id={cust}", headers=h).json()["pet_id"]
+    assert client.post(f"/api/internal/submissions/{sub.id}/create-services?pet_id={pet}", headers=h).status_code == 200
+
+    _event(client, plans_link["token"], "plan_request", uuid.uuid4().hex, plan_id=5, weight_tier="Mediano")
+    data = client.get(url, headers=auth("creator")).json()
+    row = next(t for t in data["by_tenant"] if t["tenant_id"] == world["tenant_a"])
+    assert row["forms_all"] == before["forms_all"] + 1
+    assert row["orders_all"] == before["orders_all"] + 1
+    assert row["order"] == before["order"]          # el catálogo no se atribuye el formulario directo
+    assert data["totals"]["orders_all"] >= row["orders_all"]
+    size = next(s for s in data["top_sizes"] if s["weight_tier"] == "Mediano")
+    assert size["tenant_id"] == world["tenant_a"] and size["tenant_name"]

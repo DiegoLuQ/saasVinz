@@ -170,6 +170,7 @@ def get_tracking_info(
             tenant_website = tenant.social_media.get("website") or tenant.social_media.get("instagram")
 
         return schemas.PublicTrackingResponse(
+            pet_images=_tracking_photos(None, submission.images),
             pet_name=pet_name_db,
             pet_species=pet_data.get("type") or pet_data.get("species") or "Canino",
             pet_breed=pet_breed,
@@ -277,6 +278,7 @@ def get_tracking_info(
         pet_species=pet.species,
         pet_breed=pet.breed,
         pet_image_url=pet.image_url,
+        pet_images=_tracking_photos(pet.image_url, pet.images),
         pet_weight=cremation.weight,
         customer_name=owner_name,
         service_status=cremation.status,
@@ -348,6 +350,18 @@ def submit_feedback(
 # Imagen de previsualización (Open Graph) para compartir por WhatsApp
 # ---------------------------------------------------------------------------
 _OG_W, _OG_H = 1200, 630
+
+
+TRACKING_PHOTOS_MAX = 3
+
+
+def _tracking_photos(main, images) -> list[str]:
+    """Fotos de la mascota para el seguimiento: la principal primero, sin repetir, máx. 3."""
+    out: list[str] = []
+    for u in [main, *(images if isinstance(images, list) else [])]:
+        if isinstance(u, str) and u.strip() and u not in out:
+            out.append(u)
+    return out[:TRACKING_PHOTOS_MAX]
 
 
 def _find_tracking_pet_image(db: Session, slug: str, pet_name: str, token: str):

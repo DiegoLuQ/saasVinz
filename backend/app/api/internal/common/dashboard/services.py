@@ -145,7 +145,7 @@ def _format_orders(
         scheduled_at = c.scheduling.scheduled_at if c.scheduling else None
         is_overdue = bool(
             scheduled_at
-            and scheduled_at < now
+            and tz.to_santiago(scheduled_at) < now
             and (c.status or "").lower() not in CLOSED_STATUSES
         )
 

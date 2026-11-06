@@ -14,11 +14,11 @@ import { getLandingContent, whatsappLink, type PlanId } from '@/lib/memorialLand
 
 type Tier = 'free' | 'legacy' | 'mensual' | 'anual' | 'eterno';
 
-// Límites por plan: deben coincidir con rec_plans.features (migración e3b5d7f9a124)
+// Límites por plan: deben coincidir con rec_plans.features (migraciones e3b5d7f9a124 + d4f6b8c0e173)
 const PLAN_SPECS: Record<PlanId, { photos: number; dedications: number }> = {
     mensual: { photos: 3, dedications: 10 },
-    anual: { photos: 10, dedications: 35 },
-    eterno: { photos: 25, dedications: Infinity },
+    anual: { photos: 5, dedications: 35 },
+    eterno: { photos: 8, dedications: Infinity },
 };
 
 const UNLIMITED = 10000;

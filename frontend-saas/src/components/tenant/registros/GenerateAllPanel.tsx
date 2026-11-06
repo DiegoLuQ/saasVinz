@@ -25,6 +25,8 @@ import { useFeatures } from '@/hooks/useFeatures';
 
 export type StepKey = 'cliente' | 'mascota' | 'orden' | AutoDocKind;
 type StepState = 'pending' | 'running' | 'done' | 'error' | 'skipped';
+
+const NO_CREDITS_DETAIL = 'Omitida: sin créditos IA';
 interface StepStatus { state: StepState; detail?: string; href?: string; startedAt?: number; ms?: number }
 
 /** Una ejecución de «Generar todo»: para el modal de progreso y la medición. */
@@ -67,6 +69,9 @@ interface Props {
     tenant: { name?: string | null; logo_url?: string | null; social_media?: Record<string, unknown> | null } | null | undefined;
     /** Crea lo que falte de cliente → mascota → orden e informa el avance de cada paso. */
     processRegistro: (onStep: (step: 'cliente' | 'mascota' | 'orden', s: StepStatus) => void) => Promise<ProcessResult>;
+    /** Avisa si «Generar todo» está disponible (hay documentos configurados y el rol puede generar):
+     *  la página deja entonces «Procesar registro» como opción secundaria. */
+    onAvailableChange?: (available: boolean) => void;
 }
 
 /**
@@ -75,7 +80,7 @@ interface Props {
  * redes con las plantillas de Configuración → Documentos automáticos. La de
  * redes usa créditos IA si su plantilla tiene IA (se avisa antes).
  */
-export default function GenerateAllPanel({ submission, existing, canRun, tenant, processRegistro }: Props) {
+export default function GenerateAllPanel({ submission, existing, canRun, tenant, processRegistro, onAvailableChange }: Props) {
     const { canOpen } = useCanOpen();
     const { showToast } = useToast();
     const qc = useQueryClient();
@@ -285,12 +290,14 @@ export default function GenerateAllPanel({ submission, existing, canRun, tenant,
     // ------------------------------------------------------------------
     // Ejecución
     // ------------------------------------------------------------------
-    const run = async (kinds: AutoDocKind[], withProcess: boolean) => {
+    const run = async (kinds: AutoDocKind[], withProcess: boolean, socialSkippedNoCredits = false) => {
         setConfirm(null);
         setRunning(true);
         const initial: Partial<Record<StepKey, StepStatus>> = {};
         if (withProcess) (['cliente', 'mascota', 'orden'] as const).forEach(k => { initial[k] = { state: 'pending' }; });
         kinds.forEach(k => { initial[k] = { state: 'pending' }; });
+        // Sin créditos IA: la imagen para redes no se genera, pero se muestra como omitida (no es un error)
+        if (socialSkippedNoCredits) initial.social = { state: 'skipped', detail: NO_CREDITS_DETAIL };
         stepsRef.current = initial;
         setSteps(initial);
         runSessionRef.current = null;
@@ -369,6 +376,8 @@ export default function GenerateAllPanel({ submission, existing, canRun, tenant,
 
     const hasOrder = !!existing.cremation_id && !!existing.pet_id;
     const configured = enabledKinds.length > 0;
+    const available = !!auto && configured && canRun;
+    useEffect(() => { onAvailableChange?.(available); }, [available, onAvailableChange]);
     const noCreditsForSocial = socialUsesAi && !(socialSession?.active && socialSession.attempts_left > 0) && (credits?.available ?? 0) <= 0;
 
     // ------------------------------------------------------------------
@@ -555,6 +564,23 @@ export default function GenerateAllPanel({ submission, existing, canRun, tenant,
                                         <p className="text-sm font-black text-slate-900 dark:text-white">{runInfo.attemptsLeft != null ? `${runInfo.attemptsLeft} restantes` : '—'}</p>
                                     </div>
                                 </div>
+                                {steps.social?.state === 'skipped' && steps.social.detail === NO_CREDITS_DETAIL && (
+                                    <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200">
+                                        <MinusCircle size={14} className="mt-0.5 shrink-0" />
+                                        <div className="flex-1 space-y-1.5">
+                                            <p>
+                                                <b>Imagen para redes omitida:</b> no tienes créditos IA. Lo demás se creó normalmente;
+                                                puedes generarla después desde «Imagen redes» o en Diseños para Redes.
+                                            </p>
+                                            {canOpen('/dashboard/configuracion?tab=creditos') && (
+                                                <Link href="/dashboard/configuracion?tab=creditos"
+                                                    className="inline-flex items-center rounded-lg bg-amber-500 px-3 py-1.5 text-[11px] font-black text-white hover:bg-amber-600">
+                                                    Comprar créditos
+                                                </Link>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                                 {auto && petId && (
                                     <DocumentPreviews kinds={runInfo.kinds} auto={auto} petId={petId} cremationId={existing.cremation_id ?? null}
                                         petName={submission.pet_data?.name || ''} dedication={submission.pet_data?.dedication}
@@ -615,7 +641,11 @@ export default function GenerateAllPanel({ submission, existing, canRun, tenant,
                         <div className="flex gap-2">
                             <button onClick={() => setConfirm(null)} className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 text-sm font-bold">Cancelar</button>
                             <button
-                                onClick={() => run(confirm.kinds.filter(k => include[k] && !(k === 'social' && noCreditsForSocial)), confirm.process)}
+                                onClick={() => run(
+                                    confirm.kinds.filter(k => include[k] && !(k === 'social' && noCreditsForSocial)),
+                                    confirm.process,
+                                    confirm.kinds.includes('social') && noCreditsForSocial,
+                                )}
                                 disabled={!confirm.process && !confirm.kinds.some(k => include[k] && !(k === 'social' && noCreditsForSocial))}
                                 className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-sm font-black disabled:opacity-40">
                                 <Wand2 size={15} /> Generar

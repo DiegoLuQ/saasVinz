@@ -95,6 +95,14 @@ export default function TrackingPage() {
     const token = decodeParam(params?.token);
 
     const [data, setData] = useState<any>(null);
+    // Fotos de la mascota (hasta 3): rotan suavemente en el círculo principal
+    const [photoIdx, setPhotoIdx] = useState(0);
+    const petPhotos: string[] = (data?.pet_images?.length ? data.pet_images : data?.pet_image_url ? [data.pet_image_url] : []);
+    useEffect(() => {
+        if (petPhotos.length < 2) return;
+        const t = setInterval(() => setPhotoIdx(i => (i + 1) % petPhotos.length), 5000);
+        return () => clearInterval(t);
+    }, [petPhotos.length]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [selectedEvidence, setSelectedEvidence] = useState<any>(null);
@@ -458,18 +466,42 @@ export default function TrackingPage() {
                     <div className="relative inline-block mb-8">
                         {/* Main Hero: Pet Photo */}
                         <div className={`w-48 h-48 mx-auto rounded-full flex items-center justify-center border-[6px] overflow-hidden group relative z-10 transition-all duration-500 ${theme.petPhotoBorder} ${theme.petPhotoShadow}`}>
-                            {data.pet_image_url ? (
-                                <img
-                                    src={getImageUrl(data.pet_image_url) || ''}
-                                    alt={data.pet_name}
-                                    className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-700"
-                                />
+                            {petPhotos.length > 0 ? (
+                                <AnimatePresence initial={false}>
+                                    <motion.img
+                                        key={petPhotos[photoIdx % petPhotos.length]}
+                                        src={getImageUrl(petPhotos[photoIdx % petPhotos.length]) || ''}
+                                        alt={data.pet_name}
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        transition={{ duration: 1.2 }}
+                                        className="absolute inset-0 w-full h-full object-cover transition-transform group-hover:scale-105 duration-700"
+                                    />
+                                </AnimatePresence>
                             ) : (
                                 <div className="w-full h-full bg-emerald-50 flex items-center justify-center">
                                     <PawPrint size={64} className="text-emerald-200" />
                                 </div>
                             )}
                         </div>
+
+                        {/* Puntos para elegir la foto (solo con 2 o más) */}
+                        {petPhotos.length > 1 && (
+                            <div className="absolute -bottom-7 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
+                                {petPhotos.map((_, i) => (
+                                    <button
+                                        key={i}
+                                        type="button"
+                                        onClick={() => setPhotoIdx(i)}
+                                        aria-label={`Ver foto ${i + 1} de ${data.pet_name}`}
+                                        className={`h-1.5 rounded-full transition-all duration-500 ${i === photoIdx % petPhotos.length
+                                            ? `w-4 ${isDarkMode ? 'bg-white/70' : 'bg-gray-500'}`
+                                            : `w-1.5 ${isDarkMode ? 'bg-white/25' : 'bg-gray-300'}`}`}
+                                    />
+                                ))}
+                            </div>
+                        )}
 
                         {/* Corner Badge: Tenant Logo */}
                         <div className={`absolute -bottom-2 -right-2 z-20 w-16 h-16 rounded-full border-4 shadow-lg overflow-hidden flex items-center justify-center transition-all duration-500 ${theme.tenantLogoBg}`}>

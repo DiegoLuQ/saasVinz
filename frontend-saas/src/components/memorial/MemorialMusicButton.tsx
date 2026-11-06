@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Music, Pause } from 'lucide-react';
 
 interface Props {
@@ -11,12 +11,18 @@ interface Props {
 
 const TARGET_VOLUME = 0.6;
 
+export interface MemorialMusicHandle {
+    /** Empieza a sonar (no hace nada si ya suena). */
+    play: () => void;
+}
+
 /**
  * Botón flotante de la melodía del memorial (elegida por el crematorio).
  * Nunca suena sola: los navegadores bloquean el audio automático y conviene
  * respetar a quien entra. Al tocarlo suena en bucle con una entrada suave.
+ * También empieza al encender la vela (`ref.play()`, desde ese mismo clic).
  */
-export default function MemorialMusicButton({ url, name, locale = 'es' }: Props) {
+const MemorialMusicButton = forwardRef<MemorialMusicHandle, Props>(function MemorialMusicButton({ url, name, locale = 'es' }, ref) {
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const fadeRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const [playing, setPlaying] = useState(false);
@@ -27,15 +33,10 @@ export default function MemorialMusicButton({ url, name, locale = 'es' }: Props)
         audioRef.current?.pause();
     }, []);
 
-    const toggle = () => {
+    const start = () => {
         const audio = audioRef.current;
         if (!audio) return;
         if (fadeRef.current) clearInterval(fadeRef.current);
-        if (playing) {
-            audio.pause();
-            setPlaying(false);
-            return;
-        }
         audio.volume = 0;
         audio.play().then(() => {
             setPlaying(true);
@@ -47,6 +48,24 @@ export default function MemorialMusicButton({ url, name, locale = 'es' }: Props)
         }).catch(() => setPlaying(false));
     };
 
+    useImperativeHandle(ref, () => ({
+        play: () => {
+            const audio = audioRef.current;
+            if (audio && audio.paused) start();
+        },
+    }));
+
+    const toggle = () => {
+        const audio = audioRef.current;
+        if (!audio) return;
+        if (playing) {
+            if (fadeRef.current) clearInterval(fadeRef.current);
+            audio.pause();
+            setPlaying(false);
+            return;
+        }
+        start();
+    };
     const label = playing
         ? (es ? 'Pausar melodía' : 'Pause melody')
         : (es ? 'Escuchar melodía' : 'Play melody');
@@ -70,4 +89,6 @@ export default function MemorialMusicButton({ url, name, locale = 'es' }: Props)
             </button>
         </>
     );
-}
+});
+
+export default MemorialMusicButton;

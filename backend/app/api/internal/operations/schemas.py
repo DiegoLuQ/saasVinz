@@ -356,6 +356,8 @@ class PublicTrackingResponse(BaseModel):
     pet_species: str
     pet_breed: Optional[str] = None
     pet_image_url: Optional[str] = None
+    # Hasta 3 fotos de la mascota (principal primero): la página de seguimiento las va rotando
+    pet_images: List[str] = []
     pet_weight: Optional[float] = None
     customer_name: Optional[str] = None  # Nombre del dueño
     service_status: str # received, processing, etc.

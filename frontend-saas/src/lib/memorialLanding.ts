@@ -1,7 +1,7 @@
 // Contenido de la landing del memorial (memorial.vinzer.cl), ES / EN.
 // Los planes en USD se venden de forma asistida por WhatsApp; el SuperAdmin
 // los asigna al memorial (rec_plans: mensual, anual, eterno — migración
-// e3b5d7f9a124), que es donde se aplican los límites de fotos y dedicatorias.
+// e3b5d7f9a124 + d4f6b8c0e173), que es donde se aplican los límites de fotos y dedicatorias.
 // La gestión familiar del memorial (MemorialPlanUpgrade) usa estos mismos planes.
 
 import type { Locale } from './translations';
@@ -134,7 +134,7 @@ const es: LandingContent = {
         ],
         rows: [
             { label: 'Facturación', values: ['Mensual', 'Anual', 'Pago único'] },
-            { label: 'Fotos del recuerdo', values: ['Hasta 3', 'Hasta 10', 'Hasta 25'] },
+            { label: 'Fotos del recuerdo', values: ['Hasta 3', 'Hasta 5', 'Hasta 8'] },
             { label: 'Velas y dedicatorias', values: ['Hasta 10', 'Hasta 35', 'Ilimitadas'] },
             { label: 'Altar personalizable (fondo, partículas, tipografía)', values: [true, true, true] },
             { label: 'Memorial privado con PIN', values: [true, true, true] },
@@ -234,7 +234,7 @@ const en: LandingContent = {
         ],
         rows: [
             { label: 'Billing', values: ['Monthly', 'Yearly', 'One-time'] },
-            { label: 'Memory photos', values: ['Up to 3', 'Up to 10', 'Up to 25'] },
+            { label: 'Memory photos', values: ['Up to 3', 'Up to 5', 'Up to 8'] },
             { label: 'Candles & dedications', values: ['Up to 10', 'Up to 35', 'Unlimited'] },
             { label: 'Customizable altar (background, particles, typography)', values: [true, true, true] },
             { label: 'Private memorial with PIN', values: [true, true, true] },

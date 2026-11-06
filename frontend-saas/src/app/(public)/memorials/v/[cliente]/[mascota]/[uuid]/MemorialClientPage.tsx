@@ -34,10 +34,12 @@ import DedicationModal from '@/components/memorial/DedicationModal';
 import Snowflakes from '@/components/memorial/Snowflakes';
 import TwinklingStars from '@/components/memorial/TwinklingStars';
 import { ExpirationModal } from '@/components/memorial/ExpirationModal';
-import MemorialMusicButton from '@/components/memorial/MemorialMusicButton';
+import MemorialMusicButton, { type MemorialMusicHandle } from '@/components/memorial/MemorialMusicButton';
 import RitualSummary from '@/components/memorial/RitualSummary';
 import FloatingPetals from '@/components/memorial/FloatingPetals';
 import type { RitualKind, RitualState } from '@/lib/memorialRituals';
+
+const RITUAL_MIN_INTERVAL_MS = 3000;
 import { publicApiRequest } from '@/lib/api/public';
 import CelestialBackground from '@/components/memorial/CelestialBackground';
 import MemorialEntranceEffect from '@/components/memorial/MemorialEntranceEffect';
@@ -197,6 +199,11 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
     // en su navegador para que la vela siga prendida al volver o recargar.
     const ritualDidKey = `memorial_rituals_did_${uuid}`;
     const [ritualDid, setRitualDid] = useState<Partial<Record<RitualKind, boolean>>>({});
+    // Un gesto por tipo cada RITUAL_MIN_INTERVAL_MS: los clics seguidos (p. ej. «beso al cielo»)
+    // mantienen la animación pero no disparan una petición por clic.
+    const ritualLastRef = useRef<Partial<Record<RitualKind, number>>>({});
+    // Melodía: al encender la vela empieza a sonar (en todos los diseños)
+    const musicRef = useRef<MemorialMusicHandle>(null);
     useEffect(() => {
         try {
             const raw = localStorage.getItem(ritualDidKey);
@@ -230,6 +237,8 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
 
             setNewDedication({ nombre: '', mensaje: '' });
             setShowSuccessModal(true);
+            // Con publicación automática el mensaje ya está visible: recargar la lista
+            if (response?.estado === 'aprobado') fetchData();
         } catch (err: any) {
             console.error("Error creating dedication:", err);
             alert("Error de conexión. Por favor reintente.");
@@ -592,6 +601,9 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
     };
 
     const sendRitual = async (kind: RitualKind, name?: string) => {
+        const now = Date.now();
+        if (now - (ritualLastRef.current[kind] || 0) < RITUAL_MIN_INTERVAL_MS) return;
+        ritualLastRef.current[kind] = now;
         const base = ritualOverride || ritualView;
         setRitualOverride({
             counts: { ...base.counts, [kind]: (base.counts[kind] || 0) + 1 },
@@ -671,7 +683,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
             onSendKiss: handleSendKiss,
             themeConfig,
             isUltra,
-            rituals: { counts: ritualView.counts || {}, stars: ritualView.stars || [], send: sendRitual, did: ritualDid },
+            rituals: { counts: ritualView.counts || {}, stars: ritualView.stars || [], send: sendRitual, did: ritualDid, playMusic: () => musicRef.current?.play() },
         };
 
         switch (rawTipo) {
@@ -861,6 +873,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
             {/* Melodía elegida por el crematorio (solo llega si está activa) */}
             {memorial?.melody?.url && (
                 <MemorialMusicButton
+                    ref={musicRef}
                     url={memorial.melody.url}
                     name={memorial.melody.name}
                     locale={locale === 'en' ? 'en' : 'es'}
@@ -929,19 +942,6 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                                     {locale === 'en' ? 'Leave a Message' : 'Dejar Mensaje'}
                                 </button>
                             )}
-
-                            <button
-                                type="button"
-                                onClick={() => router.push(`/memorials/m/${uuid}/login`)}
-                                className={`px-4 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2 border transition-all ${
-                                    isDarkMode
-                                        ? 'bg-white/5 hover:bg-white/10 border-white/15 text-white/80'
-                                        : 'bg-white/80 hover:bg-white border-slate-300 text-slate-700'
-                                }`}
-                            >
-                                <ShieldCheck size={14} className="text-amber-500" />
-                                {locale === 'en' ? 'Family Comment Management' : 'Gestionar Comentarios (Familia)'}
-                            </button>
                         </div>
                     </div>
 
@@ -1065,14 +1065,7 @@ export default function MemorialClientPage({ initialData }: { initialData?: any 
                                         <h3 className="text-xl font-serif italic opacity-90 mb-2">
                                             {t.mem_limit_full || `Se ha alcanzado el máximo de ${MAX_MEMORIAL_COMMENTS} comentarios conmemorativos`}
                                         </h3>
-                                        <p className="text-sm opacity-60 uppercase tracking-widest mb-4">{t.mem_limit_reached}</p>
-                                        <button
-                                            type="button"
-                                            onClick={() => router.push(`/memorials/m/${uuid}/login`)}
-                                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest bg-amber-500/20 text-amber-500 border border-amber-500/30 hover:bg-amber-500/30 transition-all"
-                                        >
-                                            <ShieldCheck size={14} /> Gestionar Comentarios (Familia)
-                                        </button>
+                                        <p className="text-sm opacity-60 uppercase tracking-widest">{t.mem_limit_reached}</p>
                                     </div>
                                 </motion.div>
                             );
