@@ -40,6 +40,7 @@ import { usePermissions } from '@/app/(tenant)/tenant/context/PermissionContext'
 import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
 import QuickCustomerModal from '@/components/tenant/crm/QuickCustomerModal';
 import PetDateInput from '@/components/tenant/crm/PetDateInput';
+import PetPhotosDownload from '@/components/tenant/crm/PetPhotosDownload';
 import { formatPetDate } from '@/lib/petDates';
 
 interface Pet {
@@ -835,6 +836,11 @@ export default function PetsPage() {
                     </div>
                 )
             }
+
+            {/* Fotos de las mascotas para descargar (individual o ZIP) */}
+            <div className="pt-4">
+                <PetPhotosDownload />
+            </div>
 
             {/* Modal de Gestión de Macotas */}
             <Modal

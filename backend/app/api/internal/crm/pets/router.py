@@ -29,6 +29,87 @@ def get_pets(
         .all()
     )
 
+# --- Fotos de mascotas para descargar (antes de /{pet_id}) ---
+
+@router.get("/photos")
+def list_pet_photos(
+    q: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 10,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    _: bool = Depends(check_permission("mascotas", "view"))
+):
+    """Fotos de las mascotas (10 por página), filtradas por mascota o dueño."""
+    from app.services.pet_photos import photo_rows, ZIP_MAX_PHOTOS
+    page = max(1, page)
+    page_size = max(1, min(page_size, 50))
+    rows = photo_rows(db, tenant_id, q)
+    start = (page - 1) * page_size
+    return {
+        "total": len(rows),
+        "pets": len({r["pet_id"] for r in rows}),
+        "page": page,
+        "page_size": page_size,
+        "zip_max": ZIP_MAX_PHOTOS,
+        "items": rows[start:start + page_size],
+    }
+
+
+@router.get("/photos/download")
+def download_pet_photos(
+    q: Optional[str] = None,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    _: bool = Depends(check_permission("mascotas", "view"))
+):
+    """ZIP con todas las fotos del filtro (máx. ZIP_MAX_PHOTOS)."""
+    from fastapi import Response
+    from app.services.pet_photos import photo_rows, build_zip, ZIP_MAX_PHOTOS
+    rows = photo_rows(db, tenant_id, q)
+    if not rows:
+        raise HTTPException(status_code=404, detail="No hay fotos para descargar")
+    if len(rows) > ZIP_MAX_PHOTOS:
+        raise HTTPException(status_code=400, detail=f"Son {len(rows)} fotos: filtra por mascota o dueño para descargar hasta {ZIP_MAX_PHOTOS} a la vez")
+    data, added = build_zip(rows)
+    if not added:
+        raise HTTPException(status_code=404, detail="No se pudieron leer las fotos")
+    return Response(
+        content=data,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": 'attachment; filename="fotos-mascotas.zip"',
+            "X-Photos-Count": str(added),
+            "Access-Control-Expose-Headers": "X-Photos-Count, Content-Disposition",
+        },
+    )
+
+
+@router.get("/{pet_id}/photos/{index}/download")
+def download_pet_photo(
+    pet_id: int,
+    index: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    _: bool = Depends(check_permission("mascotas", "view"))
+):
+    """Una foto de la mascota como archivo (el navegador no puede forzar la
+    descarga de una URL de otro dominio)."""
+    from fastapi import Response
+    from app.services.pet_photos import photo_rows, fetch_photo
+    pet = db.query(models.Pet).filter(models.Pet.id == pet_id, models.Pet.tenant_id == tenant_id).first()
+    if not pet:
+        raise HTTPException(status_code=404, detail="Mascota no encontrada")
+    row = next((r for r in photo_rows(db, tenant_id) if r["pet_id"] == pet_id and r["index"] == index), None)
+    data = fetch_photo(row["url"]) if row else None
+    if not data:
+        raise HTTPException(status_code=404, detail="Foto no disponible")
+    ext = row["filename"].rsplit(".", 1)[-1]
+    media = {"jpg": "image/jpeg", "png": "image/png", "gif": "image/gif", "avif": "image/avif"}.get(ext, "image/webp")
+    return Response(content=data, media_type=media,
+                    headers={"Content-Disposition": f'attachment; filename="{row["filename"]}"'})
+
+
 @router.get("/{pet_id}", response_model=schemas.PetInDB)
 def get_pet(
     pet_id: int,
