@@ -251,9 +251,10 @@ export default function Navbar() {
 
     const handleDeleteNotification = async (id: number, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
-        if (!confirm('¿Estás seguro de eliminar esta notificación y sus datos asociados?')) return;
+        if (!confirm('¿Eliminar esta notificación? Si es un registro web, pasa a «Eliminados» con sus datos y fotos y se puede restaurar.')) return;
         try {
             await apiRequest(`/api/internal/notifications/${id}`, { method: 'DELETE' });
+            queryClient.invalidateQueries({ queryKey: ['submissions', 'deleted'] });
             queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
         } catch (err) {
             console.error('Error deleting notification:', err);

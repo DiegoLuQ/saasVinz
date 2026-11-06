@@ -22,7 +22,8 @@ import {
     Copy,
     Check,
     ExternalLink,
-    Feather
+    Feather,
+    RotateCcw
 } from 'lucide-react';
 import { apiRequest, getImageUrl } from '@/lib/tenant/api';
 import { copyToClipboard } from '@/lib/clipboard';
@@ -140,19 +141,41 @@ export default function SubmissionDetailPage() {
         setIsDeleteModalOpen(true);
     };
 
+    // En Eliminados: datos y fotos intactos; se restaura o (solo admin) se borra definitivamente
+    const isDeleted = submission?.status === 'deleted';
+    const isAdmin = userRole === 'admin' || userRole === 'creator';
+    const [isRestoring, setIsRestoring] = useState(false);
+
     const handleDeleteConfirm = async () => {
         if (!submission) return;
         setIsDeleting(true);
         try {
-            await apiRequest(`/api/internal/submissions/${submission.id}`, { method: 'DELETE' });
-            showToast('Registro eliminado', 'success');
+            await apiRequest(`/api/internal/submissions/${submission.id}${isDeleted ? '?permanent=true' : ''}`, { method: 'DELETE' });
+            showToast(isDeleted ? 'Registro eliminado definitivamente' : 'Registro enviado a Eliminados', 'success');
             queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
+            queryClient.invalidateQueries({ queryKey: ['submissions', 'deleted'] });
             router.push('/dashboard');
         } catch (err: any) {
             showToast(err.message, 'error');
         } finally {
             setIsDeleting(false);
             setIsDeleteModalOpen(false);
+        }
+    };
+
+    const handleRestore = async () => {
+        if (!submission) return;
+        setIsRestoring(true);
+        try {
+            const res = await apiRequest(`/api/internal/submissions/${submission.id}/restore`, { method: 'POST' });
+            showToast(res?.status === 'processed' ? 'Registro restaurado (ya tenía orden)' : 'Registro restaurado a pendiente', 'success');
+            queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
+            queryClient.invalidateQueries({ queryKey: ['submissions', 'deleted'] });
+            await fetchDetail();
+        } catch (err: any) {
+            showToast(err.message, 'error');
+        } finally {
+            setIsRestoring(false);
         }
     };
 
@@ -264,7 +287,13 @@ export default function SubmissionDetailPage() {
                     <div>
                         <div className="flex items-center gap-2 flex-wrap">
                             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">Detalle del Registro</h1>
-                            <span className="text-xs bg-primary/10 text-primary px-3 py-1 rounded-full font-bold">Pendiente</span>
+                            {isDeleted ? (
+                                <span className="text-xs bg-red-500/10 text-red-500 border border-red-500/20 px-3 py-1 rounded-full font-bold">Eliminado</span>
+                            ) : submission.status === 'processed' ? (
+                                <span className="text-xs bg-emerald-500/10 text-emerald-500 px-3 py-1 rounded-full font-bold">Procesado</span>
+                            ) : (
+                                <span className="text-xs bg-primary/10 text-primary px-3 py-1 rounded-full font-bold">Pendiente</span>
+                            )}
                             {submission.code && (
                                 <span className="text-xs bg-orange-500/10 text-orange-400 border border-orange-500/20 px-3 py-1 rounded-full font-mono font-bold uppercase tracking-wider">
                                     Cód: {submission.code}
@@ -274,15 +303,40 @@ export default function SubmissionDetailPage() {
                         <p className="text-muted-foreground text-sm mt-1">Enviado el {submission.created_at}</p>
                     </div>
                 </div>
-                {(userRole === 'admin' || userRole === 'recepcion' || userRole === 'creator') && (
+                {(userRole === 'admin' || userRole === 'recepcion' || userRole === 'creator') && (isDeleted ? (
+                    <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+                        <button
+                            onClick={handleRestore}
+                            disabled={isRestoring}
+                            className="py-3 px-5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-60"
+                        >
+                            {isRestoring ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />} Restaurar a pendiente
+                        </button>
+                        {isAdmin && (
+                            <button
+                                onClick={handleDeleteClick}
+                                className="py-3 px-5 rounded-2xl bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white font-bold text-xs uppercase tracking-wider transition-all border border-red-500/20 flex items-center justify-center gap-2 active:scale-95"
+                            >
+                                <Trash2 size={16} /> Eliminar definitivamente
+                            </button>
+                        )}
+                    </div>
+                ) : (
                     <button
                         onClick={handleDeleteClick}
                         className="py-3 px-5 rounded-2xl bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white font-bold text-xs uppercase tracking-wider transition-all border border-red-500/20 flex items-center justify-center gap-2 active:scale-95 self-start sm:self-auto"
                     >
                         <Trash2 size={16} /> Eliminar Registro
                     </button>
-                )}
+                ))}
             </div>
+
+            {isDeleted && (
+                <div className="p-5 rounded-3xl bg-red-500/10 border border-red-500/20 text-sm text-red-700 dark:text-red-200">
+                    <p className="font-bold">Este registro está en Eliminados{submission.deleted_at ? ` desde el ${submission.deleted_at}` : ''}.</p>
+                    <p className="mt-1 text-xs">Sus datos y fotos se conservan. Restáuralo para volver a procesarlo.</p>
+                </div>
+            )}
 
             {/* La solicitud ya es una orden: acceso a su expediente */}
             {submission.order && (
@@ -503,7 +557,7 @@ export default function SubmissionDetailPage() {
                     </div>
 
                     {/* Documentos: certificado, imagen digital e imagen para redes (Generar todo) */}
-                    {canGenerateAll && (
+                    {canGenerateAll && !isDeleted && (
                     <GenerateAllPanel
                         submission={submission}
                         existing={workflowStep}
@@ -655,7 +709,11 @@ export default function SubmissionDetailPage() {
                             })}
                         </ul>
 
-                        {(userRole === 'admin' || userRole === 'recepcion' || userRole === 'creator') ? (
+                        {isDeleted ? (
+                            <p className="py-3 px-4 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-center text-red-600 dark:text-red-300 font-semibold">
+                                Restaura el registro para procesarlo.
+                            </p>
+                        ) : (userRole === 'admin' || userRole === 'recepcion' || userRole === 'creator') ? (
                             workflowStep.cremation_id ? (
                                 <button
                                     onClick={() => router.push(`/dashboard/recepcion-pedidos?orden=${workflowStep.cremation_id}`)}
@@ -783,18 +841,29 @@ export default function SubmissionDetailPage() {
             <Modal
                 isOpen={isDeleteModalOpen}
                 onClose={() => !isDeleting && setIsDeleteModalOpen(false)}
-                title="Eliminar Registro"
+                title={isDeleted ? 'Eliminar definitivamente' : 'Eliminar Registro'}
                 maxWidth="max-w-md"
             >
                 <div className="p-4 text-center">
                     <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                         <AlertCircle className="text-red-400" size={32} />
                     </div>
-                    <h3 className="text-xl font-bold mb-2">¿Confirmar eliminación permanente?</h3>
-                    <p className="text-muted-foreground text-sm mb-4">
-                        Esta acción no se puede deshacer. Se eliminarán los datos de este registro (familia, mascota, plan y fechas) y sus fotos en la nube.
-                    </p>
-                    {(submission?.order || submission?.pet_id) && (
+                    {isDeleted ? (
+                        <>
+                            <h3 className="text-xl font-bold mb-2">¿Eliminar definitivamente?</h3>
+                            <p className="text-muted-foreground text-sm mb-4">
+                                Esta acción no se puede deshacer. Se borrarán los datos de este registro (familia, mascota, plan y fechas) y sus fotos en la nube.
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            <h3 className="text-xl font-bold mb-2">¿Enviar a Eliminados?</h3>
+                            <p className="text-muted-foreground text-sm mb-4">
+                                El registro sale de la bandeja, pero sus datos y fotos se conservan. Podrás restaurarlo a pendiente desde la pestaña «Eliminados» de Registros Formulario.
+                            </p>
+                        </>
+                    )}
+                    {isDeleted && (submission?.order || submission?.pet_id) && (
                         <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-left text-xs text-amber-800 dark:text-amber-300">
                             <p className="font-bold">
                                 Este registro ya creó {submission?.order ? `la orden ${submission.order.oc_number || `#${submission.order.id}`}` : 'la ficha de la mascota'}.
@@ -805,7 +874,7 @@ export default function SubmissionDetailPage() {
                             </p>
                         </div>
                     )}
-                    {!(submission?.order || submission?.pet_id) && <div className="mb-2" />}
+                    {!(isDeleted && (submission?.order || submission?.pet_id)) && <div className="mb-2" />}
                     <div className="flex gap-3">
                         <button
                             disabled={isDeleting}
@@ -819,7 +888,7 @@ export default function SubmissionDetailPage() {
                             onClick={handleDeleteConfirm}
                             className="flex-1 py-3 px-4 rounded-xl bg-red-500 text-white font-bold hover:bg-red-600 transition-all text-sm flex justify-center"
                         >
-                            {isDeleting ? <Loader2 size={18} className="animate-spin" /> : 'Eliminar'}
+                            {isDeleting ? <Loader2 size={18} className="animate-spin" /> : isDeleted ? 'Eliminar definitivamente' : 'Enviar a Eliminados'}
                         </button>
                     </div>
                 </div>

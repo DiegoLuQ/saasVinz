@@ -173,6 +173,9 @@ class FormSubmission(Base):
     code = Column(String(20), unique=True, index=True, nullable=True)
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
     processed_at = Column(DateTime, nullable=True)
+    # Papelera: status 'deleted' conserva datos y fotos (services/submission_trash.py)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_by = Column(Integer, ForeignKey("sys_users.id", ondelete="SET NULL"), nullable=True)
     
     # Relations
     tenant = relationship("Tenant")

@@ -136,19 +136,11 @@ def delete_notification(
         ).first()
 
     if submission:
+        # Va a la papelera (datos y fotos se conservan; se puede restaurar)
         check_permission("ordenes", "delete")(db=db, current_user=current_user)
-        try:
-            tenant = db.query(models.Tenant).get(tenant_id)
-            if tenant:
-                submission_dir = Path("app/static/storage") / tenant.slug / "submissions" / str(submission.id)
-                if submission_dir.exists():
-                    shutil.rmtree(submission_dir)
-        except Exception as e:
-            print(f"Error cleaning up submission folder: {e}")
-        db.delete(submission)
-        notif.is_read = True
-        db.commit()
-        return {"message": "Notificación y datos asociados eliminados correctamente"}
+        from app.services.submission_trash import soft_delete
+        soft_delete(db, submission, current_user.id)
+        return {"message": "Registro enviado a Eliminados (se puede restaurar)"}
 
     aud.mark_for_user(db, notif.id, current_user.id, dismissed=True)
     db.commit()

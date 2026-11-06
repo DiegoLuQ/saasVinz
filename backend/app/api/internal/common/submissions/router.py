@@ -19,6 +19,7 @@ from app.api.internal.common.media_service import MediaService
 from app.api.internal.admin.rbac.router import check_permission
 
 PROCESSED = "processed"  # ya tiene orden: fuera de la lista, se conserva para el embudo del catálogo
+DELETED = "deleted"      # en la papelera: datos y fotos intactos, se puede restaurar (services/submission_trash.py)
 
 router = APIRouter()
 
@@ -59,6 +60,8 @@ class SubmissionListItem(BaseModel):
     created_at: str
     origin: str | None = "web_crematorio"
     partner_name: str | None = None
+    deleted_at: str | None = None
+    deleted_by_name: str | None = None
 
     class Config:
         from_attributes = True
@@ -77,15 +80,26 @@ def _submission_price_list_id(db: Session, tenant_id: int, pet_data) -> int | No
 
 @router.get("", response_model=list[SubmissionListItem])
 def get_submissions(
+    status: str | None = None,
     db: Session = Depends(get_db),
     tenant_id: int = Depends(deps.get_tenant_id),
     _: bool = Depends(check_permission("ordenes", "view"))
 ):
-    submissions = db.query(models.FormSubmission).filter(
-        models.FormSubmission.tenant_id == tenant_id,
-        models.FormSubmission.status != PROCESSED,
-    ).order_by(models.FormSubmission.created_at.desc()).all()
-    
+    """Bandeja (sin procesados ni eliminados) o, con `status=deleted`, la papelera."""
+    q = db.query(models.FormSubmission).filter(models.FormSubmission.tenant_id == tenant_id)
+    if status == DELETED:
+        submissions = q.filter(models.FormSubmission.status == DELETED) \
+            .order_by(models.FormSubmission.deleted_at.desc().nullslast()).all()
+    else:
+        submissions = q.filter(models.FormSubmission.status.notin_((PROCESSED, DELETED))) \
+            .order_by(models.FormSubmission.created_at.desc()).all()
+
+    deleters = {}
+    by_ids = {s.deleted_by for s in submissions if s.deleted_by}
+    if by_ids:
+        deleters = {u.id: (u.name or u.email) for u in
+                    db.query(models.User).filter(models.User.id.in_(by_ids)).all()}
+
     result = []
     for s in submissions:
         partner_id = s.owner_data.get("partner_id")
@@ -102,6 +116,8 @@ def get_submissions(
             "created_at": format_tenant_datetime(s.created_at, db, tenant_id),
             "origin": origin,
             "partner_name": ref_name,
+            "deleted_at": format_tenant_datetime(s.deleted_at, db, tenant_id) if s.deleted_at else None,
+            "deleted_by_name": deleters.get(s.deleted_by),
         })
     return result
 
@@ -269,6 +285,7 @@ def get_submission_detail(
         "pet_id": submission.pet_id,
         "partner": partner_info,
         "order": None,
+        "deleted_at": format_tenant_datetime(submission.deleted_at, db, tenant_id) if submission.deleted_at else None,
     }
 
     # Orden generada a partir de esta solicitud (misma mascota): permite abrir
@@ -283,20 +300,60 @@ def get_submission_detail(
 
     return submission_dict
 
-@router.delete("/{submission_id}")
-def delete_submission(
+def _get_submission(db: Session, tenant_id: int, submission_id: int) -> models.FormSubmission:
+    submission = db.query(models.FormSubmission).filter(
+        models.FormSubmission.id == submission_id,
+        models.FormSubmission.tenant_id == tenant_id
+    ).first()
+    if not submission:
+        raise HTTPException(status_code=404, detail="Registro no encontrado")
+    return submission
+
+
+def _not_deleted(submission) -> None:
+    if submission is not None and submission.status == DELETED:
+        raise HTTPException(status_code=409, detail="El registro está en Eliminados: restáuralo para procesarlo")
+
+
+@router.post("/{submission_id}/restore")
+def restore_submission(
     submission_id: int,
     db: Session = Depends(get_db),
     tenant_id: int = Depends(deps.get_tenant_id),
     _: bool = Depends(check_permission("ordenes", "delete"))
 ):
-    submission = db.query(models.FormSubmission).filter(
-        models.FormSubmission.id == submission_id,
-        models.FormSubmission.tenant_id == tenant_id
-    ).first()
-    
-    if not submission:
-        raise HTTPException(status_code=404, detail="Registro no encontrado")
+    """Saca el registro de Eliminados: vuelve a pendiente (o a procesado si ya tiene orden)."""
+    from app.services.submission_trash import restore
+    submission = _get_submission(db, tenant_id, submission_id)
+    if submission.status != DELETED:
+        raise HTTPException(status_code=409, detail="El registro no está en Eliminados")
+    return {"status": restore(db, submission)}
+
+
+@router.delete("/{submission_id}")
+def delete_submission(
+    submission_id: int,
+    permanent: bool = False,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(deps.get_tenant_id),
+    current_user: models.User = Depends(deps.get_current_user),
+    _: bool = Depends(check_permission("ordenes", "delete"))
+):
+    """Sin `permanent`: va a Eliminados (datos y fotos se conservan). Con
+    `permanent=true` (solo administrador y solo desde Eliminados): se borra
+    el registro y sus fotos que nadie más usa."""
+    submission = _get_submission(db, tenant_id, submission_id)
+
+    if not permanent:
+        from app.services.submission_trash import soft_delete
+        soft_delete(db, submission, current_user.id)
+        return {"status": DELETED}
+
+    role = getattr(current_user.role, "value", current_user.role)
+    if role not in ("admin", "creator"):
+        raise HTTPException(status_code=403, detail="Solo el administrador puede eliminar definitivamente")
+    if submission.status != DELETED:
+        raise HTTPException(status_code=409, detail="Primero envía el registro a Eliminados")
 
     # 1. Carpeta local antigua (antes de R2) si existiera
     try:
@@ -327,6 +384,7 @@ def create_customer_from_submission(
     
     if not submission:
         raise HTTPException(status_code=404, detail="Registro no encontrado")
+    _not_deleted(submission)
     
     owner = submission.owner_data
     print(f"Creating customer for submission {submission_id}. owner_data: {owner}")
@@ -385,6 +443,7 @@ def create_pet_from_submission(
         
         if not submission:
             raise HTTPException(status_code=404, detail="Registro no encontrado")
+        _not_deleted(submission)
         
         pet_data = submission.pet_data
         
@@ -485,6 +544,7 @@ def create_services_from_submission(
         
         if not submission:
             raise HTTPException(status_code=404, detail="Registro no encontrado")
+        _not_deleted(submission)
         
         pet = db.query(models.Pet).get(pet_id)
         if not pet:

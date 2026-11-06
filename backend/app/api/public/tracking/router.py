@@ -68,7 +68,8 @@ def resolve_tracking_code(request: Request, code: str, db: Session = Depends(get
 
     # Solicitud de formulario pendiente (aún sin orden creada)
     submission = db.query(models.FormSubmission).filter(
-        models.FormSubmission.code == code
+        models.FormSubmission.code == code,
+        models.FormSubmission.status != "deleted",
     ).first()
     if submission:
         tenant = db.query(models.Tenant).filter(models.Tenant.id == submission.tenant_id).first()
@@ -120,7 +121,8 @@ def get_tracking_info(
         # Buscar si es una solicitud de formulario pendiente (FormSubmission)
         submission = db.query(models.FormSubmission).filter(
             models.FormSubmission.code == token,
-            models.FormSubmission.tenant_id == tenant.id
+            models.FormSubmission.tenant_id == tenant.id,
+            models.FormSubmission.status != "deleted",
         ).first()
 
         if not submission:
