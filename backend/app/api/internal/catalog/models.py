@@ -100,6 +100,8 @@ class Plan(Base):
     # Peso máximo de la mascota (kg, NULL = sin límite): se oculta en catálogo/formulario
     # para tamaños mayores (plan_fits_weight en public_form_config). Migración f6c8e0a2b419.
     max_weight = Column(Float, nullable=True)
+    # Plan prioritario: sus órdenes se marcan y van primero en Panel de Trabajo / Dashboard
+    is_priority = Column(Boolean, nullable=False, default=False, server_default="false")
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
 
     # Ordenados según el orden definido en el plan(srv_plan_services.sort_order)

@@ -62,10 +62,11 @@ def _pin() -> str:
 
 
 def available_plans(db: Session) -> list[dict]:
-    """Planes Vinzer activos (Recuerdo / Eterno / Infinito), con precio y límites actuales."""
+    """Planes Vinzer activos (Recuerdo / Eterno / Infinito), con precio efectivo (con descuento) y límites actuales."""
     out = []
     for p in memorial_plans.vinzer_plans(db):
         d = memorial_plans.serialize(p)
+        d["price"] = d["final_price"]
         d["max_images"] = d["features"]["max_images"]
         d["days"] = None if p.billing == memorial_plans.BILLING_ONE_TIME else memorial_plans.YEAR_DAYS
         out.append(d)

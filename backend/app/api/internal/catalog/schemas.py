@@ -172,6 +172,7 @@ class PlanBase(BaseModel):
     sort_order: int = 0
     group_name: Optional[str] = None
     max_weight: Optional[float] = Field(None, gt=0, le=500)  # kg; None = sin límite
+    is_priority: bool = False  # sus órdenes van primero en el Panel de Trabajo
 
     _clean_group = field_validator("group_name", mode="before")(clean_group_name)
 
@@ -193,6 +194,7 @@ class PlanUpdate(BaseModel):
     sort_order: Optional[int] = None
     group_name: Optional[str] = None
     max_weight: Optional[float] = Field(None, gt=0, le=500)  # null = sin límite
+    is_priority: Optional[bool] = None
     service_ids: Optional[List[int]] = None
     product_ids: Optional[List[int]] = None
     optional_service_ids: Optional[List[int]] = None

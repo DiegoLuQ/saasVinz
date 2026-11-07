@@ -3,7 +3,7 @@ from typing import Optional, List, Literal, Any, Dict
 from datetime import datetime
 
 
-AspectRatio = Literal["9:16", "4:5", "3:4", "4:3", "1:1"]
+AspectRatio = Literal["9:16", "4:5", "3:4", "4:3", "1:1", "16:9"]
 FontFamily = Literal[
     "Playfair Display", "Cormorant Garamond", "Lora", "Cinzel", "Great Vibes",
     "Alex Brush", "Dancing Script", "Montserrat", "Quicksand",
@@ -15,6 +15,8 @@ TextBinding = Literal[
     "tenant_name", "tenant_rut", "tenant_phone", "tenant_email", "tenant_address", "tenant_city", "tenant_legal_rep",
     "tenant_instagram", "tenant_facebook", "tenant_tiktok", "tenant_youtube", "tenant_website", "tenant_whatsapp",
     "date", "phrase", "ai_text", "static",
+    # Collage (plantillas kind='collage')
+    "period_label", "period_count", "pet_names",
 ]
 PhotoShape = Literal["circle", "square", "rounded"]
 
@@ -75,6 +77,8 @@ class ImageTemplateBase(BaseModel):
     # None = global; con valor = exclusiva de ese tenant.
     tenant_id: Optional[int] = None
     is_active: bool = True
+    # 'social' = diseño por mascota; 'collage' = varias mascotas entregadas
+    kind: Literal["social", "collage"] = "social"
 
 
 class ImageTemplateCreate(ImageTemplateBase):
@@ -93,6 +97,7 @@ class ImageTemplateUpdate(BaseModel):
     ai_text_max_chars: Optional[int] = Field(None, ge=20, le=500)
     tenant_id: Optional[int] = None
     is_active: Optional[bool] = None
+    kind: Optional[Literal["social", "collage"]] = None
 
 
 class ImageTemplateInDB(ImageTemplateBase):

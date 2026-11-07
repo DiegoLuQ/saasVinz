@@ -221,6 +221,8 @@ def preview_test_admin_template(
             tenant_id=0,
             base_url=base_url,
             verification_code="YZAEAQ7TMV",
+            owner={"name": "Juan Pérez", "rut": "12.345.678-5", "email": "juan@correo.cl",
+                   "phone": "+56 9 8765 4321", "address": "Los Aromos 123, Providencia"},
         )
 
     if category == 'recibo_suscripcion':

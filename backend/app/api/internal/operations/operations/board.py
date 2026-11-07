@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Optional
 
 import pytz
-from sqlalchemy import func
+from sqlalchemy import exists, func
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app import models
@@ -65,6 +65,23 @@ def scheduled_expr():
     return func.coalesce(models.CremationScheduling.scheduled_at, models.Cremation.created_at)
 
 
+def priority_expr():
+    """La orden tiene algún plan marcado como prioritario (srv_plans.is_priority)."""
+    return exists().where(
+        models.PlanOC.cremation_id == models.Cremation.id,
+        models.PlanOC.plan_id == models.Plan.id,
+        models.Plan.is_priority.is_(True),
+    )
+
+
+def priority_plan_name(crem) -> Optional[str]:
+    """Nombre del primer plan prioritario de la orden (None = sin prioridad)."""
+    for line in getattr(crem, "planes", None) or []:
+        if line.plan is not None and line.plan.is_priority:
+            return line.plan.name
+    return None
+
+
 def base_query(db: Session, tenant_id: int):
     return db.query(
         models.Cremation,
@@ -75,6 +92,7 @@ def base_query(db: Session, tenant_id: int):
         models.Veterinary,
     ).options(
         selectinload(models.Cremation.evidence),
+        selectinload(models.Cremation.planes).joinedload(models.PlanOC.plan),
         joinedload(models.Cremation.technical),
         joinedload(models.Cremation.logistics),
         joinedload(models.Cremation.details),
@@ -176,4 +194,5 @@ def to_daily_order(row, tzinfo) -> schemas.DailyOrderSchema:
         cremation_type=crem.cremation_type,
         notes=crem.details.notes if crem.details else None,
         pet_image_url=pet.image_url if pet else None,
+        priority_plan=priority_plan_name(crem),
     )

@@ -350,6 +350,8 @@ class TrackingTimelineEvent(BaseModel):
     evidence: Optional[OrderEvidenceInDB] = None
 
 class PublicTrackingResponse(BaseModel):
+    # Zona horaria del crematorio: la página muestra las horas en ella (no en la del dispositivo)
+    timezone: str = "America/Santiago"
     oc_number: Optional[int] = None
     verification_code: Optional[str] = None  # código corto (10 car.) para validar/buscar
     pet_name: str
@@ -446,6 +448,7 @@ class DashboardLowStockProduct(BaseModel):
 
 class DashboardRecentActivity(BaseModel):
     id: int
+    priority_plan: Optional[str] = None  # plan prioritario (se marca y va primero)
     pet: str
     pet_species: Optional[str] = None
     pet_image: Optional[str] = None
@@ -538,6 +541,8 @@ class CertificateGenerateRequest(BaseModel):
 
 class DailyOrderSchema(BaseModel):
     id: int
+    # Nombre del plan prioritario de la orden (None = sin prioridad)
+    priority_plan: Optional[str] = None
     oc_number: Optional[int] = None
     verification_code: Optional[str] = None
     pet_id: int

@@ -39,6 +39,13 @@ class PlanCatalogUpdate(BaseModel):
     sort_order: Optional[int] = Field(None, ge=0, le=100)
     is_active: Optional[bool] = None
     features: Optional[dict] = None
+    discount_percent: Optional[float] = Field(None, ge=0, le=95)
+    discount_label: Optional[str] = Field(None, max_length=40)
+
+
+class GlobalDiscountUpdate(BaseModel):
+    discount_percent: float = Field(..., ge=0, le=95)
+    discount_label: Optional[str] = Field(None, max_length=40)
 
 
 @router.get("/plan-catalog")
@@ -86,11 +93,27 @@ def update_plan_catalog(
             plan.sort_order = body.sort_order
         if body.is_active is not None:
             plan.is_active = body.is_active
+        if body.discount_percent is not None or body.discount_label is not None:
+            memorial_plans.set_discount(plan, body.discount_percent, body.discount_label)
     if body.features is not None:
         plan.features = memorial_plans.clean_features(body.features, base=memorial_plans.features_of(plan))
     db.commit()
     db.refresh(plan)
     return memorial_plans.serialize(plan)
+
+
+@router.post("/plan-catalog/global-discount")
+def apply_global_discount(
+    body: GlobalDiscountUpdate,
+    db: Session = Depends(get_db),
+    current_creator: models.User = Depends(auth.get_current_creator),
+):
+    """Aplica un porcentaje de descuento (0 a 95%) y etiqueta opcional a todos los planes de venta directa Vinzer."""
+    rows = memorial_plans.vinzer_plans(db, only_active=False)
+    for p in rows:
+        memorial_plans.set_discount(p, body.discount_percent, body.discount_label if body.discount_percent > 0 else "")
+    db.commit()
+    return plan_catalog(db=db, current_creator=current_creator)
 
 @router.get("", response_model=List[schemas.AdminMemorialResponse])
 def list_all_memorials(

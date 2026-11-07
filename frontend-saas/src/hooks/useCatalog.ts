@@ -48,6 +48,8 @@ export interface Plan {
     group_name?: string | null;
     /** Peso máximo de la mascota en kg (null = sin límite) */
     max_weight?: number | null;
+    /** Plan prioritario: sus órdenes se marcan y van primero en el Panel de Trabajo / Dashboard */
+    is_priority?: boolean;
     services?: Service[];
     service_ids?: number[];          // el orden de la lista es el orden en el catálogo
     optional_service_ids?: number[]; // subconjunto de service_ids marcados como opcionales

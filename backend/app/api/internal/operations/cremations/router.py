@@ -103,6 +103,9 @@ def actualizar_carta_despedida(
     return {"cremation_id": oc.id, "dedication": text_ or None}
 
 
+from app.api.internal.operations.operations.board import priority_plan_name  # noqa: E402
+
+
 @router.get("/{cremation_id}/expediente")
 def obtener_expediente(
     cremation_id: int,
@@ -141,9 +144,12 @@ def obtener_expediente(
             models.FormSubmission.pet_id == oc.pet_id,
         ).order_by(models.FormSubmission.id.desc()).first()
     pet_data = (submission.pet_data or {}) if submission else {}
-    photos = [u for u in ((submission.images if submission else None) or []) if isinstance(u, str)]
-    if pet and pet.image_url and pet.image_url not in photos:
-        photos.insert(0, pet.image_url)
+    # Principal primero (image_url), luego las de la ficha y las del formulario, sin repetir
+    pet_photos = [u for u in ([pet.image_url] + list(pet.images or []) if pet else []) if isinstance(u, str) and u]
+    photos = []
+    for u in pet_photos + [u for u in ((submission.images if submission else None) or []) if isinstance(u, str)]:
+        if u not in photos:
+            photos.append(u)
 
     # Servicios, planes y productos de la orden.
     items = []
@@ -289,6 +295,7 @@ def obtener_expediente(
             "verification_code": oc.verification_code,
             "current_step": steps[current_idx].name if current_idx >= 0 else None,
             "notes": notes_txt,
+            "priority_plan": priority_plan_name(oc),
         },
         "pet": {
             "id": pet.id if pet else None, "name": pet.name if pet else None,
@@ -301,6 +308,8 @@ def obtener_expediente(
             "dedication_source": ("orden" if oc.details and oc.details.dedication is not None
                                   else ("formulario" if pet_data.get("dedication") else None)),
             "photos": photos,
+            # Las que se pueden marcar como principal (PUT /pets/{id}/main-image)
+            "pet_photos": list(dict.fromkeys(pet_photos)),
         },
         "customer": {
             "name": customer.name if customer else None,

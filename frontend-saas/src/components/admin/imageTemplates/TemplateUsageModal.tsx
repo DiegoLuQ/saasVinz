@@ -15,6 +15,7 @@ export default function TemplateUsageModal({ template, usage, onClose }: {
     onClose: () => void;
 }) {
     const [zoom, setZoom] = useState<TemplateUsageItem | null>(null);
+    const isCollage = template.kind === 'collage';
 
     return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -30,12 +31,15 @@ export default function TemplateUsageModal({ template, usage, onClose }: {
 
                 <div className="p-5 space-y-6">
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        {[
+                        {(isCollage ? [
+                            ['Crematorios', usage?.tenants_count ?? 0],
+                            ['Descargas', usage?.designs ?? 0],
+                        ] : [
                             ['Crematorios', usage?.tenants_count ?? 0],
                             ['Diseños', usage?.designs ?? 0],
                             ['Ilustraciones IA', usage?.illustrations ?? 0],
                             ['Generaciones IA', usage?.ai_generations ?? 0],
-                        ].map(([label, value]) => (
+                        ]).map(([label, value]) => (
                             <div key={label} className="bg-white/5 border border-white/10 rounded-xl p-3">
                                 <p className="text-[11px] font-bold uppercase tracking-wider text-white/40">{label}</p>
                                 <p className="text-2xl font-black text-white mt-0.5">{value}</p>
@@ -43,6 +47,42 @@ export default function TemplateUsageModal({ template, usage, onClose }: {
                         ))}
                     </div>
 
+                    {isCollage ? (
+                    <div>
+                        <h4 className="text-sm font-bold text-white mb-3">Descargas del collage</h4>
+                        {!usage?.downloads?.length ? (
+                            <p className="text-white/40 text-sm">Todavía ningún crematorio lo ha descargado.</p>
+                        ) : (
+                            <div className="overflow-x-auto border border-white/10 rounded-xl">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-white/5">
+                                        <tr className="text-left text-[11px] uppercase tracking-wider text-white/40">
+                                            <th className="px-3 py-2">Fecha</th>
+                                            <th className="px-3 py-2">Crematorio</th>
+                                            <th className="px-3 py-2">Usuario</th>
+                                            <th className="px-3 py-2">Periodo</th>
+                                            <th className="px-3 py-2">Fotos</th>
+                                            <th className="px-3 py-2">Formato</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {usage.downloads.map(d => (
+                                            <tr key={d.id} className="border-t border-white/5 text-white/80">
+                                                <td className="px-3 py-2 text-xs text-white/60 whitespace-nowrap">{fmt(d.created_at)}</td>
+                                                <td className="px-3 py-2 font-semibold text-white">{d.tenant_name}</td>
+                                                <td className="px-3 py-2 text-xs">{d.user_name || '—'}</td>
+                                                <td className="px-3 py-2 text-xs">{d.label || '—'}</td>
+                                                <td className="px-3 py-2">{d.photos}</td>
+                                                <td className="px-3 py-2 text-xs">{d.ratio || '—'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                        {(usage?.downloads?.length ?? 0) >= 30 && <p className="text-[11px] text-white/40 mt-2">Se muestran las últimas 30 descargas.</p>}
+                    </div>
+                    ) : (
                     <div>
                         <h4 className="text-sm font-bold text-white mb-3">Últimos creados</h4>
                         {!usage?.latest.length ? (
@@ -67,6 +107,7 @@ export default function TemplateUsageModal({ template, usage, onClose }: {
                             </div>
                         )}
                     </div>
+                    )}
 
                     <div>
                         <h4 className="text-sm font-bold text-white mb-3">Quiénes la usan</h4>
@@ -78,9 +119,9 @@ export default function TemplateUsageModal({ template, usage, onClose }: {
                                     <thead className="bg-white/5">
                                         <tr className="text-left text-[11px] uppercase tracking-wider text-white/40">
                                             <th className="px-3 py-2">Crematorio</th>
-                                            <th className="px-3 py-2">Diseños</th>
-                                            <th className="px-3 py-2">Ilustraciones</th>
-                                            <th className="px-3 py-2">Generaciones IA</th>
+                                            <th className="px-3 py-2">{isCollage ? 'Descargas' : 'Diseños'}</th>
+                                            {!isCollage && <th className="px-3 py-2">Ilustraciones</th>}
+                                            {!isCollage && <th className="px-3 py-2">Generaciones IA</th>}
                                             <th className="px-3 py-2">Último uso</th>
                                         </tr>
                                     </thead>
@@ -89,8 +130,8 @@ export default function TemplateUsageModal({ template, usage, onClose }: {
                                             <tr key={t.tenant_id} className="border-t border-white/5 text-white/80">
                                                 <td className="px-3 py-2 font-semibold text-white flex items-center gap-2"><Building2 size={13} className="text-white/40" /> {t.tenant_name}</td>
                                                 <td className="px-3 py-2">{t.designs}</td>
-                                                <td className="px-3 py-2">{t.illustrations}</td>
-                                                <td className="px-3 py-2">{t.ai_generations}</td>
+                                                {!isCollage && <td className="px-3 py-2">{t.illustrations}</td>}
+                                                {!isCollage && <td className="px-3 py-2">{t.ai_generations}</td>}
                                                 <td className="px-3 py-2 text-xs text-white/60">{fmt(t.last_used_at)}</td>
                                             </tr>
                                         ))}

@@ -1,4 +1,4 @@
-import type { AspectRatio, FontFamily, TextBinding, TextLayer, PhotoLayer, StickerLayer, PhotoSlot } from './types';
+import type { AspectRatio, CollageLayer, CollagePhoto, FontFamily, TextBinding, TextLayer, PhotoLayer, StickerLayer, PhotoSlot } from './types';
 
 export interface DataField {
     value: TextBinding;
@@ -68,12 +68,52 @@ export const DATA_FIELD_GROUPS: DataFieldGroup[] = [
     },
 ];
 
+/** Datos propios de las plantillas de collage (reemplazan a Mascota / Dueño). */
+export const COLLAGE_FIELD_GROUP: DataFieldGroup = {
+    key: 'collage', label: 'Collage', fields: [
+        { value: 'period_label', label: 'Periodo (mes y año)', sample: 'Octubre 2026' },
+        { value: 'period_count', label: 'Cantidad de mascotas', sample: '12' },
+        { value: 'pet_names', label: 'Nombres de las mascotas', sample: 'Luna, Max, Milo, Kira, Toby, Nala, Coco, Simba, Lola, Rocky, Maya y Bruno' },
+    ],
+};
+
+/** Grupos de datos según el tipo de plantilla. */
+export function dataGroupsFor(kind: 'social' | 'collage' | undefined): DataFieldGroup[] {
+    if (kind !== 'collage') return DATA_FIELD_GROUPS;
+    return [COLLAGE_FIELD_GROUP, ...DATA_FIELD_GROUPS.filter(g => g.key !== 'pet' && g.key !== 'owner' && g.key !== 'content'),
+        { key: 'content', label: 'Contenido', fields: DATA_FIELD_GROUPS.find(g => g.key === 'content')!.fields.filter(f => f.value !== 'ai_text') }];
+}
+
+const SAMPLE_COLLAGE_URLS = [
+    'https://images.unsplash.com/photo-1546238232-20216dec9f72?auto=format&fit=crop&w=300&q=70',
+    'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=300&q=70',
+    'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?auto=format&fit=crop&w=300&q=70',
+    'https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&w=300&q=70',
+    'https://images.unsplash.com/photo-1574158622682-e40e69881006?auto=format&fit=crop&w=300&q=70',
+    'https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=300&q=70',
+];
+const SAMPLE_COLLAGE_NAMES = ['Luna', 'Max', 'Milo', 'Kira', 'Toby', 'Nala', 'Coco', 'Simba', 'Lola', 'Rocky', 'Maya', 'Bruno'];
+
+/** Fotos de ejemplo para la vista previa de un collage (editor y miniaturas). */
+export function sampleCollagePhotos(n = 40): CollagePhoto[] {
+    return Array.from({ length: n }, (_, i) => ({
+        url: SAMPLE_COLLAGE_URLS[i % SAMPLE_COLLAGE_URLS.length],
+        name: SAMPLE_COLLAGE_NAMES[i % SAMPLE_COLLAGE_NAMES.length],
+    }));
+}
+
+export const COLLAGE_GRIDS: { cols: number; rows: number }[] = [
+    { cols: 3, rows: 2 }, { cols: 3, rows: 3 }, { cols: 4, rows: 3 }, { cols: 3, rows: 4 },
+    { cols: 4, rows: 4 }, { cols: 5, rows: 4 }, { cols: 4, rows: 5 }, { cols: 5, rows: 5 },
+];
+
 
 export const ASPECT_RATIOS: { value: AspectRatio; label: string; w: number; h: number }[] = [
     { value: '9:16', label: '9:16 · Vertical (Stories)', w: 9, h: 16 },
     { value: '4:5', label: '4:5 · Feed Instagram', w: 4, h: 5 },
     { value: '3:4', label: '3:4 · Retrato', w: 3, h: 4 },
     { value: '4:3', label: '4:3 · Apaisado', w: 4, h: 3 },
+    { value: '16:9', label: '16:9 · Horizontal (YouTube / Facebook)', w: 16, h: 9 },
     { value: '1:1', label: '1:1 · Cuadrado', w: 1, h: 1 },
 ];
 
@@ -171,6 +211,14 @@ export function loremOf(maxChars: number): string {
     if (text.length <= maxChars) return text;
     const cut = text.slice(0, maxChars - 1);
     return cut.slice(0, cut.lastIndexOf(' ')).replace(/[,;:]$/, '') + '.';
+}
+
+export function newCollageLayer(): CollageLayer {
+    return {
+        type: 'collage', id: newId(), x: 50, y: 52, width: 88, height: 62, cols: 3, rows: 3, gap: 3,
+        shape: 'rounded', border_color: '#ffffff', border_width: 3, glow_color: '#ffffff', glow_blur: 0,
+        show_names: true, name_color: '#ffffff', name_font: 'Quicksand', name_size: 2.4, fill: 'empty',
+    };
 }
 
 export function newStickerLayer(url: string): StickerLayer {

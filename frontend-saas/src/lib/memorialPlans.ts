@@ -30,6 +30,10 @@ export interface MemorialPlanInfo {
     name: string;
     kind?: string;
     price: number;
+    original_price?: number;
+    final_price?: number;
+    discount_percent?: number;
+    discount_label?: string | null;
     currency: string;
     billing: MemorialBilling;
     description?: string | null;
@@ -65,16 +69,21 @@ export function fetchMemorialPlans(): Promise<MemorialPlanInfo[]> {
 
 /** Planes vigentes; mientras cargan, los valores por defecto. */
 export function useMemorialPlans(): MemorialPlanInfo[] {
-    const [plans, setPlans] = useState<MemorialPlanInfo[]>(FALLBACK_MEMORIAL_PLANS);
-    useEffect(() => {
-        let alive = true;
-        fetchMemorialPlans().then((p) => { if (alive) setPlans(p); });
-        return () => { alive = false; };
-    }, []);
-    return plans;
+    return useMemorialPlansState().plans;
 }
 
-export const formatPrice = (price: number) => (Number.isInteger(price) ? String(price) : price.toFixed(2));
+/** Igual que useMemorialPlans, indicando si ya llegaron los planes de la API. */
+export function useMemorialPlansState(): { plans: MemorialPlanInfo[]; loaded: boolean } {
+    const [state, setState] = useState<{ plans: MemorialPlanInfo[]; loaded: boolean }>({ plans: FALLBACK_MEMORIAL_PLANS, loaded: false });
+    useEffect(() => {
+        let alive = true;
+        fetchMemorialPlans().then((p) => { if (alive) setState({ plans: p, loaded: true }); });
+        return () => { alive = false; };
+    }, []);
+    return state;
+}
+
+export const formatPrice = (price: number) => String(Math.round(price));
 
 export function planPeriod(billing: MemorialBilling | string | null | undefined, en = false): string {
     if (billing === 'one_time') return en ? 'one-time payment' : 'pago único';

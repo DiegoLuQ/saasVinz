@@ -11,6 +11,7 @@ from app.api.internal.admin.rbac.router import check_permission
 from app.api.internal.common.media_service import MediaService
 from app.utils.upload_validation import read_and_validate_image
 from typing import List
+from pydantic import BaseModel
 
 from app.api.deps_limits import check_resource_limit
 
@@ -157,6 +158,36 @@ def create_pet(
     db.commit()
     db.refresh(db_pet)
     return db_pet
+
+class MainImageIn(BaseModel):
+    url: str
+
+
+@router.put("/{pet_id}/main-image", response_model=schemas.PetInDB)
+def elegir_foto_principal(
+    pet_id: int,
+    body: MainImageIn,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    _: bool = Depends(check_permission("mascotas", "edit"))
+):
+    """Marca una de sus fotos como principal: queda primera en `images` y en
+    `image_url` (la que usan certificado, plantillas, IA, memorial y seguimiento).
+    No borra ni sube fotos."""
+    db_pet = db.query(models.Pet).filter(models.Pet.id == pet_id, models.Pet.tenant_id == tenant_id).first()
+    if not db_pet:
+        raise HTTPException(status_code=404, detail="Mascota no encontrada")
+    images = [i for i in (db_pet.images or []) if i]
+    if db_pet.image_url and db_pet.image_url not in images:
+        images.insert(0, db_pet.image_url)   # la principal antigua no se pierde
+    if body.url not in images:
+        raise HTTPException(status_code=400, detail="La foto no pertenece a esta mascota")
+    db_pet.images = [body.url] + [i for i in images if i != body.url]
+    db_pet.image_url = body.url
+    db.commit()
+    db.refresh(db_pet)
+    return db_pet
+
 
 @router.patch("/{pet_id}", response_model=schemas.PetInDB)
 def actualizar_mascota(

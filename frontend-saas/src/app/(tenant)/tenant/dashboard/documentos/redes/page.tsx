@@ -22,6 +22,8 @@ import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { useSessionBootstrap } from '@/hooks/useSessionBootstrap';
 import { useCanOpen } from '@/hooks/useCanOpen';
 import MyDesigns from '@/components/tenant/redes/MyDesigns';
+import CollageStudio from '@/components/tenant/redes/CollageStudio';
+import { useFeatures } from '@/hooks/useFeatures';
 import LayerAdjustPanel from '@/components/tenant/redes/LayerAdjustPanel';
 import { applyOverrides, geometryPatch, type LayerOverrides } from '@/lib/admin/imageTemplates/overrides';
 
@@ -88,7 +90,9 @@ export default function RedesDesignsPage() {
     const { data: bootstrap } = useSessionBootstrap();
     const userRole = bootstrap?.user?.role;
     // Galería: plantillas disponibles o diseños ya generados por el crematorio.
-    const [galleryTab, setGalleryTab] = useState<'plantillas' | 'disenos'>('plantillas');
+    const [galleryTab, setGalleryTab] = useState<'plantillas' | 'disenos' | 'collage'>('plantillas');
+    const { hasFeature } = useFeatures();
+    const collageOn = hasFeature('certificados:collage', true);
     // Se cargan de a TEMPLATES_PAGE_SIZE (las más recientes primero), no todas de una vez.
     const [templatesPage, setTemplatesPage] = useState(1);
     const { data: templatesData, isLoading } = useQuery({
@@ -587,14 +591,16 @@ export default function RedesDesignsPage() {
                     </p>
                 </header>
                 <div className="flex gap-1 bg-slate-100 dark:bg-white/5 p-1 rounded-xl w-fit" role="tablist">
-                    {([['plantillas', 'Plantillas'], ['disenos', 'Mis diseños generados']] as const).map(([key, label]) => (
+                    {([['plantillas', 'Plantillas'], ['collage', 'Collage del mes'], ['disenos', 'Mis diseños generados']] as const).filter(([key]) => key !== 'collage' || collageOn).map(([key, label]) => (
                         <button key={key} role="tab" aria-selected={galleryTab === key} onClick={() => setGalleryTab(key)}
                             className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${galleryTab === key ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}>
                             {label}
                         </button>
                     ))}
                 </div>
-                {galleryTab === 'disenos' ? (
+                {galleryTab === 'collage' && collageOn ? (
+                    <CollageStudio />
+                ) : galleryTab === 'disenos' ? (
                     <MyDesigns canDelete={userRole === 'admin' || userRole === 'creator'} />
                 ) : isLoading ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

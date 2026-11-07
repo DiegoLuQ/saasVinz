@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import TemplateCanvas from './TemplateCanvas';
-import { ASPECT_RATIOS, DATA_FIELD_GROUPS, SAMPLE_PHOTO_URL } from '@/lib/admin/imageTemplates/constants';
+import { ASPECT_RATIOS, COLLAGE_FIELD_GROUP, DATA_FIELD_GROUPS, SAMPLE_PHOTO_URL } from '@/lib/admin/imageTemplates/constants';
 import type { ImageTemplate, PhotoFills, TemplateLatestDesign } from '@/lib/admin/imageTemplates/types';
 import { applyOverrides } from '@/lib/admin/imageTemplates/overrides';
 import { recipeRender } from '@/lib/admin/imageTemplates/recipe';
@@ -18,7 +18,7 @@ import type { Bindings } from './TemplateCanvas';
 
 export function sampleBindings(template: Pick<ImageTemplate, 'default_phrase'>): Bindings {
     const samples: Bindings = {};
-    DATA_FIELD_GROUPS.forEach(g => g.fields.forEach(f => { samples[f.value] = f.sample; }));
+    [...DATA_FIELD_GROUPS, COLLAGE_FIELD_GROUP].forEach(g => g.fields.forEach(f => { samples[f.value] = f.sample; }));
     return {
         ...samples,
         date: new Date().toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' }),

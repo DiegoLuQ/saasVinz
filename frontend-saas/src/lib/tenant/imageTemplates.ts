@@ -57,10 +57,42 @@ export interface ResolvedPrompts {
     max_chars: number;
 }
 
-export function listTenantImageTemplates(page = 1, page_size = 8): Promise<{
+export function listTenantImageTemplates(page = 1, page_size = 8, kind: 'social' | 'collage' = 'social'): Promise<{
     total: number; page: number; page_size: number; items: ImageTemplate[];
 }> {
-    return apiRequest(`${BASE}?page=${page}&page_size=${page_size}`);
+    return apiRequest(`${BASE}?page=${page}&page_size=${page_size}&kind=${kind}`);
+}
+
+/** Mascota con orden entregada para el collage (foto principal). */
+export interface CollageItem {
+    pet_id: number;
+    pet_name: string;
+    url: string;
+    delivered_at: string | null;
+}
+
+export interface CollagePhotosResult {
+    label: string;
+    mode: 'month' | 'last';
+    /** Autorizadas por la familia, de la más reciente a la más antigua. */
+    photos: CollageItem[];
+    /** Sin respuesta de la familia (se pueden autorizar desde el collage). */
+    pending: CollageItem[];
+    /** Familias que no autorizaron. */
+    declined: number;
+}
+
+/** Registra un collage descargado (sin imagen: solo su receta). Cuenta como uso de la plantilla. */
+export function saveCollage(templateId: number, body: {
+    ratio: string; mode: 'month' | 'last'; period: string; label: string; phrase: string;
+    photos: { pet_id: number; url: string; name: string }[];
+}): Promise<{ id: number }> {
+    return apiRequest(`${BASE}/${templateId}/collages`, { method: 'POST', body });
+}
+
+export function getCollagePhotos(params: { month?: string; last?: number }): Promise<CollagePhotosResult> {
+    const qs = params.month ? `month=${params.month}` : `last=${params.last ?? 12}`;
+    return apiRequest(`${BASE}/collage/photos?${qs}`);
 }
 
 /** Valores de los elementos de datos (mascota, dueño, crematorio) que arma el backend. */

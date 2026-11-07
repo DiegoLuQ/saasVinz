@@ -5,7 +5,9 @@ import Konva from 'konva';
 import { Stage, Layer as KLayer, Rect, Text, Image as KImage, Group, Ellipse, Transformer, Line } from 'react-konva';
 import type {
     TemplateDefinition, Layer, TextLayer, PhotoLayer, StickerLayer, PhotoFills, PhotoFill, TextBinding, ImageBinding,
+    CollageLayer, CollagePhoto,
 } from '@/lib/admin/imageTemplates/types';
+import { sampleCollagePhotos } from '@/lib/admin/imageTemplates/constants';
 
 /** Valores de los datos: textos por TextBinding y URLs de imagen por ImageBinding. */
 export type Bindings = Partial<Record<TextBinding | ImageBinding, string>>;
@@ -18,6 +20,8 @@ interface Props {
     /** Foto única (compatibilidad): se usa en cualquier hueco sin foto propia en `photos`. */
     photoUrl?: string | null;
     photos?: PhotoFills;
+    /** Fotos del collage (sin definir = fotos de ejemplo; [] = sin fotos). */
+    collage?: CollagePhoto[];
     stageRef?: React.Ref<Konva.Stage>;
     /** Modo editor del SuperAdmin: capas seleccionables, arrastrables y redimensionables. */
     editable?: boolean;
@@ -200,6 +204,93 @@ function PhotoNode({ layer, fill, ...common }: NodeCommon & { layer: PhotoLayer;
     );
 }
 
+/** Una casilla del collage: foto recortada con la forma, borde y resplandor de la capa. */
+function CollageCell({ layer, photo, x, y, w, h, nameH, k, width }: {
+    layer: CollageLayer; photo: CollagePhoto | null; x: number; y: number; w: number; h: number;
+    nameH: number; k: number; width: number;
+}) {
+    const image = useImage(photo?.url);
+    const glow = (layer.glow_blur || 0) * k;
+    const border = (layer.border_width || 0) * k;
+    const isCircle = layer.shape === 'circle';
+    const radius = layer.shape === 'rounded' ? Math.min(w, h) * 0.18 : 0;
+    const fontSize = (layer.name_size / 100) * width;
+    return (
+        <Group x={x} y={y}>
+            {glow > 0 && (
+                isCircle ? (
+                    <Ellipse x={w / 2} y={h / 2} radiusX={w / 2} radiusY={h / 2}
+                        stroke={layer.glow_color || '#ffffff'} strokeWidth={Math.max(border, 2 * k)}
+                        shadowColor={layer.glow_color || '#ffffff'} shadowBlur={glow} shadowOpacity={1} />
+                ) : (
+                    <Rect width={w} height={h} cornerRadius={radius}
+                        stroke={layer.glow_color || '#ffffff'} strokeWidth={Math.max(border, 2 * k)}
+                        shadowColor={layer.glow_color || '#ffffff'} shadowBlur={glow} shadowOpacity={1} />
+                )
+            )}
+            <Group clipFunc={(ctx: Konva.Context) => shapePath(ctx, layer.shape, w, h)}>
+                {image ? (
+                    <KImage image={image} {...coverRect(image, w, h)} />
+                ) : (
+                    <>
+                        <Rect width={w} height={h} fill="#ffffff" opacity={0.12} />
+                        {!photo && (
+                            <Text width={w} height={h} align="center" verticalAlign="middle" text="♥"
+                                fill={layer.border_color || '#ffffff'} opacity={0.5} fontSize={Math.min(w, h) * 0.28} listening={false} />
+                        )}
+                    </>
+                )}
+                {border > 0 && (
+                    isCircle ? (
+                        <Ellipse x={w / 2} y={h / 2} radiusX={w / 2} radiusY={h / 2}
+                            stroke={layer.border_color} strokeWidth={border * 2} />
+                    ) : (
+                        <Rect width={w} height={h} cornerRadius={radius} stroke={layer.border_color} strokeWidth={border * 2} />
+                    )
+                )}
+            </Group>
+            {layer.show_names && photo?.name && nameH > 0 && (
+                <Text y={h + nameH * 0.12} width={w} height={nameH} align="center" verticalAlign="middle"
+                    text={photo.name} ellipsis wrap="none" fontFamily={layer.name_font} fontSize={fontSize}
+                    fontStyle="600" fill={layer.name_color} listening={false} />
+            )}
+        </Group>
+    );
+}
+
+/** Grilla de fotos del collage, centrada en su caja. Casillas de igual tamaño. */
+function CollageNode({ layer, photos, ...common }: NodeCommon & { layer: CollageLayer; photos: CollagePhoto[] }) {
+    const { width, height } = common;
+    const k = width / REF_WIDTH;
+    const boxW = (layer.width / 100) * width;
+    const boxH = (layer.height / 100) * height;
+    const cols = Math.max(1, layer.cols);
+    const rows = Math.max(1, layer.rows);
+    const gap = (layer.gap / 100) * boxW;
+    const nameH = layer.show_names ? (layer.name_size / 100) * width * 1.5 : 0;
+    const cellW = (boxW - gap * (cols - 1)) / cols;
+    const cellH = (boxH - gap * (rows - 1)) / rows - nameH;
+    // Casillas cuadradas (o la forma que quepa): mismo lado, centradas en su espacio.
+    const side = Math.max(4, Math.min(cellW, cellH));
+    const slots = cols * rows;
+    const list: (CollagePhoto | null)[] = Array.from({ length: slots }, (_, i) => {
+        if (i < photos.length) return photos[i];
+        return layer.fill === 'repeat' && photos.length ? photos[i % photos.length] : null;
+    });
+    return (
+        <LayerGroup layer={layer} w={boxW} h={boxH} {...common}>
+            {common.editable && <Rect width={boxW} height={boxH} stroke="#ffffff40" dash={[4, 4]} />}
+            {list.map((p, i) => {
+                const c = i % cols;
+                const r = Math.floor(i / cols);
+                const x = c * (cellW + gap) + (cellW - side) / 2;
+                const y = r * (cellH + nameH + gap) + (cellH - side) / 2;
+                return <CollageCell key={i} layer={layer} photo={p} x={x} y={y} w={side} h={side} nameH={nameH} k={k} width={width} />;
+            })}
+        </LayerGroup>
+    );
+}
+
 function StickerNode({ layer, bindings, ...common }: NodeCommon & { layer: StickerLayer; bindings: Bindings }) {
     const src = layer.binding ? bindings[layer.binding] : layer.url;
     const image = useImage(src);
@@ -290,8 +381,9 @@ function Background({ definition, width, height }: { definition: TemplateDefinit
 }
 
 export default function TemplateCanvasImpl({
-    width, height, definition, bindings, photoUrl, photos, stageRef, editable = false, selectedId, onSelect, onLayerChange,
+    width, height, definition, bindings, photoUrl, photos, collage, stageRef, editable = false, selectedId, onSelect, onLayerChange,
 }: Props) {
+    const collagePhotos = useMemo(() => collage ?? sampleCollagePhotos(), [collage]);
     const trRef = useRef<Konva.Transformer>(null);
     const layerRef = useRef<Konva.Layer>(null);
     const [guides, setGuides] = useState<Guides | null>(null);
@@ -332,7 +424,7 @@ export default function TemplateCanvasImpl({
         const pct = (v: number, total: number) => Math.round((v / total) * 1000) / 10;
         const x = pct(node.x(), width);
         const y = pct(node.y(), height);
-        if (selected.type === 'photo') {
+        if (selected.type === 'photo' || selected.type === 'collage') {
             onLayerChange?.(selected.id, {
                 x, y,
                 width: Math.max(5, pct((selected.width / 100) * width * sx, width)),
@@ -370,6 +462,9 @@ export default function TemplateCanvasImpl({
                     }
                     if (layer.type === 'sticker') {
                         return <StickerNode key={layer.id} layer={layer} bindings={bindings} {...common} />;
+                    }
+                    if (layer.type === 'collage') {
+                        return <CollageNode key={layer.id} layer={layer} photos={collagePhotos} {...common} />;
                     }
                     return <TextNode key={layer.id} layer={layer} value={resolveText(layer, bindings)} {...common} />;
                 })}

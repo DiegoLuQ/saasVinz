@@ -53,6 +53,7 @@ import { copyToClipboard } from '@/lib/clipboard';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
 import { buildTrackingUrl } from '@/lib/publicUrls';
+import PriorityBadge from '@/components/tenant/operations/PriorityBadge';
 
 const OWNER_ROLES = ['admin', 'contabilidad', 'creator'];
 const OPERATOR_ROLES = ['operador_cremacion', 'operator', 'driver'];
@@ -733,6 +734,7 @@ export default function DashboardPage() {
                                                                     Atrasada
                                                                 </span>
                                                             )}
+                                                            <PriorityBadge plan={item.priority_plan} />
                                                         </div>
                                                         <p className="text-[10px] text-slate-400 truncate">
                                                             {item.pet_species || 'Mascota'}

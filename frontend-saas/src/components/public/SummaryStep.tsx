@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { User, PawPrint, Package, Heart, Pencil, ImageIcon, Check, Sparkles, Gem, ChevronDown, Camera, Eye, X, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import FarewellPreview from '@/app/(tenant)/tenant/dashboard/documentos/disenos/components/FarewellPreview';
+import { formatAge } from '@/lib/petAge';
 import { DEFAULT_FORM_CONFIG, fieldLabel, formatCLP, tierDisplay, tierForWeight, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
 
 interface OwnerData {
@@ -29,6 +30,7 @@ interface PetData {
     type: string;
     breed: string;
     age: string;
+    ageUnit?: string;
     birthDate?: string;
     deathDate?: string;
     weightRange?: string;
@@ -355,7 +357,7 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
                         {f.nickname.visible && petData.nickname && <DataRow label={fieldLabel(f.nickname, 'Apodo')} value={petData.nickname} />}
                         <DataRow label="Especie" value={petData.type} />
                         {f.breed.visible && petData.breed && <DataRow label={fieldLabel(f.breed, 'Raza')} value={petData.breed} />}
-                        {f.age.visible && <DataRow label={fieldLabel(f.age, 'Edad')} value={petData.age ? `${petData.age} años` : undefined} />}
+                        {f.age.visible && <DataRow label={fieldLabel(f.age, 'Edad')} value={formatAge(petData.age, petData.ageUnit) || undefined} />}
                         {f.weight.visible && tierText && <DataRow label={fieldLabel(f.weight, 'Peso')} value={tierText} />}
                         {f.weight.visible && !tier && weightTiers.length === 0 && petData.weightRange && <DataRow label="Peso" value={WEIGHT_LABELS[petData.weightRange]} />}
                         {f.weight.visible && petData.weightKg && <DataRow label="Peso exacto" value={`${petData.weightKg} kg`} />}

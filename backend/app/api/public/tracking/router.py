@@ -172,6 +172,7 @@ def get_tracking_info(
             tenant_website = tenant.social_media.get("website") or tenant.social_media.get("instagram")
 
         return schemas.PublicTrackingResponse(
+            timezone=tenant.timezone or "America/Santiago",
             pet_images=_tracking_photos(None, submission.images),
             pet_name=pet_name_db,
             pet_species=pet_data.get("type") or pet_data.get("species") or "Canino",
@@ -275,6 +276,7 @@ def get_tracking_info(
     fb = db.query(models.ServiceFeedback).filter(models.ServiceFeedback.cremation_id == cremation.id).first() if delivered else None
 
     return schemas.PublicTrackingResponse(
+        timezone=tenant.timezone or "America/Santiago",
         verification_code=cremation.verification_code,
         pet_name=pet.name,
         pet_species=pet.species,

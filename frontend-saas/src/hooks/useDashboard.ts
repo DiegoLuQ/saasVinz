@@ -22,6 +22,8 @@ export interface DashboardOrder {
     verification_code?: string | null;
     is_overdue?: boolean;
     scheduled_at_iso?: string | null;
+    /** Plan prioritario de la orden (null = prioridad normal); el backend ya las pone primero */
+    priority_plan?: string | null;
 }
 
 export interface DashboardLimitItem {

@@ -59,7 +59,7 @@ def _settings(tenant: models.Tenant) -> AutoDocumentsSettings:
 
 def _social_templates(db: Session, tenant_id: int):
     return (db.query(models.ImageTemplate)
-            .filter(models.ImageTemplate.is_active.is_(True),
+            .filter(models.ImageTemplate.is_active.is_(True), models.ImageTemplate.kind == "social",
                     or_(models.ImageTemplate.tenant_id.is_(None), models.ImageTemplate.tenant_id == tenant_id))
             .order_by(models.ImageTemplate.created_at.desc()))
 

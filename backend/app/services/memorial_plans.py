@@ -117,12 +117,62 @@ def limits(db: Session, memorial: mem_models.Memorial) -> dict:
     return features_of(plan_of(db, memorial))
 
 
+def discount_of(plan: mem_models.MemorialPlan | None) -> float:
+    """Porcentaje de descuento vigente (0 a 95) guardado en default_config o features."""
+    if not plan or plan.kind == KIND_PARTNER:
+        return 0.0
+    cfg = plan.default_config if isinstance(plan.default_config, dict) else {}
+    feat = plan.features if isinstance(plan.features, dict) else {}
+    raw = cfg.get("discount_percent", feat.get("discount_percent", 0))
+    try:
+        val = float(raw or 0)
+        return round(min(max(0.0, val), 95.0), 2)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def discount_label_of(plan: mem_models.MemorialPlan | None) -> str | None:
+    """Etiqueta promocional opcional (p. ej. 'Oferta lanzamiento')."""
+    if not plan or plan.kind == KIND_PARTNER:
+        return None
+    cfg = plan.default_config if isinstance(plan.default_config, dict) else {}
+    feat = plan.features if isinstance(plan.features, dict) else {}
+    label = str(cfg.get("discount_label") or feat.get("discount_label") or "").strip()
+    return label[:40] if label else None
+
+
+def set_discount(plan: mem_models.MemorialPlan, percent: float | None, label: str | None = None) -> None:
+    """Actualiza el porcentaje de descuento y la etiqueta promocional en default_config."""
+    cfg = dict(plan.default_config) if isinstance(plan.default_config, dict) else {}
+    if percent is not None:
+        cfg["discount_percent"] = round(min(max(0.0, float(percent)), 95.0), 2)
+    if label is not None:
+        clean_lbl = label.strip()[:40]
+        if clean_lbl:
+            cfg["discount_label"] = clean_lbl
+        else:
+            cfg.pop("discount_label", None)
+    plan.default_config = cfg
+
+
+def effective_price(plan: mem_models.MemorialPlan | None) -> float:
+    """Precio final tras aplicar el descuento vigente."""
+    if not plan:
+        return 0.0
+    base = float(plan.price or 0)
+    disc = discount_of(plan)
+    if disc <= 0 or base <= 0:
+        return base
+    discounted = base * (100.0 - disc) / 100.0
+    return float(int(discounted + 0.5))
+
+
 def assign(memorial: mem_models.Memorial, plan: mem_models.MemorialPlan, *, start_period: bool) -> None:
-    """Asigna el plan y congela su precio actual. Con `start_period` fija la vigencia
-    (anual = hoy + 1 año; pago único = sin vencimiento)."""
+    """Asigna el plan y congela su precio efectivo actual (con descuento si aplica).
+    Con `start_period` fija la vigencia (anual = hoy + 1 año; pago único = sin vencimiento)."""
     memorial.plan_id = plan.id
     memorial.plan = plan.name_db
-    memorial.plan_price = float(plan.price or 0)
+    memorial.plan_price = effective_price(plan)
     memorial.plan_currency = plan.currency or "USD"
     memorial.plan_billing = plan.billing or BILLING_YEARLY
     if plan.billing == BILLING_ONE_TIME:
@@ -132,12 +182,19 @@ def assign(memorial: mem_models.Memorial, plan: mem_models.MemorialPlan, *, star
 
 
 def serialize(plan: mem_models.MemorialPlan) -> dict:
+    base_price = float(plan.price or 0)
+    disc = discount_of(plan)
+    final_price = effective_price(plan)
     return {
         "id": plan.id,
         "key": plan.name_db,
         "name": plan.name,
         "kind": plan.kind,
-        "price": float(plan.price or 0),
+        "price": base_price,
+        "original_price": base_price,
+        "final_price": final_price,
+        "discount_percent": disc,
+        "discount_label": discount_label_of(plan),
         "currency": plan.currency or "USD",
         "billing": plan.billing,
         "description": plan.description,

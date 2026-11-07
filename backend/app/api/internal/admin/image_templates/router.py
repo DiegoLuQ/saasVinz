@@ -68,6 +68,15 @@ def get_image_template(
     return _get_or_404(db, template_id)
 
 
+def _kind_for(definition, kind):
+    """Una plantilla con capa «collage» es siempre de tipo collage (aunque el
+    cliente no envíe el tipo); sin esa capa se respeta el tipo enviado."""
+    layers = (definition or {}).get("layers") if isinstance(definition, dict) else None
+    if any(isinstance(l, dict) and l.get("type") == "collage" for l in (layers or [])):
+        return "collage"
+    return kind
+
+
 @router.post("", response_model=ImageTemplateInDB)
 def create_image_template(
     payload: ImageTemplateCreate,
@@ -75,7 +84,9 @@ def create_image_template(
     _creator=Depends(get_current_creator),
 ):
     _check_tenant(db, payload.tenant_id)
-    tpl = models.ImageTemplate(**payload.model_dump())
+    data = payload.model_dump()
+    data["kind"] = _kind_for(data.get("definition"), data.get("kind") or "social")
+    tpl = models.ImageTemplate(**data)
     db.add(tpl)
     db.commit()
     db.refresh(tpl)
@@ -102,6 +113,10 @@ def update_image_template(
     data = payload.model_dump(exclude_unset=True)
     if "tenant_id" in data:
         _check_tenant(db, data["tenant_id"])
+    if "definition" in data:
+        inferred = _kind_for(data["definition"], data.get("kind"))
+        if inferred:
+            data["kind"] = inferred
     for key, value in data.items():
         setattr(tpl, key, value)
 
@@ -128,6 +143,7 @@ def duplicate_image_template(
         ai_image_prompt=src.ai_image_prompt,
         ai_text_max_chars=src.ai_text_max_chars,
         tenant_id=src.tenant_id,
+        kind=src.kind or "social",
         is_active=True,
         usage_count=0,
     )
@@ -165,7 +181,8 @@ def delete_image_template(
     _creator=Depends(get_current_creator),
 ):
     tpl = _get_or_404(db, template_id)
-    if tpl.is_locked:
+    # Usada = no se elimina (aunque un collage siga editable): se perdería su historial de uso.
+    if (tpl.usage_count or 0) > 0:
         raise HTTPException(
             status_code=409,
             detail=(
@@ -349,8 +366,16 @@ def image_templates_usage(
     sub_d = db.query(exp.id, rn_d).filter(exp.template_id.isnot(None), exp.kind == "design").subquery()
     latest_designs = db.query(exp).join(sub_d, sub_d.c.id == exp.id).filter(sub_d.c.rn == 1).all()
 
+    # Historial de descargas de collages (no tienen imagen guardada): quién, cuándo y qué periodo.
+    rn_c = func.row_number().over(partition_by=exp.template_id, order_by=(exp.created_at.desc(), exp.id.desc())).label("rn")
+    sub_c = db.query(exp.id, rn_c).filter(exp.template_id.isnot(None), exp.kind == "collage").subquery()
+    collage_rows = (db.query(exp).join(sub_c, sub_c.c.id == exp.id).filter(sub_c.c.rn <= 30)
+                    .order_by(exp.template_id, exp.created_at.desc()).all())
+    user_names = dict(db.query(models.User.id, models.User.name).filter(
+        models.User.id.in_({r.created_by for r in collage_rows if r.created_by} or {0})).all())
+
     tenant_ids = ({r[1] for r in per_tenant} | {r[1] for r in ai_counts} | {r.tenant_id for r in latest_rows}
-                  | {r.tenant_id for r in latest_designs})
+                  | {r.tenant_id for r in latest_designs} | {r.tenant_id for r in collage_rows})
     names = dict(db.query(models.Tenant.id, models.Tenant.name).filter(models.Tenant.id.in_(tenant_ids or {0})).all())
 
     stats: dict = {}
@@ -367,7 +392,7 @@ def image_templates_usage(
     for tpl_id, tid, kind, count, last in per_tenant:
         e = entry(tpl_id)
         t = tenant_row(e, tid)
-        key = "designs" if kind == "design" else "illustrations"
+        key = "designs" if kind in ("design", "collage") else "illustrations"
         e[key] += count
         t[key] += count
         if last and (t["last_used_at"] is None or last > t["last_used_at"]):
@@ -392,6 +417,14 @@ def image_templates_usage(
                 "bindings": ai.template_bindings(pet, owners.get(pet.customer_id) if pet else None,
                                                  tenants_by_id.get(r.tenant_id)) if not r.media_url else None,
             }
+    for r in collage_rows:
+        meta = r.meta if isinstance(r.meta, dict) else {}
+        entry(r.template_id).setdefault("downloads", []).append({
+            "id": r.id, "tenant_name": names.get(r.tenant_id, f"Crematorio #{r.tenant_id}"),
+            "user_name": user_names.get(r.created_by), "created_at": r.created_at,
+            "label": meta.get("label") or "", "mode": meta.get("mode") or "",
+            "photos": len(meta.get("photos") or []), "ratio": meta.get("ratio") or "",
+        })
     for r in latest_rows:
         entry(r.template_id)["latest"].append({
             "id": r.id, "url": r.media_url, "title": r.title, "kind": r.kind,
@@ -410,6 +443,7 @@ def image_templates_usage(
             "tenants": tenants,
             "latest": e["latest"],
             "latest_design": e.get("latest_design"),
+            "downloads": e.get("downloads", []),
         }
     return out
 

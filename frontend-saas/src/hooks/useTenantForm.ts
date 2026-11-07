@@ -1,3 +1,4 @@
+import { type AgeUnit } from '@/lib/petAge';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { apiRequest, API_BASE_URL } from '@/lib/api';
 import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
@@ -48,6 +49,12 @@ export interface PetData {
     type: string;
     breed: string;
     age: string;
+    /** Unidad de la edad (vacío = años) */
+    ageUnit?: AgeUnit;
+    /** true = la edad se calculó con las fechas (se recalcula si cambian) */
+    ageAuto?: boolean;
+    /** La familia autoriza usar la foto en homenajes del crematorio (collage mensual). */
+    photoConsent?: boolean;
     birthDate: string;
     deathDate: string;
     size: string;
@@ -471,7 +478,8 @@ export function useTenantForm(
         const f = formConfig.fields;
         if (!petData.name) errors.name = 'Requerido';
         if (!petData.type) errors.type = 'Requerido';
-        if (f.age.required && !petData.age) errors.age = 'Requerido';
+        // Con nacimiento y fallecimiento la edad se calcula sola: deja de ser obligatoria
+        // La edad nunca es obligatoria (NEVER_REQUIRED); con ambas fechas se calcula sola
         if (f.nickname.required && !(petData.nickname || '').trim()) errors.nickname = 'Requerido';
         if (f.breed.required && !(petData.breed || '').trim()) errors.breed = 'Requerido';
         if (f.birthDate.required && !petData.birthDate) errors.birthDate = 'Requerido';
@@ -672,7 +680,7 @@ export function useTenantForm(
             const pet = { ...petData };
             if (!f.nickname.visible) pet.nickname = '';
             if (!f.breed.visible) pet.breed = '';
-            if (!f.age.visible) pet.age = '';
+            if (!f.age.visible) { pet.age = ''; pet.ageUnit = undefined; pet.ageAuto = undefined; }
             if (!f.birthDate.visible) pet.birthDate = '';
             if (!f.deathDate.visible) pet.deathDate = '';
             if (!f.weight.visible) { pet.weightKg = ''; pet.weightRange = ''; pet.weightTierId = ''; }

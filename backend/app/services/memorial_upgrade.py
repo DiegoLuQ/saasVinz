@@ -52,8 +52,10 @@ def request_upgrade(db: Session, memorial: mem_models.Memorial, plan_key: str) -
     ).all()
     duplicated = any((n.data or {}).get("memorial_id") == memorial.id and (n.data or {}).get("plan") == key for n in recent)
 
-    out = {"plan": target.name, "price": target.price, "currency": target.currency,
-           "billing": target.billing, "duplicated": duplicated}
+    eff_price = memorial_plans.effective_price(target)
+    out = {"plan": target.name, "price": eff_price, "original_price": target.price,
+           "discount_percent": memorial_plans.discount_of(target),
+           "currency": target.currency, "billing": target.billing, "duplicated": duplicated}
     if duplicated:
         return out
 
@@ -63,7 +65,7 @@ def request_upgrade(db: Session, memorial: mem_models.Memorial, plan_key: str) -
     db.add(Notification(
         title=f"Mejora de memorial: {pet} → {target.name}",
         message=f"La familia de {pet} ({tenant}) quiere pasar de {from_name} a {target.name} "
-                f"({target.price:g} {target.currency}). Coordina el pago y cambia el plan en Memoriales.",
+                f"({eff_price:g} {target.currency}). Coordina el pago y cambia el plan en Memoriales.",
         type="memorial_upgrade", recipient_type=RecipientType.admin, priority=NotificationPriority.high,
         action_url="/dashboard/memorials", data={"memorial_id": memorial.id, "plan": key},
     ))

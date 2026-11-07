@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Check } from 'lucide-react';
 import PartialDateInput from './PartialDateInput';
+import AgeInput from './AgeInput';
+import { ageFromPartialDates } from '@/lib/petAge';
 import { DEFAULT_FORM_CONFIG, fieldLabel, fieldSuffix, formatCLP, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
 
 export interface PetData {
@@ -10,6 +12,9 @@ export interface PetData {
     breed: string;
     size: string;
     age: string;
+    ageUnit?: 'days' | 'weeks' | 'months' | 'years';
+    /** true = calculada con las fechas (se recalcula si cambian) */
+    ageAuto?: boolean;
     birthDate?: string;
     deathDate?: string;
     weightRange?: 'small' | 'medium' | 'large' | 'giant' | '';
@@ -58,6 +63,22 @@ export default function PetInfoStep({ data, updateData, errors, formConfig = DEF
             // Pasando a exacto: limpiamos el rango previo
             setUseExactWeight(true);
             updateData({ weightRange: '', weightTierId: '' });
+        }
+    };
+
+    // Con nacimiento y fallecimiento la edad se propone sola (y se puede corregir)
+    // (solo con las fechas que este formulario muestra)
+    const datesShown = f.birthDate.visible && f.deathDate.visible;
+    const ageCalc = datesShown ? ageFromPartialDates(data.birthDate, data.deathDate) : null;
+    const setDates = (patch: Partial<PetData>) => {
+        const next = { ...data, ...patch };
+        const calc = ageFromPartialDates(next.birthDate, next.deathDate);
+        if (calc && (!next.age || next.ageAuto)) {
+            updateData({ ...patch, age: String(calc.value), ageUnit: calc.unit, ageAuto: true });
+        } else if (!calc && next.ageAuto) {
+            updateData({ ...patch, age: '', ageUnit: 'years', ageAuto: false });
+        } else {
+            updateData(patch);
         }
     };
 
@@ -262,29 +283,14 @@ export default function PetInfoStep({ data, updateData, errors, formConfig = DEF
                 </div>
                 )}
 
-                {f.age.visible && (
-                <div>
-                    <label className={LABEL}>{fieldLabel(f.age, 'Edad (años)')}{fieldSuffix(f.age)}</label>
-                    <input
-                        type="text"
-                        value={data.age}
-                        onChange={(e) => updateData({ age: e.target.value.replace(/\D/g, '') })}
-                        className={`input-emotional max-w-[150px] ${errClass(errors.age)}`}
-                        placeholder="Ej: 5"
-                        maxLength={3}
-                    />
-                    {errors.age && <p className={ERROR}>! {errors.age}</p>}
-                </div>
-                )}
-
                 {(f.birthDate.visible || f.deathDate.visible) && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-4">
                         {f.birthDate.visible && (
                             <div>
                                 <label className={LABEL}>{fieldLabel(f.birthDate, 'Nacimiento')}{fieldSuffix(f.birthDate)}</label>
                                 <PartialDateInput
                                     value={data.birthDate || ''}
-                                    onChange={(v) => updateData({ birthDate: v })}
+                                    onChange={(v) => setDates({ birthDate: v })}
                                     ariaLabel={fieldLabel(f.birthDate, 'Nacimiento')}
                                     className={`input-emotional ${errClass(errors.birthDate)}`}
                                 />
@@ -296,7 +302,7 @@ export default function PetInfoStep({ data, updateData, errors, formConfig = DEF
                                 <label className={LABEL}>{fieldLabel(f.deathDate, 'Fallecimiento')}{fieldSuffix(f.deathDate)}</label>
                                 <PartialDateInput
                                     value={data.deathDate || ''}
-                                    onChange={(v) => updateData({ deathDate: v })}
+                                    onChange={(v) => setDates({ deathDate: v })}
                                     ariaLabel={fieldLabel(f.deathDate, 'Fallecimiento')}
                                     className={`input-emotional ${errClass(errors.deathDate)}`}
                                 />
@@ -304,6 +310,24 @@ export default function PetInfoStep({ data, updateData, errors, formConfig = DEF
                             </div>
                         )}
                     </div>
+                )}
+
+                {f.age.visible && (
+                <div>
+                    <label className={LABEL}>
+                        {fieldLabel(f.age, 'Edad')} (Opcional)
+                    </label>
+                    <AgeInput
+                        value={data.age}
+                        unit={data.ageUnit}
+                        auto={data.ageAuto}
+                        calc={ageCalc}
+                        onChange={updateData}
+                        label={fieldLabel(f.age, 'Edad')}
+                        hasError={!!errors.age}
+                    />
+                    {errors.age && <p className={ERROR}>! {errors.age}</p>}
+                </div>
                 )}
 
                 {f.healthStatus?.visible && (

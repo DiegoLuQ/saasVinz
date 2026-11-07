@@ -186,14 +186,20 @@ async def send_finish_email(db: Session, cremation_id: int, user_id: int | None 
 
     pet = cremation.pet.name if cremation.pet else "tu mascota"
     url = tracking_url(tenant, cremation)
+    # Ya no hay encuesta en el seguimiento: se invita solo a la reseña en Google
+    # (si el crematorio la configuró). ?encuesta=1 lleva directo a esa invitación.
+    sm = tenant.social_media if isinstance(tenant.social_media, dict) else {}
+    has_review = bool((sm.get("google_review") or "").strip())
+    closing = ("Si nuestro acompañamiento te fue de ayuda, tu opinión puede orientar a otras familias en un momento difícil."
+               if has_review else "Puedes volver a ver el seguimiento del servicio cuando quieras.")
     await _send(
         tenant, customer.email.strip(),
         f"Gracias por confiarnos a {pet} · {tenant.name}",
         f"Gracias por confiarnos a {pet}",
         [f"Hola {_first_name(customer.name)}:".replace("Hola :", "Hola:"),
          f"Hemos concluido el servicio de {pet}. Sabemos que es un momento difícil y agradecemos que nos hayas permitido acompañarte.",
-         "Nos ayudaría mucho saber cómo fue tu experiencia: es una sola pregunta y toma menos de un minuto."],
-        "Contar mi experiencia", f"{url}?encuesta=1" if url else None,
+         closing],
+        "Dejar mi opinión" if has_review else "Ver el seguimiento", f"{url}?encuesta=1" if url else None,
         f"Recibes este correo porque {tenant.name} atendió el servicio de {pet}. {_no_reply_note(tenant)}",
     )
     _record(db, cremation, "finish", "email", customer.email, None, user_id)

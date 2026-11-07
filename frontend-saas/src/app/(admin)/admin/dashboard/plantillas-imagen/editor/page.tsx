@@ -7,6 +7,7 @@ import {
     ArrowLeft, Save, Loader2, Type, Image as ImageIcon, Sticker, Trash2, ChevronUp, ChevronDown,
     Sparkles, Lock, AlertCircle, CheckCircle2, Layers, Settings2, AlignLeft, AlignCenter, AlignRight,
     Wand2, Globe, RotateCcw, Database, Plus, AlignHorizontalJustifyCenter, AlignVerticalJustifyCenter, Crosshair,
+    LayoutGrid, PawPrint,
 } from 'lucide-react';
 import { useAdminTenants } from '@/hooks/useAdminBootstrap';
 import { getImageUrl } from '@/lib/admin/api';
@@ -18,11 +19,13 @@ import {
     createImageTemplate, getAiMeta, getImageTemplate, testAiImage, testAiText, updateImageTemplate, uploadTemplateAsset,
 } from '@/lib/admin/imageTemplates/api';
 import {
-    ASPECT_RATIOS, DATA_FIELD_GROUPS, FONT_FAMILIES, MAX_AI_TEXT_CHARS, PHOTO_SLOTS, PROMPT_PLACEHOLDERS, SAMPLE_PHOTO_URL,
-    TEMPLATE_FONTS_URL, TEXT_BINDINGS, loremOf, nearestAiRatio, newPhotoLayer, newStickerLayer, newTextLayer,
+    ASPECT_RATIOS, COLLAGE_FIELD_GROUP, COLLAGE_GRIDS, FONT_FAMILIES, MAX_AI_TEXT_CHARS, PHOTO_SLOTS, PROMPT_PLACEHOLDERS,
+    SAMPLE_PHOTO_URL, TEMPLATE_FONTS_URL, TEXT_BINDINGS, dataGroupsFor, loremOf, nearestAiRatio, newCollageLayer, newPhotoLayer,
+    newStickerLayer, newTextLayer,
 } from '@/lib/admin/imageTemplates/constants';
 import type {
-    AspectRatio, ImageTemplateCreate, Layer, PhotoLayer, PhotoSlot, StickerLayer, TemplateDefinition, TextBinding, TextLayer,
+    AspectRatio, CollageLayer, ImageTemplateCreate, Layer, PhotoLayer, PhotoSlot, StickerLayer, TemplateDefinition, TemplateKind,
+    TextBinding, TextLayer,
 } from '@/lib/admin/imageTemplates/types';
 
 const STAGE_MAX = 560;
@@ -119,11 +122,13 @@ function layerLabel(layer: Layer): string {
             ? `Ilustración IA · desde ${PHOTO_SLOTS.find(s => s.value === (layer.ai_from || 'photo_1'))?.label}`
             : `Foto mascota · ${PHOTO_SLOTS.find(s => s.value === (layer.slot || 'photo_1'))?.label}`;
     }
+    if (layer.type === 'collage') return `Collage · ${layer.cols}×${layer.rows} fotos`;
     if (layer.type === 'sticker') {
         if (layer.binding === 'tenant_logo') return 'Logo del crematorio';
         return layer.url.startsWith('blob:') ? 'Adorno · se sube al guardar' : 'Adorno';
     }
-    const b = TEXT_BINDINGS.find(t => t.value === layer.binding)?.label || layer.binding;
+    const b = TEXT_BINDINGS.find(t => t.value === layer.binding)?.label
+        || COLLAGE_FIELD_GROUP.fields.find(f => f.value === layer.binding)?.label || layer.binding;
     return layer.binding === 'static' ? `Texto · “${(layer.static_text || '').slice(0, 18)}”` : `Texto · ${b}`;
 }
 
@@ -161,7 +166,68 @@ function PositionFields({ layer, onChange }: { layer: Layer; onChange: (p: { x?:
     );
 }
 
-function TextProps({ layer, onChange, aiPreview, onAiPreview, maxChars, onMaxChars }: {
+function CollageProps({ layer, onChange }: { layer: CollageLayer; onChange: (p: Partial<CollageLayer>) => void }) {
+    return (
+        <div className="space-y-4">
+            <Field label={`Grilla · ${layer.cols * layer.rows} fotos`}>
+                <div className="grid grid-cols-4 gap-1.5">
+                    {COLLAGE_GRIDS.map(g => {
+                        const on = g.cols === layer.cols && g.rows === layer.rows;
+                        return (
+                            <button key={`${g.cols}x${g.rows}`} type="button" onClick={() => onChange(g)}
+                                className={`py-1.5 rounded-md text-[11px] font-bold border ${on ? 'bg-primary/20 border-primary/50 text-white' : 'bg-white/5 border-white/10 text-white/60 hover:text-white'}`}>
+                                {g.cols}×{g.rows}<span className="block text-[9px] font-normal opacity-60">{g.cols * g.rows} fotos</span>
+                            </button>
+                        );
+                    })}
+                </div>
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+                <Slider label="Columnas" value={layer.cols} min={1} max={8} onChange={(v) => onChange({ cols: v })} />
+                <Slider label="Filas" value={layer.rows} min={1} max={8} onChange={(v) => onChange({ rows: v })} />
+            </div>
+            <Field label="Forma de cada foto">
+                <select value={layer.shape} onChange={(e) => onChange({ shape: e.target.value as CollageLayer['shape'] })} className={inputCls}>
+                    <option value="circle" className="bg-slate-900">Círculo</option>
+                    <option value="rounded" className="bg-slate-900">Redondeada</option>
+                    <option value="square" className="bg-slate-900">Cuadrada</option>
+                </select>
+            </Field>
+            <Slider label="Ancho de la grilla" value={layer.width} min={10} max={100} step={0.5} suffix="%" onChange={(v) => onChange({ width: v })} />
+            <Slider label="Alto de la grilla" value={layer.height} min={10} max={100} step={0.5} suffix="%" onChange={(v) => onChange({ height: v })} />
+            <Slider label="Separación" value={layer.gap} min={0} max={15} step={0.5} suffix="%" onChange={(v) => onChange({ gap: v })} />
+            <ColorInput label="Borde" value={layer.border_color} onChange={(v) => onChange({ border_color: v })} />
+            <Slider label="Grosor borde" value={layer.border_width} min={0} max={10} step={0.5} suffix="px" onChange={(v) => onChange({ border_width: v })} />
+            <ColorInput label="Resplandor" value={layer.glow_color || '#ffffff'} onChange={(v) => onChange({ glow_color: v })} />
+            <Slider label="Intensidad resplandor" value={layer.glow_blur || 0} min={0} max={40} onChange={(v) => onChange({ glow_blur: v })} />
+            <div className="space-y-3 p-3 rounded-lg bg-white/[0.03] border border-white/10">
+                <Toggle label="Nombre bajo cada foto" checked={layer.show_names} onChange={(v) => onChange({ show_names: v })} />
+                {layer.show_names && (
+                    <>
+                        <Field label="Fuente">
+                            <select value={layer.name_font} onChange={(e) => onChange({ name_font: e.target.value as CollageLayer['name_font'] })} className={inputCls}>
+                                {FONT_FAMILIES.map(f => <option key={f.value} value={f.value} className="bg-slate-900">{f.label}</option>)}
+                            </select>
+                        </Field>
+                        <Slider label="Tamaño" value={layer.name_size} min={1} max={6} step={0.1} suffix="%" onChange={(v) => onChange({ name_size: v })} />
+                        <ColorInput label="Color" value={layer.name_color} onChange={(v) => onChange({ name_color: v })} />
+                    </>
+                )}
+            </div>
+            <Field label="Si hay menos fotos que casillas">
+                <select value={layer.fill} onChange={(e) => onChange({ fill: e.target.value as CollageLayer['fill'] })} className={inputCls}>
+                    <option value="empty" className="bg-slate-900">Casillas decorativas (♥)</option>
+                    <option value="repeat" className="bg-slate-900">Repetir las fotos</option>
+                </select>
+            </Field>
+            <p className="text-[11px] text-white/40">Se llena con las fotos principales de las mascotas con orden entregada (solo las que la familia autorizó), de la más reciente a la más antigua.</p>
+            <PositionFields layer={layer} onChange={onChange} />
+        </div>
+    );
+}
+
+function TextProps({ layer, onChange, aiPreview, onAiPreview, maxChars, onMaxChars, kind }: {
+    kind?: TemplateKind;
     layer: TextLayer;
     onChange: (p: Partial<TextLayer>) => void;
     aiPreview: string;
@@ -173,7 +239,7 @@ function TextProps({ layer, onChange, aiPreview, onAiPreview, maxChars, onMaxCha
         <div className="space-y-4">
             <Field label="Contenido">
                 <select value={layer.binding} onChange={(e) => onChange({ binding: e.target.value as TextLayer['binding'] })} className={inputCls}>
-                    {DATA_FIELD_GROUPS.map(g => (
+                    {dataGroupsFor(kind).map(g => (
                         <optgroup key={g.key} label={g.label} className="bg-slate-900">
                             {g.fields.map(f => <option key={f.value} value={f.value} className="bg-slate-900">{f.label}</option>)}
                         </optgroup>
@@ -318,8 +384,9 @@ function EditorInner() {
     const [form, setForm] = useState<ImageTemplateCreate>({
         name: '', description: '', default_phrase: '', supported_ratios: ['4:5', '1:1', '9:16'],
         definition: EMPTY_DEFINITION, ai_text_prompt: null, ai_image_prompt: null,
-        ai_text_max_chars: MAX_AI_TEXT_CHARS, tenant_id: null, is_active: true,
+        ai_text_max_chars: MAX_AI_TEXT_CHARS, tenant_id: null, is_active: true, kind: 'social',
     });
+    const isCollage = form.kind === 'collage';
     const tenants = useAdminTenants();
     // Vista previa IA del editor (no se guarda en la plantilla): texto de la capa
     // "Texto IA", foto de prueba (Foto 1) e ilustración generada en la pestaña IA.
@@ -359,7 +426,7 @@ function EditorInner() {
                     definition: t.definition?.layers ? t.definition : EMPTY_DEFINITION,
                     ai_text_prompt: t.ai_text_prompt, ai_image_prompt: t.ai_image_prompt,
                     ai_text_max_chars: t.ai_text_max_chars || MAX_AI_TEXT_CHARS, tenant_id: t.tenant_id ?? null,
-                    is_active: t.is_active,
+                    is_active: t.is_active, kind: t.kind || 'social',
                 });
                 setRatio(t.supported_ratios?.[0] || '1:1');
                 setLocked(t.is_locked);
@@ -533,6 +600,12 @@ function EditorInner() {
     const handleSave = async () => {
         if (!form.name.trim()) { showToast('Ponle un nombre a la plantilla', 'error'); setTab('plantilla'); return; }
         if (!form.supported_ratios.length) { showToast('Elige al menos un formato', 'error'); setTab('plantilla'); return; }
+        const hasCollage = form.definition.layers.some(l => l.type === 'collage');
+        if (isCollage && !hasCollage) { showToast('Agrega la capa «Collage de fotos»', 'error'); setTab('capas'); return; }
+        if (!isCollage && hasCollage) { showToast('La capa de collage solo va en plantillas de tipo Collage', 'error'); setTab('plantilla'); return; }
+        if (isCollage && form.definition.layers.some(l => l.type === 'photo' || (l.type === 'text' && ['ai_text', 'pet_name', 'species', 'breed', 'age', 'size', 'birth_date', 'death_date', 'life_range', 'owner_name', 'owner_phone', 'owner_email'].includes(l.binding)))) {
+            showToast('Un collage no usa fotos ni datos de una mascota: quita esas capas', 'error'); setTab('capas'); return;
+        }
         setSaving(true);
         try {
             setUploading(true);
@@ -606,7 +679,7 @@ function EditorInner() {
                 {/* Panel lateral */}
                 <div className="w-full xl:w-[400px] shrink-0 bg-white/5 border border-white/10 rounded-2xl p-4 xl:max-h-[calc(100vh-180px)] xl:overflow-y-auto">
                     <div className="flex gap-1 mb-4 bg-black/20 p-1 rounded-xl">
-                        {([['plantilla', 'Plantilla', Settings2], ['capas', 'Capas', Layers], ['ia', 'IA', Sparkles]] as const).map(([key, label, Icon]) => (
+                        {([['plantilla', 'Plantilla', Settings2], ['capas', 'Capas', Layers], ['ia', 'IA', Sparkles]] as const).filter(([key]) => !(isCollage && key === 'ia')).map(([key, label, Icon]) => (
                             <button key={key} onClick={() => setTab(key)}
                                 className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-colors ${tab === key ? 'bg-primary text-white' : 'text-white/60 hover:text-white'}`}>
                                 <Icon size={13} /> {label}
@@ -616,6 +689,22 @@ function EditorInner() {
 
                     {tab === 'plantilla' && (
                         <div className="space-y-4">
+                            <Field label="Tipo de plantilla">
+                                <div className="grid grid-cols-2 gap-2">
+                                    {([['social', 'Diseño por mascota', PawPrint], ['collage', 'Collage de fotos', LayoutGrid]] as const).map(([k, label, Icon]) => (
+                                        <button key={k} type="button" disabled={locked}
+                                            onClick={() => setForm(f => ({ ...f, kind: k }))}
+                                            className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold disabled:opacity-50 ${form.kind === k ? 'bg-primary text-white' : 'bg-white/5 text-white/60'}`}>
+                                            <Icon size={13} /> {label}
+                                        </button>
+                                    ))}
+                                </div>
+                                <p className="text-[11px] text-white/40 mt-1.5">
+                                    {isCollage
+                                        ? 'Junta las fotos de las mascotas despedidas en un mes o las últimas N (Diseños para Redes → Collage).'
+                                        : 'Un diseño para una mascota: sus fotos, datos e IA.'}
+                                </p>
+                            </Field>
                             <Field label="Nombre">
                                 <input value={form.name} maxLength={120} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} className={inputCls} />
                             </Field>
@@ -699,6 +788,13 @@ function EditorInner() {
                                 <button onClick={() => addLayer(newTextLayer())} className="flex flex-col items-center gap-1 py-3 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 text-[11px] font-bold">
                                     <Type size={16} /> Texto
                                 </button>
+                                {isCollage && (
+                                    <button onClick={() => addLayer(newCollageLayer())}
+                                        className="col-span-2 flex flex-col items-center gap-1 py-3 rounded-lg bg-primary/15 hover:bg-primary/25 text-white text-[11px] font-bold">
+                                        <LayoutGrid size={16} /> Collage de fotos
+                                    </button>
+                                )}
+                                {!isCollage && <>
                                 <button onClick={() => {
                                     const used = new Set(definition.layers.filter((l): l is PhotoLayer => l.type === 'photo' && l.source !== 'ai').map(l => l.slot || 'photo_1'));
                                     addLayer(newPhotoLayer(PHOTO_SLOTS.find(s => !used.has(s.value))?.value || 'photo_1'));
@@ -715,6 +811,7 @@ function EditorInner() {
                                 }} className="flex flex-col items-center gap-1 py-3 rounded-lg bg-violet-500/15 hover:bg-violet-500/25 text-violet-200 text-[11px] font-bold">
                                     <Sparkles size={16} /> Texto IA
                                 </button>
+                                </>}
                                 <button onClick={() => setPicker({ kind: 'sticker-new' })}
                                     className="flex flex-col items-center gap-1 py-3 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 text-[11px] font-bold">
                                     {uploading ? <Loader2 size={16} className="animate-spin" /> : <Sticker size={16} />} Adorno
@@ -725,7 +822,7 @@ function EditorInner() {
                                 <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-white/60">
                                     <Database size={12} /> Datos · clic para agregar
                                 </p>
-                                {DATA_FIELD_GROUPS.map(g => (
+                                {dataGroupsFor(form.kind).map(g => (
                                     <div key={g.key}>
                                         <p className="text-[10px] font-bold uppercase tracking-wider text-white/35 mb-1">{g.label}</p>
                                         <div className="flex flex-wrap gap-1">
@@ -768,10 +865,11 @@ function EditorInner() {
                                     <p className="text-xs font-black uppercase tracking-wider text-primary mb-3">{layerLabel(selected)}</p>
                                     {selected.type === 'text' && (
                                         <TextProps layer={selected} onChange={(p) => updateLayer(selected.id, p)}
-                                            aiPreview={aiText} onAiPreview={setAiPreviewText} maxChars={maxChars}
+                                            aiPreview={aiText} onAiPreview={setAiPreviewText} maxChars={maxChars} kind={form.kind}
                                             onMaxChars={(v) => setForm(f => ({ ...f, ai_text_max_chars: v }))} />
                                     )}
                                     {selected.type === 'photo' && <PhotoProps layer={selected} onChange={(p) => updateLayer(selected.id, p)} />}
+                                    {selected.type === 'collage' && <CollageProps layer={selected} onChange={(p) => updateLayer(selected.id, p)} />}
                                     {selected.type === 'sticker' && (
                                         <StickerProps layer={selected} onChange={(p) => updateLayer(selected.id, p)}
                                             onReplace={() => setPicker({ kind: 'sticker', id: selected.id })} />
@@ -781,7 +879,7 @@ function EditorInner() {
                         </div>
                     )}
 
-                    {tab === 'ia' && (
+                    {tab === 'ia' && !isCollage && (
                         <AiTab form={form} setForm={setForm} aiMeta={aiMeta} aiRatio={aiRatio} showToast={showToast}
                             hasAiText={definition.layers.some(l => l.type === 'text' && l.binding === 'ai_text')}
                             hasAiImage={!!aiLayer}

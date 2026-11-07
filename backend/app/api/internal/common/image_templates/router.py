@@ -34,7 +34,8 @@ router = APIRouter()
 # "Diseños para Redes (IA)": característica del plan (sin flag = permitido). Bloquea
 # generar con IA y guardar ilustración/diseño; las lecturas y la subida de la tarjeta
 # digital quedan abiertas (las usan "Generar todo" y la ficha de la orden).
-REDES_FEATURE = check_feature("certificados:redes", default=True)
+REDES_FEATURE = check_feature("certificados:redes", default=True)# Collage mensual / últimas N (Documentos → Diseños para Redes → Collage).
+COLLAGE_FEATURE = check_feature("certificados:collage", default=True)
 
 class AiPromptsRequest(BaseModel):
     pet_id: Optional[int] = None
@@ -116,17 +117,39 @@ class ImageTemplatePage(BaseModel):
 def list_active_image_templates(
     page: int = 1,
     page_size: int = 8,
+    kind: str = "social",
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
 ):
-    """Plantillas visibles para el crematorio, paginadas (las más recientes primero)."""
+    """Plantillas visibles para el crematorio, paginadas (las más recientes primero).
+    `kind`: social (diseño por mascota, por defecto) o collage."""
     page = max(1, page)
     page_size = min(max(1, page_size), 60)
-    query = db.query(models.ImageTemplate).filter(models.ImageTemplate.is_active.is_(True), _visible(tenant_id))
+    query = db.query(models.ImageTemplate).filter(
+        models.ImageTemplate.is_active.is_(True), _visible(tenant_id),
+        models.ImageTemplate.kind == ("collage" if kind == "collage" else "social"),
+    )
     total = query.count()
     rows = (query.order_by(models.ImageTemplate.created_at.desc(), models.ImageTemplate.id.desc())
             .offset((page - 1) * page_size).limit(page_size).all())
     return {"total": total, "page": page, "page_size": page_size, "items": rows}
+
+
+@router.get("/collage/photos", dependencies=[Depends(COLLAGE_FEATURE)])
+def collage_photos(
+    month: Optional[str] = None,
+    last: Optional[int] = None,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    _: bool = Depends(check_permission("mascotas", "view")),
+):
+    """Fotos principales de las mascotas con orden entregada (mes AAAA-MM o últimas N),
+    solo las autorizadas por la familia; `pending` = sin respuesta (se pueden autorizar)."""
+    from app.services import collage
+    try:
+        return collage.delivered_photos(db, _tenant(db, tenant_id), month=month, last=last)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/ai/usage")
@@ -541,9 +564,12 @@ def list_exports(
     page_size = min(max(1, page_size), 60)
     query = db.query(models.TemplateExport).filter(models.TemplateExport.tenant_id == tenant_id)
     # Uno o varios tipos separados por coma (ej. "design,digital").
-    kinds = [k for k in (kind or "").split(",") if k in ("design", "illustration", "digital")]
+    kinds = [k for k in (kind or "").split(",") if k in ("design", "illustration", "digital", "collage")]
     if kinds:
         query = query.filter(models.TemplateExport.kind.in_(kinds))
+    else:
+        # Los collages (varias mascotas, sin imagen guardada) no van en «Mis diseños» ni en las órdenes
+        query = query.filter(models.TemplateExport.kind != "collage")
     if template_id is not None:
         query = query.filter(models.TemplateExport.template_id == template_id)
     if pet_id is not None:
@@ -690,6 +716,46 @@ class DesignRecipe(BaseModel):
 class DesignCreate(BaseModel):
     pet_id: Optional[int] = None
     recipe: DesignRecipe
+
+
+class CollagePhotoIn(BaseModel):
+    pet_id: int
+    url: str = Field(..., max_length=1000)
+    name: str = Field("", max_length=120)
+
+
+class CollageCreate(BaseModel):
+    """Registro de un collage descargado (no se guarda la imagen: solo su receta)."""
+    ratio: str = Field("1:1", max_length=10)
+    mode: str = Field("month", max_length=10)
+    period: str = Field("", max_length=20)   # AAAA-MM o N
+    label: str = Field("", max_length=80)
+    phrase: str = Field("", max_length=500)
+    photos: List[CollagePhotoIn] = Field(default_factory=list, max_length=60)
+
+
+@router.post("/{template_id}/collages", dependencies=[Depends(COLLAGE_FEATURE)])
+def save_collage(
+    template_id: int,
+    payload: CollageCreate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Registra el collage descargado (cuenta como uso de la plantilla en el panel del SuperAdmin)."""
+    tpl = _active_template(db, template_id, tenant_id)
+    if tpl.kind != "collage":
+        raise HTTPException(status_code=400, detail="La plantilla no es de collage")
+    meta = payload.model_dump()
+    meta["photos"] = [{**p, "url": _stored_url(p["url"])} for p in meta["photos"]]
+    row = models.TemplateExport(
+        tenant_id=tenant_id, template_id=tpl.id, pet_id=None,
+        title=f"{tpl.name} · {payload.label or 'Collage'}"[:250], media_url=None, meta=meta,
+        created_by=current_user.id, kind="collage",
+    )
+    db.add(row)
+    db.commit()
+    return {"id": row.id}
 
 
 def _stored_url(url: Optional[str]) -> Optional[str]:

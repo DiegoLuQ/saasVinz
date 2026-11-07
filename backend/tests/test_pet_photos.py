@@ -60,3 +60,21 @@ def test_descarga_individual(client, auth, photos_world):
     assert client.get(f"/api/internal/pets/{photos_world['evil']['id']}/photos/0/download", headers=h).status_code == 404
     # Otro crematorio no la ve
     assert client.get(f"/api/internal/pets/{pet['id']}/photos/0/download", headers=auth("b")).status_code == 404
+
+
+def test_elegir_foto_principal(client, auth, db, world):
+    import uuid as _uuid
+    h = auth("a")
+    tag = _uuid.uuid4().hex[:6]
+    a, b, c = (f"https://cdn.test/{tag}/{n}.webp" for n in "abc")
+    cust = client.post("/api/internal/customers", headers=h, json={"name": f"Fam {tag}", "phone": "912345678"}).json()
+    pet = client.post("/api/internal/pets", headers=h, json={
+        "name": f"Toby {tag}", "species": "Canino", "customer_id": cust["id"], "images": [a, b, c], "image_url": a}).json()
+
+    r = client.put(f"/api/internal/pets/{pet['id']}/main-image", headers=h, json={"url": c})
+    assert r.status_code == 200, r.text
+    assert r.json()["image_url"] == c and r.json()["images"] == [c, a, b]
+
+    assert client.put(f"/api/internal/pets/{pet['id']}/main-image", headers=h,
+                      json={"url": "https://otro.test/x.webp"}).status_code == 400
+    assert client.put(f"/api/internal/pets/{pet['id']}/main-image", headers=auth("b"), json={"url": a}).status_code == 404

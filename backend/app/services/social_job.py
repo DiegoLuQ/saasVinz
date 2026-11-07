@@ -36,7 +36,7 @@ MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agost
           "septiembre", "octubre", "noviembre", "diciembre"]
 # Proporciones que aceptan los modelos de imagen (espejo de AI_RATIOS en el frontend).
 AI_RATIOS = [("1:1", 1.0), ("4:5", 0.8), ("3:4", 0.75), ("9:16", 0.5625), ("4:3", 4 / 3), ("16:9", 16 / 9)]
-RATIO_WH = {"9:16": (9, 16), "4:5": (4, 5), "3:4": (3, 4), "4:3": (4, 3), "1:1": (1, 1)}
+RATIO_WH = {"9:16": (9, 16), "4:5": (4, 5), "3:4": (3, 4), "4:3": (4, 3), "1:1": (1, 1), "16:9": (16, 9)}
 
 # Referencias fuertes a las tareas en curso (si no, el recolector podría cortarlas).
 _TASKS: set = set()

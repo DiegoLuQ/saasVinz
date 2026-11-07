@@ -76,6 +76,10 @@ def _pet_date(pet, which: str) -> str:
 
 
 def _age_text(pet) -> str:
+    from app.utils.pet_age import format_age
+    unit = getattr(pet, "age_unit", None) or "years"
+    if pet.age and unit != "years":
+        return format_age(pet.age, unit)  # «3 semanas», «8 meses»
     years = pet.age
     if years is None and pet.birth_date:
         end = pet.death_date or tz.get_now()

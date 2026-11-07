@@ -52,6 +52,11 @@ class Pet(Base):
     birth_date_precision = Column(String(5), nullable=False, default='day', server_default='day')
     death_date_precision = Column(String(5), nullable=False, default='day', server_default='day')
     age = Column(Integer)
+    # Unidad de la edad: days | weeks | months | years (utils/pet_age.py)
+    age_unit = Column(String(6), nullable=False, default='years', server_default='years')
+    # La familia autoriza usar la foto en homenajes del crematorio (collage).
+    # NULL = no se preguntó; False = no autoriza.
+    photo_consent = Column(Boolean, nullable=True)
     image_url = Column(String)
     images = Column(JSON, default=[])
     status = Column(Enum(PetStatus, native_enum=False), default=PetStatus.received)

@@ -15,6 +15,9 @@ export interface MemorialSignupPlan {
     key: string;
     name: string;
     price: number;
+    original_price?: number;
+    discount_percent?: number;
+    discount_label?: string | null;
     currency: string;
     billing?: string | null;
     max_images: number;
@@ -318,11 +321,22 @@ export default function MemorialCreateForm({ options, initialPlan, onSubmit, sub
                                 return (
                                     <button key={p.key} type="button" disabled={disabled} onClick={() => setPlan(p.key)}
                                         className={`${card(plan === p.key)} ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}>
-                                        <span className="flex items-center text-sm font-bold text-slate-800">
-                                            {p.name}{plan === p.key && <Check size={15} className="ml-auto text-amber-600" />}
+                                        <span className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
+                                            {p.name}
+                                            {(p.discount_percent || 0) > 0 && (
+                                                <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-black text-emerald-700">
+                                                    -{p.discount_percent}%
+                                                </span>
+                                            )}
+                                            {plan === p.key && <Check size={15} className="ml-auto text-amber-600" />}
                                         </span>
                                         <span className="mt-1 block text-xl font-black text-slate-900">
-                                            {p.price.toLocaleString("es-CL")} <span className="text-xs font-bold text-slate-500">{p.currency}</span>
+                                            {(p.discount_percent || 0) > 0 && p.original_price && p.original_price > p.price && (
+                                                <span className="mr-1.5 text-xs font-semibold text-slate-400 line-through">
+                                                    {Math.round(p.original_price).toLocaleString("es-CL")}
+                                                </span>
+                                            )}
+                                            {Math.round(p.price).toLocaleString("es-CL")} <span className="text-xs font-bold text-slate-500">{p.currency}</span>
                                         </span>
                                         <span className="block text-xs text-slate-500">
                                             {p.days === null ? "Pago único, para siempre" : p.days >= 365 ? "Por 1 año" : "Por 1 mes"} · hasta {p.max_images} fotos

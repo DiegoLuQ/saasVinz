@@ -36,6 +36,7 @@ import { PlanLimitModal } from '@/components/tenant/PlanLimitModal';
 import Modal from '@/components/tenant/Modal';
 import GenerateAllPanel, { type ProcessResult, type StepKey } from '@/components/tenant/registros/GenerateAllPanel';
 import { formatPartialDate } from '@/lib/petDates';
+import { formatAge } from '@/lib/petAge';
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
     <svg
@@ -516,7 +517,7 @@ export default function SubmissionDetailPage() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <p className="text-[10px] text-muted-foreground uppercase font-black">{submission.owner_data?.formLabels?.age || 'Edad'}</p>
-                                        <p className="text-sm font-semibold text-foreground/90 mt-1">{submission.pet_data?.age} años</p>
+                                        <p className="text-sm font-semibold text-foreground/90 mt-1">{formatAge(submission.pet_data?.age, submission.pet_data?.ageUnit) || '—'}{submission.pet_data?.ageAuto ? ' (calculada)' : ''}</p>
                                     </div>
                                     <div>
                                         <p className="text-[10px] text-muted-foreground uppercase font-black">Nacimiento</p>
@@ -527,6 +528,14 @@ export default function SubmissionDetailPage() {
                                     <p className="text-[10px] text-muted-foreground uppercase font-black">{submission.owner_data?.formLabels?.deathDate || 'Fallecimiento'}</p>
                                     <p className="text-sm font-semibold text-foreground/90 mt-1">{formatPartialDate(submission.pet_data?.deathDate) || 'N/A'}</p>
                                 </div>
+                                {typeof submission.pet_data?.photoConsent === 'boolean' && (
+                                    <div>
+                                        <p className="text-[10px] text-muted-foreground uppercase font-black">Foto en homenajes (collage)</p>
+                                        <p className={`text-sm font-semibold mt-1 ${submission.pet_data.photoConsent ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground/70'}`}>
+                                            {submission.pet_data.photoConsent ? 'Autorizada por la familia' : 'No autorizada'}
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

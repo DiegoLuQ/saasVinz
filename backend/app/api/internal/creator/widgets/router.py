@@ -7,7 +7,7 @@ crematorio desde la plataforma admin. Las consultas corren bajo bypass RLS
 """
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -15,6 +15,7 @@ from app import models
 from app.auth import get_current_creator
 from app.api.internal.integrations import schemas, services
 from app.api.internal.integrations.services import ApiKeyService
+from app.api.public.widget.router import _serialize_catalog, _serialize_recent_pets
 
 router = APIRouter()
 
@@ -53,6 +54,23 @@ def get_widget_info(
         "allowed_plans": sorted(p.name for p in active_plans if plan_has(p, "integraciones:widget")),
         "can_use_form_embed": services.tenant_can_use_form_embed(tenant),
         "form_embed_allowed_plans": sorted(p.name for p in active_plans if plan_has(p, "integraciones:formulario_incrustable")),
+    }
+
+
+@router.get("/tenants/{identifier}/preview")
+def get_widget_preview(
+    identifier: str,
+    request: Request,
+    creator: models.User = Depends(get_current_creator),
+    db: Session = Depends(get_db),
+):
+    """Vista previa en vivo de los widgets del tenant (Catálogo + Últimas Mascotas)."""
+    tenant = _resolve_tenant(identifier, db)
+    catalog = _serialize_catalog(db, tenant.id, request)
+    recent_pets = _serialize_recent_pets(db, tenant.id, 8, request)
+    return {
+        "catalog": catalog,
+        "recent_pets": recent_pets,
     }
 
 

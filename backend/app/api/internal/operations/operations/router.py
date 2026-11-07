@@ -477,8 +477,8 @@ def get_ops_board(
     elif tab == "all":
         query = query.order_by(sched.desc(), models.Cremation.id.desc())
     else:
-        # Lo más urgente primero (atrasadas arriba)
-        query = query.order_by(sched.asc(), models.Cremation.id.asc())
+        # Planes prioritarios primero; después lo más urgente (atrasadas arriba)
+        query = query.order_by(board.priority_expr().desc(), sched.asc(), models.Cremation.id.asc())
 
     rows = query.offset((page - 1) * page_size).limit(page_size).all()
     return schemas.OpsBoardResponse(

@@ -178,7 +178,7 @@ export const DEFAULT_FORM_CONFIG: PublicFormConfig = {
         nickname: { visible: false, required: false },
         breed: { visible: false, required: false },
         weight: { visible: true, required: true },
-        age: { visible: true, required: true },
+        age: { visible: true, required: false },
         birthDate: { visible: false, required: false },
         deathDate: { visible: false, required: false },
         healthStatus: { visible: false, required: false },
@@ -212,6 +212,9 @@ export function resolveFormConfig(raw?: Partial<PublicFormConfig> | null): Publi
 }
 
 /** Sufijo de etiqueta: " *" si es obligatorio, " (Opcional)" si no. */
+/** Campos que nunca son obligatorios (la edad: con fechas se calcula sola). */
+export const NEVER_REQUIRED: ReadonlySet<string> = new Set(['age']);
+
 export function fieldSuffix(setting: FormFieldSetting): string {
     return setting.required ? ' *' : ' (Opcional)';
 }

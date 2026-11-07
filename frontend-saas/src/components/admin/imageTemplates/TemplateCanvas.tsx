@@ -3,7 +3,7 @@
 import React, { forwardRef } from 'react';
 import dynamic from 'next/dynamic';
 import type Konva from 'konva';
-import type { ImageBinding, Layer, PhotoFills, TemplateDefinition, TextBinding } from '@/lib/admin/imageTemplates/types';
+import type { CollagePhoto, ImageBinding, Layer, PhotoFills, TemplateDefinition, TextBinding } from '@/lib/admin/imageTemplates/types';
 
 /** Valores de los datos: textos por TextBinding y URLs de imagen por ImageBinding. */
 export type Bindings = Partial<Record<TextBinding | ImageBinding, string>>;
@@ -15,6 +15,7 @@ interface Props {
     bindings: Bindings;
     photoUrl?: string | null;
     photos?: PhotoFills;
+    collage?: CollagePhoto[];
     editable?: boolean;
     selectedId?: string | null;
     onSelect?: (id: string | null) => void;

@@ -46,6 +46,8 @@ export interface OpsOrder {
     cremation_type?: string | null;
     notes?: string | null;
     pet_image_url?: string | null;
+    /** Plan prioritario de la orden (null = prioridad normal) */
+    priority_plan?: string | null;
 }
 
 export interface OpsBoardResponse {

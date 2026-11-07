@@ -13,6 +13,7 @@ export interface Pet {
     birth_date_precision?: 'day' | 'month' | 'year';
     death_date_precision?: 'day' | 'month' | 'year';
     age: number;
+    age_unit?: 'days' | 'weeks' | 'months' | 'years';
     status: string;
     customer_id: number;
     image_url?: string;
@@ -71,5 +72,24 @@ export const useDeletePet = () => {
         onError: (err: any) => {
             showToast(err.message || 'Error al eliminar mascota', 'error');
         },
+    });
+};
+
+/**
+ * Marca una foto como principal (queda primera e `image_url`): la usan
+ * certificado, plantillas, IA, memorial y seguimiento. No borra fotos.
+ */
+export const useSetMainImage = () => {
+    const queryClient = useQueryClient();
+    const { showToast } = useToast();
+    return useMutation({
+        mutationFn: ({ petId, url }: { petId: number; url: string }) =>
+            apiRequest(`/api/internal/pets/${petId}/main-image`, { method: 'PUT', body: JSON.stringify({ url }) }) as Promise<Pet>,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['pets'] });
+            queryClient.invalidateQueries({ queryKey: ['expediente'] });
+            showToast('Foto principal actualizada', 'success');
+        },
+        onError: (err: Error) => showToast(err.message || 'No se pudo cambiar la foto principal', 'error'),
     });
 };

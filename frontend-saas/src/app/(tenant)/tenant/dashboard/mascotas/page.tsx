@@ -27,7 +27,8 @@ import { TableSkeleton, CardSkeleton } from '@/components/tenant/ui/Skeleton';
 import { apiRequest, API_URL, getImageUrl } from '@/lib/tenant/api';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { usePets, useSavePet, useDeletePet } from '@/hooks/usePets';
+import { usePets, useSavePet, useDeletePet, useSetMainImage } from '@/hooks/usePets';
+import MainPhotoToggle from '@/components/tenant/crm/MainPhotoToggle';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useCremations } from '@/hooks/useCremations';
 import MemorialSetupModal from '@/components/tenant/memorials/MemorialSetupModal';
@@ -54,6 +55,9 @@ interface Pet {
     birth_date_precision?: 'day' | 'month' | 'year';
     death_date_precision?: 'day' | 'month' | 'year';
     age: number;
+    age_unit?: string;
+    /** Autoriza su foto en homenajes (collage). null = no se preguntó. */
+    photo_consent?: boolean | null;
     status: string;
     customer_id: number;
     image_url?: string;
@@ -64,6 +68,7 @@ interface Pet {
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import Modal from '@/components/tenant/Modal';
 import PetDeleteModal from '@/components/tenant/pets/PetDeleteModal';
+import { formatAge } from '@/lib/petAge';
 
 interface Customer {
     id: number;
@@ -114,6 +119,16 @@ export default function PetsPage() {
     const [currentPet, setCurrentPet] = useState<Partial<Pet> | null>(null);
     const [selectedImages, setSelectedImages] = useState<Blob[]>([]);
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+    // Foto principal: la primera (la usan certificado, plantillas, IA, memorial y seguimiento)
+    const setMainImage = useSetMainImage();
+    const isRemotePhoto = (u: string) => u.startsWith('/static') || u.startsWith('http');
+    const makeMain = async (url: string) => {
+        if (!currentPet?.id) return;
+        const saved = await setMainImage.mutateAsync({ petId: currentPet.id, url }).catch(() => null);
+        if (!saved) return;
+        setCurrentPet({ ...currentPet, images: saved.images, image_url: saved.image_url });
+        setImagePreviews(prev => [url, ...prev.filter(p => p !== url)]);
+    };
 
     // Cropper States
     const [crop, setCrop] = useState({ x: 0, y: 0 });
@@ -404,6 +419,14 @@ export default function PetsPage() {
                                     <div className="w-16 h-16 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
                                         <img src={getImageUrl(preview)} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
                                     </div>
+                                    {imagePreviews.length > 1 && (
+                                        <MainPhotoToggle
+                                            isMain={idx === 0}
+                                            disabled={!currentPet?.id || !isRemotePhoto(preview)}
+                                            busy={setMainImage.isPending && setMainImage.variables?.url === preview}
+                                            onSelect={() => makeMain(preview)}
+                                        />
+                                    )}
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -717,7 +740,7 @@ export default function PetsPage() {
                                             <div className="bg-white/5 px-3 py-2 rounded-xl border border-white/5">
                                                 <p className="text-[10px] text-muted-foreground uppercase font-bold mb-0.5">Edad</p>
                                                 <p className="font-medium text-sm">
-                                                    {pet.age ? `${pet.age} años` : (
+                                                    {pet.age ? formatAge(pet.age, pet.age_unit) : (
                                                         pet.birth_date ? (() => {
                                                             const diff = Date.now() - new Date(pet.birth_date).getTime();
                                                             const ageDate = new Date(diff);
@@ -858,13 +881,23 @@ export default function PetsPage() {
                 <form onSubmit={handleSave} className="space-y-6">
                     {/* Image Upload Section - Gallery */}
                     <div className="flex flex-col items-center justify-center pb-4 border-b border-white/5">
-                        <p className="text-xs font-bold text-muted-foreground uppercase mb-3">Fotos de la Mascota (mín 1, máx 3)</p>
+                        <p className="text-xs font-bold text-muted-foreground uppercase mb-1">Fotos de la Mascota (mín 1, máx 3)</p>
+                        <p className="text-[10px] text-muted-foreground mb-3">La primera es la principal (certificado, diseños, IA y memorial). Toca ⭐ para cambiarla.</p>
                         <div className="flex gap-3">
                             {imagePreviews.map((preview, idx) => (
                                 <div key={idx} className="relative group">
                                     <div className="w-24 h-24 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
                                         <img src={getImageUrl(preview)} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
                                     </div>
+                                    {imagePreviews.length > 1 && (
+                                        <MainPhotoToggle
+                                            size="md"
+                                            isMain={idx === 0}
+                                            disabled={!currentPet?.id || !isRemotePhoto(preview)}
+                                            busy={setMainImage.isPending && setMainImage.variables?.url === preview}
+                                            onSelect={() => makeMain(preview)}
+                                        />
+                                    )}
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -895,6 +928,12 @@ export default function PetsPage() {
                                 </div>
                             )}
                         </div>
+                        <label className="mt-4 flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                            <input type="checkbox" checked={currentPet?.photo_consent === true}
+                                onChange={(e) => setCurrentPet({ ...currentPet, photo_consent: e.target.checked })}
+                                className="h-4 w-4 accent-emerald-500" />
+                            La familia autoriza usar su foto en homenajes (collage del mes)
+                        </label>
                         {/* Modal de Confirmación para eliminar imagen */}
                         <Modal
                             isOpen={!!imageToDelete}

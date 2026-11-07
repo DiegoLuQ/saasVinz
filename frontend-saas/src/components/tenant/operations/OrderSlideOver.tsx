@@ -31,6 +31,9 @@ import { usePermissions } from '@/app/(tenant)/tenant/context/PermissionContext'
 import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
 import { useFeatures } from '@/hooks/useFeatures';
 import { isProOrUltraCrematoryPlan } from '@/lib/memorialDesign';
+import PriorityBadge from './PriorityBadge';
+import MainPhotoToggle from '@/components/tenant/crm/MainPhotoToggle';
+import { useSetMainImage } from '@/hooks/usePets';
 // --- Tipos de GET /api/internal/cremations/{id}/expediente ---------------------
 interface Expediente {
     order: {
@@ -40,12 +43,16 @@ interface Expediente {
         scheduled_at?: string | null; completed_at?: string | null;
         verification_code?: string | null; current_step?: string | null;
         notes?: string | null;
+        /** Plan prioritario de la orden (null = prioridad normal) */
+        priority_plan?: string | null;
     };
     pet: {
         id?: number | null; name?: string | null; species?: string | null; breed?: string | null;
         weight?: number | null; size?: string | null;
         dedication?: string | null; dedication_source?: 'orden' | 'formulario' | null;
         photos: string[];
+        /** Fotos de la ficha (se pueden marcar como principal) */
+        pet_photos?: string[];
     };
     customer: { name?: string | null; phone?: string | null; email?: string | null };
     logistics?: {
@@ -128,6 +135,8 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
     const { canEdit } = usePermissions();
     const [activeTab, setActiveTab] = useState<ExpedienteTab>('operacion');
     const [copied, setCopied] = useState<string | null>(null);
+    const [showMainPicker, setShowMainPicker] = useState(false);
+    const setMainImage = useSetMainImage();
     const [acting, setActing] = useState(false);
     const [loadingReceipt, setLoadingReceipt] = useState(false);
     const [downloadingCertId, setDownloadingCertId] = useState<number | null>(null);
@@ -314,6 +323,8 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
     const hasLogistics = !!(pickupText || deliveryText || exp?.order.scheduled_at);
     const weightVal = exp?.pet.weight ?? cremation.weight ?? 0;
     const canEditOrder = canEdit('ordenes');
+    // Foto principal de la mascota (la usan plantillas, IA, certificado y memorial)
+    const canPickMain = canEdit('mascotas') && !!exp?.pet.id && (exp?.pet.pet_photos?.length || 0) > 1;
 
     const certsCount = exp?.deliverables.certificate.issued.length || 0;
 
@@ -349,6 +360,7 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                             <span className={`w-2 h-2 rounded-full ${status.dot}`} />
                                             {status.label}
                                         </span>
+                                        <PriorityBadge plan={exp.order.priority_plan} size="md" />
                                         {exp.order.cremation_type && (
                                             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200 dark:bg-white/5 dark:text-slate-300 dark:border-white/10">
                                                 {exp.order.cremation_type}
@@ -511,6 +523,15 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                                     <p className="text-xs text-slate-500 dark:text-muted-foreground capitalize">
                                                         {[exp.pet.species, exp.pet.breed].filter(Boolean).join(' • ') || 'Mascota'}
                                                     </p>
+                                                    {canPickMain && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowMainPicker(v => !v)}
+                                                            className="mt-0.5 text-[11px] font-bold text-sky-600 dark:text-sky-400 hover:underline"
+                                                        >
+                                                            {showMainPicker ? 'Listo' : 'Cambiar foto principal'}
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
 
@@ -539,6 +560,29 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                                 )}
                                             </div>
                                         </div>
+
+                                        {/* Elegir la foto principal (la familia a veces sube primero otra) */}
+                                        {canPickMain && showMainPicker && (
+                                            <div className="pt-3 border-t border-slate-100 dark:border-white/5 space-y-2">
+                                                <p className="text-[11px] text-slate-500 dark:text-muted-foreground">
+                                                    Toca ⭐ en la foto que debe ser la principal. Se usará en lo que generes desde ahora (diseños, IA, certificado, memorial); lo ya generado puedes rehacerlo.
+                                                </p>
+                                                <div className="flex gap-2 flex-wrap">
+                                                    {(exp.pet.pet_photos || []).map((url, idx) => (
+                                                        <div key={url} className="relative group w-20 h-20 rounded-xl overflow-hidden border border-slate-200 dark:border-white/10">
+                                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                            <img src={getImageUrl(url) || ''} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                                                            <MainPhotoToggle
+                                                                size="md"
+                                                                isMain={idx === 0}
+                                                                busy={setMainImage.isPending && setMainImage.variables?.url === url}
+                                                                onSelect={() => exp.pet.id && setMainImage.mutate({ petId: exp.pet.id, url })}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {/* Datos del tutor */}
                                         <div className="pt-3 border-t border-slate-100 dark:border-white/5 flex flex-wrap items-center justify-between gap-3">

@@ -16,7 +16,8 @@ import {
     ChevronDown,
     Star,
     Store,
-    Folder
+    Folder,
+    Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -419,6 +420,30 @@ export default function EditPlanPage() {
                         </div>
                         <p className="text-[10px] text-muted-foreground/60 ml-1">
                             Ej. 1 para un plan solo hasta 1 kg. En el catálogo y el formulario este plan se oculta cuando el tamaño o el peso de la mascota es mayor.
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Prioridad operativa</label>
+                        <button
+                            type="button"
+                            role="switch"
+                            aria-checked={!!currentPlan?.is_priority}
+                            onClick={() => setCurrentPlan({ ...currentPlan, is_priority: !currentPlan?.is_priority })}
+                            className={`w-full rounded-2xl py-3 px-4 border text-sm font-bold flex items-center gap-3 transition-all text-left ${
+                                currentPlan?.is_priority
+                                    ? 'bg-rose-500/15 border-rose-500/40 text-rose-400'
+                                    : 'bg-black/20 border-white/10 text-muted-foreground hover:border-rose-500/30'
+                            }`}
+                        >
+                            <Zap size={15} className={currentPlan?.is_priority ? 'fill-rose-400 text-rose-400' : ''} />
+                            <span className="flex-1">{currentPlan?.is_priority ? 'Plan prioritario' : 'Prioridad normal'}</span>
+                            <span className={`w-9 h-5 rounded-full p-0.5 transition-colors ${currentPlan?.is_priority ? 'bg-rose-500' : 'bg-white/15'}`}>
+                                <span className={`block w-4 h-4 rounded-full bg-white transition-transform ${currentPlan?.is_priority ? 'translate-x-4' : ''}`} />
+                            </span>
+                        </button>
+                        <p className="text-[10px] text-muted-foreground/60 ml-1">
+                            Las órdenes con este plan se marcan «Prioridad» y aparecen primero en el Panel de Trabajo y en el Dashboard. Solo se ve en el panel, no en el catálogo.
                         </p>
                     </div>
 

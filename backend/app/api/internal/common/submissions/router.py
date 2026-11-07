@@ -459,17 +459,13 @@ def create_pet_from_submission(
             if img
         ]
 
-        # Safer age conversion
+        # Edad con unidad (días/semanas/meses/años; registros antiguos = años)
+        from app.utils.pet_age import clean_unit, parse_age
         try:
-            raw_age = pet_data.get("age", 0)
-            # Remove "años" if present and convert to int
-            if isinstance(raw_age, str):
-                age_val = "".join(filter(str.isdigit, raw_age))
-                age = int(age_val) if age_val else 0
-            else:
-                age = int(raw_age or 0)
-        except:
+            age = parse_age(pet_data.get("age")) or 0
+        except ValueError:
             age = 0
+        age_unit = clean_unit(pet_data.get("ageUnit"))
 
         # Safer date conversion using helper
         # La familia puede mandar fecha completa, mes y año («2015-03») o solo el año («2015»)
@@ -504,6 +500,9 @@ def create_pet_from_submission(
             breed=pet_data.get("breed", "N/A"),
             size=pet_data.get("size"), # pequeño, mediano, normal, grande, muy grande
             age=age,
+            age_unit=age_unit,
+            # Casilla «Autorizo usar su foto en homenajes» (None = formulario antiguo, no se preguntó)
+            photo_consent=(pet_data["photoConsent"] is True) if "photoConsent" in pet_data else None,
             birth_date=birth_date,
             death_date=death_date,
             birth_date_precision=birth_precision if birth_date else "day",

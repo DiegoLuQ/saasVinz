@@ -21,7 +21,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getMemorialBaseUrl } from '@/lib/publicUrls';
 import { normalizeMemorialBg } from '@/lib/memorialDesign';
-import { MemorialInvitesModal, MemorialPlansModal, NewMemorialModal } from '@/components/admin/memorials/VinzerMemorialModals';
+import { MemorialInvitesModal, MemorialPlansStudio, NewMemorialModal } from '@/components/admin/memorials/VinzerMemorialModals';
 
 interface Memorial {
     id: number;
@@ -277,6 +277,14 @@ export default function AdminMemorialsPage() {
         }
     };
 
+    if (plansOpen) {
+        return (
+            <div className="p-8 max-w-7xl mx-auto">
+                <MemorialPlansStudio onBack={() => { setPlansOpen(false); fetchMemorials(); }} />
+            </div>
+        );
+    }
+
     return (
         <div className="p-8 max-w-7xl mx-auto space-y-10">
             <header className="flex justify-between items-center">
@@ -310,7 +318,7 @@ export default function AdminMemorialsPage() {
             </header>
             {newOpen && <NewMemorialModal onClose={() => setNewOpen(false)} onCreated={fetchMemorials} />}
             {invitesOpen && <MemorialInvitesModal onClose={() => setInvitesOpen(false)} />}
-            {plansOpen && <MemorialPlansModal onClose={() => { setPlansOpen(false); fetchMemorials(); }} />}
+
 
             <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden backdrop-blur-sm">
                 <Table>

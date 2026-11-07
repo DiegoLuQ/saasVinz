@@ -36,11 +36,15 @@ DEFAULT_FIELDS: dict[str, tuple[str, str, bool, bool]] = {
     "nickname": ("pet", "Cómo le decían (apodo)", False, False),
     "breed": ("pet", "Raza", False, False),
     "weight": ("pet", "Tamaño / peso", True, True),
-    "age": ("pet", "Edad", True, True),
+    "age": ("pet", "Edad", True, False),  # opcional por defecto (con fechas se calcula)
     "birthDate": ("pet", "Fecha de nacimiento", False, False),
     "deathDate": ("pet", "Fecha de fallecimiento", False, False),
     "healthStatus": ("pet", "Estado de salud / Diagnóstico", False, False),
 }
+
+
+# Campos que nunca son obligatorios (aunque una configuración antigua lo diga)
+NEVER_REQUIRED = frozenset({"age"})
 
 
 DEFAULT_PHASES: dict[str, bool] = {
@@ -113,7 +117,7 @@ def normalize_form_config(raw: Any) -> dict:
     for key, (_section, _label, def_visible, def_required) in DEFAULT_FIELDS.items():
         saved = saved_fields.get(key) if isinstance(saved_fields.get(key), dict) else {}
         visible = bool(saved.get("visible", def_visible))
-        required = bool(saved.get("required", def_required)) and visible
+        required = bool(saved.get("required", def_required)) and visible and key not in NEVER_REQUIRED
         fields[key] = {"visible": visible, "required": required}
 
     saved_memories = raw.get("memories") if isinstance(raw.get("memories"), dict) else {}
@@ -147,7 +151,7 @@ def normalize_form_config(raw: Any) -> dict:
                 for k, (_sec, _lbl, def_v, def_r) in DEFAULT_FIELDS.items():
                     if k in cf_fields_raw and isinstance(cf_fields_raw[k], dict):
                         v = bool(cf_fields_raw[k].get("visible", def_v))
-                        r = bool(cf_fields_raw[k].get("required", def_r)) and v
+                        r = bool(cf_fields_raw[k].get("required", def_r)) and v and k not in NEVER_REQUIRED
                         cf_fields[k] = {"visible": v, "required": r}
                         label = " ".join(str(cf_fields_raw[k].get("label") or "").split())[:MAX_FIELD_LABEL]
                         if label:
@@ -476,6 +480,21 @@ def apply_form_config_to_submission(
         else:
             pet[key] = norm_value
 
+    # Edad con unidad (días/semanas/meses/años); vacía + ambas fechas = se calcula
+    from app.utils.partial_dates import parse_partial_date
+    from app.utils.pet_age import normalize_form_age
+    b, _ = parse_partial_date(pet.get("birthDate"))
+    d, _ = parse_partial_date(pet.get("deathDate"))
+    if b and d and d < b:
+        raise HTTPException(status_code=400, detail="La fecha de fallecimiento no puede ser anterior al nacimiento")
+    try:
+        normalize_form_age(pet)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    # Autorización de la foto para homenajes (casilla del resumen): solo true/false.
+    if "photoConsent" in pet:
+        pet["photoConsent"] = pet.get("photoConsent") is True
+
     if form_preset_id:
         for cf in norm.get("custom_forms", []):
             if cf.get("id") == form_preset_id or cf.get("name", "").lower() == form_preset_id.lower():
@@ -537,7 +556,7 @@ def apply_form_config_to_submission(
         "nickname": _filled(pet.get("nickname")),
         "breed": _filled(pet.get("breed")),
         "weight": _filled(pet.get("size")),
-        "age": _filled(pet.get("age")),
+        "age": _filled(pet.get("age")),  # con ambas fechas ya viene calculada
         "birthDate": _filled(pet.get("birthDate")),
         "deathDate": _filled(pet.get("deathDate")),
         "healthStatus": _filled(pet.get("healthStatus")),

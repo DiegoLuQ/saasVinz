@@ -34,7 +34,8 @@ import {
     EyeOff,
     FileSpreadsheet,
     Folder,
-    Pencil
+    Pencil,
+    Zap
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { API_URL } from '@/lib/tenant/api';
@@ -1217,6 +1218,12 @@ export default function ServicesPage() {
                                                         Más solicitado
                                                     </span>
                                                 )}
+                                                {plan.is_priority && (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-800" title="Sus órdenes van primero en el Panel de Trabajo">
+                                                        <Zap size={10} className="fill-rose-500 text-rose-500" />
+                                                        Prioritario
+                                                    </span>
+                                                )}
                                                 {plan.important_note && (
                                                     <span
                                                         className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400 border border-sky-200 dark:border-sky-800 truncate max-w-full"
@@ -1361,6 +1368,9 @@ export default function ServicesPage() {
                                                                 <span>{plan.name}</span>
                                                                 {plan.is_featured && (
                                                                     <Star size={12} className="fill-amber-500 text-amber-500" />
+                                                                )}
+                                                                {plan.is_priority && (
+                                                                    <span title="Plan prioritario"><Zap size={12} className="fill-rose-500 text-rose-500" /></span>
                                                                 )}
                                                             </div>
                                                             {plan.description && (

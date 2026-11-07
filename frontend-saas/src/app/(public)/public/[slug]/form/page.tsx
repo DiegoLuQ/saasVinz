@@ -47,6 +47,7 @@ import FormVideoPlayer from '@/components/public/FormVideoPlayer';
 import SkyBackground from '@/components/public/SkyBackground';
 import FarewellPreview from '@/app/(tenant)/tenant/dashboard/documentos/disenos/components/FarewellPreview';
 import { formatPartialDate } from '@/lib/petDates';
+import { formatAge } from '@/lib/petAge';
 
 // Frases empáticas por paso
 const STEP_PHRASES: Record<number, string> = {
@@ -281,7 +282,7 @@ export default function TenantFormPage() {
             '🐶 *DATOS DE LA MASCOTA*',
             line('Nombre', petData.name),
             line('Especie', petData.type ? `${petData.type}${petData.breed ? ` (${petData.breed})` : ''}` : ''),
-            line(fieldLabel(formConfig.fields.age, 'Edad'), petData.age ? `${petData.age} años` : ''),
+            line(fieldLabel(formConfig.fields.age, 'Edad'), formatAge(petData.age, petData.ageUnit)),
             line(fieldLabel(formConfig.fields.weight, 'Peso'), tierDisplayWithPrice),
             line(fieldLabel(formConfig.fields.birthDate, 'Fecha de nacimiento'), formatPartialDate(petData.birthDate)),
             line(fieldLabel(formConfig.fields.deathDate, 'Fecha de fallecimiento'), formatPartialDate(petData.deathDate)),
@@ -827,6 +828,20 @@ export default function TenantFormPage() {
                                         formConfig={formConfig}
                                         weightTiers={weightTiers}
                                     />
+                                )}
+                                {currentStepKey === 'resumen' && images.length > 0 && (
+                                    <label className="mt-5 flex items-start gap-3 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/60 px-5 py-4 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={petData.photoConsent === true}
+                                            onChange={(e) => setPetData(prev => ({ ...prev, photoConsent: e.target.checked }))}
+                                            className="mt-0.5 h-5 w-5 shrink-0 rounded accent-sky-600"
+                                        />
+                                        <span className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+                                            Autorizo a <b>{tenant?.name || 'el crematorio'}</b> a incluir la foto de <b>{petData.name || 'mi mascota'}</b> en homenajes que publique, como el collage mensual de sus redes sociales.
+                                            <span className="block text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Opcional. Si no la marcas, su foto no se publicará.</span>
+                                        </span>
+                                    </label>
                                 )}
                             </motion.div>
                         </AnimatePresence>

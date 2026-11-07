@@ -122,6 +122,9 @@ def _format_time(dt: Optional[datetime], today) -> str:
     return local.strftime("%H:%M") if local.date() == today else local.strftime("%d/%m %H:%M")
 
 
+from app.api.internal.operations.operations.board import priority_plan_name  # noqa: E402
+
+
 def _format_orders(
     orders: Sequence[models.CremationOC],
     today,
@@ -163,7 +166,10 @@ def _format_orders(
             verification_code=c.verification_code,
             is_overdue=is_overdue,
             scheduled_at_iso=scheduled_at.isoformat() if scheduled_at else None,
+            priority_plan=priority_plan_name(c),
         ))
+    # Planes prioritarios primero (el orden original se mantiene dentro de cada grupo)
+    formatted.sort(key=lambda o: o.priority_plan is None)
     return formatted
 
 

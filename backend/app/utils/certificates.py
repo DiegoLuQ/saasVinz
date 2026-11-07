@@ -1020,6 +1020,30 @@ def _ov_date(ov: dict):
         return None
 
 
+# Campos del dueño de la mascota → clave del dict `owner`.
+OWNER_FIELDS = {
+    "nombre_dueno": "name",
+    "rut_dueno": "rut",
+    "correo_dueno": "email",
+    "telefono_dueno": "phone",
+    "direccion_dueno": "address",
+}
+
+
+def certificate_owner(customer) -> dict:
+    """Datos del dueño (crm_customers) para los campos del certificado."""
+    if not customer:
+        return {}
+    address = ", ".join(x for x in [(customer.address or "").strip(), (customer.city or "").strip()] if x)
+    return {
+        "name": (customer.name or "").strip(),
+        "rut": (customer.rut or "").strip(),
+        "email": (customer.email or "").strip(),
+        "phone": (customer.phone or "").strip(),
+        "address": address,
+    }
+
+
 def generate_image_certificate_html(
     background_url: str,
     aspect_ratio: str,
@@ -1047,6 +1071,7 @@ def generate_image_certificate_html(
     base_url: str = "http://localhost:8000",
     verification_code: str = "",
     text_values: dict = None,
+    owner: dict = None,
     **kwargs,
 ) -> dict:
     """Genera el HTML de un certificado basado en imagen con campos posicionados.
@@ -1066,6 +1091,8 @@ def generate_image_certificate_html(
     """
     fields = fields or []
     text_values = text_values if isinstance(text_values, dict) else {}
+    # Dueño de la mascota (tutor): {name, rut, email, phone, address}
+    owner = owner if isinstance(owner, dict) else {}
     elements = elements or []
     overrides = overrides or {}
     pet_images = pet_images or []
@@ -1257,6 +1284,8 @@ def generate_image_certificate_html(
             value = tenant_phone or ""
         elif ftype == "direccion_tenant":
             value = tenant_address or ""
+        elif ftype in OWNER_FIELDS:
+            value = owner.get(OWNER_FIELDS[ftype]) or ""
         elif ftype == "codigo_verificacion":
             # Código corto de la orden (el mismo del panel y del seguimiento público)
             value = verification_code or ""

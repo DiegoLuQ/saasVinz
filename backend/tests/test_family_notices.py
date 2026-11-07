@@ -111,3 +111,5 @@ def test_seguimiento_entrega_hasta_3_fotos(client, db, order):
     r = client.get(url)
     assert r.status_code == 200, r.text
     assert r.json()["pet_images"] == ["https://cdn.example/f1.webp", "https://cdn.example/f2.webp", "https://cdn.example/f3.webp"]
+    # Zona horaria del crematorio: la página muestra las horas en ella, no en la del dispositivo
+    assert r.json()["timezone"] == "America/Santiago"

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { CheckCircle2, Clock, MapPin, User } from 'lucide-react';
+import PriorityBadge from '../PriorityBadge';
 import { parseServerDate, formatChileTime, formatChileDate } from '@/lib/dates';
 import { isFinished, isNotStarted, type OpsOrder } from '@/hooks/useOperations';
 
@@ -57,7 +58,7 @@ export default function OpsOrderCard({
             type="button"
             onClick={() => onOpen(order)}
             className={`glass-card text-left w-full rounded-2xl border p-4 flex flex-col gap-3 transition-colors hover:border-primary/40 ${
-                schedule?.overdue ? 'border-red-500/40' : 'border-foreground/10'
+                schedule?.overdue ? 'border-red-500/40' : order.priority_plan && !finished ? 'border-rose-500/50 ring-1 ring-rose-500/20' : 'border-foreground/10'
             }`}
         >
             <div className="flex items-start justify-between gap-3">
@@ -67,9 +68,12 @@ export default function OpsOrderCard({
                         {[order.pet_species, order.pet_breed, order.weight ? `${order.weight} kg` : null].filter(Boolean).join(' · ')}
                     </p>
                 </div>
-                <span className="text-[11px] font-mono font-bold text-muted-foreground bg-foreground/5 px-2 py-1 rounded-md shrink-0">
-                    #{order.oc_number ?? order.id}
-                </span>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className="text-[11px] font-mono font-bold text-muted-foreground bg-foreground/5 px-2 py-1 rounded-md">
+                        #{order.oc_number ?? order.id}
+                    </span>
+                    <PriorityBadge plan={order.priority_plan} />
+                </div>
             </div>
 
             {schedule && (

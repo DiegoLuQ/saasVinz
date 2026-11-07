@@ -60,6 +60,7 @@ export function layerName(layer: Layer): string {
             : (PHOTO_SLOTS.find(s => s.value === (layer.slot || 'photo_1'))?.label || 'Foto');
     }
     if (layer.type === 'sticker') return layer.binding === 'tenant_logo' ? 'Logo' : 'Adorno';
+    if (layer.type === 'collage') return 'Collage de fotos';
     if (layer.binding === 'static') return `Texto «${(layer.static_text || '').slice(0, 20)}»`;
     return TEXT_BINDINGS.find(t => t.value === layer.binding)?.label || 'Texto';
 }

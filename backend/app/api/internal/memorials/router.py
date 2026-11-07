@@ -241,6 +241,8 @@ def _apply_memorial_limit(memorial: mem_models.Memorial, db: Session):
     plan = memorial_plans.plan_of(db, memorial)
     setattr(memorial, "plan_features", memorial_plans.features_of(plan))
     setattr(memorial, "is_vinzer_plan", bool(plan and plan.kind == memorial_plans.KIND_VINZER))
+    # Nombre configurado del plan (Admin → Memoriales → Planes y precios), p. ej. «Partner»
+    setattr(memorial, "plan_name", plan.name if plan else None)
     from app.services import memorial_expiry
     setattr(memorial, "expired", memorial_expiry.is_expired(memorial))
     from app.services import memorial_timeline

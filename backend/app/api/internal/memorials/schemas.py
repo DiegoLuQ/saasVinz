@@ -127,6 +127,7 @@ class MemorialPublicResponse(BaseModel):
     # Límites y funciones del plan del memorial (app/services/memorial_plans.py)
     plan_features: dict = {}
     is_vinzer_plan: bool = False
+    plan_name: Optional[str] = None
     # Vencido (plan anual sin renovar): vista reducida, sin mensajes nuevos
     expired: bool = False
     valid_until: Optional[datetime] = None
@@ -211,6 +212,7 @@ class MemorialManageResponse(BaseModel):
     # Límites y funciones del plan del memorial (app/services/memorial_plans.py)
     plan_features: dict = {}
     is_vinzer_plan: bool = False
+    plan_name: Optional[str] = None
     # Vencido (plan anual sin renovar): vista reducida, sin mensajes nuevos
     expired: bool = False
     valid_until: Optional[datetime] = None

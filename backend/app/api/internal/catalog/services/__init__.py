@@ -304,6 +304,7 @@ class PlanService:
             sort_order=plan_in.sort_order,
             group_name=plan_in.group_name,
             max_weight=plan_in.max_weight,
+            is_priority=plan_in.is_priority,
             tenant_id=tenant_id
         )
         self.db.add(db_plan)

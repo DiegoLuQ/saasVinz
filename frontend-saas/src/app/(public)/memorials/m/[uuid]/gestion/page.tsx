@@ -533,6 +533,7 @@ export default function GestionMemorialPage() {
                         isDark={isDark}
                         isFromCrematorium={isFromCrematorium}
                         currentFeatures={memorial.plan_features}
+                        currentPlanName={memorial.plan_name}
                         crematoriumName={tenant?.name}
                         accessKey={getPin()}
                     />

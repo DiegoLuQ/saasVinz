@@ -150,6 +150,7 @@ export const FEATURES_REGISTRY: Record<string, ModuleDef> = {
                 features: [
                     { key: 'certificados:diseno', label: 'Tarjetas de Homenaje', description: 'Página «Tarjetas de Homenaje» y el botón de diseño de despedida en las órdenes' },
                     { key: 'certificados:redes', label: 'Diseños para Redes (IA)', description: 'Página «Diseños para Redes»: generar textos e ilustraciones con IA y guardar diseños' },
+                    { key: 'certificados:collage', label: 'Collage del mes', description: 'Pestaña «Collage del mes» en Diseños para Redes: junta las fotos autorizadas de las mascotas entregadas (mes o últimas N)' },
                 ],
             },
             {

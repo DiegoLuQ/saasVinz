@@ -40,11 +40,18 @@ class ImageTemplate(Base):
 
     is_active = Column(Boolean, nullable=False, default=True)
 
+    # 'social' = diseño por mascota; 'collage' = fotos de varias órdenes entregadas
+    kind = Column(String(10), nullable=False, default="social", server_default="social")
+
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
     updated_at = Column(DateTime(timezone=True), default=tz.get_now, onupdate=tz.get_now)
 
     @property
     def is_locked(self) -> bool:
+        # Los collages no se bloquean: cada descarga guarda sus propios datos (quién,
+        # cuándo, periodo) y nunca se vuelve a dibujar con la plantilla.
+        if self.kind == "collage":
+            return False
         return (self.usage_count or 0) > 0
 
 

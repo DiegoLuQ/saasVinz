@@ -56,7 +56,8 @@ import {
     type FormVideo,
     DEFAULT_PHASES,
     DEFAULT_MEMORIES_CONFIG,
-    DEFAULT_WELCOME_MODAL_CONFIG
+    DEFAULT_WELCOME_MODAL_CONFIG,
+    NEVER_REQUIRED
 } from '@/lib/publicFormConfig';
 
 // Configuración del formulario público (el enlace que se envía a la familia).
@@ -1012,7 +1013,7 @@ export function PublicFormTab() {
                                                 <Toggle label={`Mostrar ${f.label}`} checked={f.visible} onChange={v => updateField(f.key, { visible: v })} />
                                             </div>
                                             <div className="flex justify-center">
-                                                <Toggle label={`${f.label} obligatorio`} checked={f.required} disabled={!f.visible} onChange={v => updateField(f.key, { required: v })} />
+                                                <Toggle label={`${f.label} obligatorio`} checked={f.required && !NEVER_REQUIRED.has(f.key)} disabled={!f.visible || NEVER_REQUIRED.has(f.key)} onChange={v => updateField(f.key, { required: v })} />
                                             </div>
                                         </div>
                                     );
@@ -1082,7 +1083,7 @@ export function PublicFormTab() {
                                                     <Toggle label={`Mostrar ${f.label}`} checked={f.visible} onChange={v => updateField(f.key, { visible: v })} />
                                                 </div>
                                                 <div className="flex justify-center">
-                                                    <Toggle label={`${f.label} obligatorio`} checked={f.required} disabled={!f.visible} onChange={v => updateField(f.key, { required: v })} />
+                                                    <Toggle label={`${f.label} obligatorio`} checked={f.required && !NEVER_REQUIRED.has(f.key)} disabled={!f.visible || NEVER_REQUIRED.has(f.key)} onChange={v => updateField(f.key, { required: v })} />
                                                 </div>
                                             </div>
                                         );
@@ -2401,8 +2402,8 @@ export function PublicFormTab() {
                                                             <div className="flex justify-center">
                                                                 <Toggle
                                                                     label={`${f.label} obligatorio`}
-                                                                    checked={f.required}
-                                                                    disabled={!f.visible}
+                                                                    checked={f.required && !NEVER_REQUIRED.has(f.key)}
+                                                                    disabled={!f.visible || NEVER_REQUIRED.has(f.key)}
                                                                     onChange={v => updatePresetField(f.key, { required: v })}
                                                                 />
                                                             </div>

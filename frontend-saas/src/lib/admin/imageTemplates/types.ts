@@ -1,4 +1,4 @@
-export type AspectRatio = '9:16' | '4:5' | '3:4' | '4:3' | '1:1';
+export type AspectRatio = '9:16' | '4:5' | '3:4' | '4:3' | '1:1' | '16:9';
 export type FontFamily =
     | 'Playfair Display'
     | 'Cormorant Garamond'
@@ -19,7 +19,9 @@ export type TextBinding =
     // Redes sociales del crematorio
     | 'tenant_instagram' | 'tenant_facebook' | 'tenant_tiktok' | 'tenant_youtube' | 'tenant_website' | 'tenant_whatsapp'
     // Contenido
-    | 'date' | 'phrase' | 'ai_text' | 'static';
+    | 'date' | 'phrase' | 'ai_text' | 'static'
+    // Collage (plantillas kind 'collage'): «Octubre 2026», «23», «Luna, Max, …»
+    | 'period_label' | 'period_count' | 'pet_names';
 
 /** Imágenes que vienen de los datos (no de un archivo fijo de la plantilla). */
 export type ImageBinding = 'tenant_logo';
@@ -92,7 +94,42 @@ export interface StickerLayer {
     opacity: number;
 }
 
-export type Layer = TextLayer | PhotoLayer | StickerLayer;
+/** Grilla de fotos de un collage: se llena con las mascotas entregadas del periodo. */
+export interface CollageLayer {
+    type: 'collage';
+    id: string;
+    /** Caja de la grilla (centro y tamaño en % del lienzo). */
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    cols: number;
+    rows: number;
+    /** Separación entre fotos (% del ancho de la caja). */
+    gap: number;
+    shape: PhotoShape;
+    border_color: string;
+    border_width: number;
+    glow_color?: string;
+    glow_blur?: number;
+    /** Nombre de cada mascota bajo su foto. */
+    show_names: boolean;
+    name_color: string;
+    name_font: FontFamily;
+    /** Tamaño del nombre (% del ancho del lienzo). */
+    name_size: number;
+    /** Si hay menos fotos que casillas: repetirlas o dejar casillas decorativas vacías. */
+    fill: 'repeat' | 'empty';
+}
+
+export interface CollagePhoto {
+    url: string;
+    name?: string;
+}
+
+export type Layer = TextLayer | PhotoLayer | StickerLayer | CollageLayer;
+
+export type TemplateKind = 'social' | 'collage';
 
 export interface TemplateDefinition {
     background: BackgroundDef;
@@ -112,6 +149,7 @@ export interface ImageTemplate {
     ai_text_max_chars: number;
     /** null = global; con valor = exclusiva de ese tenant. */
     tenant_id: number | null;
+    kind?: TemplateKind;
     usage_count: number;
     is_locked: boolean;
     is_active: boolean;
@@ -131,6 +169,7 @@ export interface ImageTemplateCreate {
     ai_text_max_chars?: number;
     tenant_id?: number | null;
     is_active?: boolean;
+    kind?: TemplateKind;
 }
 
 export type ImageTemplateUpdate = Partial<ImageTemplateCreate>;
@@ -197,6 +236,18 @@ export interface TemplateLatestDesign {
     created_at: string;
 }
 
+/** Una descarga de collage (sin imagen guardada). */
+export interface TemplateCollageDownload {
+    id: number;
+    tenant_name: string;
+    user_name: string | null;
+    created_at: string;
+    label: string;
+    mode: string;
+    photos: number;
+    ratio: string;
+}
+
 export interface TemplateUsage {
     tenants_count: number;
     designs: number;
@@ -205,4 +256,6 @@ export interface TemplateUsage {
     tenants: TemplateUsageTenant[];
     latest: TemplateUsageItem[];
     latest_design?: TemplateLatestDesign | null;
+    /** Solo plantillas de collage: últimas descargas (quién y cuándo). */
+    downloads?: TemplateCollageDownload[];
 }

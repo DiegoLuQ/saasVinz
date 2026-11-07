@@ -18,7 +18,7 @@ import uuid
 
 from datetime import datetime
 from app.utils import tz
-from app.utils.certificates import generate_certificate_json, generate_image_certificate_html
+from app.utils.certificates import certificate_owner, generate_certificate_json, generate_image_certificate_html
 from app.api.internal.common.media_service import MediaService
 
 router = APIRouter()
@@ -141,6 +141,8 @@ def _render_preview(request: Request, tenant: models.Tenant, template: Optional[
             base_url=base_url,
             verification_code="YZAEAQ7TMV",
             text_values=(tenant.cert_text_values if tenant else None),
+            owner={"name": "Juan Pérez", "rut": "12.345.678-5", "email": "juan@correo.cl",
+                   "phone": "+56 9 8765 4321", "address": "Los Aromos 123, Providencia"},
         )
 
     t = template
@@ -390,6 +392,11 @@ def generar_certificado(
                 base_url=base_url,
                 verification_code=(cremation.verification_code if cremation else "") or "",
                 text_values=(tenant.cert_text_values if tenant else None),
+                owner=certificate_owner(
+                    db.query(models.Customer).filter(
+                        models.Customer.id == pet.customer_id, models.Customer.tenant_id == tenant_id,
+                    ).first() if pet and pet.customer_id else None
+                ),
             )
 
             # persist=False -> solo vista previa (Documentos la pide en vivo sin

@@ -429,8 +429,8 @@ function TemplateCard({
                     </button>
                     <button
                         onClick={onDelete}
-                        disabled={template.is_locked}
-                        title={template.is_locked ? 'No se puede eliminar (en uso)' : 'Eliminar'}
+                        disabled={template.usage_count > 0}
+                        title={template.usage_count > 0 ? 'No se puede eliminar (en uso)' : 'Eliminar'}
                         className="bg-white/5 hover:bg-red-500/20 hover:text-red-400 text-white/70 p-2 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white/5 disabled:hover:text-white/70"
                     >
                         <Trash2 size={13} />

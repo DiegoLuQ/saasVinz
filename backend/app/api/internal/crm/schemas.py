@@ -55,8 +55,11 @@ class PetBase(BaseModel):
     birth_date_precision: Literal["day", "month", "year"] = "day"
     death_date_precision: Literal["day", "month", "year"] = "day"
     age: Optional[int] = None
+    age_unit: Literal["days", "weeks", "months", "years"] = "years"
     image_url: Optional[str] = None
     images: Optional[List[str]] = []
+    # Autoriza su foto en homenajes del crematorio (collage). None = no se preguntó.
+    photo_consent: Optional[bool] = None
 
 class PetCreate(PetBase):
     customer_id: int
@@ -71,9 +74,11 @@ class PetUpdate(BaseModel):
     birth_date_precision: Optional[Literal["day", "month", "year"]] = None
     death_date_precision: Optional[Literal["day", "month", "year"]] = None
     age: Optional[int] = None
+    age_unit: Optional[Literal["days", "weeks", "months", "years"]] = None
     image_url: Optional[str] = None
     images: Optional[List[str]] = None
     status: Optional[PetStatus] = None
+    photo_consent: Optional[bool] = None
 
 class PetInDB(PetBase):
     id: int

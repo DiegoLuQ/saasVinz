@@ -4,7 +4,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, Check, Crown, Heart, Infinity as InfinityIcon, MessageCircle, Sparkles, Clock, AlertTriangle, ShieldCheck, Lock } from 'lucide-react';
 import { whatsappLink } from '@/lib/memorialLanding';
-import { formatPrice, planPeriod, useMemorialPlans, type MemorialPlanFeatures, type MemorialPlanInfo } from '@/lib/memorialPlans';
+import { formatPrice, planPeriod, useMemorialPlansState, type MemorialPlanFeatures, type MemorialPlanInfo } from '@/lib/memorialPlans';
 
 /**
  * Plan del memorial en la gestión familiar: estado (vigencia y uso) y mejoras reales
@@ -44,6 +44,8 @@ interface MemorialPlanUpgradeProps {
     isFromCrematorium?: boolean;
     /** Límites del plan actual (memorial.plan_features); necesarios para comparar un Partner */
     currentFeatures?: MemorialPlanFeatures | null;
+    /** Nombre configurado del plan actual (memorial.plan_name, p. ej. «Partner») */
+    currentPlanName?: string | null;
     crematoriumName?: string | null;
     /** PIN de la gestión: registra la solicitud de mejora */
     accessKey?: string;
@@ -51,10 +53,11 @@ interface MemorialPlanUpgradeProps {
 
 export default function MemorialPlanUpgrade({
     plan, validUntil, contract, photosUsed, photoLimit, dedicationsUsed, dedicationLimit,
-    gestures, petName, uuid, locale, isDark, isFromCrematorium, currentFeatures, crematoriumName, accessKey,
+    gestures, petName, uuid, locale, isDark, isFromCrematorium, currentFeatures, currentPlanName, crematoriumName, accessKey,
 }: MemorialPlanUpgradeProps) {
     const en = locale === 'en';
-    const plans = useMemorialPlans();
+    // Solo los planes configurados en Admin (no se muestran los valores por defecto mientras cargan)
+    const { plans, loaded } = useMemorialPlansState();
     const key = (plan || '').trim().toLowerCase();
     const currentIdx = plans.findIndex((p) => p.key === key);
     const name = petName || (en ? 'your companion' : 'tu compañero');
@@ -63,9 +66,9 @@ export default function MemorialPlanUpgrade({
     const current: MemorialPlanInfo | null = currentIdx >= 0
         ? plans[currentIdx]
         : (currentFeatures
-            ? { key: 'partner', name: en ? 'Courtesy' : 'Cortesía', price: 0, currency: 'USD', billing: 'included', features: currentFeatures }
+            ? { key: 'partner', name: (currentPlanName || 'Partner').replace(/^plan\s+/i, ''), price: 0, currency: 'USD', billing: 'included', features: currentFeatures }
             : null);
-    if (!current || (courtesy && !isFromCrematorium && !currentFeatures)) {
+    if (!loaded || !current || (courtesy && !isFromCrematorium && !currentFeatures)) {
         return null;
     }
 
@@ -95,6 +98,15 @@ export default function MemorialPlanUpgrade({
     }
     plans.slice(currentIdx + 1).forEach((p) => offers.push({ plan: p, renewal: false, price: p.price, currency: p.currency }));
     const stacked = offers.length >= 3;
+    const promoOffer = offers.find((o) => (o.plan.discount_percent || 0) > 0);
+    const currentBasePrice = current.original_price ?? current.price;
+    const currentContractPrice = contract?.price ?? current.price;
+    const currentAppliedDiscount =
+        (current.discount_percent || 0) > 0
+            ? Number(current.discount_percent)
+            : currentBasePrice > 0 && currentContractPrice > 0 && currentContractPrice < currentBasePrice
+                ? Math.round((1 - currentContractPrice / currentBasePrice) * 100)
+                : 0;
 
     type Gain = { label: string; from?: string; to?: string };
     const gainsFor = (o: Offer): Gain[] => {
@@ -125,7 +137,8 @@ export default function MemorialPlanUpgrade({
         const action = o.renewal
             ? (en ? (isExpired ? 'renew' : 'extend by one year') : (isExpired ? 'renovar' : 'extender por un año'))
             : (en ? 'move to' : 'pasar al');
-        const price = `${formatPrice(o.price)} ${o.currency} ${planPeriod(o.plan.billing, en)}`;
+        const discNote = (o.plan.discount_percent || 0) > 0 ? (en ? `, -${o.plan.discount_percent}% OFF applied` : `, con -${o.plan.discount_percent}% dcto aplicado`) : '';
+        const price = `${formatPrice(o.price)} ${o.currency} ${planPeriod(o.plan.billing, en)}${discNote}`;
         if (courtesy) {
             return en
                 ? `Hi, I'm from ${petName}'s family. Our memorial was a gift from ${crematoriumName || 'the crematorium'} and we'd like to upgrade it to the ${o.plan.name} plan (${price}). Memorial ID: ${uuid}`
@@ -164,8 +177,14 @@ export default function MemorialPlanUpgrade({
             <div className="text-center mb-10 space-y-3">
                 <span className={`inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>
                     <Sparkles size={14} /> {en ? 'Their space in heaven' : 'Su espacio en el cielo'}
+                    {promoOffer && (
+                        <span className="ml-2 rounded-full bg-emerald-500/15 border border-emerald-500/35 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-500">
+                            -{promoOffer.plan.discount_percent}% {en ? 'OFF' : 'DCTO'}
+                            {promoOffer.plan.discount_label ? ` · ${promoOffer.plan.discount_label}` : ''}
+                        </span>
+                    )}
                 </span>
-                <h2 className={`text-3xl sm:text-4xl font-serif font-black tracking-tight ${strong}`}>
+                <h2 className={`text-2xl sm:text-3xl font-sans font-extrabold tracking-tight ${strong}`}>
                     {courtesy
                         ? (en ? `Give ${name}'s memory more room` : `Dale más espacio al recuerdo de ${name}`)
                         : isForever
@@ -173,7 +192,7 @@ export default function MemorialPlanUpgrade({
                         : (en ? `Keep ${name}'s light shining` : `Mantén encendida la luz de ${name}`)}
                 </h2>
                 {gestures > 0 && (
-                    <p className={`text-base sm:text-lg italic ${muted}`} style={{ fontFamily: "'Cormorant Garamond', serif" }}>
+                    <p className={`text-sm sm:text-base ${muted}`}>
                         {en
                             ? `${gestures} ${gestures === 1 ? 'person has' : 'people have'} already left a gesture of love on their altar.`
                             : `${gestures} ${gestures === 1 ? 'gesto de cariño ya acompaña' : 'gestos de cariño ya acompañan'} su altar.`}
@@ -194,7 +213,14 @@ export default function MemorialPlanUpgrade({
                         <div className={`w-11 h-11 rounded-2xl flex items-center justify-center text-white bg-gradient-to-br ${styleOf(current.key).gradient}`}>
                             {React.createElement(styleOf(current.key).Icon, { size: 20 })}
                         </div>
-                        <p className={`text-2xl font-serif font-bold ${strong}`}>{en ? `${current.name} plan` : `Plan ${current.name}`}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <p className={`text-xl font-sans font-bold tracking-tight ${strong}`}>{en ? `${current.name} plan` : `Plan ${current.name}`}</p>
+                            {!courtesy && currentAppliedDiscount > 0 && (
+                                <span className="rounded-md bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                                    -{currentAppliedDiscount}%
+                                </span>
+                            )}
+                        </div>
                     </div>
 
                     {/* Vigencia */}
@@ -315,7 +341,7 @@ export default function MemorialPlanUpgrade({
                                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white bg-gradient-to-br ${gradient}`}>
                                             <Icon size={18} />
                                         </div>
-                                        <h3 className={`text-xl font-serif font-bold ${strong}`}>
+                                        <h3 className={`text-lg font-sans font-bold tracking-tight ${strong}`}>
                                             {o.renewal
                                                 ? (isExpired ? (en ? `Renew ${o.plan.name}` : `Renovar ${o.plan.name}`) : (en ? 'Extend 1 year' : 'Extender 1 año'))
                                                 : (en ? `${o.plan.name} plan` : `Plan ${o.plan.name}`)}
@@ -323,16 +349,45 @@ export default function MemorialPlanUpgrade({
                                     </div>
 
                                     {(o.renewal || o.plan.description) && (
-                                        <p className={`text-sm italic mb-5 ${muted}`} style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.05rem' }}>
+                                        <p className={`text-xs leading-relaxed mb-4 ${muted}`}>
                                             {o.renewal ? (en ? 'Add 12 months to their current validity.' : 'Suma 12 meses a su vigencia actual.') : o.plan.description}
                                         </p>
                                     )}
 
+                                    {(() => {
+                                        const baseOrig = o.plan.original_price ?? o.plan.price;
+                                        const discPct =
+                                            (o.plan.discount_percent || 0) > 0
+                                                ? Number(o.plan.discount_percent)
+                                                : baseOrig > 0 && o.price > 0 && o.price < baseOrig
+                                                    ? Math.round((1 - o.price / baseOrig) * 100)
+                                                    : 0;
+                                        return discPct > 0 ? (
+                                            <div className="mb-1.5 space-y-1">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    {baseOrig > o.price && (
+                                                        <span className={`text-xs font-medium line-through tabular-nums ${muted}`}>
+                                                            ${formatPrice(baseOrig)} {o.currency}
+                                                        </span>
+                                                    )}
+                                                    <span className="inline-flex items-center rounded-md bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">
+                                                        -{discPct}% OFF
+                                                    </span>
+                                                </div>
+                                                {o.plan.discount_label && (
+                                                    <p className="text-[11px] font-medium text-emerald-400/90 leading-snug">
+                                                        {o.plan.discount_label}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ) : null;
+                                    })()}
                                     <div className="flex flex-wrap items-baseline gap-x-2 mb-1">
-                                        <span className={`whitespace-nowrap text-4xl font-serif font-bold ${highlight ? (isDark ? 'text-amber-300' : 'text-amber-600') : strong}`}>
-                                            {formatPrice(o.price)} {o.currency}
+                                        <span className={`whitespace-nowrap text-3xl font-sans font-extrabold tracking-tight tabular-nums ${highlight ? (isDark ? 'text-amber-300' : 'text-amber-600') : strong}`}>
+                                            ${formatPrice(o.price)} <span className={`text-xs font-bold uppercase tracking-wider ${muted}`}>{o.currency}</span>
                                         </span>
-                                        <span className={`text-sm ${muted}`}>{planPeriod(o.plan.billing, en)}</span>
+
+                                        <span className={`text-xs font-medium ${muted}`}>{planPeriod(o.plan.billing, en)}</span>
                                     </div>
                                     {o.renewal && extendedLabel && !isExpired && (
                                         <p className={`text-xs mb-5 ${muted}`}>{en ? `New validity: until ${extendedLabel}` : `Nueva vigencia: hasta el ${extendedLabel}`}</p>

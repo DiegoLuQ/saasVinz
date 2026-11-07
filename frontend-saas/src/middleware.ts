@@ -271,16 +271,26 @@ async function handleFormEmbed(req: NextRequest) {
     const result = await resolveFormEmbed(apiKey);
     if (!result.ok) return embedErrorResponse(result.status, result.message);
 
+    const themeParam = req.nextUrl.searchParams.get('theme');
     const url = req.nextUrl.clone();
     url.pathname = `/public/${encodeURIComponent(result.tenantSlug)}/form`;
     url.search = '';
     url.searchParams.set('embed', '1');
+    url.searchParams.set('key', apiKey);
+    if (themeParam) url.searchParams.set('theme', themeParam);
 
     // Host sin esquema: permite http/https según el esquema de la página; `:*`
     // cubre puertos no estándar (útil para pruebas locales).
     const ancestors = result.allowedDomains
         .filter((d) => /^[a-z0-9.-]+$/i.test(d))
         .flatMap((d) => [d, `${d}:*`]);
+
+    const isDev = process.env.NODE_ENV !== 'production';
+    if (isDev) {
+        // En desarrollo local permite probar el iframe desde index.html
+        // abierto en file://, localhost o subdominios lvh.me.
+        ancestors.push('http://localhost:*', 'http://127.0.0.1:*', 'http://*.lvh.me:*', 'file:', '*');
+    }
 
     const res = NextResponse.rewrite(url);
     res.headers.set('Content-Security-Policy', `frame-ancestors ${ancestors.length ? ancestors.join(' ') : "'none'"}`);

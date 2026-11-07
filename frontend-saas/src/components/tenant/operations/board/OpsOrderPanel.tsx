@@ -18,6 +18,7 @@ import {
     User,
     X as XIcon,
 } from 'lucide-react';
+import PriorityBadge from '../PriorityBadge';
 import { API_URL } from '@/lib/tenant/api';
 import { copyToClipboard } from '@/lib/clipboard';
 import { buildTrackingUrl } from '@/lib/publicUrls';
@@ -228,6 +229,7 @@ export default function OpsOrderPanel({
                             </div>
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm text-muted-foreground">
                                 <span className="font-mono">#{order.oc_number ?? order.id}</span>
+                                <PriorityBadge plan={order.priority_plan} size="md" />
                                 <span className="flex items-center gap-1"><User size={14} /> {order.customer_name}</span>
                                 {order.partner_name && <span>· {order.partner_name}</span>}
                             </div>

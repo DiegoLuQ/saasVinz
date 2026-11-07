@@ -1,5 +1,6 @@
 "use client";
 
+import { AGE_UNIT_OPTIONS, asAgeUnit } from '@/lib/petAge';
 import React, { useState, useEffect } from 'react';
 import { Loader2, Plus, Dog } from 'lucide-react';
 import Modal from '@/components/tenant/Modal';
@@ -172,17 +173,27 @@ export default function QuickPetModal({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                            Edad Estimada (Años)
+                            Edad Estimada
                         </label>
-                        <input
-                            type="number"
-                            min="0"
-                            max="30"
-                            placeholder="Ej: 5"
-                            value={formData.age || 0}
-                            onChange={e => setFormData({ ...formData, age: Number(e.target.value) })}
-                            className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition text-sm"
-                        />
+                        <div className="flex gap-2">
+                            <input
+                                type="number"
+                                min="0"
+                                max="999"
+                                placeholder="Ej: 5"
+                                value={formData.age || 0}
+                                onChange={e => setFormData({ ...formData, age: Number(e.target.value) })}
+                                className="w-24 px-4 py-2.5 bg-background border border-white/10 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition text-sm"
+                            />
+                            <select
+                                value={formData.age_unit || 'years'}
+                                onChange={e => setFormData({ ...formData, age_unit: asAgeUnit(e.target.value) })}
+                                aria-label="Unidad de la edad"
+                                className="flex-1 px-3 py-2.5 bg-background border border-white/10 rounded-xl focus:border-primary outline-none text-sm"
+                            >
+                                {AGE_UNIT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                            </select>
+                        </div>
                     </div>
 
                     <div>
