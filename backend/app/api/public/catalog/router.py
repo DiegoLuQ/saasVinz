@@ -148,6 +148,21 @@ def get_public_catalog(
     categories = db.query(Category).filter(Category.tenant_id == tenant.id).all()
     categories_map = {c.id: c.name for c in categories}
 
+    # Veces comprado: unidades del producto en órdenes no canceladas (incluye las del plan).
+    from sqlalchemy import func as _f
+    from app.api.internal.operations.models import ProductoOC, CremationOC
+    purchased = dict(
+        db.query(ProductoOC.product_id, _f.coalesce(_f.sum(ProductoOC.cantidad), 0))
+        .join(CremationOC, CremationOC.id == ProductoOC.cremation_id)
+        .filter(
+            CremationOC.tenant_id == tenant.id,
+            _f.lower(_f.coalesce(CremationOC.status, "")) != "cancelado",
+            ProductoOC.product_id.in_([p.id for p in products] or [0]),
+        )
+        .group_by(ProductoOC.product_id)
+        .all()
+    )
+
     product_list = []
     for p in products:
         category_name = categories_map.get(p.category_id) if p.category_id else "General"
@@ -161,6 +176,10 @@ def get_public_catalog(
                 stock=int(p.stock or 0),
                 availability_status=p.availability_status or "Disponible",
                 description=p.description or "",
+                note=p.note,
+                made_to_order=bool(p.made_to_order),
+                badge=p.badge,
+                times_purchased=int(purchased.get(p.id) or 0) if p.show_purchases is not False else None,
                 image_url=p.image_url,
                 images=p.images or [],
                 category_name=category_name,

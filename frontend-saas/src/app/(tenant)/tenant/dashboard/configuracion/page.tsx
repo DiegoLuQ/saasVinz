@@ -13,7 +13,8 @@ import {
     Award,
     ClipboardList,
     Coins,
-    Wand2
+    Wand2,
+    Link2
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -35,6 +36,7 @@ import { BillingTab } from '@/components/tenant/settings/BillingTab';
 import { CertificatesTab } from '@/components/tenant/settings/CertificatesTab';
 import { AiCreditsTab } from '@/components/tenant/settings/AiCreditsTab';
 import { AutoDocumentsTab } from '@/components/tenant/settings/AutoDocumentsTab';
+import { OfficialLinksTab } from '@/components/tenant/settings/OfficialLinksTab';
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState('general');
@@ -98,6 +100,7 @@ export default function SettingsPage() {
             tabs: [
                 { id: 'flujo', name: 'Flujo Operativo', hint: 'Etapas del servicio', icon: Activity },
                 { id: 'formulario', name: 'Formulario y Pesos', hint: 'Formulario público y tramos', icon: ClipboardList },
+                { id: 'enlaces', name: 'Enlaces oficiales', hint: 'Formulario y catálogos oficiales', icon: Link2 },
             ],
         },
         {
@@ -260,6 +263,7 @@ export default function SettingsPage() {
                         )}
 
                         {currentTab === 'documentos-auto' && <AutoDocumentsTab />}
+                        {currentTab === 'enlaces' && <OfficialLinksTab />}
 
                         {currentTab === 'creditos' && <AiCreditsTab />}
                     </motion.div>

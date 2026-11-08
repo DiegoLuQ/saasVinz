@@ -25,6 +25,7 @@ import {
     Download,
     Stethoscope,
     Play,
+    Gift,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -474,6 +475,31 @@ export default function TenantFormPage() {
                             <p className="text-xs text-amber-900/90 dark:text-amber-200/90 font-medium leading-relaxed">
                                 {formConfig.delivery_notice}
                             </p>
+                        </motion.div>
+                    )}
+
+                    {/* Recuerdos: catálogo de productos oficial (solo con los enlaces oficiales completos) */}
+                    {tenant.souvenir_store_url && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.25 }}
+                            className="mb-6 rounded-3xl p-6 bg-gradient-to-br from-sky-50/90 to-cyan-50/80 dark:from-sky-950/30 dark:to-slate-900/40 border border-sky-200/60 dark:border-sky-500/20"
+                        >
+                            <div className="w-11 h-11 mx-auto mb-3 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
+                                <Gift className="w-5 h-5 text-sky-600 dark:text-sky-300" />
+                            </div>
+                            <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                                Mientras nuestro equipo se dirige a retirar a <b className="text-slate-800 dark:text-slate-100">{petData.name || 'tu compañero'}</b>, puedes revisar con calma las opciones para llevar su recuerdo siempre contigo.
+                            </p>
+                            <a
+                                href={tenant.souvenir_store_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-4 w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold uppercase tracking-[0.12em] shadow-lg shadow-sky-600/20 transition-all"
+                            >
+                                <Gift size={15} /> Ver catálogo de recuerdos y relicarios
+                            </a>
                         </motion.div>
                     )}
 

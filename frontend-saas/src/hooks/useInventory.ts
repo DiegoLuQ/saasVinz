@@ -15,6 +15,14 @@ export interface Product {
     image_url: string;
     images: string[];
     availability_status: string;
+    note?: string | null;
+    made_to_order?: boolean;
+    /** Producto especial: adicional en el formulario de la familia (máx. 4) */
+    is_special?: boolean;
+    /** Etiqueta destacada en el catálogo («Popular», «Más vendido»…) */
+    badge?: string | null;
+    /** Mostrar «Comprado N veces» en el catálogo (por defecto sí) */
+    show_purchases?: boolean;
     is_active: boolean;
     discount_percentage?: number;
     category?: { name: string };

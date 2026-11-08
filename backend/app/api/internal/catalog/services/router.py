@@ -34,6 +34,18 @@ def _duplicate_message(name: str, group_name) -> str:
     return f"El servicio '{name}' ya existe {where}."
 
 
+@router.post("/upload-image")
+async def upload_service_image(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    _: bool = Depends(check_permission("servicios", "edit"))
+):
+    """Imagen de un servicio especial: JPG/PNG → recorte 1:1, WebP optimizado (R2)."""
+    from app.api.internal.catalog.services import PlanService
+    return {"image_url": await PlanService(db).upload_image(tenant_id, file, kind="service")}
+
+
 @router.get("/groups", response_model=List[str])
 def list_groups(
     db: Session = Depends(get_db),

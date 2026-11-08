@@ -29,6 +29,8 @@ export interface Service {
     price_on_request?: boolean;
     /** Nota importante que ve la familia (formulario, resumen y correo) */
     important_note?: string | null;
+    /** Imagen (WebP 1:1) del servicio especial, mostrada en el formulario */
+    image_url?: string | null;
 }
 
 export interface Plan {

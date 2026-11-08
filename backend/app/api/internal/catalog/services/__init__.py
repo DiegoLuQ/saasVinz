@@ -128,14 +128,46 @@ class ProviderService:
         return {"message": "Provider deleted"}
 
 
+MAX_SPECIAL_PRODUCTS = 4
+
+
 class ProductService:
     def __init__(self, db: Session):
         self.db = db
 
+    def _check_special_limit(self, tenant_id: int, exclude_id: Optional[int] = None) -> None:
+        """Máximo MAX_SPECIAL_PRODUCTS productos especiales activos por crematorio."""
+        q = self.db.query(func.count(models.Product.id)).filter(
+            models.Product.tenant_id == tenant_id,
+            models.Product.is_special.is_(True),
+            models.Product.is_active.isnot(False),
+        )
+        if exclude_id is not None:
+            q = q.filter(models.Product.id != exclude_id)
+        if (q.scalar() or 0) >= MAX_SPECIAL_PRODUCTS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Solo puedes tener {MAX_SPECIAL_PRODUCTS} productos especiales. Quita la marca a otro antes.",
+            )
+
     def get_all(self, tenant_id: int) -> List[models.Product]:
         return self.db.query(models.Product).filter(models.Product.tenant_id == tenant_id).all()
 
+    def _next_code(self, tenant_id: int) -> str:
+        """Siguiente código libre P-0001, P-0002… (para altas sin código, p. ej. la carga masiva)."""
+        codes = {c for (c,) in self.db.query(models.Product.code).filter(models.Product.tenant_id == tenant_id).all() if c}
+        n = len(codes) + 1
+        while f"P-{n:04d}" in codes:
+            n += 1
+        return f"P-{n:04d}"
+
     def create(self, tenant_id: int, product_in: schemas.ProductCreate) -> models.Product:
+        product_in.code = (product_in.code or "").strip()
+        product_in.note = (product_in.note or "").strip() or None
+        if not product_in.code:
+            product_in.code = self._next_code(tenant_id)
+        if product_in.is_special and product_in.is_active:
+            self._check_special_limit(tenant_id)
         if product_in.code:
             existing = self.db.query(models.Product).filter(
                 models.Product.tenant_id == tenant_id,
@@ -145,6 +177,8 @@ class ProductService:
                 raise HTTPException(status_code=400, detail=f"El código de producto '{product_in.code}' ya está en uso.")
         
         db_product = models.Product(**product_in.model_dump(), tenant_id=tenant_id)
+        if db_product.made_to_order:
+            db_product.availability_status = "A pedido"
         self.db.add(db_product)
         self.db.commit()
         self.db.refresh(db_product)
@@ -169,8 +203,21 @@ class ProductService:
             if existing:
                 raise HTTPException(status_code=400, detail=f"El código de producto '{update_data['code']}' ya está en uso por otro producto.")
 
+        if "note" in update_data:
+            update_data["note"] = (update_data["note"] or "").strip() or None
+        will_special = update_data.get("is_special", db_product.is_special)
+        will_active = update_data.get("is_active", db_product.is_active) is not False
+        if will_special and will_active and not (db_product.is_special and db_product.is_active is not False):
+            self._check_special_limit(tenant_id, exclude_id=product_id)
+        if "code" in update_data and not (update_data["code"] or "").strip():
+            update_data.pop("code")  # no se puede dejar sin código
         for key, value in update_data.items():
             setattr(db_product, key, value)
+        if "made_to_order" in update_data:
+            if db_product.made_to_order:
+                db_product.availability_status = "A pedido"
+            elif db_product.availability_status == "A pedido":
+                db_product.availability_status = "Disponible" if (db_product.stock or 0) > 0 else "Agotado"
         
         self.db.commit()
         self.db.refresh(db_product)
@@ -501,8 +548,9 @@ class PlanService:
         self.db.commit()
         return {"status": "deleted", "message": f"Plan {db_plan.name} eliminado correctamente"}
 
-    async def upload_image(self, tenant_id: int, file: UploadFile) -> str:
+    async def upload_image(self, tenant_id: int, file: UploadFile, kind: str = "plan") -> str:
         """Sube la imagen de catálogo de un plan (WEBP 1:1 optimizado en R2).
+        `kind="service"`: imagen de un servicio especial (categoría «services»).
 
         Solo acepta JPG/JPEG/PNG; el MediaService recorta a 1:1, convierte a WEBP
         y optimiza el peso.
@@ -527,24 +575,25 @@ class PlanService:
             shutil.copyfileobj(file.file, buffer)
 
         try:
-            clean_name = "".join(x for x in (file.filename or "plan") if x.isalnum() or x in "._-")
-            prefix = f"plan_{os.path.splitext(clean_name)[0]}"
+            svc = kind == "service"
+            clean_name = "".join(x for x in (file.filename or kind) if x.isalnum() or x in "._-")
+            prefix = f"{'serv' if svc else 'plan'}_{os.path.splitext(clean_name)[0]}"
 
             media_item = MediaService.upload_media(
                 db=self.db,
                 local_path=temp_path,
                 media_type="image",
-                category="plans",
+                category="services" if svc else "plans",
                 ratio="1:1",  # Catálogo uniforme: tarjetas cuadradas consistentes
-                description=f"Plan {file.filename}",
-                alt_text=f"Imagen de plan {file.filename}",
+                description=f"{'Servicio' if svc else 'Plan'} {file.filename}",
+                alt_text=f"Imagen de {'servicio' if svc else 'plan'} {file.filename}",
                 processing_mode="optimized",
                 custom_prefix=prefix,
                 tenant_id=tenant_id
             )
             return media_item.url
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error al procesar la imagen del plan: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error al procesar la imagen: {str(e)}")
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)

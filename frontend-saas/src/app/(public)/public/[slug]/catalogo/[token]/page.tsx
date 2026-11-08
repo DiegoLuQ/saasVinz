@@ -21,7 +21,9 @@ import {
     ChevronRight,
     ExternalLink,
     Sun,
-    Moon
+    Moon,
+    Flame,
+    ShoppingBag
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PublicPlansCatalog, { type PublicPlan } from '@/components/public/catalog/PublicPlansCatalog';
@@ -37,6 +39,12 @@ interface ProductItem {
     stock: number;
     availability_status: string;
     description: string;
+    note?: string | null;
+    made_to_order?: boolean;
+    /** Etiqueta destacada («Popular», «Más vendido»…) */
+    badge?: string | null;
+    /** Unidades compradas (órdenes no canceladas) */
+    times_purchased?: number;
     image_url: string | null;
     images: string[];
     category_name: string;
@@ -154,7 +162,7 @@ export default function PublicCatalogPage() {
 
             const matchesCategory = selectedCategory === 'all' || p.category_name === selectedCategory;
 
-            const isOutOfStock = p.stock <= 0 || p.availability_status?.toLowerCase() === 'agotado';
+            const isOutOfStock = !p.made_to_order && (p.stock <= 0 || p.availability_status?.toLowerCase() === 'agotado');
             const matchesStock = onlyAvailable ? !isOutOfStock : true;
 
             return matchesSearch && matchesCategory && matchesStock;
@@ -527,7 +535,7 @@ export default function PublicCatalogPage() {
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {filteredProducts.map((product) => {
-                            const isOutOfStock = product.stock <= 0 || product.availability_status?.toLowerCase() === 'agotado';
+                            const isOutOfStock = !product.made_to_order && (product.stock <= 0 || product.availability_status?.toLowerCase() === 'agotado');
                             const hasDiscount = product.discount_percentage > 0;
                             const finalPrice = hasDiscount
                                 ? Math.round(product.sale_price * (1 - product.discount_percentage / 100))
@@ -560,9 +568,21 @@ export default function PublicCatalogPage() {
                                             </div>
                                         )}
 
+                                        {/* Etiqueta destacada (Inventario → producto) */}
+                                        {product.badge && (
+                                            <div className="absolute bottom-3 left-3 z-10 bg-gradient-to-r from-sky-300 to-cyan-300 text-slate-900 ring-1 ring-white/60 text-[10px] font-black px-2.5 py-1 rounded-xl shadow-lg shadow-sky-500/30 flex items-center gap-1 uppercase tracking-wider">
+                                                <Flame size={11} />
+                                                <span>{product.badge}</span>
+                                            </div>
+                                        )}
+
                                         {/* Stock indicator badge */}
                                         <div className="absolute top-3 right-3 z-10">
-                                            {isOutOfStock ? (
+                                            {product.made_to_order ? (
+                                                <span className="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider bg-sky-500/85 backdrop-blur-md text-white border border-sky-400/30 shadow-lg shadow-sky-500/20">
+                                                    A pedido
+                                                </span>
+                                            ) : isOutOfStock ? (
                                                 <span className="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider bg-red-500/80 backdrop-blur-md text-white border border-red-500/30 shadow-lg shadow-red-500/20">
                                                     Agotado
                                                 </span>
@@ -618,10 +638,21 @@ export default function PublicCatalogPage() {
                                             <h3 className="font-bold text-base text-slate-900 dark:text-white leading-snug group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors line-clamp-2">
                                                 {product.name}
                                             </h3>
+                                            {(product.times_purchased ?? 0) > 0 && (
+                                                <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 dark:text-neutral-400">
+                                                    <ShoppingBag size={11} />
+                                                    Comprado {product.times_purchased} {product.times_purchased === 1 ? 'vez' : 'veces'}
+                                                </p>
+                                            )}
 
                                             {product.description && (
                                                 <p className="text-xs text-slate-600 dark:text-neutral-400 mt-1.5 line-clamp-2 leading-relaxed">
                                                     {product.description}
+                                                </p>
+                                            )}
+                                            {product.note && (
+                                                <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-300 mt-1.5 line-clamp-2">
+                                                    {product.note}
                                                 </p>
                                             )}
                                         </div>
@@ -748,13 +779,30 @@ export default function PublicCatalogPage() {
                                         </span>
                                     </div>
 
+                                    {previewProduct.badge && (
+                                        <span className="inline-flex items-center gap-1 bg-gradient-to-r from-sky-300 to-cyan-300 text-slate-900 ring-1 ring-white/60 text-[10px] font-black px-2.5 py-1 rounded-xl uppercase tracking-wider">
+                                            <Flame size={11} /> {previewProduct.badge}
+                                        </span>
+                                    )}
                                     <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
                                         {previewProduct.name}
                                     </h2>
+                                    {(previewProduct.times_purchased ?? 0) > 0 && (
+                                        <p className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-neutral-400 -mt-1">
+                                            <ShoppingBag size={13} />
+                                            Comprado {previewProduct.times_purchased} {previewProduct.times_purchased === 1 ? 'vez' : 'veces'}
+                                        </p>
+                                    )}
 
                                     {previewProduct.description && (
                                         <p className="text-sm text-slate-700 dark:text-neutral-300 leading-relaxed bg-slate-50 border border-slate-200 dark:bg-white/[0.02] dark:border-white/[0.04] p-4 rounded-2xl">
                                             {previewProduct.description}
+                                        </p>
+                                    )}
+                                    {(previewProduct.made_to_order || previewProduct.note) && (
+                                        <p className="text-sm font-semibold text-amber-800 dark:text-amber-200 bg-amber-50 border border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/20 p-3 rounded-2xl">
+                                            {previewProduct.made_to_order && <span className="font-black">A pedido. </span>}
+                                            {previewProduct.note}
                                         </p>
                                     )}
 

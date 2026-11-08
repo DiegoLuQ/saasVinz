@@ -437,7 +437,9 @@ async def submit_public_form(
                         "name": prod.name,
                         "price": prod.sale_price or 0.0,
                         "cost": prod.cost_price or 0.0,
-                        "quantity": 1
+                        "quantity": 1,
+                        # Constancia de la nota especial que vio la familia
+                        "important_note": prod.note if prod.is_special else None,
                     })
         except Exception as e:
             print(f"Error enriching item {item_id}: {e}")

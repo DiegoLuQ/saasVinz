@@ -374,6 +374,8 @@ class PublicTrackingResponse(BaseModel):
     tenant_plan: Optional[str] = None
     # Encuesta de satisfacción: se muestra al entregar si el crematorio la tiene activa.
     feedback_enabled: Optional[bool] = False
+    # «Tiendita de recuerdos»: catálogo de productos oficial (None = enlaces oficiales incompletos)
+    souvenir_store_url: Optional[str] = None
     feedback: Optional[dict] = None  # {rating, comment} si la familia ya respondió
     show_vinzer_brand: Optional[bool] = True  # «Tecnología por Vinzer» en el pie (marca blanca = False)
 

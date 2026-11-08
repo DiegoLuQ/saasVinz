@@ -10,6 +10,8 @@ export interface Product {
     cost_price: number;
     image_url?: string;
     stock: number;
+    /** «A pedido»: se encarga al proveedor, no se bloquea por stock */
+    made_to_order?: boolean;
 }
 
 export interface SelectedProduct {

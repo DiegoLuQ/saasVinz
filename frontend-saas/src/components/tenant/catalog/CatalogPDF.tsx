@@ -12,6 +12,7 @@ interface CatalogProduct {
     image_url?: string | null;
     category?: { name: string } | null;
     availability_status?: string;
+    made_to_order?: boolean;
 }
 
 interface CatalogPDFProps {
@@ -191,6 +192,15 @@ const styles = StyleSheet.create({
     stockRed: {
         backgroundColor: '#ef4444',
     },
+    stockBlue: {
+        backgroundColor: '#0ea5e9',
+    },
+    stockTextPedido: {
+        fontSize: 6.5,
+        color: '#0284c7',
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+    },
     category: {
         fontSize: 6.5,
         color: '#6b7280',
@@ -316,14 +326,21 @@ function CatalogPDF({ products, tenantName, logoUrl, origin, showPrices = true }
                                          <View
                                              style={[
                                                  styles.stockDot,
-                                                 (product.stock <= 0 || product.availability_status?.toLowerCase() === 'agotado')
+                                                 product.made_to_order
+                                                     ? styles.stockBlue
+                                                     : (product.stock <= 0 || product.availability_status?.toLowerCase() === 'agotado')
                                                      ? styles.stockRed
                                                      : product.stock === 1
                                                      ? styles.stockYellow
                                                      : styles.stockGreen,
                                              ]}
                                          />
-                                         {(product.stock <= 0 || product.availability_status?.toLowerCase() === 'agotado') && (
+                                         {product.made_to_order && (
+                                             <Text style={styles.stockTextPedido}>
+                                                 A pedido
+                                             </Text>
+                                         )}
+                                         {!product.made_to_order && (product.stock <= 0 || product.availability_status?.toLowerCase() === 'agotado') && (
                                              <Text style={styles.stockTextAgotado}>
                                                  Agotado
                                              </Text>

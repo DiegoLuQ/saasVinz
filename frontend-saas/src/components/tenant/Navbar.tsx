@@ -489,6 +489,13 @@ export default function Navbar() {
                                                 </div>
                                             )}
                                         </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setShowNotifications(false); router.push('/dashboard/registros'); }}
+                                            className="w-full border-t border-slate-200 dark:border-white/10 py-3 text-xs font-bold text-[#0284c7] dark:text-sky-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+                                        >
+                                            Ver registros del formulario (pendientes y eliminados)
+                                        </button>
                                     </motion.div>
                                 )}
                             </AnimatePresence>

@@ -413,7 +413,7 @@ class CremationService:
                 prod = self.db.query(models.Product).filter(models.Product.id == p_assoc.product_id).first()
                 if prod:
                     prod.stock += p_assoc.cantidad
-                    prod.availability_status = "Disponible"
+                    prod.availability_status = "A pedido" if prod.made_to_order else ("Disponible" if (prod.stock or 0) > 0 else "Agotado")
             
             # Las fotos de la orden y de la mascota NO se tocan al cancelar (igual
             # que al eliminar solo la orden). Antes este bloque leía db_obj.images,
@@ -663,7 +663,7 @@ class CremationService:
             prod = self.db.query(models.Product).filter(models.Product.id == p_assoc.product_id).first()
             if prod:
                 prod.stock += p_assoc.cantidad
-                prod.availability_status = "Disponible"
+                prod.availability_status = "A pedido" if prod.made_to_order else ("Disponible" if (prod.stock or 0) > 0 else "Agotado")
         
         self.db.delete(db_cremation)
         self.db.commit()

@@ -208,6 +208,7 @@ def render_vinzer_email(
     brand: dict | None = None,
     rows: list[tuple[str, str]] | None = None,
     image_url: str | None = None,
+    products: dict | None = None,
 ) -> str:
     """HTML del correo. Los textos son planos (se escapan).
 
@@ -246,6 +247,36 @@ def render_vinzer_email(
             '<p style="margin: 0 0 14px 0; font-size: 12px; color: #64748b; word-break: break-all;">'
             '¿No funciona el botón? Copia este enlace en tu navegador:<br>'
             f'<a href="{url}" style="color: #0e7490;">{esc(button_url)}</a></p>'
+        )
+    # Bloque de productos (p. ej. «Recuerdos para honrar a X»): {title, subtitle, items:
+    # [{name, price, image_url}], button_label, url}. Grilla de 3 columnas (2 en móvil no
+    # es posible en todos los clientes: celdas de 33 %).
+    shop = ""
+    if products and products.get("items") and products.get("url"):
+        purl = esc(products["url"], quote=True)
+        cells = []
+        for it in products["items"][:6]:
+            price = f'<div style="font-size: 12px; color: #0e7490; font-weight: 700;">{esc(it.get("price") or "")}</div>' if it.get("price") else ""
+            cells.append(
+                f'<td width="33%" style="padding: 6px; vertical-align: top; text-align: center;">'
+                f'<a href="{purl}" style="text-decoration: none; color: #0f172a;">'
+                f'<img src="{esc(it["image_url"], quote=True)}" alt="{esc(it.get("name") or "")}" width="150" '
+                f'style="width: 100%; max-width: 150px; height: auto; border-radius: 12px; border: 1px solid #e2e8f0; display: block; margin: 0 auto 6px auto;">'
+                f'<div style="font-size: 12px; line-height: 1.35; font-weight: 600;">{esc(it.get("name") or "")}</div>{price}</a></td>'
+            )
+        while len(cells) % 3:
+            cells.append('<td width="33%" style="padding: 6px;"></td>')
+        grid = "".join(f"<tr>{''.join(cells[i:i + 3])}</tr>" for i in range(0, len(cells), 3))
+        sub = f'<p style="margin: 0 0 12px 0; font-size: 14px; color: #475569;">{esc(products.get("subtitle") or "")}</p>' if products.get("subtitle") else ""
+        shop = (
+            '<div style="margin: 26px 0 6px 0; padding: 20px 14px; border-radius: 16px; background: #f0f9ff; border: 1px solid #bae6fd; text-align: center;">'
+            f'<p style="margin: 0 0 6px 0; font-size: 18px; font-weight: 800; color: #0A192F;">{esc(products.get("title") or "")}</p>'
+            f'{sub}'
+            f'<table role="presentation" cellpadding="0" cellspacing="0" width="100%">{grid}</table>'
+            '<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 14px auto 0 auto;"><tr>'
+            '<td style="border-radius: 12px; background: #0ea5e9;">'
+            f'<a href="{purl}" style="display: inline-block; padding: 11px 24px; font-weight: 700; font-size: 14px; color: #ffffff; text-decoration: none;">'
+            f'{esc(products.get("button_label") or "Ver catálogo")}</a></td></tr></table></div>'
         )
     note = (f'<p style="margin: 18px 0 0 0; padding-top: 16px; border-top: 1px solid #e2e8f0; '
             f'font-size: 12px; color: #64748b;">{esc(footer)}</p>' if footer else "")
@@ -293,7 +324,7 @@ def render_vinzer_email(
   <tr><td style="padding: 30px 28px 26px 28px; color: #0f172a; font-size: 15px; line-height: 1.65;">
     {kicker_html}
     <h1 style="margin: 0 0 18px 0; font-size: 22px; line-height: 1.3; color: #0A192F;">{esc(title)}</h1>
-    {body}{button}{note}
+    {body}{button}{shop}{note}
   </td></tr>
   <tr><td style="background: #0A192F; padding: 24px 28px; text-align: center; font-size: 13px; line-height: 1.7; color: #94a3b8;">
     {eslogan}
@@ -321,12 +352,13 @@ async def send_action_email(
     rows: list[tuple[str, str]] | None = None,
     image_url: str | None = None,
     attachments: list | None = None,
+    products: dict | None = None,
 ) -> None:
     """Correo transaccional: título, párrafos (texto plano) y un botón opcional.
     Con `brand` sale con la marca de un crematorio («Crematorio X vía Vinzer»);
     `reply_to` = a quién llegan las respuestas. La cuenta que envía es no-reply,
     así que sin `reply_to` las respuestas van al correo de Vinzer (Datos del SaaS)."""
-    html_body = render_vinzer_email(title, paragraphs, button_label, button_url, footer, kicker, brand, rows, image_url)
+    html_body = render_vinzer_email(title, paragraphs, button_label, button_url, footer, kicker, brand, rows, image_url, products)
     if not reply_to:
         reply_to = _brand().get("correo") or None
     await fm.send_message(MessageSchema(

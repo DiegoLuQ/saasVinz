@@ -63,6 +63,7 @@ import SearchableSelect from '@/components/tenant/SearchableSelect';
 import ShareCatalogModal from '@/components/tenant/catalog/ShareCatalogModal';
 import ImportServicesModal from '@/components/tenant/catalog/ImportServicesModal';
 import { apiRequest } from '@/lib/tenant/api';
+import PlanImageUploader from '@/components/tenant/catalog/PlanImageUploader';
 import { useQueryClient } from '@tanstack/react-query';
 
 const NO_GROUP = '__none__';
@@ -124,6 +125,7 @@ export default function ServicesPage() {
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentService, setCurrentService] = useState<Partial<Service> | null>(null);
+    const [serviceImageFile, setServiceImageFile] = useState<File | null>(null);
     const [itemToDelete, setItemToDelete] = useState<{ type: 'service' | 'plan'; id: number; name: string } | null>(null);
     const [showLimitModal, setShowLimitModal] = useState(false);
     const [modalResource, setModalResource] = useState('Servicios');
@@ -374,6 +376,7 @@ export default function ServicesPage() {
             is_special: false,
             show_in_form: true
         });
+        setServiceImageFile(null);
         setIsModalOpen(true);
     };
 
@@ -382,10 +385,24 @@ export default function ServicesPage() {
         setIsSaving(true);
         try {
             const isEdit = !!currentService?.id;
+            let service: Partial<Service> = { ...(currentService || {}) };
+            // Imagen del servicio especial: se sube recortada (1:1) y el backend la optimiza a WebP
+            if (serviceImageFile && service.is_special) {
+                const fd = new FormData();
+                fd.append('file', serviceImageFile, serviceImageFile.name);
+                try {
+                    const res = await apiRequest('/api/internal/services/upload-image', { method: 'POST', body: fd });
+                    service = { ...service, image_url: res.image_url };
+                } catch (err) {
+                    showToast(err instanceof Error ? err.message : 'No se pudo subir la imagen', 'error');
+                    return;
+                }
+            }
             await saveServiceMutation.mutateAsync({
                 isEdit,
-                service: currentService || {}
+                service
             });
+            setServiceImageFile(null);
             setIsModalOpen(false);
         } catch {
             // Toast handled by mutation
@@ -1603,6 +1620,15 @@ export default function ServicesPage() {
 
                             {currentService?.is_special && (
                                 <div className="space-y-3 p-3.5 rounded-2xl border border-violet-200 dark:border-violet-900/60 bg-violet-50/40 dark:bg-violet-950/20">
+                                    <div className="flex flex-col items-center">
+                                        <PlanImageUploader
+                                            label="Imagen del servicio"
+                                            imageUrl={currentService?.image_url}
+                                            onChange={(file) => setServiceImageFile(file)}
+                                            onClearUrl={() => { setServiceImageFile(null); setCurrentService({ ...currentService, image_url: null }); }}
+                                        />
+                                        <p className="text-[11px] text-muted-foreground text-center">La familia la ve al elegir los servicios adicionales del formulario.</p>
+                                    </div>
                                     <label className="flex items-start gap-3 cursor-pointer">
                                         <input
                                             type="checkbox"

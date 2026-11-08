@@ -45,6 +45,7 @@ import QuickTrackingModal from '@/components/tenant/dashboard/QuickTrackingModal
 import SharePublicLinksModal from '@/components/tenant/dashboard/SharePublicLinksModal';
 import DashboardHeroCarousel from '@/components/tenant/dashboard/DashboardHeroCarousel';
 import OnboardingChecklist from '@/components/tenant/dashboard/OnboardingChecklist';
+import OfficialLinksGuide from '@/components/tenant/dashboard/OfficialLinksGuide';
 import SatisfactionCard from '@/components/tenant/dashboard/SatisfactionCard';
 import { useFeatures } from '@/hooks/useFeatures';
 import { useCanOpen } from '@/hooks/useCanOpen';
@@ -311,6 +312,7 @@ export default function DashboardPage() {
 
             {/* Primeros pasos de los crematorios nuevos */}
             <OnboardingChecklist />
+            <OfficialLinksGuide />
 
             {/* ALERTA DE STOCK CRÍTICO (Urnas / Insumos <= 3) */}
             {lowStockProducts.length > 0 && (
@@ -526,6 +528,17 @@ export default function DashboardPage() {
                         Atrasadas:
                         <span className="font-extrabold tabular-nums">{pipeline.atrasadas}</span>
                     </button>
+
+                    {canOpen('/dashboard/registros') && (
+                        <Link
+                            href="/dashboard/registros"
+                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25"
+                        >
+                            <Inbox size={13} />
+                            Registros formulario:
+                            <span className="font-extrabold tabular-nums">{pendingSubmissions.length}</span>
+                        </Link>
+                    )}
                 </div>
             </div>
 

@@ -45,6 +45,15 @@ class Product(Base):
     image_url = Column(String) 
     images = Column(JSON, default=[]) 
     availability_status = Column(String, default="Disponible") 
+    # Nota corta (catálogo) y producto «a pedido» (no se bloquea por stock). Migración c5e7a9b1d208.
+    note = Column(String(300), nullable=True)
+    made_to_order = Column(Boolean, nullable=False, default=False, server_default='false')
+    # Producto especial: adicional en el formulario de la familia (máx. 4 activos). Migración e9b1d3f5a432.
+    is_special = Column(Boolean, nullable=False, default=False, server_default='false')
+    # Etiqueta destacada en el catálogo («Popular», «Más vendido»…). Migración f1c3e5a7b546.
+    badge = Column(String(24), nullable=True)
+    # Mostrar «Comprado N veces» (número real) en el catálogo. Migración a2d4f6b8c657.
+    show_purchases = Column(Boolean, nullable=False, default=True, server_default='true')
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
 
@@ -71,6 +80,8 @@ class Service(Base):
     price_on_request = Column(Boolean, nullable=False, default=False, server_default='false')
     # Nota importante para la familia (formulario, resumen y correo de confirmación)
     important_note = Column(String(300), nullable=True)
+    # Imagen (WebP 1:1) de los servicios especiales; se muestra en el formulario. Migración d7f9b1c3e320.
+    image_url = Column(String(500), nullable=True)
     # Grupo (texto libre, solo para ordenar el panel). Unicidad: (tenant, nombre, grupo)
     # vía índice uix_service_name_group_tenant (migración a6c8e0b2d359).
     group_name = Column(String(60), nullable=True)

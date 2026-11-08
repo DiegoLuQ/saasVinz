@@ -13,6 +13,9 @@ from app.api.internal.catalog.models import Product
 
 
 def _set_availability(prod: Product) -> None:
+    if getattr(prod, "made_to_order", False):
+        prod.availability_status = "A pedido"
+        return
     prod.availability_status = "Disponible" if (prod.stock or 0) > 0 else "Agotado"
 
 
@@ -29,7 +32,8 @@ def take(db: Session, tenant_id: int, product_id: int, qty: int, allowance: Opti
         return None
     qty = int(qty or 0)
     remaining = (allowance or {}).get(product_id, 0)
-    if qty > remaining and (prod.stock or 0) < qty:
+    # Producto «a pedido»: se encarga al proveedor, no se bloquea por stock.
+    if qty > remaining and (prod.stock or 0) < qty and not prod.made_to_order:
         raise HTTPException(
             status_code=409,
             detail=f'Stock insuficiente para "{prod.name}": quedan {max(prod.stock or 0, 0)} y se necesitan {qty}.',

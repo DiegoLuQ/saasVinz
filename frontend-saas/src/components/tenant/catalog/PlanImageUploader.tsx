@@ -12,6 +12,8 @@ interface PlanImageUploaderProps {
     onClearUrl: () => void;
     /** Reutilizar una imagen ya subida por el crematorio (no se vuelve a subir). */
     onPickExisting?: (url: string) => void;
+    /** Texto del título (por defecto «Imagen del plan») */
+    label?: string;
 }
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8MB
@@ -59,7 +61,7 @@ const getCroppedImg = (imageSrc: string, pixelCrop: any, fileName: string): Prom
     });
 };
 
-export default function PlanImageUploader({ imageUrl, onChange, onClearUrl, onPickExisting }: PlanImageUploaderProps) {
+export default function PlanImageUploader({ imageUrl, onChange, onClearUrl, onPickExisting, label = 'Imagen del plan' }: PlanImageUploaderProps) {
     const inputRef = useRef<HTMLInputElement>(null);
     const [libraryOpen, setLibraryOpen] = useState(false);
 
@@ -144,7 +146,7 @@ export default function PlanImageUploader({ imageUrl, onChange, onClearUrl, onPi
     return (
         <div className="flex flex-col items-center gap-3 py-2 w-full">
             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider self-center text-center">
-                Imagen del plan <span className="text-muted-foreground/40 normal-case font-medium">(opcional · 1:1)</span>
+                {label} <span className="text-muted-foreground/40 normal-case font-medium">(opcional · 1:1)</span>
             </label>
 
             <input
@@ -159,7 +161,7 @@ export default function PlanImageUploader({ imageUrl, onChange, onClearUrl, onPi
                 {currentDisplayUrl ? (
                     <div className="relative group/img w-full h-full rounded-2xl overflow-hidden border border-white/10 bg-black/20">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={currentDisplayUrl} alt="Imagen del plan" className="w-full h-full object-cover" />
+                        <img src={currentDisplayUrl} alt={label} className="w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/55 transition-all flex items-center justify-center gap-2 opacity-0 group-hover/img:opacity-100">
                             <button
                                 type="button"

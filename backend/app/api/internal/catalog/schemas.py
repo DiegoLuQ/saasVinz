@@ -80,6 +80,7 @@ class ServiceBase(BaseModel):
     group_name: Optional[str] = None
     price_on_request: bool = False
     important_note: Optional[str] = Field(None, max_length=300)
+    image_url: Optional[str] = Field(None, max_length=500)
 
     _clean_group = field_validator("group_name", mode="before")(clean_group_name)
     _clean_note = field_validator("important_note", mode="before")(lambda v: (str(v).strip() or None) if v is not None else None)
@@ -98,6 +99,7 @@ class ServiceUpdate(BaseModel):
     group_name: Optional[str] = None
     price_on_request: Optional[bool] = None
     important_note: Optional[str] = Field(None, max_length=300)
+    image_url: Optional[str] = Field(None, max_length=500)
 
     _clean_note = field_validator("important_note", mode="before")(lambda v: (str(v).strip() or None) if v is not None else None)
 
@@ -115,7 +117,7 @@ class ServiceInDB(ServiceBase):
 
 # Productos
 class ProductBase(BaseModel):
-    code: str
+    code: str = ""  # vacío = se genera (P-0001…)
     name: str
     category_id: Optional[int] = None
     provider_id: Optional[int] = None
@@ -126,8 +128,14 @@ class ProductBase(BaseModel):
     image_url: Optional[str] = None
     images: Optional[List[str]] = []
     availability_status: str = "Disponible"
+    note: Optional[str] = Field(None, max_length=300)
+    made_to_order: bool = False
+    is_special: bool = False
+    badge: Optional[str] = Field(None, max_length=24)
+    show_purchases: bool = True
     is_active: bool = True
 
+    _clean_badge = field_validator("badge", mode="before")(lambda v: (str(v).strip()[:24] or None) if v is not None else None)
     _normalize_fks = field_validator("category_id", "provider_id", mode="before")(_empty_fk_to_none)
 
 class ProductCreate(ProductBase):
@@ -145,8 +153,14 @@ class ProductUpdate(BaseModel):
     image_url: Optional[str] = None
     images: Optional[List[str]] = None
     availability_status: Optional[str] = None
+    note: Optional[str] = Field(None, max_length=300)
+    made_to_order: Optional[bool] = None
+    is_special: Optional[bool] = None
+    badge: Optional[str] = Field(None, max_length=24)
+    show_purchases: Optional[bool] = None
     is_active: Optional[bool] = None
 
+    _clean_badge = field_validator("badge", mode="before")(lambda v: (str(v).strip()[:24] or None) if v is not None else None)
     _normalize_fks = field_validator("category_id", "provider_id", mode="before")(_empty_fk_to_none)
 
 class ProductInDB(ProductBase):
@@ -312,6 +326,10 @@ class PublicCatalogProduct(BaseModel):
     stock: int
     availability_status: str
     description: Optional[str] = None
+    note: Optional[str] = None
+    made_to_order: bool = False
+    badge: Optional[str] = None
+    times_purchased: Optional[int] = None  # unidades en órdenes no canceladas; None = el crematorio no lo muestra
     image_url: Optional[str] = None
     images: Optional[List[str]] = []
     category_name: Optional[str] = None

@@ -25,6 +25,8 @@ export interface Tenant {
     weight_tiers?: WeightTier[];
     /** «Con tecnología de Vinzer» en el pie (false = plan con marca blanca) */
     show_vinzer_brand?: boolean;
+    /** Catálogo de recuerdos (productos oficial); null = enlaces oficiales incompletos */
+    souvenir_store_url?: string | null;
 }
 
 export interface OwnerData {

@@ -293,6 +293,8 @@ from app.api.internal.common.ai_credits.router import router as ai_credits_route
 app.include_router(ai_credits_router, prefix="/api/internal/ai-credits", tags=["Créditos IA"])
 from app.api.internal.common.auto_documents.router import router as auto_documents_router
 app.include_router(auto_documents_router, prefix="/api/internal/auto-documents", tags=["Documentos automáticos"])
+from app.api.internal.common.official_links.router import router as official_links_router
+app.include_router(official_links_router, prefix="/api/internal/official-links", tags=["Enlaces oficiales"])
 app.include_router(form_tokens_router, prefix="/api/internal/form-tokens", tags=["Form Tokens"])
 app.include_router(health_router, prefix="/api/internal", tags=["Health"])
 app.include_router(media_router, prefix="/api/internal", tags=["Biblioteca de Medios"])

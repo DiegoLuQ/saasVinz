@@ -715,7 +715,7 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
     // (al editar, el backend lo devuelve antes de volver a descontarlo).
     const stockAvailable = useCallback((productId: number) => {
         const product = products.find(p => p.id === productId);
-        if (!product) return Number.POSITIVE_INFINITY;
+        if (!product || product.made_to_order) return Number.POSITIVE_INFINITY;
         const saved = (originalItems?.products || [])
             .filter(p => p.product_id === productId)
             .reduce((sum, p) => sum + (p.quantity || 0), 0);

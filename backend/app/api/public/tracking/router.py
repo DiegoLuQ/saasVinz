@@ -299,7 +299,16 @@ def get_tracking_info(
         show_vinzer_brand=_show_brand(tenant),
         feedback_enabled=delivered and feature_on(tenant),
         feedback={"rating": fb.rating, "comment": fb.comment} if fb else None,
+        souvenir_store_url=_store_url(db, tenant),
     )
+
+
+def _store_url(db, tenant):
+    from app.services.official_links import store_url
+    try:
+        return store_url(db, tenant)
+    except Exception:
+        return None
 
 
 class FeedbackIn(BaseModel):

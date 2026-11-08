@@ -116,6 +116,25 @@ async def send_submission_notifications(
                 for name, note in notes:
                     family_rows.append((f"Importante · {name}", note))
 
+                # «Recuerdos para honrar a X»: hasta 6 productos (el más vendido siempre) + catálogo
+                # oficial; solo con los enlaces oficiales completos (services/official_links.py).
+                souvenirs = None
+                try:
+                    from app.services import official_links
+                    shop_url = official_links.store_url(db, tenant)
+                    items = official_links.souvenir_products(db, tenant.id) if shop_url else []
+                    if items:
+                        souvenirs = {
+                            "title": f"Recuerdos para honrar a {pet_name}",
+                            "subtitle": f"Lleva a {pet_name} siempre cerca. Puedes revisar con calma las opciones de relicarios y recuerdos.",
+                            "items": [{"name": p.name, "price": format_clp(p.sale_price) if (p.sale_price or 0) > 0 else "",
+                                       "image_url": p.image_url} for p in items],
+                            "button_label": "Ver catálogo de recuerdos y relicarios",
+                            "url": shop_url,
+                        }
+                except Exception as e:
+                    logger.warning("[EMAIL] No se pudo armar el bloque de recuerdos (%s): %s", submission_code, e)
+
                 try:
                     await send_action_email(
                         to=customer_email,
@@ -134,6 +153,7 @@ async def send_submission_notifications(
                         brand=brand,
                         reply_to=tenant_email or None,
                         rows=family_rows,
+                        products=souvenirs,
                     )
                     logger.info("[EMAIL] Confirmación enviada a la familia: %s (%s)", customer_email, submission_code)
                 except Exception as e:

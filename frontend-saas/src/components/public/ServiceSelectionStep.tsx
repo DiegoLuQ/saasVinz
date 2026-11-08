@@ -304,7 +304,7 @@ export default function ServiceSelectionStep({
             {specials.length > 0 && (
                 <div className="space-y-3 pt-2">
                     <div className="text-center">
-                        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">¿Necesitas algún servicio adicional?</h3>
+                        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{specials.some(x => (x.category || '').toLowerCase() === 'producto') ? '¿Necesitas algún servicio o producto adicional?' : '¿Necesitas algún servicio adicional?'}</h3>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Opcional. Puedes elegir más de uno.</p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -329,6 +329,15 @@ export default function ServiceSelectionStep({
                                     }`}>
                                         {isSelected && <Check size={12} className="text-white" strokeWidth={3} />}
                                     </span>
+                                    {s.image_url && (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img
+                                            src={resolveImageUrl(s.image_url) || ''}
+                                            alt={s.name}
+                                            loading="lazy"
+                                            className="shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover border border-slate-200 dark:border-slate-700"
+                                        />
+                                    )}
                                     <span className="flex-1 min-w-0">
                                         <span className="flex items-start justify-between gap-2">
                                             <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{s.name}</span>

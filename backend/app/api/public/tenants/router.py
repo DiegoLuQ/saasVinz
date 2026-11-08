@@ -25,6 +25,8 @@ class TenantPublicInfo(BaseModel):
     weight_tiers: list[dict] = []
     # «Con tecnología de Vinzer» en el pie (services/plan_features.show_vinzer_brand)
     show_vinzer_brand: bool = True
+    # Catálogo de recuerdos (productos oficial) para la pantalla final; None = sin enlaces oficiales completos
+    souvenir_store_url: str | None = None
 
     class Config:
         from_attributes = True
@@ -46,6 +48,8 @@ def get_tenant_by_slug(slug: str, token: str | None = None, form: str | None = N
     info = TenantPublicInfo.model_validate(tenant)
     from app.services.plan_features import show_vinzer_brand
     info.show_vinzer_brand = show_vinzer_brand(tenant)
+    from app.services.official_links import store_url
+    info.souvenir_store_url = store_url(db, tenant)
     info.form_config = form_config
     # Con la tabla por plan los tramos no llevan recargo (el precio va en cada plan).
     from app.services.price_lists import effective_for_request
@@ -113,6 +117,7 @@ def get_tenant_services(slug: str, token: str | None = None, form: str | None = 
             "is_special": bool(s.is_special),
             "price_on_request": bool(s.price_on_request),
             "important_note": s.important_note,
+            "image_url": s.image_url if s.is_special else None,
         })
         
     # Fetch Plans
@@ -156,13 +161,20 @@ def get_tenant_services(slug: str, token: str | None = None, form: str | None = 
         models.Product.is_active == True
     ).all()
     for pr in products:
+        # Un producto especial sin stock (y que no es «a pedido») no se ofrece a la familia.
+        if pr.is_special and (pr.stock or 0) <= 0 and not pr.made_to_order:
+            continue
         all_items.append({
             "id": f"prod_{pr.id}",
             "name": pr.name,
             "description": pr.description,
             "price": pr.sale_price,
             "category": "producto",
-            "sub_items": None
+            "sub_items": None,
+            # Producto especial: adicional como los servicios especiales, con su nota e imagen
+            "is_special": bool(pr.is_special),
+            "important_note": pr.note if pr.is_special else None,
+            "image_url": pr.image_url if pr.is_special else None,
         })
     
 

@@ -29,6 +29,7 @@ import {
     ChevronUp,
     Share2,
     Check,
+    Gift,
 } from 'lucide-react';
 import EvidenceModal from '@/components/public/EvidenceModal';
 import FeedbackSurvey from '@/components/public/FeedbackSurvey';
@@ -1332,6 +1333,26 @@ export default function TrackingPage() {
                             initial={data.feedback ?? null}
                             onDone={(feedback) => setData((d: any) => ({ ...d, feedback }))}
                         />
+                    )}
+
+                    {/* Tiendita de recuerdos: catálogo de productos oficial (antes o después de la cremación) */}
+                    {data.souvenir_store_url && (
+                        <div id="recuerdos" className={`mx-auto max-w-md rounded-3xl border px-6 py-5 text-center transition-colors duration-500 ${isDarkMode ? 'bg-sky-400/[0.06] border-sky-300/20' : 'bg-white/80 border-sky-200 shadow-sm'}`}>
+                            <p className={`text-sm font-semibold ${isDarkMode ? 'text-neutral-100' : 'text-gray-800'}`}>
+                                Lleva a {data.pet_name || 'tu compañero'} siempre cerca
+                            </p>
+                            <p className={`mt-1 text-xs leading-relaxed ${isDarkMode ? 'text-neutral-400' : 'text-gray-500'}`}>
+                                Relicarios y recuerdos para honrar su memoria. Puedes pedirlos antes o después de la cremación.
+                            </p>
+                            <a
+                                href={data.souvenir_store_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`mt-4 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-xs font-bold transition-colors ${isDarkMode ? 'bg-sky-300 text-slate-900 hover:bg-sky-200' : 'bg-sky-600 text-white hover:bg-sky-700'}`}
+                            >
+                                <Gift size={14} /> Tiendita de recuerdos
+                            </a>
+                        </div>
                     )}
 
                     {showReview && (

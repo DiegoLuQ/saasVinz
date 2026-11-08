@@ -180,7 +180,7 @@ def purge(db: Session, tenant_id: int, pet: models.Pet, customer: models.Custome
             prod = db.query(models.Product).filter(models.Product.id == p_assoc.product_id).first()
             if prod:
                 prod.stock += p_assoc.cantidad
-                prod.availability_status = "Disponible"
+                prod.availability_status = "A pedido" if prod.made_to_order else ("Disponible" if (prod.stock or 0) > 0 else "Agotado")
         db.delete(o)          # detalle, finanzas, evidencias, certificados, comisión… en cascada
     db.flush()
     db.delete(pet)

@@ -13,7 +13,9 @@ import {
     Camera,
     BookOpen,
     Lock,
-    Share2
+    Share2,
+    Images,
+    Sparkles
 } from 'lucide-react';
 import { apiRequest, API_URL } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
@@ -32,6 +34,7 @@ import { PlanLimitModal } from '@/components/tenant/PlanLimitModal';
 import { useFeatures } from '@/hooks/useFeatures';
 import dynamic from 'next/dynamic';
 import ShareCatalogModal from '@/components/tenant/catalog/ShareCatalogModal';
+import BulkProductImagesModal from '@/components/tenant/catalog/BulkProductImagesModal';
 
 const DownloadLink = dynamic(() => import('@/components/tenant/catalog/PDFDownloadButton'), { ssr: false });
 
@@ -48,11 +51,19 @@ interface Product {
     image_url: string;
     images: string[];
     availability_status: string;
+    note?: string | null;
+    made_to_order?: boolean;
+    is_special?: boolean;
+    badge?: string | null;
+    show_purchases?: boolean;
     is_active: boolean;
     discount_percentage?: number;
     category?: { name: string };
     provider?: { name: string };
 }
+
+/** Etiquetas sugeridas para destacar un producto en el catálogo (≤ 24 caracteres). */
+const BADGE_PRESETS = ['Popular', 'Más vendido', 'Recomendado', 'Nuevo', 'Oferta', 'Edición limitada'];
 
 interface Category {
     id: number;
@@ -119,6 +130,7 @@ export default function ProductsPage() {
     const [showLimitModal, setShowLimitModal] = useState(false);
     const [showCatalogModal, setShowCatalogModal] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [isBulkOpen, setIsBulkOpen] = useState(false);
     const [catalogOnlyAvailable, setCatalogOnlyAvailable] = useState(false);
     const [catalogShowPrices, setCatalogShowPrices] = useState(true);
 
@@ -128,6 +140,10 @@ export default function ProductsPage() {
     };
 
     const maxProducts = tenantData?.subscription_plan?.max_products || 0;
+    // Productos especiales (adicionales del formulario): máximo 4 activos
+    const MAX_SPECIAL = 4;
+    const specialCount = products.filter((p: Product) => p.is_special && p.is_active !== false && p.id !== currentProduct?.id).length;
+    const specialFull = specialCount >= MAX_SPECIAL;
     const isLimitReached = maxProducts > 0 && maxProducts < 999999 && products.length >= maxProducts;
 
 
@@ -148,6 +164,9 @@ export default function ProductsPage() {
                 sale_price: 0,
                 stock: 0,
                 description: '',
+                note: '',
+                made_to_order: false,
+                is_special: false,
                 image_url: '',
                 availability_status: 'Disponible',
                 is_active: true
@@ -331,7 +350,7 @@ export default function ProductsPage() {
     const catalogProducts = React.useMemo(() => {
         let list = filteredProducts;
         if (catalogOnlyAvailable) {
-            list = list.filter(p => p.stock > 0 && p.availability_status?.toLowerCase() !== 'agotado');
+            list = list.filter(p => p.made_to_order || (p.stock > 0 && p.availability_status?.toLowerCase() !== 'agotado'));
         }
         return list;
     }, [filteredProducts, catalogOnlyAvailable]);
@@ -386,6 +405,17 @@ export default function ProductsPage() {
                         )}
                         Compartir Online
                     </button>
+                    {canCreateProduct && (
+                        <button
+                            onClick={() => !canCreateProductFeature ? showToast('Tu plan no incluye crear productos.', 'error') : isLimitReached ? setShowLimitModal(true) : setIsBulkOpen(true)}
+                            disabled={!canCreateProductFeature}
+                            title="Crear varios productos subiendo sus imágenes"
+                            className={`flex-1 sm:flex-none whitespace-nowrap border border-white/10 bg-white/5 text-white font-bold py-3 px-4 sm:px-6 rounded-2xl flex items-center justify-center transition-all text-sm hover:bg-white/10 active:scale-95 ${!canCreateProductFeature ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                            <Images className="mr-2" size={18} />
+                            Carga masiva
+                        </button>
+                    )}
                     {canCreateProduct && (
                         <button
                             onClick={() => canCreateProductFeature ? handleOpenModal() : showToast('Tu plan no incluye crear productos.', 'error')}
@@ -447,6 +477,7 @@ export default function ProductsPage() {
                                             <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wider ${
                                                 product.availability_status === 'Disponible'
                                                     ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                    : product.made_to_order ? 'bg-sky-500/10 text-sky-300 border border-sky-500/20'
                                                     : 'bg-red-500/10 text-red-400 border border-red-500/20'
                                             }`}>
                                                 {product.availability_status}
@@ -457,6 +488,16 @@ export default function ProductsPage() {
                                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 uppercase tracking-wide">
                                                 {product.category?.name || 'Sin categoría'}
                                             </span>
+                                            {product.is_special && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                                                    <Sparkles size={10} /> Especial
+                                                </span>
+                                            )}
+                                            {product.badge && (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-400/15 text-sky-300 border border-sky-400/30">
+                                                    {product.badge}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -556,6 +597,16 @@ export default function ProductsPage() {
                                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20 uppercase tracking-wide">
                                                 {product.category?.name || '-'}
                                             </span>
+                                            {product.is_special && (
+                                                <span className="ml-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-500/10 text-violet-400 border border-violet-500/20 align-middle">
+                                                    <Sparkles size={10} /> Especial
+                                                </span>
+                                            )}
+                                            {product.badge && (
+                                                <span className="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-400/15 text-sky-300 border border-sky-400/30 align-middle">
+                                                    {product.badge}
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 align-middle">
                                             <div className="flex items-center gap-3">
@@ -589,6 +640,7 @@ export default function ProductsPage() {
                                             <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider ${
                                                 product.availability_status === 'Disponible'
                                                     ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                    : product.made_to_order ? 'bg-sky-500/10 text-sky-300 border border-sky-500/20'
                                                     : 'bg-red-500/10 text-red-400 border border-red-500/20'
                                             }`}>
                                                 {product.availability_status}
@@ -657,7 +709,8 @@ export default function ProductsPage() {
                         <div className="space-y-2">
                             <label className="text-sm font-bold text-muted-foreground ml-1">Código</label>
                             <input
-                                required
+                                required={!!currentProduct?.id}
+                                placeholder={currentProduct?.id ? undefined : 'Automático (P-0001…)'}
                                 value={currentProduct?.code || ''}
                                 onChange={(e) => setCurrentProduct({ ...currentProduct, code: e.target.value })}
                                 className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-primary/50"
@@ -770,6 +823,9 @@ export default function ProductsPage() {
 
                         <div className="space-y-2">
                             <label className="text-sm font-bold text-muted-foreground ml-1">Estado</label>
+                            {currentProduct?.made_to_order ? (
+                                <div className="w-full bg-sky-500/10 border border-sky-500/30 text-sky-300 rounded-2xl py-3 px-4 text-sm font-bold">A pedido</div>
+                            ) : (
                             <SearchableSelect
                                 options={[
                                     { value: 'Disponible', label: 'Disponible' },
@@ -779,6 +835,103 @@ export default function ProductsPage() {
                                 onChange={(val) => setCurrentProduct({ ...currentProduct, availability_status: String(val) })}
                                 placeholder="Seleccionar..."
                             />
+                            )}
+                        </div>
+
+                        <label className="md:col-span-2 flex items-start gap-3 bg-white/5 border border-white/10 rounded-2xl p-4 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={!!currentProduct?.made_to_order}
+                                onChange={(e) => setCurrentProduct({ ...currentProduct, made_to_order: e.target.checked })}
+                                className="mt-1 accent-primary w-4 h-4"
+                            />
+                            <span>
+                                <span className="block text-sm font-bold">Producto a pedido</span>
+                                <span className="block text-xs text-muted-foreground">Se encarga al proveedor: se puede agregar a una orden aunque no haya stock y se muestra como «A pedido».</span>
+                            </span>
+                        </label>
+
+                        <div className="md:col-span-2 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <label className="text-sm font-bold text-muted-foreground ml-1">Etiqueta destacada en el catálogo</label>
+                                <span className="text-[10px] text-muted-foreground">{(currentProduct?.badge || '').length}/24</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {['', ...BADGE_PRESETS].map(b => {
+                                    const active = (currentProduct?.badge || '') === b;
+                                    return (
+                                        <button
+                                            key={b || 'none'}
+                                            type="button"
+                                            onClick={() => setCurrentProduct({ ...currentProduct, badge: b || null })}
+                                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${active ? 'bg-sky-400/20 text-sky-300 border-sky-400/40' : 'bg-white/5 border-white/10 text-muted-foreground hover:bg-white/10'}`}
+                                        >
+                                            {b || 'Ninguna'}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <input
+                                type="text"
+                                maxLength={24}
+                                value={currentProduct?.badge || ''}
+                                onChange={(e) => setCurrentProduct({ ...currentProduct, badge: e.target.value })}
+                                placeholder="O escribe la tuya (ej: Favorita de las familias)"
+                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 px-4 text-sm outline-none focus:border-primary/50"
+                            />
+                            <p className="text-[11px] text-muted-foreground ml-1">Se muestra sobre la foto del producto en el catálogo online.</p>
+                        </div>
+
+                        <label className="md:col-span-2 flex items-start gap-3 bg-white/5 border border-white/10 rounded-2xl p-4 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={currentProduct?.show_purchases !== false}
+                                onChange={(e) => setCurrentProduct({ ...currentProduct, show_purchases: e.target.checked })}
+                                className="mt-1 accent-primary w-4 h-4"
+                            />
+                            <span>
+                                <span className="block text-sm font-bold">Mostrar «Comprado N veces» en el catálogo</span>
+                                <span className="block text-xs text-muted-foreground">Número real: unidades en órdenes no canceladas, incluidas las que vienen dentro de un plan. Solo se ve cuando ya se compró al menos una vez.</span>
+                            </span>
+                        </label>
+
+                        <label className={`md:col-span-2 flex items-start gap-3 rounded-2xl p-4 border ${currentProduct?.is_special ? 'bg-violet-500/10 border-violet-500/30' : 'bg-white/5 border-white/10'} ${specialFull && !currentProduct?.is_special ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}>
+                            <input
+                                type="checkbox"
+                                checked={!!currentProduct?.is_special}
+                                disabled={specialFull && !currentProduct?.is_special}
+                                onChange={(e) => setCurrentProduct({ ...currentProduct, is_special: e.target.checked })}
+                                className="mt-1 accent-primary w-4 h-4"
+                            />
+                            <span className="flex-1">
+                                <span className="flex items-center justify-between gap-2">
+                                    <span className="text-sm font-bold flex items-center gap-1.5"><Sparkles size={14} className="text-violet-400" /> Marcar como producto especial</span>
+                                    <span className="text-[11px] font-bold text-muted-foreground">{specialCount + (currentProduct?.is_special ? 1 : 0)}/{MAX_SPECIAL}</span>
+                                </span>
+                                <span className="block text-xs text-muted-foreground mt-0.5">
+                                    {specialFull && !currentProduct?.is_special
+                                        ? `Ya tienes ${MAX_SPECIAL} productos especiales. Quita la marca a otro para usar este.`
+                                        : 'Se ofrece a la familia en el formulario como adicional, igual que los servicios especiales, con su imagen y nota especial.'}
+                                </span>
+                            </span>
+                        </label>
+
+                        <div className="space-y-2 md:col-span-2">
+                            <div className="flex items-center justify-between">
+                                <label className="text-sm font-bold text-muted-foreground ml-1">{currentProduct?.is_special ? 'Nota especial (la ve la familia)' : 'Nota'}</label>
+                                <span className="text-[10px] text-muted-foreground">{(currentProduct?.note || '').length}/300</span>
+                            </div>
+                            <textarea
+                                rows={2}
+                                maxLength={300}
+                                value={currentProduct?.note || ''}
+                                onChange={(e) => setCurrentProduct({ ...currentProduct, note: e.target.value })}
+                                placeholder={currentProduct?.is_special ? 'Ej: Se entrega junto con las cenizas · El grabado demora 5 días hábiles' : 'Ej: Demora 10 días hábiles · Incluye placa grabada'}
+                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-primary/50 resize-none"
+                            />
+                            {currentProduct?.is_special && (
+                                <p className="text-[11px] text-muted-foreground ml-1">Se muestra al elegirlo en el formulario, en el resumen y en el correo de confirmación.</p>
+                            )}
                         </div>
 
                         <div className="space-y-2 md:col-span-2">
@@ -1073,21 +1226,21 @@ export default function ProductsPage() {
                                                     )}
 
                                                     <div className="flex items-center gap-1.5">
-                                                        {(product.stock <= 0 || product.availability_status?.toLowerCase() === 'agotado') && (
+                                                        {(!product.made_to_order && (product.stock <= 0 || product.availability_status?.toLowerCase() === 'agotado')) && (
                                                             <span className="text-[10px] font-black text-red-500 uppercase tracking-widest animate-pulse">
                                                                 Agotado
                                                             </span>
                                                         )}
                                                         <span
                                                             className={`inline-block w-3 h-3 rounded-full ${
-                                                                (product.stock <= 0 || product.availability_status?.toLowerCase() === 'agotado')
+                                                                (!product.made_to_order && (product.stock <= 0 || product.availability_status?.toLowerCase() === 'agotado'))
                                                                     ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'
                                                                     : product.stock === 1
                                                                     ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]'
                                                                     : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]'
                                                             }`}
                                                             title={
-                                                                (product.stock <= 0 || product.availability_status?.toLowerCase() === 'agotado')
+                                                                (!product.made_to_order && (product.stock <= 0 || product.availability_status?.toLowerCase() === 'agotado'))
                                                                     ? 'Sin stock'
                                                                     : product.stock === 1
                                                                     ? 'Última unidad'
@@ -1120,6 +1273,15 @@ export default function ProductsPage() {
                     </div>
                 </div>
             </Modal>
+            <BulkProductImagesModal
+                isOpen={isBulkOpen}
+                onClose={() => setIsBulkOpen(false)}
+                categories={bootstrapCategories as { id: number; name: string }[]}
+                providers={bootstrapProviders as { id: number; name: string }[]}
+                existingNames={products.map((p: Product) => p.name)}
+                remaining={maxProducts > 0 && maxProducts < 999999 ? maxProducts - products.length : Number.POSITIVE_INFINITY}
+                specialSlots={MAX_SPECIAL - products.filter((p: Product) => p.is_special && p.is_active !== false).length}
+            />
             {/* Modal Compartir Catálogo Online con Token */}
             <ShareCatalogModal
                 isOpen={isShareModalOpen}
