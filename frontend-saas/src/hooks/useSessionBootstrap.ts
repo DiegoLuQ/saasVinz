@@ -60,6 +60,8 @@ export interface BootstrapRBACData {
 export interface BootstrapMetadata {
     unread_notifications: number;
     pending_submissions: number;
+    /** Solicitudes de productos del catálogo pendientes (badge celeste del Sidebar) */
+    pending_product_requests?: number;
 }
 
 export interface BootstrapThemeData {

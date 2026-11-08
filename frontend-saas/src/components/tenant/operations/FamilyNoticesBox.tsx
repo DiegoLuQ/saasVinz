@@ -12,8 +12,8 @@ interface NoticesData { enabled: boolean; email?: string | null; phone?: string 
 /**
  * «Avisar a la familia» de una orden: WhatsApp (abre el chat con el mensaje y el
  * link de seguimiento, sin API de Meta) y correo (reenvío manual), más el
- * historial de avisos. Los correos automáticos salen al entrar a las fases con
- * «Avisar a la familia» (Configuración → Flujo). Ver services/family_notices.py.
+ * historial de avisos. Al avanzar de fase, AdvanceNoticeModal pregunta si avisar
+ * (nunca automático). Ver services/family_notices.py.
  */
 export default function FamilyNoticesBox({ orderId, stepId, finished, compact = false }: {
     orderId: number; stepId?: number | null; finished: boolean; compact?: boolean;

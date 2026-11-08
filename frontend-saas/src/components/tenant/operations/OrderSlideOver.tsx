@@ -23,6 +23,7 @@ import MemorialOrderSection from './expediente/MemorialOrderSection';
 import DedicationSection from './expediente/DedicationSection';
 import OrderDiscountsBox from './expediente/OrderDiscountsBox';
 import FamilyNoticesBox from './FamilyNoticesBox';
+import AdvanceNoticeModal from './AdvanceNoticeModal';
 import StageTimeline, { type Stage } from './expediente/StageTimeline';
 import RevertOrderModal, { canRevertStatus } from './RevertOrderModal';
 import CertificateTextsModal, { DATE_LABELS, ISSUE_TEMPLATE_QUERY_KEY, issueDateFields, issueTextFields, loadIssueTemplate, missingPetDates, usePetDates, type CertOverrides } from './CertificateTextsModal';
@@ -138,6 +139,8 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
     const [showMainPicker, setShowMainPicker] = useState(false);
     const setMainImage = useSetMainImage();
     const [acting, setActing] = useState(false);
+    // Confirmación de avance + aviso a la familia (AdvanceNoticeModal)
+    const [askNotice, setAskNotice] = useState(false);
     const [loadingReceipt, setLoadingReceipt] = useState(false);
     const [downloadingCertId, setDownloadingCertId] = useState<number | null>(null);
     const [showRevert, setShowRevert] = useState(false);
@@ -304,8 +307,9 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
             if (key === 'entregar') {
                 if (onUpdateStatus) await onUpdateStatus(cremation.id, 'entregado');
             } else {
-                await apiRequest(`/api/internal/operations/ops/orders/${cremation.id}/advance`, { method: 'PATCH' });
-                showToast(key === 'iniciar' ? 'Operación iniciada' : 'Etapa avanzada', 'success');
+                // Avanzar pide confirmación primero (modal); el avance se guarda al confirmar
+                setAskNotice(true);
+                return;
             }
             await refresh();
         } catch (err: unknown) {
@@ -962,6 +966,23 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                     orderId={cremation.id}
                     petName={petName}
                     onSave={() => refresh()}
+                />
+            )}
+            {askNotice && (
+                <AdvanceNoticeModal
+                    orderId={cremation.id}
+                    onAdvance={async () => {
+                        try {
+                            await apiRequest(`/api/internal/operations/ops/orders/${cremation.id}/advance`, { method: 'PATCH' });
+                            showToast(exp?.next_action?.key === 'iniciar' ? 'Operación iniciada' : 'Etapa avanzada', 'success');
+                            await refresh();
+                            return true;
+                        } catch (err: unknown) {
+                            showToast(err instanceof Error ? err.message : 'No se pudo avanzar la etapa', 'error');
+                            return false;
+                        }
+                    }}
+                    onClose={() => setAskNotice(false)}
                 />
             )}
         </SlideOver>

@@ -194,7 +194,8 @@ def world():
                     name=f"Crematorio {key.upper()}", slug=slug, email=f"admin-{slug}@vinzer-pruebas.cl", phone="+56911111111",
                 )
             out[f"tenant_{key}"] = t.id
-            out[f"admin_{key}"] = s.query(models.User).filter(models.User.tenant_id == t.id).first().id
+            out[f"admin_{key}"] = (s.query(models.User).filter(models.User.tenant_id == t.id, models.User.role != models.UserRole.creator)
+                                  .order_by(models.User.id).first().id)
 
         creator = s.query(models.User).filter(models.User.role == models.UserRole.creator).first()
         if not creator:

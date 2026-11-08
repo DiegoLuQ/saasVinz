@@ -1,8 +1,9 @@
 """Avisos a la familia y encuesta de satisfacción.
 
-- Al entrar la orden a una fase con `notify_family` se envía un correo a la
-  familia (correo del cliente) con la marca del crematorio y el link de
-  seguimiento. Al concluir, si el crematorio lo activó (`sys_tenants.family_notices
+- Al avanzar de fase el panel pregunta (modal, manual) si avisar a la familia:
+  correo con la foto de la mascota, la etapa, la hora, la marca del crematorio, el
+  link de seguimiento y su catálogo de productos (si tiene), o WhatsApp si no hay
+  correo. Ya no se envía solo al avanzar. Al concluir, si el crematorio lo activó (`sys_tenants.family_notices
   .on_finish`), un correo de agradecimiento con la encuesta.
 - El operador también puede avisar por WhatsApp desde la orden: se arma el
   mensaje con el link y se abre wa.me (sin API de Meta); queda registrado.
@@ -135,8 +136,25 @@ def _load(db: Session, cremation_id: int):
     ).filter(models.Cremation.id == cremation_id).first()
 
 
-async def send_step_email(db: Session, cremation_id: int, step_id: int, user_id: int | None = None, force: bool = False) -> dict:
-    """Correo «tu servicio avanzó a la fase X». `force` = reenvío manual desde la orden."""
+MAX_MESSAGE = 1000
+
+
+def default_step_message(customer_name: str | None, pet: str, step_name: str) -> str:
+    """Mensaje que el panel propone (editable) al avanzar de etapa."""
+    hello = f"Hola {_first_name(customer_name)}".strip()
+    return (f"{hello}, te contamos con mucho cariño que el servicio de {pet} avanzó a la etapa «{step_name}». "
+            "Cada paso lo cuidamos con el respeto y la dedicación que merece.")
+
+
+def _clean_message(message: str | None) -> str | None:
+    text = (message or "").strip()
+    return text[:MAX_MESSAGE] if text else None
+
+
+async def send_step_email(db: Session, cremation_id: int, step_id: int, user_id: int | None = None, force: bool = False,
+                          message: str | None = None) -> dict:
+    """Correo «tu servicio avanzó a la fase X». `force` = aviso manual desde la orden;
+    `message` = texto escrito en el panel (reemplaza el saludo y el primer párrafo)."""
     cremation = _load(db, cremation_id)
     step = db.query(models.WorkflowStep).filter(models.WorkflowStep.id == step_id).first()
     if not cremation or not step:
@@ -154,15 +172,24 @@ async def send_step_email(db: Session, cremation_id: int, step_id: int, user_id:
 
     pet = cremation.pet.name if cremation.pet else "tu mascota"
     url = tracking_url(tenant, cremation)
-    await _send(
-        tenant, customer.email.strip(),
+    from app.services.email import send_action_email
+    await send_action_email(
+        customer.email.strip(),
         f"{pet}: {step.name} · {tenant.name}",
-        f"Novedades sobre {pet}",
-        [f"Hola {_first_name(customer.name)}:".replace("Hola :", "Hola:"),
-         f"Te contamos que el servicio de {pet} avanzó a la etapa «{step.name}».",
-         "En el enlace de seguimiento puedes ver cada paso del proceso, con sus horarios y, cuando corresponda, fotos y notas de nuestro equipo."],
-        "Ver el seguimiento", url,
+        f"Seguimos acompañando a {pet}",
+        [*([p.strip() for p in _clean_message(message).split("\n") if p.strip()] if _clean_message(message) else
+           [f"Hola {_first_name(customer.name)}:".replace("Hola :", "Hola:"),
+            f"Queremos contarte, con mucho cariño, que el servicio de {pet} avanzó a una nueva etapa. "
+            "Cada paso lo cuidamos con el respeto y la dedicación que merece."]),
+         "Sabemos que no es un momento fácil. Puedes seguir el proceso cuando lo necesites desde el enlace de "
+         "seguimiento, donde verás cada etapa con su horario y, cuando corresponda, fotos y notas de nuestro equipo.",
+         "Estamos aquí para lo que necesites."],
+        "Ver el seguimiento de " + pet, url,
         f"Recibes este correo porque {tenant.name} atiende el servicio de {pet}. {_no_reply_note(tenant)}",
+        kicker=tenant.name, brand=tenant_brand(tenant), reply_to=tenant.email or None,
+        highlight={"label": "Etapa actual", "value": step.name, "meta": _now_text(db, tenant.id)},
+        image_url=pet_photo(cremation),
+        products=_catalog_block(db, tenant, pet, cremation.details.tracking_token if cremation.details else None),
     )
     _record(db, cremation, "step", "email", customer.email, step.id, user_id)
     return {"sent": True, "to": customer.email}
@@ -206,6 +233,46 @@ async def send_finish_email(db: Session, cremation_id: int, user_id: int | None 
     return {"sent": True, "to": customer.email}
 
 
+def pet_photo(cremation) -> str | None:
+    """Foto principal de la mascota (URL absoluta) o None."""
+    pet = cremation.pet
+    if not pet:
+        return None
+    for u in [pet.image_url, *((pet.images or []) if isinstance(pet.images, list) else [])]:
+        if isinstance(u, str) and u.startswith(("http://", "https://")):
+            return u
+    return None
+
+
+def _now_text(db: Session, tenant_id: int) -> str:
+    from app.utils.time import get_tenant_now
+    return get_tenant_now(db, tenant_id).strftime("%d-%m-%Y · %H:%M hrs")
+
+
+def _catalog_block(db: Session, tenant, pet: str, ref: str | None = None) -> dict | None:
+    """Catálogo de productos al final del correo; None si el crematorio no tiene."""
+    try:
+        from app.services import official_links
+        url = official_links.with_ref(official_links.products_catalog_url(db, tenant), ref)
+        if not url:
+            return None
+        from app.services.form_submission_notifications import format_clp
+        # Solo 3 (más vendido + categorías distintas): el correo no se alarga en el celular
+        items = official_links.souvenir_products(db, tenant.id, limit=3, diverse=True)
+        return {
+            "title": f"Recuerdos para honrar a {pet}",
+            "subtitle": f"Si lo deseas, puedes revisar con calma los relicarios y recuerdos para llevar a {pet} siempre cerca.",
+            "items": [{"name": p.name, "price": format_clp(p.sale_price) if (p.sale_price or 0) > 0 else "",
+                       "image_url": p.image_url} for p in items],
+            "button_label": "Ver catálogo completo de recuerdos",
+            "url": url,
+            "soft": True,
+        }
+    except Exception:  # noqa: BLE001 - el catálogo es opcional
+        logger.warning("No se pudo armar el catálogo del aviso (tenant %s)", tenant.id, exc_info=True)
+        return None
+
+
 def _wa_phone(raw: str | None) -> str | None:
     digits = "".join(ch for ch in (raw or "") if ch.isdigit())
     if len(digits) == 9 and digits.startswith("9"):  # celular chileno sin código
@@ -213,7 +280,7 @@ def _wa_phone(raw: str | None) -> str | None:
     return digits if len(digits) >= 10 else None
 
 
-def whatsapp_message(db: Session, cremation_id: int, step_id: int | None) -> dict:
+def whatsapp_message(db: Session, cremation_id: int, step_id: int | None, message: str | None = None) -> dict:
     """Mensaje y enlace wa.me para avisar a la familia desde la orden."""
     cremation = _load(db, cremation_id)
     if not cremation:
@@ -233,6 +300,8 @@ def whatsapp_message(db: Session, cremation_id: int, step_id: int | None) -> dic
         body = f"{hello}, te escribimos de {tenant.name}. El servicio de {pet} avanzó a la etapa «{step.name}»."
     else:
         body = f"{hello}, te escribimos de {tenant.name} sobre el servicio de {pet}."
+    if _clean_message(message):
+        body = _clean_message(message)
     if url:
         body += f" Puedes seguirlo aquí: {url}"
     return {"url": f"https://wa.me/{phone}?text={quote(body)}", "phone": phone, "message": body}

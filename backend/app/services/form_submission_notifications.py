@@ -121,7 +121,7 @@ async def send_submission_notifications(
                 souvenirs = None
                 try:
                     from app.services import official_links
-                    shop_url = official_links.store_url(db, tenant)
+                    shop_url = official_links.with_ref(official_links.store_url(db, tenant), submission_code)
                     items = official_links.souvenir_products(db, tenant.id) if shop_url else []
                     if items:
                         souvenirs = {

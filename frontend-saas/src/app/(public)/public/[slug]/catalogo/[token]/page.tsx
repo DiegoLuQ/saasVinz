@@ -23,12 +23,14 @@ import {
     Sun,
     Moon,
     Flame,
-    ShoppingBag
+    ShoppingBag,
+    Plus,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PublicPlansCatalog, { type PublicPlan } from '@/components/public/catalog/PublicPlansCatalog';
 import type { WeightTier } from '@/lib/publicFormConfig';
 import { vinzerPromoUrl } from '@/lib/publicUrls';
+import ProductCart, { type CartLine } from '@/components/public/catalog/ProductCart';
 
 interface ProductItem {
     id: number;
@@ -72,6 +74,8 @@ interface PublicCatalogData {
     weight_tiers?: WeightTier[];
     catalog_message?: string | null;
     show_plan_request?: boolean;
+    /** Abierto con ?ref= (correo / seguimiento): mascota y si se puede pedir */
+    order_ref?: { pet_name?: string | null; can_request: boolean } | null;
 }
 
 export default function PublicCatalogPage() {
@@ -95,6 +99,17 @@ export default function PublicCatalogPage() {
     // Copy link feedback
     const [copiedLink, setCopiedLink] = useState(false);
 
+    // Carrito: ?ref= liga la solicitud a la orden de la mascota (si no, compra externa)
+    const [ref, setRef] = useState<string | null>(null);
+    const [refReady, setRefReady] = useState(false);
+    const [cart, setCart] = useState<CartLine[]>([]);
+    const [cartOpen, setCartOpen] = useState(false);
+    const [addedId, setAddedId] = useState<number | null>(null);
+    useEffect(() => {
+        try { setRef(new URLSearchParams(window.location.search).get('ref')); } catch { /* sin URL */ }
+        setRefReady(true);
+    }, []);
+
     // Modo claro / oscuro: preferencia guardada o la del sistema (igual que el formulario público).
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
     useEffect(() => {
@@ -116,14 +131,15 @@ export default function PublicCatalogPage() {
     };
 
     useEffect(() => {
-        if (!slug || !token) return;
+        if (!slug || !token || !refReady) return;
 
         let isMounted = true;
         const fetchCatalog = async () => {
             try {
                 setLoading(true);
                 setError(null);
-                const res = await apiRequest(`/api/public/catalog/${encodeURIComponent(slug)}/${encodeURIComponent(token)}`);
+                const qs = ref ? `?ref=${encodeURIComponent(ref)}` : '';
+                const res = await apiRequest(`/api/public/catalog/${encodeURIComponent(slug)}/${encodeURIComponent(token)}${qs}`);
                 if (isMounted) {
                     setData(res as PublicCatalogData);
                 }
@@ -139,7 +155,7 @@ export default function PublicCatalogPage() {
 
         fetchCatalog();
         return () => { isMounted = false; };
-    }, [slug, token]);
+    }, [slug, token, ref, refReady]);
 
     // Categories list
     const categories = useMemo(() => {
@@ -207,6 +223,24 @@ export default function PublicCatalogPage() {
 
         return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     };
+
+    const unitPrice = (p: ProductItem) =>
+        p.discount_percentage > 0 ? Math.round(p.sale_price * (1 - p.discount_percentage / 100)) : p.sale_price;
+    const maxQty = (p: ProductItem) => (p.made_to_order ? 20 : Math.max(0, Math.min(20, p.stock)));
+    const addToCart = (p: ProductItem) => {
+        setCart(prev => {
+            const found = prev.find(l => l.id === p.id);
+            if (found) return prev.map(l => l.id === p.id ? { ...l, qty: Math.min(l.qty + 1, l.max) } : l);
+            return [...prev, {
+                id: p.id, name: p.name, price: unitPrice(p), image: getImageUrl(p.image_url),
+                made_to_order: !!p.made_to_order, max: maxQty(p), qty: 1,
+            }];
+        });
+        setAddedId(p.id);
+        setTimeout(() => setAddedId(cur => (cur === p.id ? null : cur)), 1500);
+    };
+    const cartCount = cart.reduce((s, l) => s + l.qty, 0);
+    const cartTotal = cart.reduce((s, l) => s + l.qty * l.price, 0);
 
     const buildRenewalWhatsAppUrl = () => {
         if (!data) return '#';
@@ -431,6 +465,18 @@ export default function PublicCatalogPage() {
                 </div>
             </header>
 
+            {data.order_ref && (
+                <div className={`border-b ${data.order_ref.can_request
+                    ? 'bg-sky-50 border-sky-200 text-sky-900 dark:bg-sky-500/10 dark:border-sky-500/20 dark:text-sky-100'
+                    : 'bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-100'}`}>
+                    <p className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 text-sm font-semibold">
+                        {data.order_ref.can_request
+                            ? <>Recuerdos para <b>{data.order_ref.pet_name || 'tu mascota'}</b>: lo que agregues se sumará a su servicio.</>
+                            : <>El servicio de <b>{data.order_ref.pet_name || 'tu mascota'}</b> ya concluyó, por eso no se reciben más solicitudes desde aquí. Escríbenos por WhatsApp y te ayudamos.</>}
+                    </p>
+                </div>
+            )}
+
             {/* Hero / Filter Bar */}
             <section className="relative bg-gradient-to-b from-amber-500/[0.04] via-transparent to-transparent pt-8 pb-6 border-b border-slate-200 dark:border-white/[0.04]">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
@@ -440,7 +486,7 @@ export default function PublicCatalogPage() {
                             Modelos y Accesorios Disponibles
                         </h2>
                         <p className="text-xs sm:text-sm text-slate-600 dark:text-neutral-400 mt-1 max-w-2xl leading-relaxed">
-                            Selecciona cualquier producto para consultar disponibilidad o solicitarlo de inmediato mediante WhatsApp con atención personalizada.
+                            Agrega los productos que quieras a tu solicitud y envíala: el crematorio la revisa y te contacta. También puedes consultarnos por WhatsApp.
                         </p>
                     </div>
 
@@ -542,6 +588,7 @@ export default function PublicCatalogPage() {
                                 : product.sale_price;
 
                             const whatsAppHref = buildWhatsAppUrl(product);
+                            const canRequest = data.order_ref ? data.order_ref.can_request : true;
 
                             return (
                                 <motion.div
@@ -675,19 +722,31 @@ export default function PublicCatalogPage() {
                                                 </div>
                                             </div>
 
-                                            {/* WhatsApp CTA Button */}
+                                            {/* Solicitar (carrito) + consulta por WhatsApp */}
+                                            {canRequest && !isOutOfStock && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => addToCart(product)}
+                                                    className="w-full py-3 px-4 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 bg-amber-500 hover:bg-amber-600 text-black shadow-amber-500/20"
+                                                >
+                                                    {addedId === product.id ? <Check size={16} /> : <Plus size={16} />}
+                                                    <span>{addedId === product.id ? 'Agregado' : 'Solicitar'}</span>
+                                                </button>
+                                            )}
                                             <a
                                                 href={whatsAppHref}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className={`w-full py-3 px-4 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${
-                                                    isOutOfStock
-                                                        ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 dark:bg-white/10 dark:hover:bg-white/15 dark:text-neutral-300 dark:border-white/10 shadow-none'
-                                                        : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20 hover:shadow-emerald-500/30'
+                                                className={`w-full py-2.5 px-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-95 ${
+                                                    canRequest && !isOutOfStock
+                                                        ? 'text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10'
+                                                        : isOutOfStock
+                                                            ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 dark:bg-white/10 dark:hover:bg-white/15 dark:text-neutral-300 dark:border-white/10'
+                                                            : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20'
                                                 }`}
                                             >
-                                                <MessageCircle size={16} />
-                                                <span>{isOutOfStock ? 'Consultar Próximo Ingreso' : 'Pedir por WhatsApp'}</span>
+                                                <MessageCircle size={15} />
+                                                <span>{isOutOfStock ? 'Consultar próximo ingreso' : 'Consultar por WhatsApp'}</span>
                                             </a>
                                         </div>
                                     </div>
@@ -822,6 +881,17 @@ export default function PublicCatalogPage() {
                                     </div>
 
                                     {/* Action button inside modal */}
+                                    {(data.order_ref ? data.order_ref.can_request : true)
+                                        && (previewProduct.made_to_order || previewProduct.stock > 0) && (
+                                        <button
+                                            type="button"
+                                            onClick={() => { addToCart(previewProduct); setPreviewProduct(null); setCartOpen(true); }}
+                                            className="w-full bg-amber-500 hover:bg-amber-600 active:scale-95 text-black font-black py-4 px-6 rounded-2xl flex items-center justify-center gap-2.5 transition-all shadow-xl shadow-amber-500/20 text-sm uppercase tracking-wider"
+                                        >
+                                            <Plus size={20} />
+                                            <span>Solicitar</span>
+                                        </button>
+                                    )}
                                     <a
                                         href={buildWhatsAppUrl(previewProduct)}
                                         target="_blank"
@@ -837,6 +907,30 @@ export default function PublicCatalogPage() {
                     </div>
                 )}
             </AnimatePresence>
+
+            {cartCount > 0 && !cartOpen && (
+                <button
+                    type="button"
+                    onClick={() => setCartOpen(true)}
+                    className="fixed z-40 bottom-5 left-1/2 -translate-x-1/2 sm:left-auto sm:right-6 sm:translate-x-0 bg-amber-500 hover:bg-amber-600 text-black font-black text-sm px-5 py-3.5 rounded-2xl shadow-2xl shadow-amber-500/30 flex items-center gap-2.5"
+                    style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
+                >
+                    <ShoppingBag size={18} /> Ver solicitud ({cartCount}) · ${cartTotal.toLocaleString('es-CL')}
+                </button>
+            )}
+            {cartOpen && (
+                <ProductCart
+                    slug={slug}
+                    token={token}
+                    lines={cart}
+                    orderRef={ref && data.order_ref?.can_request ? { ref, pet_name: data.order_ref.pet_name } : null}
+                    tenantName={data.tenant_name}
+                    onQty={(id, qty) => setCart(prev => prev.map(l => l.id === id ? { ...l, qty: Math.max(1, Math.min(qty, l.max)) } : l))}
+                    onRemove={id => setCart(prev => prev.filter(l => l.id !== id))}
+                    onClear={() => setCart([])}
+                    onClose={() => setCartOpen(false)}
+                />
+            )}
 
             {/* Footer */}
             <footer className="border-t border-slate-200 bg-white dark:border-white/[0.06] dark:bg-[#07090e] py-8 mt-auto">

@@ -15,11 +15,11 @@ import {
     ChevronDown,
     CreditCard,
     ShoppingBag,
+    ShoppingCart,
     Package,
     Tags,
     Truck,
     Heart,
-    ShieldCheck,
     AlertCircle,
     LogOut,
     Briefcase,
@@ -29,9 +29,9 @@ import {
     Stamp,
     Lock,
     CreditCard as CreditCardIcon,
-    HelpCircle,
     Sparkles,
-    Building2
+    Building2,
+    BarChart3
 } from 'lucide-react';
 import { getSubscriptionInfo, isModuleAllowedWhenLocked } from '@/lib/tenant/subscription';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -72,11 +72,13 @@ const NAV_GROUPS: { key: NavGroup; label: string }[] = [
 
 const navItems: NavItem[] = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, moduleKey: 'dashboard', group: 'principal' },
+    { name: 'Indicadores', href: '/dashboard/indicadores', icon: BarChart3, moduleKey: 'dashboard', featureKey: 'dashboard:metricas', allowedRoles: ['admin', 'contabilidad', 'creator'], group: 'principal' },
     { name: 'Clientes', href: '/dashboard/clientes', icon: Users, moduleKey: 'clientes', group: 'clientes' },
     { name: 'Mascotas', href: '/dashboard/mascotas', icon: Dog, moduleKey: 'mascotas', group: 'clientes' },
     { name: 'Convenios', href: '/dashboard/convenios', icon: Building2, moduleKey: 'clientes', featureKey: 'clientes:convenios', group: 'clientes' },
     { name: 'Catálogo de Servicios', href: '/dashboard/gestion-servicios', icon: Palette, moduleKey: 'servicios', group: 'catalogo' },
     { name: 'Recepción y Pedidos', href: '/dashboard/recepcion-pedidos', icon: Flame, moduleKey: 'ordenes', group: 'operacion' },
+    { name: 'Solicitudes de productos', href: '/dashboard/solicitudes-productos', icon: ShoppingCart, moduleKey: 'ordenes', group: 'operacion' },
     {
         name: 'Inventario',
         href: '#',
@@ -123,8 +125,7 @@ const navItems: NavItem[] = [
             { name: 'Comisiones', href: '/dashboard/partners/comisiones', icon: DollarSign, featureKey: 'veterinarios:comisiones:ver' },
         ]
     },
-    { name: 'Roles y Módulos', href: '/dashboard/roles-modulos', icon: ShieldCheck, moduleKey: 'configuracion', featureKey: 'configuracion:roles', group: 'configuracion' }, // Nuevo
-    { name: 'Ayuda y Tutoriales', href: '/dashboard/ayuda', icon: HelpCircle, group: 'configuracion' },
+    // «Roles y Módulos» y «Ayuda y Tutoriales» viven en el menú del usuario (Navbar, junto a Cerrar sesión)
 ];
 
 export default function Sidebar() {
@@ -158,6 +159,7 @@ export default function Sidebar() {
         .filter(m => m.is_active)
         .map(m => m.module_key) || [];
     const pendingSubmissionsCount = bootstrapData?.metadata?.pending_submissions ?? 0;
+    const pendingProductRequests = bootstrapData?.metadata?.pending_product_requests ?? 0;
 
     // Estado de suscripción: si está en lockdown (post-gracia), todos los módulos
     // excepto los permitidos se muestran con candado.
@@ -407,24 +409,34 @@ export default function Sidebar() {
                                                 </motion.span>
                                             )}
                                         </div>
-                                        {/* Solicitudes web pendientes: se revisan en el Dashboard (aviso «N solicitudes web pendientes») */}
-                                        {item.href === '/dashboard' && pendingSubmissionsCount > 0 && (
-                                            collapsed ? (
-                                                <span
-                                                    title={`${pendingSubmissionsCount} solicitud(es) web pendiente(s)`}
-                                                    className="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-slate-950 font-black text-[9px] flex items-center justify-center shadow-xs"
-                                                >
-                                                    {pendingSubmissionsCount > 9 ? '9+' : pendingSubmissionsCount}
+                                        {/* Pendientes: ámbar = registros del formulario, celeste = solicitudes de productos del catálogo */}
+                                        {(() => {
+                                            const badges: { n: number; title: string; cls: string }[] = [];
+                                            if (item.href === '/dashboard' && pendingSubmissionsCount > 0)
+                                                badges.push({ n: pendingSubmissionsCount, title: `${pendingSubmissionsCount} registro(s) del formulario pendiente(s)`, cls: 'bg-amber-500 text-slate-950' });
+                                            if ((item.href === '/dashboard' || item.href === '/dashboard/solicitudes-productos') && pendingProductRequests > 0)
+                                                badges.push({ n: pendingProductRequests, title: `${pendingProductRequests} solicitud(es) de productos pendiente(s)`, cls: 'bg-sky-300 text-slate-950 ring-1 ring-sky-500/40' });
+                                            if (!badges.length) return null;
+                                            return collapsed ? (
+                                                <span className="absolute top-1 right-1 flex flex-col gap-0.5">
+                                                    {badges.map(b => (
+                                                        <span key={b.cls} title={b.title}
+                                                            className={`min-w-[16px] h-4 px-1 rounded-full font-black text-[9px] flex items-center justify-center shadow-xs ${b.cls}`}>
+                                                            {b.n > 9 ? '9+' : b.n}
+                                                        </span>
+                                                    ))}
                                                 </span>
                                             ) : (
-                                                <span
-                                                    title={`${pendingSubmissionsCount} solicitud(es) web pendiente(s)`}
-                                                    className="ml-2 shrink-0 px-1.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] leading-none shadow-xs"
-                                                >
-                                                    {pendingSubmissionsCount}
+                                                <span className="ml-2 shrink-0 flex items-center gap-1">
+                                                    {badges.map(b => (
+                                                        <span key={b.cls} title={b.title}
+                                                            className={`px-1.5 py-0.5 rounded-full font-black text-[10px] leading-none shadow-xs ${b.cls}`}>
+                                                            {b.n}
+                                                        </span>
+                                                    ))}
                                                 </span>
-                                            )
-                                        )}
+                                            );
+                                        })()}
                                     </Link>
                                 )}
 

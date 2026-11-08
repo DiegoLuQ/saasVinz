@@ -692,12 +692,8 @@ def advance_order_step(
     db.commit()
     db.refresh(cremation)
 
-    # Aviso a la familia si la nueva fase lo tiene activo (correo en segundo plano).
-    new_step = next((st for st in steps if st.id == tech.step_id), None)
-    if new_step is not None and new_step.notify_family:
-        from app.services.family_notices import notify_in_background
-        background_tasks.add_task(notify_in_background, cremation.id, new_step.id, False, current_user.id)
-
+    # El aviso a la familia es manual: el panel abre un modal tras avanzar
+    # (POST .../family-notices/email o /whatsapp). No se envía nada automáticamente.
     return get_enriched_order(db, cremation_id, tenant_id)
 
 @router.patch("/ops/orders/{cremation_id}/revert", response_model=schemas.DailyOrderSchema)

@@ -93,16 +93,44 @@ def status(db: Session, tenant) -> dict:
     }
 
 
+def with_ref(url: str | None, ref: str | None) -> str | None:
+    """Catálogo ligado a la orden: ?ref=<token de seguimiento / código del registro>
+    (el carrito del catálogo queda asociado a esa mascota, services/product_requests.py)."""
+    if not url or not ref:
+        return url
+    from urllib.parse import quote
+    return f"{url}{'&' if '?' in url else '?'}ref={quote(str(ref), safe='')}"
+
+
+def products_catalog_url(db: Session, tenant) -> str | None:
+    """Catálogo de productos del crematorio para los avisos: el oficial o, si no hay,
+    el enlace de productos activo y vigente más reciente. None = no tiene."""
+    from datetime import datetime, timezone
+    tok = _valid_token(db, tenant.id, _config(tenant)["products_token_id"], "products")
+    if tok is None:
+        now = datetime.now(timezone.utc)
+        for t in db.query(CatalogShareToken).filter(
+            CatalogShareToken.tenant_id == tenant.id,
+            CatalogShareToken.catalog_type == "products",
+            CatalogShareToken.is_active.is_(True),
+        ).order_by(CatalogShareToken.created_at.desc()).all():
+            if t.expires_at is None or t.expires_at > now:
+                tok = t
+                break
+    return catalog_url(tenant.slug, tok.token) if tok is not None else None
+
+
 def store_url(db: Session, tenant) -> str | None:
     """Catálogo de recuerdos (productos oficial), solo con los tres enlaces configurados."""
     st = status(db, tenant)
     return st["products"]["url"] if st["complete"] else None
 
 
-def souvenir_products(db: Session, tenant_id: int, limit: int = MAX_SOUVENIRS) -> list[Product]:
+def souvenir_products(db: Session, tenant_id: int, limit: int = MAX_SOUVENIRS, diverse: bool = False) -> list[Product]:
     """Hasta `limit` productos para mostrar: el más vendido siempre (compras reales; si
     nadie ha comprado, el de etiqueta «Más vendido») y el resto al azar. Solo activos,
-    con foto y con stock o «a pedido»."""
+    con foto y con stock o «a pedido». `diverse` = el resto de categorías distintas
+    primero (p. ej. un relicario, una ánfora y un huellero)."""
     from app.api.internal.operations.models import ProductoOC, CremationOC
 
     products = [
@@ -125,6 +153,16 @@ def souvenir_products(db: Session, tenant_id: int, limit: int = MAX_SOUVENIRS) -
         best = tagged[0] if tagged else None
     rest = [p for p in products if best is None or p.id != best.id]
     random.shuffle(rest)
+    if diverse:
+        seen = {best.category_id} if best else set()
+        first, later = [], []
+        for p in rest:
+            if p.category_id not in seen:
+                seen.add(p.category_id)
+                first.append(p)
+            else:
+                later.append(p)
+        rest = first + later
     chosen = ([best] if best else []) + rest
     return chosen[:limit]
 

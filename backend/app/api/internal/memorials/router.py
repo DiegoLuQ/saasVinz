@@ -31,6 +31,10 @@ _RATE_LIMIT_WINDOW = 60   # seconds
 def _check_rate_limit(client_ip: str):
     """Raises 429 if client exceeds 5 requests/minute."""
     now = time.time()
+    if len(_rate_limit_store) > 500:
+        stale_keys = [k for k, v in list(_rate_limit_store.items()) if not v or now - v[-1] >= _RATE_LIMIT_WINDOW]
+        for k in stale_keys:
+            _rate_limit_store.pop(k, None)
     timestamps = _rate_limit_store[client_ip]
     # Purge expired entries
     _rate_limit_store[client_ip] = [t for t in timestamps if now - t < _RATE_LIMIT_WINDOW]
@@ -93,7 +97,12 @@ def list_public_memorials(
         mem_models.Memorial.status == mem_models.MemorialStatus.active
     ).order_by(mem_models.Memorial.fecha.desc())
     
-    memorials = query.limit(limit).all()
+    from app.core.tenant_context import apply_bypass_rls, clear_rls
+    apply_bypass_rls(db)
+    try:
+        memorials = query.limit(limit).all()
+    finally:
+        clear_rls(db)
     
     return [
         mem_schemas.MemorialCardResponse(
@@ -333,7 +342,8 @@ def create_memorial(
 
     # 3. Check if memorial already exists
     existing = db.query(mem_models.Memorial).filter(
-        mem_models.Memorial.id_mascota == memorial_in.id_mascota
+        mem_models.Memorial.id_mascota == memorial_in.id_mascota,
+        mem_models.Memorial.id_tenant == current_user.tenant_id
     ).first()
     if existing:
         existing_mem = db.query(mem_models.Memorial).options(
@@ -631,7 +641,8 @@ def _drop_timeline_photo(db: Session, url: str | None) -> None:
     try:
         MediaService.delete_media_by_url(db, url)
     except Exception as e:  # noqa: BLE001 — el momento se borra igual
-        print(f"No se pudo borrar la foto del momento: {e}")
+        import logging
+        logging.getLogger(__name__).warning("No se pudo borrar la foto del momento: %s", e)
 
 
 def _timeline_out(db: Session, memorial: mem_models.Memorial) -> dict:
@@ -874,7 +885,8 @@ def update_memorial_settings(
         raise HTTPException(status_code=401, detail="No autorizado.")
 
     # Rate limiting per IP
-    client_ip = request.client.host if request.client else "unknown"
+    from app.core.client_ip import get_client_ip
+    client_ip = get_client_ip(request)
     _check_rate_limit(client_ip)
 
     update_data = memorial_up.model_dump(exclude_unset=True)
@@ -1193,6 +1205,10 @@ async def send_credentials_endpoint(
 
     from app.services.memorial_notifications import send_memorial_welcome_email
     target_email = payload.email if payload and payload.email else None
+    if current_user.role != "creator" and memorial.id_tenant != current_user.tenant_id:
+        raise HTTPException(status_code=404, detail="Memorial no encontrado.")
+    from app.core.tenant_context import apply_tenant_rls
+    apply_tenant_rls(db, memorial.id_tenant)
     result = await send_memorial_welcome_email(db, memorial.id, to_email=target_email)
     if not result.get("sent"):
         raise HTTPException(
@@ -1204,6 +1220,7 @@ async def send_credentials_endpoint(
 
 @router.post("/cron/anniversaries")
 async def trigger_anniversary_check(
+    current_user: models.User = Depends(auth.get_current_creator),
     db: Session = Depends(get_db)
 ):
     """Revisa memoriales y envía recordatorios anuales de angelitos."""

@@ -191,6 +191,7 @@ def get_tracking_info(
             is_ultra_plan="ULTRA" in ((getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper()),
             tenant_plan=(getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper(),
             show_vinzer_brand=_show_brand(tenant),
+            souvenir_store_url=_store_url(db, tenant, token),
         )
 
     # 3. Validar Nombre de Mascota (Seguridad Adicional + UX)
@@ -299,14 +300,14 @@ def get_tracking_info(
         show_vinzer_brand=_show_brand(tenant),
         feedback_enabled=delivered and feature_on(tenant),
         feedback={"rating": fb.rating, "comment": fb.comment} if fb else None,
-        souvenir_store_url=_store_url(db, tenant),
+        souvenir_store_url=_store_url(db, tenant, token),
     )
 
 
-def _store_url(db, tenant):
-    from app.services.official_links import store_url
+def _store_url(db, tenant, ref=None):
+    from app.services.official_links import store_url, with_ref
     try:
-        return store_url(db, tenant)
+        return with_ref(store_url(db, tenant), ref)
     except Exception:
         return None
 

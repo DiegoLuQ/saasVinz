@@ -6,7 +6,7 @@ envío vive en app/services/family_notices.py.
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -38,10 +38,26 @@ def list_family_notices(
     rows = db.query(models.FamilyNotice).filter(models.FamilyNotice.cremation_id == c.id) \
         .order_by(models.FamilyNotice.created_at.desc()).all()
     steps = {s.id: s.name for s in db.query(models.WorkflowStep).filter(models.WorkflowStep.tenant_id == tenant_id).all()}
+    step_id = c.technical.step_id if c.technical else None
+    # Etapa a la que pasaría al avanzar (None = ya está en la última: se concluye)
+    active = db.query(models.WorkflowStep).filter(models.WorkflowStep.tenant_id == tenant_id,
+                                                  models.WorkflowStep.is_active == True) \
+        .order_by(models.WorkflowStep.order_index).all()  # noqa: E712
+    idx = next((i for i, s in enumerate(active) if s.id == step_id), -1)
+    nxt = active[idx + 1] if idx + 1 < len(active) else None
+    pet_name = c.pet.name if c.pet else "tu mascota"
     return {
         "enabled": fn.feature_on(c.tenant),
         "email": (customer.email or None) if customer else None,
         "phone": (customer.phone or None) if customer else None,
+        "owner_name": customer.name if customer else None,
+        "pet_name": c.pet.name if c.pet else None,
+        "pet_photo": fn.pet_photo(c),
+        "step_id": step_id,
+        "step_name": steps.get(step_id) if step_id else None,
+        "next_step_id": nxt.id if nxt else None,
+        "next_step_name": nxt.name if nxt else None,
+        "next_message": fn.default_step_message(customer.name if customer else None, pet_name, nxt.name) if nxt else None,
         "notices": [{
             "id": r.id, "kind": r.kind, "channel": r.channel, "sent_to": r.sent_to,
             "step_id": r.step_id, "step_name": steps.get(r.step_id), "created_at": r.created_at,
@@ -51,6 +67,8 @@ def list_family_notices(
 
 class NoticeRequest(BaseModel):
     step_id: Optional[int] = None
+    # Texto escrito en el panel (opcional; vacío = mensaje por defecto)
+    message: Optional[str] = Field(default=None, max_length=fn.MAX_MESSAGE)
 
 
 @router.post("/ops/orders/{cremation_id}/family-notices/whatsapp")
@@ -66,7 +84,7 @@ def whatsapp_notice(
     if not fn.feature_on(c.tenant):
         raise HTTPException(status_code=403, detail="Los avisos a la familia no están incluidos en tu plan")
     step_id = data.step_id or (c.technical.step_id if c.technical else None)  # sin indicar = fase actual
-    result = fn.whatsapp_message(db, c.id, step_id)
+    result = fn.whatsapp_message(db, c.id, step_id, data.message)
     if not result.get("url"):
         raise HTTPException(status_code=422, detail="El cliente no tiene un celular válido registrado")
     fn.record_whatsapp(db, c.id, step_id, current_user.id)
@@ -90,7 +108,7 @@ async def email_notice(
         step_id = data.step_id or (c.technical.step_id if c.technical else None)
         if not step_id:
             raise HTTPException(status_code=422, detail="La orden aún no tiene una fase")
-        result = await fn.send_step_email(db, c.id, step_id, current_user.id, force=True)
+        result = await fn.send_step_email(db, c.id, step_id, current_user.id, force=True, message=data.message)
     if not result.get("sent"):
         reasons = {"no_email": "El cliente no tiene correo registrado",
                    "plan": "Los avisos a la familia no están incluidos en tu plan"}

@@ -8,6 +8,7 @@
  */
 
 const ROUTE_MODULES: { prefix: string; module: string }[] = [
+    { prefix: '/dashboard/indicadores', module: 'dashboard' },
     { prefix: '/dashboard/clientes', module: 'clientes' },
     { prefix: '/dashboard/convenios', module: 'clientes' },
     { prefix: '/dashboard/mascotas', module: 'mascotas' },
@@ -15,6 +16,7 @@ const ROUTE_MODULES: { prefix: string; module: string }[] = [
     { prefix: '/dashboard/recepcion-pedidos', module: 'ordenes' },
     { prefix: '/dashboard/asignacion-servicios', module: 'ordenes' },
     { prefix: '/dashboard/registros', module: 'ordenes' },
+    { prefix: '/dashboard/solicitudes-productos', module: 'ordenes' },
     { prefix: '/dashboard/inventario', module: 'inventario' },
     { prefix: '/dashboard/documentos', module: 'certificados' },
     { prefix: '/dashboard/operaciones', module: 'operaciones' },
@@ -46,6 +48,7 @@ const ROUTE_FEATURES: { prefix: string; feature: string; exact?: boolean }[] = [
     { prefix: '/dashboard/partners', feature: 'veterinarios:gestionar' },
     { prefix: '/dashboard/roles-modulos', feature: 'configuracion:roles' },
     { prefix: '/dashboard/convenios', feature: 'clientes:convenios' },
+    { prefix: '/dashboard/indicadores', feature: 'dashboard:metricas' },
 ];
 
 /** Característica del plan que exige una ruta, o null. */

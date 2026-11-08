@@ -295,6 +295,10 @@ from app.api.internal.common.auto_documents.router import router as auto_documen
 app.include_router(auto_documents_router, prefix="/api/internal/auto-documents", tags=["Documentos automáticos"])
 from app.api.internal.common.official_links.router import router as official_links_router
 app.include_router(official_links_router, prefix="/api/internal/official-links", tags=["Enlaces oficiales"])
+from app.api.internal.catalog.product_requests.router import router as product_requests_router
+app.include_router(product_requests_router, prefix="/api/internal/product-requests", tags=["Solicitudes de productos"])
+from app.api.internal.common.kpis.router import router as kpis_router
+app.include_router(kpis_router, prefix="/api/internal/kpis", tags=["Indicadores"])
 app.include_router(form_tokens_router, prefix="/api/internal/form-tokens", tags=["Form Tokens"])
 app.include_router(health_router, prefix="/api/internal", tags=["Health"])
 app.include_router(media_router, prefix="/api/internal", tags=["Biblioteca de Medios"])
@@ -386,7 +390,7 @@ class RequestLoggerMiddleware:
 
         method = scope["method"]
         path = scope["path"]
-        logger.info(f"--> incoming: {method} {path}")
+        t0 = datetime.now()
 
         response_status = [500]
 
@@ -397,7 +401,13 @@ class RequestLoggerMiddleware:
 
         try:
             await self.app(scope, receive, send_wrapper)
-            logger.info(f"<-- outgoing: {response_status[0]} for {path}")
+            elapsed_ms = (datetime.now() - t0).total_seconds() * 1000
+            status_code = response_status[0]
+            is_noisy = path in ("/health", "/favicon.ico") or path.startswith(("/static/", "/storage/"))
+            if status_code >= 400:
+                logger.warning(f"{method} {path} -> {status_code} ({elapsed_ms:.1f}ms)")
+            elif not is_noisy:
+                logger.info(f"{method} {path} -> {status_code} ({elapsed_ms:.1f}ms)")
         except Exception as e:
             logger.error(f"[ERROR]: {str(e)} in {path}")
             raise e

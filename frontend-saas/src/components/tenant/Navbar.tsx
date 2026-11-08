@@ -29,6 +29,7 @@ import {
     Coins,
     FileText,
     ExternalLink,
+    HelpCircle,
 } from 'lucide-react';
 import type { CustomFormPreset } from '@/lib/publicFormConfig';
 import Modal from '@/components/tenant/Modal';
@@ -266,6 +267,9 @@ export default function Navbar() {
         if (n.type === 'new_submission' && n.data?.submission_id) {
             router.push(`/dashboard/registros/${n.data.submission_id}`);
             setShowNotifications(false);
+        } else if (n.type === 'product_request' && n.data?.request_id) {
+            router.push(`/dashboard/solicitudes-productos?id=${n.data.request_id}`);
+            setShowNotifications(false);
         } else {
             setSelectedNotification(n);
             setShowNotifModal(true);
@@ -387,7 +391,12 @@ export default function Navbar() {
                             >
                                 <Bell size={20} />
                                 {notifications.length > 0 && (
-                                    <span className="absolute top-2 right-2 sm:top-2.5 sm:right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+                                    <span
+                                        aria-label={`${notifications.length} notificaciones`}
+                                        className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-black leading-none rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center tabular-nums"
+                                    >
+                                        {notifications.length > 99 ? '99+' : notifications.length}
+                                    </span>
                                 )}
                             </button>
 
@@ -598,6 +607,24 @@ export default function Navbar() {
                                                 Configuración
                                             </button>
                                         )}
+                                        {canOpen('/dashboard/roles-modulos') && (
+                                            <Link
+                                                href="/dashboard/roles-modulos"
+                                                onClick={() => setShowUserMenu(false)}
+                                                className="flex items-center w-full p-2.5 rounded-xl hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-all dark:hover:bg-slate-800 dark:text-slate-200"
+                                            >
+                                                <ShieldCheck size={15} className="mr-2.5 text-slate-400" />
+                                                Roles y Módulos
+                                            </Link>
+                                        )}
+                                        <Link
+                                            href="/dashboard/ayuda"
+                                            onClick={() => setShowUserMenu(false)}
+                                            className="flex items-center w-full p-2.5 rounded-xl hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-all dark:hover:bg-slate-800 dark:text-slate-200"
+                                        >
+                                            <HelpCircle size={15} className="mr-2.5 text-slate-400" />
+                                            Ayuda y Tutoriales
+                                        </Link>
                                         <div className="h-px bg-slate-100 my-1 dark:bg-slate-800" />
                                         <button
                                             onClick={handleLogout}

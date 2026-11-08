@@ -215,3 +215,37 @@ class CatalogEvent(Base):
     session_id = Column(String(40), nullable=False)
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
 
+
+
+class ProductRequest(Base):
+    """Solicitud de productos desde el catálogo público (carrito de la familia).
+
+    kind 'order' = ligada a una orden de cremación (o a su registro web mientras no
+    hay orden): al aceptarla se agregan las líneas a la orden. kind 'external' =
+    persona sin orden (nombre + WhatsApp): es la «orden de compra de productos»
+    (PC-0001), con su propio estado. Precios congelados del catálogo en `items`.
+    Lógica en app/services/product_requests.py.
+    """
+    __tablename__ = "inv_product_requests"
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("sys_tenants.id"), nullable=False, index=True)
+    number = Column(Integer, nullable=False)  # correlativo por crematorio (PC-0001)
+    kind = Column(String(20), nullable=False, default="order")  # order | external
+    status = Column(String(20), nullable=False, default="pending")  # pending | accepted | delivered | rejected | cancelled
+    cremation_id = Column(Integer, ForeignKey("oc_cremations.id", ondelete="SET NULL"), nullable=True, index=True)
+    submission_id = Column(Integer, ForeignKey("web_form_submissions.id", ondelete="SET NULL"), nullable=True, index=True)
+    customer_id = Column(Integer, ForeignKey("crm_customers.id", ondelete="SET NULL"), nullable=True)
+    catalog_token_id = Column(Integer, ForeignKey("inv_catalog_tokens.id", ondelete="SET NULL"), nullable=True)
+    pet_name = Column(String(120), nullable=True)
+    contact_name = Column(String(120), nullable=True)
+    contact_phone = Column(String(40), nullable=True)
+    note = Column(Text, nullable=True)
+    items = Column(JSON, nullable=False, default=list)  # [{product_id, name, price, qty, made_to_order, image_url}]
+    total = Column(Float, nullable=False, default=0.0)
+    reject_reason = Column(String(300), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=tz.get_now)
+    decided_at = Column(DateTime(timezone=True), nullable=True)
+    decided_by = Column(Integer, ForeignKey("sys_users.id", ondelete="SET NULL"), nullable=True)
+    delivered_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (UniqueConstraint('tenant_id', 'number', name='uix_product_request_number'),)

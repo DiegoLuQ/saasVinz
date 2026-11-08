@@ -94,8 +94,8 @@ export function WorkflowTab() {
                         <div>
                             <h4 className="font-bold">Avisos a la familia</h4>
                             <p className="text-sm text-muted-foreground mt-0.5">
-                                Marca en cada paso «Avisar a la familia»: cuando la orden entra a ese paso, la familia recibe un correo con tu logo y
-                                el enlace de seguimiento. Desde el Panel de Trabajo también puedes avisar por WhatsApp.
+                                Cada vez que avanzas de etapa (Panel de Trabajo u orden), te preguntamos si quieres avisar a la familia: por correo, con
+                                la foto de la mascota, tu logo, el enlace de seguimiento y tu catálogo de productos, o por WhatsApp si no tiene correo. Nunca se envía solo.
                             </p>
                         </div>
                     </div>
@@ -168,22 +168,10 @@ export function WorkflowTab() {
                                         <p className="font-bold text-lg">{step.name}</p>
                                         <p className="text-xs text-muted-foreground">
                                             {step.is_active ? 'Activo' : 'Inactivo'}
-                                            {step.notify_family && notices?.enabled && <span className="ml-2 text-sky-600 dark:text-sky-300 font-semibold">· Avisa a la familia</span>}
                                         </p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    {notices?.enabled && (
-                                        <button
-                                            onClick={() => handleUpdateStep(step.id, { notify_family: !step.notify_family })}
-                                            title={step.notify_family ? 'Dejar de avisar a la familia en este paso' : 'Enviar un correo a la familia cuando la orden entre a este paso'}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${step.notify_family
-                                                ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300 hover:bg-sky-500/25'
-                                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-white/5 dark:text-white/50 dark:hover:bg-white/10'}`}
-                                        >
-                                            <Mail size={13} /> {step.notify_family ? 'Avisa a la familia' : 'Avisar a la familia'}
-                                        </button>
-                                    )}
                                     <button
                                         onClick={() => handleUpdateStep(step.id, { is_active: !step.is_active })}
                                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${step.is_active

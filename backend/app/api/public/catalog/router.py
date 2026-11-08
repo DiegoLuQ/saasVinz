@@ -27,10 +27,12 @@ def get_public_catalog(
     slug: str,
     token: str,
     preview: bool = False,
+    ref: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     """
     Endpoint público para visualizar el catálogo compartido de un tenant vía token.
+    `ref` = token de seguimiento / código del registro: el carrito queda ligado a esa orden.
     Valida vigencia y genera la lista de productos disponibles con WhatsApp.
     """
     # 1. Resolver Tenant por Slug (Bypass RLS para lookup inicial)
@@ -162,6 +164,10 @@ def get_public_catalog(
         .group_by(ProductoOC.product_id)
         .all()
     )
+    # + compras externas aceptadas o entregadas (services/product_requests.py)
+    from app.services.product_requests import external_sold, public_ref_info
+    for pid, qty in external_sold(db, tenant.id).items():
+        purchased[pid] = int(purchased.get(pid) or 0) + qty
 
     product_list = []
     for p in products:
@@ -191,7 +197,48 @@ def get_public_catalog(
         is_expired=False,
         **tenant_info,
         products=product_list,
+        order_ref=public_ref_info(db, tenant.id, ref) if ref else None,
     )
+
+
+class ProductRequestItemIn(BaseModel):
+    product_id: int
+    qty: int = Field(1, ge=1, le=20)
+
+
+class ProductRequestIn(BaseModel):
+    ref: Optional[str] = Field(default=None, max_length=128)
+    items: list[ProductRequestItemIn] = Field(..., min_length=1, max_length=20)
+    contact_name: Optional[str] = Field(default=None, max_length=100)
+    contact_phone: Optional[str] = Field(default=None, max_length=40)
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
+@router.post("/{slug}/{token}/requests")
+@limiter.limit("6/minute;30/hour")
+def create_product_request(
+    request: Request,
+    slug: str,
+    token: str,
+    data: ProductRequestIn,
+    db: Session = Depends(get_db),
+):
+    """Carrito del catálogo de productos: crea la solicitud (ligada a la orden con `ref`,
+    o compra externa con nombre + WhatsApp) y avisa al crematorio en la campana."""
+    from app.services import product_requests
+
+    apply_bypass_rls(db)
+    tenant = db.query(models.Tenant).filter(models.Tenant.slug == slug).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Crematorio no encontrado")
+    share_token = db.query(CatalogShareToken).filter(
+        CatalogShareToken.tenant_id == tenant.id, CatalogShareToken.token == token).first()
+    now = tz.get_now()
+    if (not share_token or (share_token.catalog_type or "products") != "products" or not share_token.is_active
+            or (share_token.expires_at and now > share_token.expires_at)):
+        raise HTTPException(status_code=404, detail="Catálogo no disponible")
+    apply_tenant_rls(db, tenant.id)
+    return product_requests.create(db, tenant, share_token, data.model_dump())
 
 
 class CatalogEventIn(BaseModel):

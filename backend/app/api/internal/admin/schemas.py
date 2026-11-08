@@ -708,6 +708,7 @@ class BootstrapMetadata(BaseModel):
     """Additional metadata for bootstrap"""
     unread_notifications: int = 0
     pending_submissions: int = 0
+    pending_product_requests: int = 0  # carrito del catálogo (services/product_requests.py)
     total_commission_pending: float = 0.0 # Added for Veterinary
     total_commission_paid: float = 0.0 # Veterinary: total histórico pagado
     active_links_count: int = 0 # Added for Veterinary

@@ -673,9 +673,22 @@ def get_bootstrap(
         operation_steps=[schemas.WorkflowStepInDB.model_validate(s) for s in operation_steps],
         metadata=schemas.BootstrapMetadata(
             unread_notifications=unread_count,
-            pending_submissions=len([s for s in formatted_submissions if s.status == "pending"])
+            pending_submissions=len([s for s in formatted_submissions if s.status == "pending"]),
+            pending_product_requests=_pending_product_requests(db, current_user),
         )
     )
+
+def _pending_product_requests(db, user) -> int:
+    """Solicitudes de productos pendientes del crematorio (badge celeste del Sidebar)."""
+    if not getattr(user, "tenant_id", None):
+        return 0
+    try:
+        from app.api.internal.catalog.models import ProductRequest
+        return db.query(ProductRequest).filter(ProductRequest.tenant_id == user.tenant_id,
+                                               ProductRequest.status == "pending").count()
+    except Exception:  # noqa: BLE001 - el bootstrap nunca debe fallar por el contador
+        return 0
+
 
 class UserUpdateMe(BaseModel):
     name: Optional[str] = None

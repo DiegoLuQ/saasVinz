@@ -28,6 +28,7 @@ import EditDateModal from '@/components/tenant/EditDateModal';
 import EditWeightModal from '@/components/tenant/EditWeightModal';
 import OpsOrderDetailModal from './OpsOrderDetailModal';
 import FamilyNoticesBox from '../FamilyNoticesBox';
+import AdvanceNoticeModal from '../AdvanceNoticeModal';
 import { isFinished, isNotStarted, useOpsOrderActions, type OpsOrder, type OrderEvidence } from '@/hooks/useOperations';
 import { elapsedLabel, type OpsStep } from './OpsOrderCard';
 
@@ -177,6 +178,9 @@ export default function OpsOrderPanel({
     const [editWeight, setEditWeight] = useState(false);
     const [showInfoModal, setShowInfoModal] = useState(false);
     const actions = useOpsOrderActions(showToast, updated => { setOrder(updated); setEditingEvidence(false); });
+    // Avanzar pide confirmación primero (y si avisar a la familia); no avanza hasta confirmar
+    const [askNotice, setAskNotice] = useState<{ starting: boolean } | null>(null);
+    const advanceAndAsk = (starting: boolean) => setAskNotice({ starting });
 
     const finished = isFinished(order);
     const notStarted = isNotStarted(order);
@@ -377,7 +381,7 @@ export default function OpsOrderPanel({
                         </div>
                     ) : notStarted ? (
                         <button
-                            onClick={() => actions.advance(order.id, true)}
+                            onClick={() => advanceAndAsk(true)}
                             disabled={!!actions.busy || steps.length === 0}
                             className="w-full py-5 rounded-2xl bg-primary text-primary-foreground text-base font-bold flex items-center justify-center gap-2 disabled:opacity-40"
                         >
@@ -398,7 +402,7 @@ export default function OpsOrderPanel({
                                     </button>
                                 )}
                                 <button
-                                    onClick={() => (isLastStep ? setConfirm('finalize') : actions.advance(order.id, false))}
+                                    onClick={() => (isLastStep ? setConfirm('finalize') : advanceAndAsk(false))}
                                     disabled={!!actions.busy}
                                     className={`flex-1 py-5 rounded-2xl text-base font-bold flex items-center justify-center gap-2 disabled:opacity-40 ${isLastStep ? 'bg-emerald-600 text-white' : 'bg-primary text-primary-foreground'
                                         }`}
@@ -475,6 +479,13 @@ export default function OpsOrderPanel({
                     onClose={() => setShowInfoModal(false)}
                     order={order}
                 />
+                {askNotice && (
+                    <AdvanceNoticeModal
+                        orderId={order.id}
+                        onAdvance={async () => !!(await actions.advance(order.id, askNotice.starting))}
+                        onClose={() => setAskNotice(null)}
+                    />
+                )}
             </div>
         </div>
     );

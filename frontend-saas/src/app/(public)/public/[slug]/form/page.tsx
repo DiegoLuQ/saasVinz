@@ -493,7 +493,7 @@ export default function TenantFormPage() {
                                 Mientras nuestro equipo se dirige a retirar a <b className="text-slate-800 dark:text-slate-100">{petData.name || 'tu compañero'}</b>, puedes revisar con calma las opciones para llevar su recuerdo siempre contigo.
                             </p>
                             <a
-                                href={tenant.souvenir_store_url}
+                                href={submissionCode ? `${tenant.souvenir_store_url}${tenant.souvenir_store_url.includes("?") ? "&" : "?"}ref=${encodeURIComponent(submissionCode)}` : tenant.souvenir_store_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="mt-4 w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold uppercase tracking-[0.12em] shadow-lg shadow-sky-600/20 transition-all"
