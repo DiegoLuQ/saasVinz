@@ -9,7 +9,9 @@ renueva al enviar). Tabla `web_form_events` (migración a5b7c9d1e246, RLS): una 
 sesión + formulario + evento + detalle (ON CONFLICT DO NOTHING → la primera vez; su hora
 mide el tiempo entre pasos). Eventos:
   open · step_view:<paso> · field_error:<campo> · field_touch:<paso>.<campo> · back:<paso> · size_select ·
-  service_select · photo_add · welcome_video · souvenir_click · card_download · whatsapp_click ·
+  service_select · photo_add ·
+  welcome_shown · welcome_video_offer · welcome_video · welcome_close · end_video ·
+  souvenir_click · card_download · whatsapp_click ·
   submit_click · submit_error · submitted
 """
 from __future__ import annotations
@@ -33,7 +35,7 @@ STEP_LABELS = {"familia": "Familia", "angel": "Ángel", "camino": "Camino", "rec
                "resumen": "Resumen", "submit_click": "Pulsó «Enviar»", "submitted": "Enviado"}
 WITH_DETAIL = {"step_view": STEPS, "back": STEPS, "field_error": None, "field_touch": None}
 KINDS = ("open", "step_view", "field_error", "field_touch", "back", "size_select", "service_select", "photo_add",
-         "welcome_video", "souvenir_click", "card_download", "whatsapp_click", "submit_click", "submit_error", "submitted")
+         "welcome_shown", "welcome_video_offer", "welcome_video", "welcome_close", "end_video", "souvenir_click", "card_download", "whatsapp_click", "submit_click", "submit_error", "submitted")
 CLICK_LABELS = {
     "size_select": "Eligió tamaño",
     "service_select": "Eligió plan o servicio",
@@ -55,6 +57,26 @@ FIELD_LABELS = {
     "photoConsent": "Autorización de fotos",
 }
 TOP_LIMIT = 10
+
+# Fase a la que pertenece cada campo (para ubicar los errores de validación)
+FIELD_STEP = {
+    **{f: "familia" for f in ("fullName", "phone", "rut", "email", "contactPreference", "address", "veterinary", "comments")},
+    **{f: "angel" for f in ("name", "type", "nickname", "breed", "birthDate", "deathDate", "healthStatus",
+                            "weightRange", "weightKg", "weight", "age")},
+    "services": "camino",
+    **{f: "recuerdos" for f in ("photos", "dedication", "photoConsent")},
+}
+# Acciones que se muestran dentro de cada fase
+PHASE_ACTIONS = {
+    "angel": [("size_select", "Eligió tamaño")],
+    "camino": [("service_select", "Eligió plan o servicio")],
+    "recuerdos": [("photo_add", "Subió fotos")],
+    "resumen": [("submit_click", "Pulsó «Enviar»"), ("submit_error", "Error al enviar")],
+    "enviado": [("card_download", "Descargó la imagen conmemorativa"),
+                ("souvenir_click", "Entró al catálogo de productos (tiendita)"),
+                ("whatsapp_click", "Escribió por WhatsApp"),
+                ("end_video", "Vio el video final")],
+}
 
 
 # ===== Formulario oficial =====
@@ -160,6 +182,83 @@ def _last_step(ev: dict) -> str:
     return reached[-1] if reached else "open"
 
 
+def _count(sessions: list[dict], key: tuple[str, str]) -> int:
+    return sum(1 for s in sessions if key in s["events"])
+
+
+def _phases(sessions: list[dict], abandon: dict[str, int], last_fields: dict[str, dict[str, int]]) -> list[dict]:
+    """Recorrido fase por fase: Inicio (bienvenida/video) → pasos del formulario → Enviado.
+    En cada una: cuántos llegan, qué tocan, campos que llenan, errores y cuántos se quedaron ahí."""
+    n = len(sessions)
+    pct = lambda v, base=n: round(v * 100 / base, 1) if base else 0  # noqa: E731
+    out = []
+
+    # Inicio: abrió el formulario, mensaje de bienvenida y video
+    shown = _count(sessions, ("welcome_shown", ""))
+    offered = [s for s in sessions if ("welcome_video_offer", "") in s["events"]]
+    watched = sum(1 for s in offered if ("welcome_video", "") in s["events"])
+    acts = [{"key": "welcome_shown", "label": "Vio el mensaje de bienvenida", "sessions": shown, "pct": pct(shown)}]
+    if offered:
+        acts += [
+            {"key": "welcome_video", "label": "Vio el video", "sessions": watched, "pct": pct(watched, len(offered))},
+            {"key": "welcome_skip", "label": "Saltó el video", "sessions": len(offered) - watched,
+             "pct": pct(len(offered) - watched, len(offered))},
+        ]
+    out.append({"key": "inicio", "label": "Inicio", "reached": n, "pct": 100.0 if n else 0,
+                "lost_here": abandon.get("open", 0), "median_seconds": None, "actions": acts,
+                "video_offered": len(offered), "fields": [], "errors": [], "last_fields": []})
+
+    prev_key = ("open", "")
+    for st in STEPS:
+        key = ("step_view", st)
+        hit = [s for s in sessions if key in s["events"]]
+        if not hit:
+            continue
+        secs = [(s["events"][key] - s["events"][prev_key]).total_seconds()
+                for s in hit if prev_key in s["events"] and s["events"][key] >= s["events"][prev_key]]
+        touched: dict[str, int] = {}
+        errs: dict[str, int] = {}
+        for s in hit:
+            for (k, d) in s["events"]:
+                if k == "field_touch" and d.startswith(f"{st}."):
+                    f = d.split(".", 1)[1]
+                    touched[f] = touched.get(f, 0) + 1
+                elif k == "field_error" and FIELD_STEP.get(d) == st:
+                    errs[d] = errs.get(d, 0) + 1
+        acts = [{"key": k, "label": lbl, "sessions": c, "pct": pct(c, len(hit))}
+                for k, lbl in PHASE_ACTIONS.get(st, []) for c in [_count(hit, (k, ""))]]
+        back = _count(hit, ("back", st))
+        if back:
+            acts.append({"key": "back", "label": "Volvió al paso anterior", "sessions": back, "pct": pct(back, len(hit))})
+        lost = abandon.get(st, 0) + (abandon.get("submit_click", 0) if st == "resumen" else 0)
+        lf = last_fields.get(st, {})
+        out.append({
+            "key": st, "label": STEP_LABELS[st], "reached": len(hit), "pct": pct(len(hit)),
+            "lost_here": lost, "median_seconds": round(median(secs)) if secs else None,
+            "actions": acts,
+            "fields": [{"field": f, "label": FIELD_LABELS.get(f, f), "sessions": c, "pct": pct(c, len(hit))}
+                       for f, c in sorted(touched.items(), key=lambda kv: -kv[1])],
+            "errors": [{"field": f, "label": FIELD_LABELS.get(f, f), "sessions": c}
+                       for f, c in sorted(errs.items(), key=lambda kv: -kv[1])],
+            "last_fields": [{"field": f, "label": FIELD_LABELS.get(f, f) if f else "Sin tocar ningún campo", "sessions": c}
+                            for f, c in sorted(lf.items(), key=lambda kv: (kv[0] == "", -kv[1]))],
+            "stuck_on_submit": abandon.get("submit_click", 0) if st == "resumen" else 0,
+        })
+        prev_key = key
+
+    sent = [s for s in sessions if ("submitted", "") in s["events"]]
+    sent_secs = [(s["events"][("submitted", "")] - s["events"][prev_key]).total_seconds()
+                 for s in sent if prev_key in s["events"] and s["events"][("submitted", "")] >= s["events"][prev_key]]
+    out.append({
+        "key": "enviado", "label": "Enviado", "reached": len(sent), "pct": pct(len(sent)), "lost_here": 0,
+        "median_seconds": round(median(sent_secs)) if sent_secs else None,
+        "actions": [{"key": k, "label": lbl, "sessions": c, "pct": pct(c, len(sent))}
+                    for k, lbl in PHASE_ACTIONS["enviado"] for c in [_count(sent, (k, ""))]],
+        "fields": [], "errors": [], "last_fields": [],
+    })
+    return out
+
+
 def _summary(sessions: list[dict]) -> dict:
     n_open = len(sessions)
     submitted = sum(1 for s in sessions if ("submitted", "") in s["events"])
@@ -207,6 +306,8 @@ def _summary(sessions: list[dict]) -> dict:
         for k, n in sorted(abandon.items(), key=lambda kv: (-kv[1], order.index(kv[0]) if kv[0] in order else 99))
     ]
 
+    phases = _phases(sessions, abandon, last_fields)
+
     errors: dict[str, int] = {}
     clicks: dict[str, int] = {}
     for s in sessions:
@@ -225,6 +326,7 @@ def _summary(sessions: list[dict]) -> dict:
         "submitted": submitted,
         "conversion": round(submitted * 100 / n_open, 1) if n_open else 0,
         "steps": steps,
+        "phases": phases,
         "abandon": abandon_list,
         "field_errors": [
             {"field": f, "label": FIELD_LABELS.get(f, f), "sessions": n}

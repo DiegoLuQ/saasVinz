@@ -61,6 +61,10 @@ def test_reporte_hasta_donde_llegan(client, db, world, auth):
     _ev(client, a, "submit_click")
     _ev(client, a, "submitted")
     _ev(client, a, "card_download")
+    for sid in (a, b):
+        _ev(client, sid, "welcome_shown")
+        _ev(client, sid, "welcome_video_offer")
+    _ev(client, a, "welcome_video")                         # a vio el video, b lo saltó
     _ev(client, a, "souvenir_click")
 
     url = f"/api/internal/creator/catalog-funnel/form?tenant_id={tid}"
@@ -79,5 +83,14 @@ def test_reporte_hasta_donde_llegan(client, db, world, auth):
     assert next(x for x in d["clicks"] if x["kind"] == "size_select")["sessions"] >= 2
     assert next(x for x in d["clicks"] if x["kind"] == "card_download")["sessions"] >= 1
     assert next(x for x in d["clicks"] if x["kind"] == "souvenir_click")["sessions"] >= 1
+    ph = {p["key"]: p for p in d["phases"]}
+    assert list(ph)[0] == "inicio" and list(ph)[-1] == "enviado"
+    acts = {a["key"]: a["sessions"] for a in ph["inicio"]["actions"]}
+    assert acts["welcome_video"] >= 1 and acts["welcome_skip"] >= 1
+    assert ph["angel"]["reached"] >= 2 and any(f["field"] == "age" for f in ph["angel"]["last_fields"])
+    assert any(f["field"] == "age" for f in ph["angel"]["fields"])
+    assert any(e["field"] == "phone" for e in ph["familia"]["errors"])   # el error queda en su fase
+    assert ph["enviado"]["reached"] >= 1
+    assert next(x for x in ph["enviado"]["actions"] if x["key"] == "card_download")["sessions"] >= 1
     row = next(t for t in d["by_tenant"] if t["tenant_id"] == tid)
     assert row["form_name"] == "Formulario principal"

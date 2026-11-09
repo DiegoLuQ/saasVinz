@@ -9,7 +9,7 @@
  */
 export type FormEventKind =
     | 'open' | 'step_view' | 'field_error' | 'back' | 'size_select' | 'service_select'
-    | 'photo_add' | 'field_touch' | 'welcome_video' | 'souvenir_click' | 'card_download' | 'whatsapp_click'
+    | 'photo_add' | 'field_touch' | 'welcome_shown' | 'welcome_video_offer' | 'welcome_video' | 'welcome_close' | 'end_video' | 'souvenir_click' | 'card_download' | 'whatsapp_click'
     | 'submit_click' | 'submit_error' | 'submitted';
 
 /** Campo del formulario → clave que se mide (varios inputs cuentan como un campo). */

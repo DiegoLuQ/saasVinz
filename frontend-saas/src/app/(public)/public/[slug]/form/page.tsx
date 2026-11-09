@@ -526,7 +526,7 @@ export default function TenantFormPage() {
                             ) : (
                                 <button
                                     type="button"
-                                    onClick={() => { setWatchingEndVideo(true); trackFormEvent('welcome_video'); }}
+                                    onClick={() => { setWatchingEndVideo(true); trackFormEvent('end_video'); }}
                                     className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-slate-900 dark:bg-slate-950 dark:border dark:border-slate-800 text-white text-xs font-bold uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
                                 >
                                     <Play size={14} className="fill-current" /> {formConfig.welcome_modal?.video_button_text?.trim() || 'Ver video'}
@@ -695,6 +695,8 @@ export default function TenantFormPage() {
                         tenant={tenant}
                         config={formConfig.welcome_modal}
                         onWatchVideo={() => trackFormEvent('welcome_video')}
+                        onShown={(hasVideo) => { trackFormEvent('welcome_shown'); if (hasVideo) trackFormEvent('welcome_video_offer'); }}
+                        onDismiss={() => trackFormEvent('welcome_close')}
                     />
                 )}
 

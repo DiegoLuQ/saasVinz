@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Play, X } from 'lucide-react';
 import Image from 'next/image';
@@ -19,12 +19,22 @@ interface Props {
     onClose: () => void;
     /** Métricas: la familia pulsó «Ver video» */
     onWatchVideo?: () => void;
+    /** Métricas: se mostró la bienvenida (hasVideo = ofrecía «Ver video») */
+    onShown?: (hasVideo: boolean) => void;
+    /** Métricas: la familia cerró la bienvenida */
+    onDismiss?: () => void;
     tenant: Tenant;
     config?: WelcomeModalConfig | null;
 }
 
-export default function CondolenceModal({ isOpen, onClose, tenant, config, onWatchVideo }: Props) {
+export default function CondolenceModal({ isOpen, onClose, tenant, config, onWatchVideo, onShown, onDismiss }: Props) {
     const [watching, setWatching] = useState(false);
+    const hasVideo = !!(config?.show_video_button && config.video && config.video_position !== 'end');
+    const enabled = config?.enabled !== false;
+    useEffect(() => {
+        if (isOpen && enabled) onShown?.(hasVideo);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al abrirse
+    }, [isOpen, enabled]);
     if (config?.enabled === false) {
         return null;
     }
@@ -38,7 +48,7 @@ export default function CondolenceModal({ isOpen, onClose, tenant, config, onWat
     // Con video_position 'end' el botón va en la pantalla final, no aquí.
     const video = config?.show_video_button && config.video && config.video_position !== 'end' ? config.video : null;
     const videoButtonText = config?.video_button_text?.trim() || 'Ver video';
-    const close = () => { setWatching(false); onClose(); };
+    const close = () => { setWatching(false); onDismiss?.(); onClose(); };
 
     return (
         <AnimatePresence>

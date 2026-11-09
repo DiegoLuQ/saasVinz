@@ -2,13 +2,21 @@
 
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, ClipboardList, Info, Loader2, MousePointerClick, LogOut } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ClipboardList, Info, Loader2, MousePointerClick, LogOut } from 'lucide-react';
 import { apiRequest } from '@/lib/admin/api';
 
 // --- GET /api/internal/creator/catalog-funnel/form (backend services/form_funnel.py) ---
 interface Step { key: string; label: string; sessions: number; pct: number; lost: number; median_seconds: number | null }
+interface PhaseItem { field?: string; key?: string; label: string; sessions: number; pct?: number }
+interface Phase {
+    key: string; label: string; reached: number; pct: number; lost_here: number; median_seconds: number | null;
+    actions: PhaseItem[]; fields: PhaseItem[]; errors: PhaseItem[]; last_fields: PhaseItem[];
+    video_offered?: number; stuck_on_submit?: number;
+}
 interface FormFunnel {
     sessions: number;
+    /** Recorrido fase por fase (Inicio → pasos → Enviado) */
+    phases?: Phase[];
     submitted: number;
     conversion: number;
     steps: Step[];
@@ -29,20 +37,107 @@ function duration(s: number | null): string {
     return m < 60 ? `${m} min ${s % 60 ? `${s % 60} s` : ''}`.trim() : `${Math.floor(m / 60)} h ${m % 60} min`;
 }
 
-function Bars({ rows, total }: { rows: { label: string; value: number; hint?: string }[]; total: number }) {
-    const max = Math.max(total, ...rows.map((r) => r.value), 1);
+const PHASE_HINT: Record<string, string> = {
+    inicio: 'Abrieron el formulario y el mensaje de bienvenida',
+    familia: 'Datos de la familia',
+    angel: 'Datos de la mascota',
+    camino: 'Plan y servicios',
+    recuerdos: 'Fotos y dedicatoria',
+    resumen: 'Revisan y envían',
+    enviado: 'Pantalla final, después de enviar',
+};
+
+function Chip({ item, tone = 'default' }: { item: PhaseItem; tone?: 'default' | 'error' }) {
     return (
-        <ul className="mt-3 space-y-2">
-            {rows.map((r) => (
-                <li key={r.label} className="text-sm" title={`${r.label}: ${r.value}${r.hint ? ` · ${r.hint}` : ''}`}>
-                    <div className="flex justify-between gap-3 text-white/80">
-                        <span className="min-w-0 truncate">{r.label}</span>
-                        <span className="font-bold shrink-0">{r.value}{r.hint && <span className="ml-1.5 text-[11px] font-normal text-white/40">{r.hint}</span>}</span>
+        <span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] ${tone === 'error'
+            ? 'bg-amber-500/10 text-amber-200 border border-amber-500/20' : 'bg-white/5 text-white/75 border border-white/10'}`}>
+            {item.label} <b className="text-white">{item.sessions}</b>{item.pct != null && <span className="text-white/40">{item.pct}%</span>}
+        </span>
+    );
+}
+
+/** Una fase del recorrido: cuántos llegan, qué hacen, qué campos llenan, errores y cuántos se quedaron ahí. */
+function PhaseCard({ phase, index, total }: { phase: Phase; index: number; total: number }) {
+    const done = phase.key === 'enviado';
+    return (
+        <li className={`${cardCls} p-4 sm:p-5`}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black ${done ? 'bg-emerald-500/20 text-emerald-300' : 'bg-primary/20 text-primary'}`}>
+                        {done ? <CheckCircle2 size={16} /> : index}
+                    </span>
+                    <div className="min-w-0">
+                        <h3 className="text-white font-bold">{phase.label}</h3>
+                        <p className="text-[11px] text-white/40">{PHASE_HINT[phase.key] || ''}</p>
                     </div>
-                    <div className="h-1.5 mt-1 rounded-full bg-white/5"><div className="h-full rounded-full bg-primary/60" style={{ width: `${(r.value / max) * 100}%` }} /></div>
-                </li>
-            ))}
-        </ul>
+                </div>
+                <div className="flex items-center gap-4 text-right">
+                    <div>
+                        <p className="text-[10px] uppercase tracking-wider text-white/40">Llegaron</p>
+                        <p className="text-lg font-black text-white">{phase.reached}<span className="ml-1 text-xs font-normal text-white/40">{phase.pct}%</span></p>
+                    </div>
+                    {!done && (
+                        <div>
+                            <p className="text-[10px] uppercase tracking-wider text-white/40">Se quedaron aquí</p>
+                            <p className={`text-lg font-black ${phase.lost_here ? 'text-rose-300' : 'text-white/40'}`}>{phase.lost_here}</p>
+                        </div>
+                    )}
+                    {phase.median_seconds != null && (
+                        <div className="hidden sm:block">
+                            <p className="text-[10px] uppercase tracking-wider text-white/40">Tardan</p>
+                            <p className="text-sm font-bold text-white/80">{duration(phase.median_seconds)}</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+            <div className="h-1.5 mt-3 rounded-full bg-white/5">
+                <div className={`h-full rounded-full ${done ? 'bg-emerald-400/70' : 'bg-primary/60'}`} style={{ width: `${total ? (phase.reached / total) * 100 : 0}%` }} />
+            </div>
+
+            <div className="mt-3 space-y-2.5 text-sm">
+                {phase.actions.length > 0 && (
+                    <div>
+                        <p className="text-[10px] uppercase tracking-wider text-white/40 mb-1.5 flex items-center gap-1"><MousePointerClick size={11} /> Qué hicieron</p>
+                        <div className="flex flex-wrap gap-1.5">{phase.actions.map((a) => <Chip key={a.key} item={a} />)}</div>
+                        {phase.key === 'inicio' && !phase.video_offered && (
+                            <p className="mt-1 text-[11px] text-white/35">El formulario no ofrece video de bienvenida.</p>
+                        )}
+                    </div>
+                )}
+                {phase.fields.length > 0 && (
+                    <div>
+                        <p className="text-[10px] uppercase tracking-wider text-white/40 mb-1.5">Campos que llenaron</p>
+                        <div className="flex flex-wrap gap-1.5">{phase.fields.map((f) => <Chip key={f.field} item={f} />)}</div>
+                    </div>
+                )}
+                {phase.errors.length > 0 && (
+                    <div>
+                        <p className="text-[10px] uppercase tracking-wider text-white/40 mb-1.5 flex items-center gap-1"><AlertTriangle size={11} /> Errores al avanzar</p>
+                        <div className="flex flex-wrap gap-1.5">{phase.errors.map((f) => <Chip key={f.field} item={f} tone="error" />)}</div>
+                    </div>
+                )}
+                {phase.lost_here > 0 && (
+                    <div className="rounded-xl border border-rose-500/20 bg-rose-500/[0.06] p-3">
+                        <p className="text-[11px] font-bold text-rose-200 flex items-center gap-1.5">
+                            <LogOut size={12} /> {phase.lost_here} {phase.lost_here === 1 ? 'persona dejó' : 'personas dejaron'} el formulario aquí
+                            {phase.key === 'inicio' && ' (solo lo abrieron)'}
+                        </p>
+                        {!!phase.stuck_on_submit && (
+                            <p className="mt-1 text-[11px] text-rose-200/80">{phase.stuck_on_submit} pulsaron «Enviar» pero no se completó el envío.</p>
+                        )}
+                        {phase.last_fields.length > 0 && (
+                            <ul className="mt-1.5 space-y-0.5">
+                                {phase.last_fields.map((f) => (
+                                    <li key={f.field || 'none'} className="flex justify-between gap-3 text-xs text-white/60">
+                                        <span>→ Último campo: {f.label}</span><span>{f.sessions}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                )}
+            </div>
+        </li>
     );
 }
 
@@ -86,63 +181,9 @@ export default function OfficialFormFunnel({ dateFrom, dateTo, tenantId }: { dat
                     {data.sessions === 0 ? (
                         <p className={`${cardCls} p-5 text-sm text-white/50`}>Aún no hay visitas al formulario oficial en el periodo.</p>
                     ) : (
-                        <div className="grid gap-4 lg:grid-cols-2">
-                            <div className={`${cardCls} p-5`}>
-                                <h3 className="text-white font-bold">Pasos</h3>
-                                <p className="text-[11px] text-white/40 mt-1">Visitas que llegaron a cada paso · % de las visitas · tiempo típico desde el paso anterior.</p>
-                                <Bars total={data.sessions} rows={[
-                                    { label: 'Abrió el formulario', value: data.sessions, hint: '100%' },
-                                    ...data.steps.map((s) => ({
-                                        label: s.label, value: s.sessions,
-                                        hint: [`${s.pct}%`, s.lost ? `−${s.lost}` : '', duration(s.median_seconds)].filter(Boolean).join(' · '),
-                                    })),
-                                ]} />
-                            </div>
-
-                            <div className={`${cardCls} p-5`}>
-                                <h3 className="text-white font-bold flex items-center gap-2"><LogOut size={15} className="text-primary" /> Dónde se quedaron</h3>
-                                <p className="text-[11px] text-white/40 mt-1">Fase donde dejaron el formulario (sin enviar) y el último campo que tocaron en ella.</p>
-                                {data.abandon.length === 0 ? <p className="py-3 text-sm text-white/40">Todas las visitas enviaron el formulario.</p> : (
-                                    <ul className="mt-3 space-y-3">
-                                        {data.abandon.map((a) => {
-                                            const lost = Math.max(data.sessions - data.submitted, 1);
-                                            const pct = Math.round((a.sessions / data.sessions) * 1000) / 10;
-                                            return (
-                                                <li key={a.key} className="text-sm">
-                                                    <div className="flex justify-between gap-3 text-white/85">
-                                                        <span className="font-bold">{a.label}</span>
-                                                        <span className="font-bold shrink-0">{a.sessions}<span className="ml-1.5 text-[11px] font-normal text-white/40">{pct}% de las visitas</span></span>
-                                                    </div>
-                                                    <div className="h-1.5 mt-1 rounded-full bg-white/5"><div className="h-full rounded-full bg-primary/60" style={{ width: `${(a.sessions / lost) * 100}%` }} /></div>
-                                                    {!!a.fields?.length && (
-                                                        <ul className="mt-1.5 pl-3 border-l border-white/10 space-y-0.5">
-                                                            {a.fields.map((f) => (
-                                                                <li key={f.field || 'none'} className="flex justify-between gap-3 text-xs text-white/55">
-                                                                    <span className="truncate">→ {f.label}</span>
-                                                                    <span className="shrink-0">{f.sessions}</span>
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    )}
-                                                </li>
-                                            );
-                                        })}
-                                    </ul>
-                                )}
-                            </div>
-
-                            <div className={`${cardCls} p-5`}>
-                                <h3 className="text-white font-bold flex items-center gap-2"><MousePointerClick size={15} className="text-primary" /> Qué tocan</h3>
-                                <Bars total={data.sessions} rows={data.clicks.map((c) => ({ label: c.label, value: c.sessions, hint: `${c.pct}%` }))} />
-                            </div>
-
-                            <div className={`${cardCls} p-5`}>
-                                <h3 className="text-white font-bold flex items-center gap-2"><AlertTriangle size={15} className="text-primary" /> Campos con más errores</h3>
-                                <p className="text-[11px] text-white/40 mt-1">Visitas que intentaron avanzar con ese campo vacío o inválido.</p>
-                                {data.field_errors.length === 0 ? <p className="py-3 text-sm text-white/40">Sin errores en el periodo.</p>
-                                    : <Bars total={data.sessions} rows={data.field_errors.map((e) => ({ label: e.label, value: e.sessions }))} />}
-                            </div>
-                        </div>
+                        <ol className="space-y-3">
+                            {(data.phases || []).map((ph, i) => <PhaseCard key={ph.key} phase={ph} index={i} total={data.sessions} />)}
+                        </ol>
                     )}
 
                     {!tenantId && data.by_tenant.length > 0 && (
