@@ -73,6 +73,8 @@ export default function SubmissionDetailPage() {
     const canGenerateAll = hasFeature('certificados:generar_todo', true);
     // «Generar todo» realmente disponible (plan + documentos configurados + rol): «Procesar registro» pasa a secundario
     const [generateAllAvailable, setGenerateAllAvailable] = useState(false);
+    // Cada clic en «Procesar registro» abre el modal de GenerateAllPanel (qué se crea + ejemplos)
+    const [processRequest, setProcessRequest] = useState(0);
 
     const [showLimitModal, setShowLimitModal] = useState(false);
     const [modalResource, setModalResource] = useState('');
@@ -573,6 +575,7 @@ export default function SubmissionDetailPage() {
                         canRun={userRole === 'admin' || userRole === 'recepcion' || userRole === 'creator'}
                         tenant={tenant}
                         onAvailableChange={setGenerateAllAvailable}
+                        processRequest={processRequest}
                         processRegistro={async (onStep) => {
                             const res = await processRegistro((k, st) => {
                                 setProcessSteps(prev => ({ ...prev, [k]: st }));
@@ -731,31 +734,15 @@ export default function SubmissionDetailPage() {
                                     <ExternalLink size={15} /> Ver orden
                                 </button>
                             ) : (
-                                canGenerateAll && generateAllAvailable ? (
-                                    // Con «Generar todo» disponible: opción secundaria, sin documentos ni créditos
-                                    <div className="space-y-1.5">
-                                        <button
-                                            onClick={handleProcess}
-                                            disabled={processingAction === 'process'}
-                                            className="w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 border border-card-border bg-muted/40 text-foreground hover:bg-muted disabled:opacity-60"
-                                        >
-                                            {processingAction === 'process' ? <Loader2 className="animate-spin" size={14} /> : <Package size={14} />}
-                                            Solo crear la orden (sin documentos)
-                                        </button>
-                                        <p className="text-[11px] text-muted-foreground text-center">
-                                            Para crear la orden y los documentos juntos usa «Generar todo».
-                                        </p>
-                                    </div>
-                                ) : (
                                 <button
-                                    onClick={handleProcess}
+                                    // Con documentos disponibles abre el modal (eliges qué crear, con ejemplos); si no, procesa directo
+                                    onClick={() => (canGenerateAll && generateAllAvailable ? setProcessRequest(n => n + 1) : handleProcess())}
                                     disabled={processingAction === 'process'}
                                     className="w-full py-3.5 px-4 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:brightness-110 active:scale-[0.98] shadow-md shadow-emerald-500/30 disabled:opacity-60"
                                 >
                                     {processingAction === 'process' ? <Loader2 className="animate-spin" size={16} /> : <Package size={16} />}
                                     Procesar registro
                                 </button>
-                                )
                             )
                         ) : (
                             <div className="py-4 px-6 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-center">

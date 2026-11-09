@@ -127,6 +127,10 @@ def validate(db: Session, data: dict, photos: list[UploadFile]) -> dict:
         raise HTTPException(400, "La fecha de nacimiento no puede ser posterior a la de partida.")
 
     scenario = design.get("scenario") if design.get("scenario") in SCENARIOS else "normal"
+    # Solo un escenario que incluya el plan elegido (Admin → Memoriales → Planes)
+    allowed = memorial_plans.features_of(memorial_plans.get_vinzer_plan(db, out["plan"]))["scenarios"]
+    if scenario not in allowed:
+        raise HTTPException(400, "Ese diseño no está incluido en el plan elegido.")
     theme_default, effect_default = SCENARIO_DEFAULTS[scenario]
     melody_id = design.get("melody_id")
     melody = None

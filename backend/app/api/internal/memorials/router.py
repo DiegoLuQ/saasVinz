@@ -28,8 +28,12 @@ _rate_limit_store: dict[str, list[float]] = defaultdict(list)
 _RATE_LIMIT_MAX = 5       # max requests
 _RATE_LIMIT_WINDOW = 60   # seconds
 
-def _check_rate_limit(client_ip: str):
-    """Raises 429 if client exceeds 5 requests/minute."""
+# Guardado automático de la gestión (cada cambio de apariencia = 1 PATCH): con el PIN correcto
+_MANAGE_SAVES_MAX = 60    # por minuto, por memorial + IP
+
+
+def _check_rate_limit(client_ip: str, limit: int = _RATE_LIMIT_MAX):
+    """Raises 429 if `client_ip` (o la clave dada) supera `limit` solicitudes por minuto."""
     now = time.time()
     if len(_rate_limit_store) > 500:
         stale_keys = [k for k, v in list(_rate_limit_store.items()) if not v or now - v[-1] >= _RATE_LIMIT_WINDOW]
@@ -38,7 +42,7 @@ def _check_rate_limit(client_ip: str):
     timestamps = _rate_limit_store[client_ip]
     # Purge expired entries
     _rate_limit_store[client_ip] = [t for t in timestamps if now - t < _RATE_LIMIT_WINDOW]
-    if len(_rate_limit_store[client_ip]) >= _RATE_LIMIT_MAX:
+    if len(_rate_limit_store[client_ip]) >= limit:
         raise HTTPException(
             status_code=429,
             detail="Demasiadas solicitudes. Intenta de nuevo en un minuto."
@@ -384,6 +388,12 @@ def create_memorial(
     if partner:
         db_memorial.plan_id = partner.id
         db_memorial.plan_price, db_memorial.plan_currency, db_memorial.plan_billing = 0, partner.currency or "USD", memorial_plans.BILLING_INCLUDED
+    # Escenario: solo uno que incluya el plan Partner (si no, el primero permitido)
+    allowed = memorial_plans.features_of(partner)["scenarios"]
+    diseno = dict(db_memorial.diseno or {})
+    if diseno.get("tipo_diseno") not in allowed:
+        diseno["tipo_diseno"] = allowed[0]
+        db_memorial.diseno = diseno
     db.add(db_memorial)
     db.commit()
     db.refresh(db_memorial)
@@ -881,13 +891,15 @@ def update_memorial_settings(
         db.commit()
         db.refresh(memorial)
 
-    if (memorial.access_key or "").strip() != access_key:
-        raise HTTPException(status_code=401, detail="No autorizado.")
-
-    # Rate limiting per IP
     from app.core.client_ip import get_client_ip
     client_ip = get_client_ip(request)
-    _check_rate_limit(client_ip)
+    if (memorial.access_key or "").strip() != access_key:
+        # PIN errado: límite estricto (5/min por IP) contra adivinar el PIN
+        _check_rate_limit(f"pin:{client_ip}")
+        raise HTTPException(status_code=401, detail="No autorizado.")
+
+    # PIN correcto: la página guarda sola en cada cambio de diseño, así que el límite es amplio
+    _check_rate_limit(f"manage:{recuerdo_uuid}:{client_ip}", _MANAGE_SAVES_MAX)
 
     update_data = memorial_up.model_dump(exclude_unset=True)
 
@@ -935,6 +947,9 @@ def update_memorial_settings(
     if "diseno" in update_data:
         # La melodía es solo del crematorio (PUT /{uuid}/melody): aquí se ignora.
         incoming = {k: v for k, v in (update_data["diseno"] or {}).items() if k != melodies.DISENO_KEY}
+        # Solo los escenarios que incluye el plan del memorial (Admin → Memoriales → Planes)
+        from app.services import memorial_plans
+        memorial_plans.check_scenario(db, memorial, incoming.get("tipo_diseno"))
         update_data["diseno"] = merge_diseno(memorial.diseno, incoming)
 
     for key, value in update_data.items():

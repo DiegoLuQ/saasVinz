@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.internal.memorials import models as mem_models
@@ -38,6 +39,12 @@ FEATURE_DEFAULTS: dict = {
     "expired_images": 3,          # lo que se ve con el plan vencido
     "expired_dedications": 5,
 }
+# Escenarios de diseño incluidos (features.scenarios). Sin dato = solo Santuario Sereno (= Partner).
+SCENARIOS = ("normal", "altar", "cielo", "constelacion")
+SCENARIO_NAMES = {"normal": "Santuario Sereno", "altar": "Altar de Luz", "cielo": "Jardín Celestial",
+                  "constelacion": "Constelación Eterna"}
+DEFAULT_SCENARIOS = ["normal"]
+
 INT_FEATURES = {k for k, v in FEATURE_DEFAULTS.items() if isinstance(v, int) and not isinstance(v, bool)}
 BOOL_FEATURES = {k for k, v in FEATURE_DEFAULTS.items() if isinstance(v, bool)}
 FEATURE_MAX = {
@@ -46,9 +53,17 @@ FEATURE_MAX = {
 }
 
 
+def clean_scenarios(value) -> list[str]:
+    """Lista válida en el orden fijo de SCENARIOS; vacía o inválida = solo Santuario Sereno."""
+    chosen = set(value) if isinstance(value, (list, tuple, set)) else set()
+    out = [s for s in SCENARIOS if s in chosen]
+    return out or list(DEFAULT_SCENARIOS)
+
+
 def features_of(plan: mem_models.MemorialPlan | None) -> dict:
     raw = (plan.features or {}) if plan else {}
     out = dict(FEATURE_DEFAULTS)
+    out["scenarios"] = clean_scenarios(raw.get("scenarios"))
     for k in INT_FEATURES:
         v = raw.get(k)
         if k == "max_dedications" and v is None:
@@ -75,6 +90,9 @@ def clean_features(data: dict | None, base: dict | None = None) -> dict:
                 continue
         elif k in BOOL_FEATURES:
             out[k] = bool(v)
+        elif k == "scenarios":
+            out[k] = clean_scenarios(v)
+    out["scenarios"] = clean_scenarios(out.get("scenarios"))
     out.pop("velas", None)
     return {k: out[k] for k in FEATURE_DEFAULTS} | {k: v for k, v in out.items() if k not in FEATURE_DEFAULTS}
 
@@ -115,6 +133,20 @@ def is_vinzer(db: Session, memorial: mem_models.Memorial) -> bool:
 
 def limits(db: Session, memorial: mem_models.Memorial) -> dict:
     return features_of(plan_of(db, memorial))
+
+
+def check_scenario(db: Session, memorial: mem_models.Memorial, new_scenario: str | None) -> None:
+    """400 si se pide cambiar a un escenario que el plan del memorial no incluye. El que ya
+    tiene se mantiene aunque el plan no lo incluya (no se cambia nada solo)."""
+    if not new_scenario:
+        return
+    current = (memorial.diseno or {}).get("tipo_diseno") if isinstance(memorial.diseno, dict) else None
+    if new_scenario == (current or "normal"):
+        return
+    plan = plan_of(db, memorial)
+    if new_scenario not in features_of(plan)["scenarios"]:
+        name = SCENARIO_NAMES.get(new_scenario, new_scenario)
+        raise HTTPException(status_code=400, detail=f"El diseño «{name}» no está incluido en el plan {plan.name if plan else 'del memorial'}.")
 
 
 def discount_of(plan: mem_models.MemorialPlan | None) -> float:

@@ -22,6 +22,26 @@ export interface MemorialPlanFeatures {
     max_voice: number;
     expired_images: number;
     expired_dedications: number;
+    /** Escenarios de diseño incluidos (normal/altar/cielo/constelacion). Sin dato = solo Santuario Sereno. */
+    scenarios?: string[];
+}
+
+/** Orden fijo de los escenarios y sus nombres (mismo que backend memorial_plans.SCENARIOS). */
+export const SCENARIO_ORDER = ['normal', 'altar', 'cielo', 'constelacion'] as const;
+export const SCENARIO_LABELS: Record<string, string> = {
+    normal: 'Santuario Sereno', altar: 'Altar de Luz', cielo: 'Jardín Celestial', constelacion: 'Constelación Eterna',
+};
+
+/** Escenarios que incluye un plan (sin dato o vacío = solo Santuario Sereno, como el backend). */
+export function scenariosOf(features?: Partial<MemorialPlanFeatures> | null): string[] {
+    const chosen = new Set(Array.isArray(features?.scenarios) ? features!.scenarios : []);
+    const out = SCENARIO_ORDER.filter((s) => chosen.has(s)) as string[];
+    return out.length ? out : ['normal'];
+}
+
+/** Primer plan (en el orden dado) que incluye ese escenario, para «Disponible en plan X». */
+export function planWithScenario(plans: MemorialPlanInfo[], scenario: string): MemorialPlanInfo | undefined {
+    return plans.find((p) => scenariosOf(p.features).includes(scenario));
 }
 
 export interface MemorialPlanInfo {
@@ -48,11 +68,11 @@ const base = { max_dedication_chars: 500, expired_images: 3, expired_dedications
 /** Solo mientras carga la API (mismos valores que la migración a9c1e3f5b708). */
 export const FALLBACK_MEMORIAL_PLANS: MemorialPlanInfo[] = [
     { key: 'recuerdo', name: 'Recuerdo', price: 39, currency: 'USD', billing: 'yearly', description: 'Su recuerdo, siempre cerca.',
-      features: { ...base, max_images: 10, max_dedications: 30, max_melodies: 1, qr: false, timeline: false, max_timeline: 0, max_videos: 0, max_voice: 0 } },
+      features: { ...base, max_images: 10, max_dedications: 30, max_melodies: 1, qr: false, timeline: false, max_timeline: 0, max_videos: 0, max_voice: 0, scenarios: ['normal', 'altar'] } },
     { key: 'eterno', name: 'Eterno', price: 79, currency: 'USD', billing: 'yearly', highlight: true, description: 'Su historia completa, en una línea de tiempo.',
-      features: { ...base, max_images: 30, max_dedications: 50, max_melodies: 3, qr: true, timeline: true, max_timeline: 50, max_videos: 0, max_voice: 0 } },
+      features: { ...base, max_images: 30, max_dedications: 50, max_melodies: 3, qr: true, timeline: true, max_timeline: 50, max_videos: 0, max_voice: 0, scenarios: ['normal', 'altar', 'cielo'] } },
     { key: 'infinito', name: 'Infinito', price: 135, currency: 'USD', billing: 'one_time', description: 'Para siempre, con su voz y un video.',
-      features: { ...base, max_images: 150, max_dedications: 100, max_melodies: 3, qr: true, timeline: true, max_timeline: 100, max_videos: 1, max_voice: 1 } },
+      features: { ...base, max_images: 150, max_dedications: 100, max_melodies: 3, qr: true, timeline: true, max_timeline: 100, max_videos: 1, max_voice: 1, scenarios: [...SCENARIO_ORDER] } },
 ];
 
 let cache: Promise<MemorialPlanInfo[]> | null = null;
@@ -101,6 +121,7 @@ export function compareRows(plans: MemorialPlanInfo[], en = false): CompareRow[]
         { label: en ? 'Billing' : 'Cobro', values: plans.map((p) => (p.billing === 'one_time' ? (en ? 'One-time' : 'Pago único') : (en ? 'Yearly' : 'Anual'))) },
         { label: en ? 'Gallery photos' : 'Fotos de la galería', values: plans.map((p) => upTo(p.features.max_images)) },
         { label: en ? 'Messages of love' : 'Mensajes de cariño', values: plans.map((p) => upTo(p.features.max_dedications)) },
+        { label: en ? 'Memorial designs' : 'Diseños de memorial', values: plans.map((p) => { const n = scenariosOf(p.features).length; return en ? `${n} of ${SCENARIO_ORDER.length}` : `${n} de ${SCENARIO_ORDER.length}`; }) },
         { label: en ? 'Candles, flowers and kisses' : 'Velas, flores y besos', values: plans.map(() => (en ? 'Unlimited' : 'Ilimitados')) },
         { label: en ? 'Background music' : 'Música de fondo', values: plans.map((p) => (p.features.max_melodies > 1 ? (en ? `${p.features.max_melodies} melodies to choose` : `${p.features.max_melodies} melodías a elegir`) : (en ? '1 melody' : '1 melodía'))) },
         { label: en ? 'Life timeline' : 'Línea de tiempo de su vida', values: plans.map((p) => (p.features.timeline && p.features.max_timeline > 0 ? (en ? `${p.features.max_timeline} moments` : `${p.features.max_timeline} momentos`) : false)) },
@@ -120,6 +141,8 @@ export function planHighlights(p: MemorialPlanInfo, en = false): string[] {
         en ? `Up to ${f.max_dedications} messages · unlimited candles` : `Hasta ${f.max_dedications} mensajes · velas ilimitadas`,
         f.max_melodies > 1 ? (en ? `${f.max_melodies} melodies to choose from` : `${f.max_melodies} melodías a elegir`) : (en ? 'Background melody' : 'Melodía de fondo'),
     ];
+    const nSc = scenariosOf(f).length;
+    out.push(nSc >= SCENARIO_ORDER.length ? (en ? 'All memorial designs' : 'Todos los diseños de memorial') : (en ? `${nSc} memorial designs` : `${nSc} diseños de memorial`));
     if (f.timeline && f.max_timeline > 0) out.push(en ? `Life timeline (${f.max_timeline} moments)` : `Línea de tiempo (${f.max_timeline} momentos)`);
     if (f.qr) out.push(en ? 'Printable QR code' : 'Código QR para imprimir');
     if (f.max_videos > 0) out.push(en ? '30-second video' : 'Un video de 30 segundos');

@@ -14,7 +14,6 @@ import {
     ShieldCheck,
     Heart,
     Loader2,
-    Crown,
     Share2,
     BookHeart,
 } from 'lucide-react';
@@ -28,7 +27,6 @@ import {
     MEMORIAL_SCENARIOS,
     normalizeScenarioId,
     isProOrUltraCrematoryPlan,
-    isUltraCrematoryPlan,
     type MemorialScenarioId,
 } from '@/lib/memorialDesign';
 import MemorialSetupModal from '@/components/tenant/memorials/MemorialSetupModal';
@@ -87,10 +85,6 @@ export default function MemorialOrderSection({
         if (tenant?.plan?.can_use_memorial === true) return true;
         return isProOrUltraCrematoryPlan(planName);
     }, [tenant, planName]);
-
-    const isUltraPlan = useMemo(() => {
-        return isUltraCrematoryPlan(planName);
-    }, [planName]);
 
     // Consulta de datos completos del memorial
     const { data: memorial, isLoading, refetch } = useQuery({
@@ -291,15 +285,9 @@ export default function MemorialOrderSection({
                         </div>
 
                         <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                            {scenarioConfig.requiresUltraPlan ? (
-                                <span className="inline-flex items-center gap-1 text-purple-600 dark:text-purple-300">
-                                    <Crown size={12} /> Plan ULTRA
-                                </span>
-                            ) : (
-                                <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-300">
-                                    <ShieldCheck size={12} /> Plan {planName}
-                                </span>
-                            )}
+                            <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-300">
+                                <ShieldCheck size={12} /> Plan {memorial?.plan_name || 'Partner'}
+                            </span>
                         </div>
                     </div>
 

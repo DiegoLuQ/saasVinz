@@ -362,153 +362,12 @@ export default function TenantFormPage() {
                         El equipo de <span className="text-emerald-500 dark:text-emerald-400 font-black">{tenant.name}</span> se pondrá en contacto contigo a la brevedad.
                     </p>
 
-                    {/* Video del crematorio configurado para el final (welcome_modal.video_position = 'end') */}
-                    {endVideo && (
-                        <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.1 }}
-                            className="mb-6"
-                        >
-                            {watchingEndVideo ? (
-                                <FormVideoPlayer video={endVideo} />
-                            ) : (
-                                <button
-                                    type="button"
-                                    onClick={() => setWatchingEndVideo(true)}
-                                    className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-slate-900 dark:bg-slate-950 dark:border dark:border-slate-800 text-white text-xs font-bold uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
-                                >
-                                    <Play size={14} className="fill-current" /> {formConfig.welcome_modal?.video_button_text?.trim() || 'Ver video'}
-                                </button>
-                            )}
-                        </motion.div>
-                    )}
-
-                    {/* 1. Enlace de Seguimiento en Vivo */}
-                    {submissionCode && (
-                        <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.15 }}
-                            className="mb-6 rounded-3xl p-6 bg-gradient-to-br from-indigo-50/80 to-purple-50/80 dark:from-slate-800/40 dark:to-slate-800/20 border border-indigo-200/40 dark:border-indigo-500/20 shadow-inner"
-                        >
-                            <p className="text-[10px] uppercase font-black tracking-[0.2em] text-indigo-500 dark:text-indigo-400 mb-3">
-                                Enlace de Seguimiento en Vivo
-                            </p>
-                            
-                            <div className="flex items-center gap-2 bg-white/90 dark:bg-slate-950/90 p-2.5 rounded-2xl border border-slate-200/60 dark:border-slate-800">
-                                <span className="text-xs font-mono truncate text-slate-600 dark:text-slate-400 select-all text-left flex-1 pl-2">
-                                    {trackUrl}
-                                </span>
-                                <button
-                                    onClick={() => {
-                                        navigator.clipboard.writeText(trackUrl);
-                                        setCopiedTrackLink(true);
-                                        setTimeout(() => setCopiedTrackLink(false), 2000);
-                                    }}
-                                    className="p-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl transition-all flex items-center justify-center shrink-0 cursor-pointer"
-                                    title="Copiar enlace"
-                                    type="button"
-                                >
-                                    {copiedTrackLink ? <Check size={14} /> : <Copy size={14} />}
-                                </button>
-                                <a
-                                    href={trackUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl transition-all flex items-center justify-center shrink-0 cursor-pointer"
-                                    title="Abrir enlace"
-                                >
-                                    <ExternalLink size={14} />
-                                </a>
-                            </div>
-                            
-                            <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                                Guarda este enlace para ver el seguimiento en vivo del servicio.
-                            </p>
-
-                            <a
-                                href={whatsappShareUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="mt-4 w-full inline-flex items-center justify-center gap-2.5 py-3 px-5 bg-[#25D366] hover:bg-[#20bd5a] text-white font-black text-[10px] uppercase tracking-[0.15em] rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-[#25D366]/20 cursor-pointer"
-                            >
-                                <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4" aria-hidden="true">
-                                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.71.306 1.263.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.247-.694.247-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-                                </svg>
-                                Compartir por WhatsApp
-                            </a>
-                        </motion.div>
-                    )}
-
-                    {/* 2. Tu código de solicitud */}
-                    {submissionCode && (
-                        <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.2 }}
-                            className="mb-8 rounded-3xl p-6 bg-gradient-to-br from-emerald-50 to-sky-50 dark:from-slate-800/60 dark:to-slate-800/30 border border-emerald-200/60 dark:border-emerald-500/20 shadow-inner"
-                        >
-                            <p className="text-[10px] uppercase font-black tracking-[0.25em] text-slate-500 dark:text-slate-400 mb-3">
-                                Tu código de solicitud
-                            </p>
-                            <p className="font-mono text-2xl sm:text-3xl font-black tracking-[0.25em] text-slate-800 dark:text-emerald-300 select-all break-all">
-                                {submissionCode}
-                            </p>
-                            <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                                Guárdalo. Te servirá para identificar tu solicitud al hablar con {tenant.name}.
-                            </p>
-                        </motion.div>
-                    )}
-
-                    {/* Plazo / Aviso de entrega si está configurado */}
-                    {formConfig.delivery_notice && (
-                        <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.22 }}
-                            className="mb-8 rounded-3xl p-5 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-slate-800/40 border border-amber-200/80 dark:border-amber-900/40 text-center"
-                        >
-                            <p className="text-[10px] uppercase font-black tracking-[0.2em] text-amber-800 dark:text-amber-300 mb-1">
-                                Plazo de Entrega de Cenizas
-                            </p>
-                            <p className="text-xs text-amber-900/90 dark:text-amber-200/90 font-medium leading-relaxed">
-                                {formConfig.delivery_notice}
-                            </p>
-                        </motion.div>
-                    )}
-
-                    {/* Recuerdos: catálogo de productos oficial (solo con los enlaces oficiales completos) */}
-                    {tenant.souvenir_store_url && (
-                        <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.25 }}
-                            className="mb-6 rounded-3xl p-6 bg-gradient-to-br from-sky-50/90 to-cyan-50/80 dark:from-sky-950/30 dark:to-slate-900/40 border border-sky-200/60 dark:border-sky-500/20"
-                        >
-                            <div className="w-11 h-11 mx-auto mb-3 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
-                                <Gift className="w-5 h-5 text-sky-600 dark:text-sky-300" />
-                            </div>
-                            <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                                Mientras nuestro equipo se dirige a retirar a <b className="text-slate-800 dark:text-slate-100">{petData.name || 'tu compañero'}</b>, puedes revisar con calma las opciones para llevar su recuerdo siempre contigo.
-                            </p>
-                            <a
-                                href={submissionCode ? `${tenant.souvenir_store_url}${tenant.souvenir_store_url.includes("?") ? "&" : "?"}ref=${encodeURIComponent(submissionCode)}` : tenant.souvenir_store_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="mt-4 w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold uppercase tracking-[0.12em] shadow-lg shadow-sky-600/20 transition-all"
-                            >
-                                <Gift size={15} /> Ver catálogo de recuerdos y relicarios
-                            </a>
-                        </motion.div>
-                    )}
-
-                    {/* 3. Tarjeta Conmemorativa del Homenaje (Solo si se subió al menos 1 foto) */}
+                    {/* 1. Tarjeta Conmemorativa del Homenaje (Solo si se subió al menos 1 foto) */}
                     {images && images.length > 0 && (
                         <motion.div
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: 0.25 }}
+                            transition={{ delay: 0.1 }}
                             className="mb-8 rounded-3xl p-5 bg-gradient-to-br from-amber-500/10 via-slate-50 to-sky-50 dark:from-amber-500/15 dark:via-slate-800/40 dark:to-slate-800/20 border border-amber-300/40 dark:border-amber-500/30 shadow-xl flex flex-col items-center text-center"
                         >
                             <div className="flex items-center gap-2 mb-3">
@@ -591,6 +450,147 @@ export default function TenantFormPage() {
                                     </>
                                 )}
                             </button>
+                        </motion.div>
+                    )}
+
+                    {/* 2. Enlace de Seguimiento en Vivo */}
+                    {submissionCode && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.15 }}
+                            className="mb-6 rounded-3xl p-6 bg-gradient-to-br from-indigo-50/80 to-purple-50/80 dark:from-slate-800/40 dark:to-slate-800/20 border border-indigo-200/40 dark:border-indigo-500/20 shadow-inner"
+                        >
+                            <p className="text-[10px] uppercase font-black tracking-[0.2em] text-indigo-500 dark:text-indigo-400 mb-3">
+                                Enlace de Seguimiento en Vivo
+                            </p>
+                            
+                            <div className="flex items-center gap-2 bg-white/90 dark:bg-slate-950/90 p-2.5 rounded-2xl border border-slate-200/60 dark:border-slate-800">
+                                <span className="text-xs font-mono truncate text-slate-600 dark:text-slate-400 select-all text-left flex-1 pl-2">
+                                    {trackUrl}
+                                </span>
+                                <button
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(trackUrl);
+                                        setCopiedTrackLink(true);
+                                        setTimeout(() => setCopiedTrackLink(false), 2000);
+                                    }}
+                                    className="p-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl transition-all flex items-center justify-center shrink-0 cursor-pointer"
+                                    title="Copiar enlace"
+                                    type="button"
+                                >
+                                    {copiedTrackLink ? <Check size={14} /> : <Copy size={14} />}
+                                </button>
+                                <a
+                                    href={trackUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl transition-all flex items-center justify-center shrink-0 cursor-pointer"
+                                    title="Abrir enlace"
+                                >
+                                    <ExternalLink size={14} />
+                                </a>
+                            </div>
+                            
+                            <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                                Guarda este enlace para ver el seguimiento en vivo del servicio.
+                            </p>
+
+                            <a
+                                href={whatsappShareUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-4 w-full inline-flex items-center justify-center gap-2.5 py-3 px-5 bg-[#25D366] hover:bg-[#20bd5a] text-white font-black text-[10px] uppercase tracking-[0.15em] rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-[#25D366]/20 cursor-pointer"
+                            >
+                                <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4" aria-hidden="true">
+                                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.71.306 1.263.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.247-.694.247-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                                </svg>
+                                Compartir por WhatsApp
+                            </a>
+                        </motion.div>
+                    )}
+
+                    {/* Video del crematorio configurado para el final (welcome_modal.video_position = 'end') */}
+                    {endVideo && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.18 }}
+                            className="mb-6"
+                        >
+                            {watchingEndVideo ? (
+                                <FormVideoPlayer video={endVideo} />
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => setWatchingEndVideo(true)}
+                                    className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-slate-900 dark:bg-slate-950 dark:border dark:border-slate-800 text-white text-xs font-bold uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+                                >
+                                    <Play size={14} className="fill-current" /> {formConfig.welcome_modal?.video_button_text?.trim() || 'Ver video'}
+                                </button>
+                            )}
+                        </motion.div>
+                    )}
+
+                    {/* 3. Tu código de solicitud */}
+                    {submissionCode && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.2 }}
+                            className="mb-8 rounded-3xl p-6 bg-gradient-to-br from-emerald-50 to-sky-50 dark:from-slate-800/60 dark:to-slate-800/30 border border-emerald-200/60 dark:border-emerald-500/20 shadow-inner"
+                        >
+                            <p className="text-[10px] uppercase font-black tracking-[0.25em] text-slate-500 dark:text-slate-400 mb-3">
+                                Tu código de solicitud
+                            </p>
+                            <p className="font-mono text-2xl sm:text-3xl font-black tracking-[0.25em] text-slate-800 dark:text-emerald-300 select-all break-all">
+                                {submissionCode}
+                            </p>
+                            <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                                Guárdalo. Te servirá para identificar tu solicitud al hablar con {tenant.name}.
+                            </p>
+                        </motion.div>
+                    )}
+
+                    {/* Plazo / Aviso de entrega si está configurado */}
+                    {formConfig.delivery_notice && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.22 }}
+                            className="mb-8 rounded-3xl p-5 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-slate-800/40 border border-amber-200/80 dark:border-amber-900/40 text-center"
+                        >
+                            <p className="text-[10px] uppercase font-black tracking-[0.2em] text-amber-800 dark:text-amber-300 mb-1">
+                                Plazo de Entrega de Cenizas
+                            </p>
+                            <p className="text-xs text-amber-900/90 dark:text-amber-200/90 font-medium leading-relaxed">
+                                {formConfig.delivery_notice}
+                            </p>
+                        </motion.div>
+                    )}
+
+                    {/* Recuerdos: catálogo de productos oficial (solo con los enlaces oficiales completos) */}
+                    {tenant.souvenir_store_url && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.25 }}
+                            className="mb-6 rounded-3xl p-6 bg-gradient-to-br from-sky-50/90 to-cyan-50/80 dark:from-sky-950/30 dark:to-slate-900/40 border border-sky-200/60 dark:border-sky-500/20"
+                        >
+                            <div className="w-11 h-11 mx-auto mb-3 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
+                                <Gift className="w-5 h-5 text-sky-600 dark:text-sky-300" />
+                            </div>
+                            <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                                Mientras nuestro equipo se dirige a retirar a <b className="text-slate-800 dark:text-slate-100">{petData.name || 'tu compañero'}</b>, puedes revisar con calma las opciones para llevar su recuerdo siempre contigo.
+                            </p>
+                            <a
+                                href={submissionCode ? `${tenant.souvenir_store_url}${tenant.souvenir_store_url.includes("?") ? "&" : "?"}ref=${encodeURIComponent(submissionCode)}` : tenant.souvenir_store_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-4 w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold uppercase tracking-[0.12em] shadow-lg shadow-sky-600/20 transition-all"
+                            >
+                                <Gift size={15} /> Ver catálogo de recuerdos y relicarios
+                            </a>
                         </motion.div>
                     )}
 

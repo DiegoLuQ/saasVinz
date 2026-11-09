@@ -37,11 +37,11 @@ import {
     MAX_MEMORIAL_COMMENTS,
     normalizeScenarioId,
     isProOrUltraCrematoryPlan,
-    isUltraCrematoryPlan,
     getSuggestedEpitaphs,
     type MemorialScenarioId,
 } from "@/lib/memorialDesign";
 import MemorialMelodyPicker, { type MelodyOption } from "./MemorialMelodyPicker";
+import { scenariosOf } from "@/lib/memorialPlans";
 
 interface MemorialSetupModalProps {
     isOpen: boolean;
@@ -117,9 +117,10 @@ export default function MemorialSetupModal({
         return isProOrUltraCrematoryPlan(planName);
     }, [tenant, planName]);
 
-    const isUltraPlan = useMemo(() => {
-        return isUltraCrematoryPlan(planName) || isUltraCrematoryPlan(memorial?.plan);
-    }, [planName, memorial?.plan]);
+    // Escenarios: los decide el plan del MEMORIAL (Admin → Memoriales → Planes), no el plan SaaS.
+    // Sin dato (aún sin crear) = Partner = solo Santuario Sereno. El actual nunca se bloquea.
+    const allowedScenarios = useMemo(() => scenariosOf(memorial?.plan_features), [memorial?.plan_features]);
+    const memorialPlanName: string = memorial?.plan_name || "Partner";
 
     const availableImages = useMemo(() => {
         const list: string[] = [];
@@ -231,8 +232,8 @@ export default function MemorialSetupModal({
         }
     };
 
-    const handleSelectScenario = (id: MemorialScenarioId, requiresUltra: boolean) => {
-        if (requiresUltra && !isUltraPlan && scenarioId !== "constelacion") {
+    const handleSelectScenario = (id: MemorialScenarioId) => {
+        if (!allowedScenarios.includes(id) && scenarioId !== id) {
             return;
         }
         setScenarioId(id);
@@ -563,15 +564,15 @@ export default function MemorialSetupModal({
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     {MEMORIAL_SCENARIOS.map((sc) => {
                                         const isSelected = scenarioId === sc.id;
-                                        const isLockedUltra =
-                                            sc.requiresUltraPlan && !isUltraPlan && scenarioId !== "constelacion";
+                                        const isLockedUltra = !allowedScenarios.includes(sc.id) && !isSelected;
 
                                         return (
                                             <button
                                                 key={sc.id}
                                                 type="button"
                                                 disabled={isLockedUltra}
-                                                onClick={() => handleSelectScenario(sc.id, sc.requiresUltraPlan)}
+                                                onClick={() => handleSelectScenario(sc.id)}
+                                                title={isLockedUltra ? `No incluido en el plan ${memorialPlanName} del memorial` : undefined}
                                                 className={`text-left p-4 rounded-2xl border transition-all relative flex flex-col justify-between gap-3 ${
                                                     isSelected
                                                         ? "bg-amber-500/10 dark:bg-amber-500/15 border-amber-500 ring-2 ring-amber-500/25 shadow-md"
@@ -608,7 +609,7 @@ export default function MemorialSetupModal({
                                                             </div>
                                                         ) : isLockedUltra ? (
                                                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-500/30">
-                                                                🔒 Ultra
+                                                                🔒 No incluido
                                                             </span>
                                                         ) : (
                                                             <div className="w-5 h-5 rounded-full border-2 border-slate-300 dark:border-white/20" />

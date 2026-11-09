@@ -31,6 +31,7 @@ import {
 import type { Locale } from '@/lib/translations';
 import { getLandingContent, whatsappLink } from '@/lib/memorialLanding';
 import { MEMORIAL_SCENARIOS } from '@/lib/memorialDesign';
+import { planWithScenario, scenariosOf, useMemorialPlans } from '@/lib/memorialPlans';
 import { PublicHeader } from '@/components/public/PublicHeader';
 import { MemorialLandingPlans } from '@/components/public/MemorialLandingPlans';
 import { MemorialLandingFooter } from '@/components/public/MemorialLandingFooter';
@@ -193,6 +194,20 @@ export default function MemorialLandingClient() {
 
   const currentScenario =
     MEMORIAL_SCENARIOS.find((s) => s.id === activeScenarioId) || MEMORIAL_SCENARIOS[1];
+
+  // Qué plan incluye cada diseño (Admin → Memoriales → Planes y precios).
+  const memorialPlans = useMemorialPlans();
+  const scenarioInAll = (id: string) => memorialPlans.every((p) => scenariosOf(p.features).includes(id));
+  const scenarioPlanTag = (id: string) => {
+    if (scenarioInAll(id)) return null;
+    const p = planWithScenario(memorialPlans, id);
+    return p ? p.name : null;
+  };
+  const scenarioPlanText = (id: string) => {
+    if (scenarioInAll(id)) return 'Incluido en todos los planes';
+    const p = planWithScenario(memorialPlans, id);
+    return p ? `Desde el plan ${p.name}` : 'Incluido';
+  };
 
   return (
     <div className="min-h-screen bg-[#0A0D14] text-slate-100 selection:bg-amber-500/30 selection:text-amber-200">
@@ -449,9 +464,9 @@ export default function MemorialLandingClient() {
                 >
                   <span className="text-base sm:text-lg">{icons[sc.id]}</span>
                   <span>{sc.name}</span>
-                  {sc.requiresUltraPlan && (
+                  {scenarioPlanTag(sc.id) && (
                     <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-950/40 text-amber-200 uppercase font-black tracking-widest">
-                      Ultra
+                      {scenarioPlanTag(sc.id)}
                     </span>
                   )}
                 </button>
@@ -463,7 +478,7 @@ export default function MemorialLandingClient() {
           <div className="bg-slate-900/60 border border-amber-500/30 rounded-[2.5rem] p-6 sm:p-10 md:p-14 shadow-2xl backdrop-blur-xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             <div className="lg:col-span-7 space-y-5 text-left">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-black uppercase tracking-[0.2em]">
-                <span>{currentScenario.levelLabel}</span> · <span>{currentScenario.badgeText}</span>
+                <span>{currentScenario.levelLabel}</span> · <span>{scenarioPlanText(currentScenario.id)}</span>
               </div>
 
               <h3 className="text-3xl sm:text-4xl font-serif font-bold text-white">

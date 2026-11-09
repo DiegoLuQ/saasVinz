@@ -36,6 +36,8 @@ interface Props {
     dedication?: string | null;
     tenant: Tenant;
     socialUsesAi: boolean;
+    /** Una sola miniatura sin textos (tarjetas del modal «Procesar registro»). */
+    single?: boolean;
 }
 
 /** Ancho de un contenedor (para escalar certificado y tarjeta a su tamaño). */
@@ -55,7 +57,7 @@ function useBoxWidth(): [(el: HTMLDivElement | null) => (() => void) | void, num
  * Vista previa de los documentos del registro: lo ya generado para esta mascota
  * o, si aún no existe, un ejemplo con la plantilla configurada. El ojito lo amplía.
  */
-export default function DocumentPreviews({ kinds, auto, petId, cremationId, petName, dedication, tenant, socialUsesAi }: Props) {
+export default function DocumentPreviews({ kinds, auto, petId, cremationId, petName, dedication, tenant, socialUsesAi, single = false }: Props) {
     const [open, setOpen] = useState<AutoDocKind | null>(null);
     const [editCert, setEditCert] = useState(false);
     const queryClient = useQueryClient();
@@ -165,12 +167,12 @@ export default function DocumentPreviews({ kinds, auto, petId, cremationId, petN
 
     return (
         <>
-            <div className="grid grid-cols-3 gap-2 sm:gap-4">
+            <div className={single ? 'grid grid-cols-1' : 'grid grid-cols-3 gap-2 sm:gap-4'}>
                 {kinds.map(k => {
                     const Icon = META[k].icon;
                     return (
                         <div key={k} className="min-w-0">
-                            <div className="group relative aspect-[4/5] rounded-2xl overflow-hidden bg-slate-100 ring-1 ring-slate-200 dark:bg-black/30 dark:ring-white/10">
+                            <div className={`group relative ${single ? 'aspect-[5/4]' : 'aspect-[4/5]'} rounded-2xl overflow-hidden bg-slate-100 ring-1 ring-slate-200 dark:bg-black/30 dark:ring-white/10`}>
                                 {content(k, 'thumb')}
                                 <span className={`absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold shadow-sm ${generated[k] ? 'bg-emerald-500 text-white' : 'bg-white/90 text-slate-700'}`}>
                                     {generated[k] ? 'Generado' : 'Ejemplo'}
@@ -185,6 +187,7 @@ export default function DocumentPreviews({ kinds, auto, petId, cremationId, petN
                                     <Eye size={15} />
                                 </button>
                             </div>
+                            {!single && (<>
                             <p className="mt-2 text-[11px] sm:text-xs font-bold text-foreground flex items-center gap-1 truncate">
                                 <Icon size={11} className="text-primary shrink-0" /> {META[k].label}
                             </p>
@@ -192,6 +195,7 @@ export default function DocumentPreviews({ kinds, auto, petId, cremationId, petN
                             {k === 'social' && socialUsesAi && (
                                 <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-600 dark:text-violet-300 text-[9px] font-bold">1 crédito IA</span>
                             )}
+                            </>)}
                         </div>
                     );
                 })}

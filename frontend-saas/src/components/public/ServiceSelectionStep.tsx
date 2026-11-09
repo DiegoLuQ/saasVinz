@@ -317,18 +317,28 @@ export default function ServiceSelectionStep({
                                     type="button"
                                     disabled={included}
                                     aria-pressed={isSelected}
+                                    title={included ? 'Ya viene incluido en tu plan: no se cobra aparte' : undefined}
                                     onClick={() => toggleService(s.id)}
-                                    className={`text-left rounded-2xl border-2 p-4 flex gap-3 transition-all ${
-                                        isSelected
-                                            ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/20'
-                                            : 'border-slate-200 bg-white dark:bg-slate-900/80 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-500/50'
-                                    } ${included ? 'cursor-default opacity-90' : 'cursor-pointer'}`}
+                                    className={`min-w-0 overflow-hidden text-left rounded-2xl border-2 p-4 flex gap-3 transition-all ${
+                                        included
+                                            ? 'border-dashed border-emerald-300 bg-emerald-50/40 dark:border-emerald-500/40 dark:bg-emerald-950/10 cursor-default'
+                                            : isSelected
+                                                ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/20 cursor-pointer'
+                                                : 'border-slate-200 bg-white dark:bg-slate-900/80 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-500/50 cursor-pointer'
+                                    }`}
                                 >
-                                    <span className={`shrink-0 mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center ${
-                                        isSelected ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950'
-                                    }`}>
-                                        {isSelected && <Check size={12} className="text-white" strokeWidth={3} />}
-                                    </span>
+                                    {/* Incluido en el plan: no es un check editable, es un sello */}
+                                    {included ? (
+                                        <span className="shrink-0 mt-0.5 w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center">
+                                            <Check size={12} className="text-emerald-600 dark:text-emerald-400" strokeWidth={3} />
+                                        </span>
+                                    ) : (
+                                        <span className={`shrink-0 mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center ${
+                                            isSelected ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950'
+                                        }`}>
+                                            {isSelected && <Check size={12} className="text-white" strokeWidth={3} />}
+                                        </span>
+                                    )}
                                     {s.image_url && (
                                         // eslint-disable-next-line @next/next/no-img-element
                                         <img
@@ -339,21 +349,22 @@ export default function ServiceSelectionStep({
                                         />
                                     )}
                                     <span className="flex-1 min-w-0">
-                                        <span className="flex items-start justify-between gap-2">
-                                            <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{s.name}</span>
-                                            {included ? (
-                                                <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Incluido en tu plan</span>
-                                            ) : s.price_on_request ? (
-                                                <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">Precio a cotizar</span>
-                                            ) : showPrices && s.price != null && s.price > 0 && (
-                                                <span className="shrink-0 text-sm font-bold text-emerald-600 dark:text-emerald-400">{formatCLP(s.price)}</span>
-                                            )}
-                                        </span>
+                                        <span className="block text-sm font-bold text-slate-800 dark:text-slate-100 break-words">{s.name}</span>
+                                        {included ? (
+                                            <span className="mt-1 inline-block whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">Incluido</span>
+                                        ) : s.price_on_request ? (
+                                            <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">Precio a cotizar</span>
+                                        ) : showPrices && s.price != null && s.price > 0 ? (
+                                            <span className="mt-0.5 block text-sm font-bold text-emerald-600 dark:text-emerald-400">{formatCLP(s.price)}</span>
+                                        ) : null}
+                                        {included && (
+                                            <span className="block text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Ya viene en tu plan, no se cobra aparte.</span>
+                                        )}
                                         {s.description && (
-                                            <span className="block text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{s.description}</span>
+                                            <span className="block text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed break-words">{s.description}</span>
                                         )}
                                         {s.important_note && (
-                                            <span className="mt-2 block rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] leading-relaxed text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200">
+                                            <span className="mt-2 block break-words rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] leading-relaxed text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200">
                                                 <b>Importante:</b> {s.important_note}
                                             </span>
                                         )}

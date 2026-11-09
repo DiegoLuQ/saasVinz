@@ -5,6 +5,7 @@ import { Check, ChevronDown, Crown, Flower2, Heart, Snowflake, Star, X, Feather 
 import { getTranslations, type Locale } from '@/lib/translations';
 import { MEMORIAL_SCENARIOS, normalizeScenarioId } from '@/lib/memorialDesign';
 import { mutedClass, primaryBtn, titleClass, type ManageForm } from './ui';
+import { planWithScenario, useMemorialPlans } from '@/lib/memorialPlans';
 
 const SCENARIO_ICONS: Record<string, string> = {
     normal: '🕯️',
@@ -32,12 +33,14 @@ type Props = {
     diseno: ManageForm['diseno'];
     onChange: (patch: Partial<ManageForm['diseno']>) => void;
     backgrounds: { id?: number | string; url: string; name?: string }[];
-    isUltra: boolean;
+    /** Escenarios que incluye el plan del memorial (Admin → Memoriales → Planes). */
+    allowedScenarios: string[];
     isDark: boolean;
     locale: Locale;
 };
 
-export default function AppearanceSheet({ open, onClose, diseno, onChange, backgrounds, isUltra, isDark, locale }: Props) {
+export default function AppearanceSheet({ open, onClose, diseno, onChange, backgrounds, allowedScenarios, isDark, locale }: Props) {
+    const plans = useMemorialPlans();
     const es = locale === 'es';
     const t = getTranslations(locale);
     const [advancedOpen, setAdvancedOpen] = useState(Boolean(diseno.portada_url));
@@ -68,7 +71,9 @@ export default function AppearanceSheet({ open, onClose, diseno, onChange, backg
     ];
 
     const activeScenario = normalizeScenarioId(diseno.tipo_diseno);
-    const hasLockedScenario = MEMORIAL_SCENARIOS.some((sc) => sc.requiresUltraPlan && !isUltra && activeScenario !== sc.id);
+    // El que ya tiene se mantiene aunque el plan no lo incluya.
+    const isLocked = (id: string) => !allowedScenarios.includes(id) && activeScenario !== id;
+    const hasLockedScenario = MEMORIAL_SCENARIOS.some((sc) => isLocked(sc.id));
 
     const sectionLabel = `text-sm font-semibold mb-3 ${isDark ? 'text-slate-200' : 'text-slate-700'}`;
     const optionClass = (active: boolean) =>
@@ -98,8 +103,9 @@ export default function AppearanceSheet({ open, onClose, diseno, onChange, backg
                 <p className={sectionLabel}>{es ? 'Escenario' : 'Scene'}</p>
                 <div className="grid grid-cols-2 gap-2.5">
                     {MEMORIAL_SCENARIOS.map((sc) => {
-                        const locked = sc.requiresUltraPlan && !isUltra && activeScenario !== sc.id;
+                        const locked = isLocked(sc.id);
                         const active = activeScenario === sc.id;
+                        const upPlan = locked ? planWithScenario(plans, sc.id) : undefined;
                         return (
                             <button
                                 key={sc.id}
@@ -109,7 +115,14 @@ export default function AppearanceSheet({ open, onClose, diseno, onChange, backg
                                 className={`${optionClass(active)} p-3 text-left flex items-center gap-3 ${locked ? 'opacity-45 cursor-not-allowed' : ''}`}
                             >
                                 <span className="text-2xl">{SCENARIO_ICONS[sc.id] || '🕯️'}</span>
-                                <span className={`text-sm font-semibold flex-1 ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{sc.name}</span>
+                                <span className="flex-1 min-w-0">
+                                    <span className={`block text-sm font-semibold ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{sc.name}</span>
+                                    {upPlan && (
+                                        <span className="block text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                                            {es ? `Disponible en plan ${upPlan.name}` : `Available on ${upPlan.name} plan`}
+                                        </span>
+                                    )}
+                                </span>
                                 {active && <Check size={16} className="text-sky-500" strokeWidth={3} />}
                                 {locked && <Crown size={14} className="text-amber-500" />}
                             </button>
@@ -190,7 +203,7 @@ export default function AppearanceSheet({ open, onClose, diseno, onChange, backg
                 {hasLockedScenario && (
                     <p className={`mt-5 text-xs flex items-center gap-1.5 ${mutedClass(isDark)}`}>
                         <Crown size={12} className="text-amber-500" />
-                        {es ? 'Los escenarios con corona están disponibles en un plan superior.' : 'Scenes with a crown are available on a higher plan.'}
+                        {es ? 'Los escenarios con corona no están incluidos en el plan de este memorial: se activan al mejorar el plan.' : 'Scenes with a crown are not included in this memorial plan: upgrade to unlock them.'}
                     </p>
                 )}
 

@@ -10,6 +10,7 @@ import { ArrowLeft, ArrowRight, Check, Flower2, ImagePlus, Loader2, Snowflake, S
 import { compressImage } from "@/lib/clientImageCompressor";
 import { MEMORIAL_SCENARIOS, type MemorialScenarioId } from "@/lib/memorialDesign";
 import MemorialMelodyPicker, { type MelodyOption } from "@/components/tenant/memorials/MemorialMelodyPicker";
+import { scenariosOf } from "@/lib/memorialPlans";
 
 export interface MemorialSignupPlan {
     key: string;
@@ -22,6 +23,8 @@ export interface MemorialSignupPlan {
     billing?: string | null;
     max_images: number;
     days: number | null;
+    /** Límites del plan; `features.scenarios` = diseños incluidos. */
+    features?: { scenarios?: string[] };
 }
 
 export interface MemorialSignupOptions {
@@ -95,6 +98,25 @@ export default function MemorialCreateForm({ options, initialPlan, onSubmit, sub
 
     const maxPhotos = options.max_photos || 3;
     const selectedPlan = useMemo(() => options.plans.find((p) => p.key === plan), [options.plans, plan]);
+
+    // Diseños por plan (Admin → Memoriales → Planes). Con plan elegido solo se ofrecen los suyos;
+    // sin plan aún, cada diseño dice desde qué plan está disponible.
+    const allowedScenarios = selectedPlan ? scenariosOf(selectedPlan.features) : null;
+    const firstPlanWith = (id: string) => options.plans.find((p) => scenariosOf(p.features).includes(id));
+    const [scenarioNote, setScenarioNote] = useState<string | null>(null);
+
+    const choosePlan = (key: string) => {
+        setPlan(key);
+        const p = options.plans.find((x) => x.key === key);
+        const allowed = scenariosOf(p?.features);
+        if (!allowed.includes(scenario)) {
+            const name = MEMORIAL_SCENARIOS.find((s) => s.id === scenario)?.name || scenario;
+            pickScenario(allowed[0] as MemorialScenarioId);
+            setScenarioNote(`El plan ${p?.name || ""} no incluye «${name}»: cambiamos al diseño «${MEMORIAL_SCENARIOS.find((s) => s.id === allowed[0])?.name}».`);
+        } else {
+            setScenarioNote(null);
+        }
+    };
 
     const pickScenario = (id: MemorialScenarioId) => {
         setScenario(id);
@@ -263,15 +285,28 @@ export default function MemorialCreateForm({ options, initialPlan, onSubmit, sub
                     <div>
                         <p className={label}>Escenario</p>
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                            {MEMORIAL_SCENARIOS.map((sc) => (
-                                <button key={sc.id} type="button" onClick={() => pickScenario(sc.id)} className={card(scenario === sc.id)}>
-                                    <span className="flex items-center gap-2 text-sm font-bold text-slate-800">
-                                        <span className="text-lg">{SCENARIO_ICONS[sc.id]}</span>{sc.name}
-                                        {scenario === sc.id && <Check size={15} className="ml-auto text-amber-600" />}
-                                    </span>
-                                    <span className="mt-1 block text-xs text-slate-500">{sc.subtitle.trim()}</span>
-                                </button>
-                            ))}
+                            {MEMORIAL_SCENARIOS.map((sc) => {
+                                const locked = allowedScenarios ? !allowedScenarios.includes(sc.id) : false;
+                                const from = firstPlanWith(sc.id);
+                                const inAll = options.plans.every((p) => scenariosOf(p.features).includes(sc.id));
+                                return (
+                                    <button key={sc.id} type="button" disabled={locked} onClick={() => { pickScenario(sc.id); setScenarioNote(null); }}
+                                        className={`${card(scenario === sc.id)} ${locked ? "opacity-45 cursor-not-allowed" : ""}`}>
+                                        <span className="flex items-center gap-2 text-sm font-bold text-slate-800">
+                                            <span className="text-lg">{SCENARIO_ICONS[sc.id]}</span>{sc.name}
+                                            {scenario === sc.id && <Check size={15} className="ml-auto text-amber-600" />}
+                                        </span>
+                                        <span className="mt-1 block text-xs text-slate-500">{sc.subtitle.trim()}</span>
+                                        {locked ? (
+                                            <span className="mt-1 block text-[11px] font-semibold text-amber-700">
+                                                No incluido en el plan {selectedPlan?.name}{from ? ` · disponible en ${from.name}` : ""}
+                                            </span>
+                                        ) : !selectedPlan && !inAll && from ? (
+                                            <span className="mt-1 block text-[11px] font-semibold text-amber-700">Desde el plan {from.name}</span>
+                                        ) : null}
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
                     <div>
@@ -319,7 +354,7 @@ export default function MemorialCreateForm({ options, initialPlan, onSubmit, sub
                             {options.plans.map((p) => {
                                 const disabled = Boolean(lockedPlan && lockedPlan !== p.key);
                                 return (
-                                    <button key={p.key} type="button" disabled={disabled} onClick={() => setPlan(p.key)}
+                                    <button key={p.key} type="button" disabled={disabled} onClick={() => choosePlan(p.key)}
                                         className={`${card(plan === p.key)} ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}>
                                         <span className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
                                             {p.name}
@@ -341,10 +376,18 @@ export default function MemorialCreateForm({ options, initialPlan, onSubmit, sub
                                         <span className="block text-xs text-slate-500">
                                             {p.days === null ? "Pago único, para siempre" : p.days >= 365 ? "Por 1 año" : "Por 1 mes"} · hasta {p.max_images} fotos
                                         </span>
+                                        {!scenariosOf(p.features).includes(scenario) && (
+                                            <span className="mt-1 block text-[11px] font-semibold text-amber-700">
+                                                No incluye «{MEMORIAL_SCENARIOS.find((s) => s.id === scenario)?.name}»
+                                            </span>
+                                        )}
                                     </button>
                                 );
                             })}
                         </div>
+                        {scenarioNote && (
+                            <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{scenarioNote}</p>
+                        )}
                     </div>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="sm:col-span-2">

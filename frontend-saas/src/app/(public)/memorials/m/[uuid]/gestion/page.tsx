@@ -15,6 +15,7 @@ import {
 import LimitReachedModal from '@/components/memorial/LimitReachedModal';
 import ImageCropper from '@/components/tenant/ImageCropper';
 import MemorialPlanUpgrade from '@/components/memorial/MemorialPlanUpgrade';
+import { scenariosOf } from '@/lib/memorialPlans';
 import { HuellasFooter } from '@/components/public/HuellasFooter';
 import { ToastProvider } from '@/app/(tenant)/tenant/context/ToastContext';
 import ManageHeader, { type SaveState } from '@/components/memorial/manage/ManageHeader';
@@ -545,7 +546,7 @@ export default function GestionMemorialPage() {
                     diseno={form.diseno}
                     onChange={(patch) => updateForm(prev => ({ ...prev, diseno: { ...prev.diseno, ...patch } }))}
                     backgrounds={uiBackgrounds}
-                    isUltra={isUltra}
+                    allowedScenarios={scenariosOf(memorial.plan_features)}
                     isDark={isDark}
                     locale={locale}
                 />

@@ -14,6 +14,7 @@ import {
     Building2, Eye, EyeOff, Minus, Plus, AlertCircle, Tags, ArrowLeft, Percent
 } from 'lucide-react';
 import { apiRequest } from '@/lib/admin/api';
+import { SCENARIO_LABELS, SCENARIO_ORDER, scenariosOf } from '@/lib/memorialPlans';
 import MemorialCreateForm, { type MemorialCreateResult, type MemorialSignupOptions } from '@/components/memorial/create/MemorialCreateForm';
 
 function Shell({
@@ -254,8 +255,11 @@ export interface CatalogPlan {
     sort_order: number;
     is_active: boolean;
     memorials: number;
-    features: Record<string, number | boolean>;
+    /** `scenarios` = diseños incluidos (lista); el resto son límites o interruptores. */
+    features: Record<string, number | boolean | string[]>;
 }
+
+const SCENARIO_ICONS: Record<string, string> = { normal: '🕯️', altar: '🏛️', cielo: '☁️', constelacion: '🌌' };
 
 const ACTIVE_LIMIT_FIELDS: {
     key: string;
@@ -342,8 +346,16 @@ function PlanEditorCard({ plan, onSaved }: { plan: CatalogPlan; onSaved: (p: Cat
         draft.currency !== plan.currency ||
         (draft.discount_percent || 0) !== (plan.discount_percent || 0);
 
-    const setF = (k: string, v: number | boolean) =>
+    const setF = (k: string, v: number | boolean | string[]) =>
         setDraft((prev) => ({ ...prev, features: { ...prev.features, [k]: v } }));
+
+    // Diseños incluidos: al menos uno (el backend deja Santuario Sereno si queda vacío).
+    const scenarios = scenariosOf({ scenarios: draft.features.scenarios as string[] | undefined });
+    const toggleScenario = (id: string) => {
+        const next = scenarios.includes(id) ? scenarios.filter((s) => s !== id) : [...scenarios, id];
+        if (!next.length) return;
+        setF('scenarios', SCENARIO_ORDER.filter((s) => next.includes(s)));
+    };
 
     const reset = () => {
         setDraft(plan);
@@ -682,6 +694,42 @@ function PlanEditorCard({ plan, onSaved }: { plan: CatalogPlan; onSaved: (p: Cat
                             );
                         })}
                     </div>
+                </div>
+
+                {/* Diseños (escenarios) incluidos */}
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-white/60">Diseños incluidos</p>
+                        <span className="text-[10px] text-white/40">{scenarios.length} de {SCENARIO_ORDER.length}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        {SCENARIO_ORDER.map((id) => {
+                            const on = scenarios.includes(id);
+                            const last = on && scenarios.length === 1;
+                            return (
+                                <button
+                                    key={id}
+                                    type="button"
+                                    onClick={() => toggleScenario(id)}
+                                    disabled={last}
+                                    title={last ? 'Debe quedar al menos un diseño' : undefined}
+                                    aria-pressed={on}
+                                    className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs font-bold transition-all ${
+                                        on
+                                            ? 'bg-emerald-500/10 border-emerald-500/35 text-white'
+                                            : 'bg-white/[0.02] border-white/10 text-white/45 hover:text-white'
+                                    } ${last ? 'cursor-not-allowed' : ''}`}
+                                >
+                                    <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${on ? 'bg-emerald-500 border-emerald-500' : 'border-white/25'}`}>
+                                        {on && <span className="text-[10px] leading-none text-white">✓</span>}
+                                    </span>
+                                    <span className="text-sm">{SCENARIO_ICONS[id]}</span>
+                                    <span className="truncate">{SCENARIO_LABELS[id]}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <p className="text-[10px] text-white/40">Los memoriales que ya usan un diseño lo conservan aunque lo quites del plan.</p>
                 </div>
 
                 {/* 4. Funciones Especiales (Toggles) */}
