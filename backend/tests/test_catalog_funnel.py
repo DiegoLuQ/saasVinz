@@ -135,3 +135,36 @@ def test_reporte_cuenta_todos_los_formularios_y_tamanos_por_crematorio(client, d
     assert data["totals"]["orders_all"] >= row["orders_all"]
     size = next(s for s in data["top_sizes"] if s["weight_tier"] == "Mediano")
     assert size["tenant_id"] == world["tenant_a"] and size["tenant_name"]
+
+
+def test_vistas_de_links_publicos_no_rompen_el_reporte(client, db, world, auth):
+    """Regresión: la tabla de vistas la crea la migración; registrar guarda la huella (no el token)
+    y el reporte responde 200 aunque esa consulta falle (antes abortaba la transacción → 500)."""
+    import hashlib
+    from unittest import mock
+    from sqlalchemy import text
+    from app.services import catalog_funnel
+
+    token = "tok-" + hashlib.md5(str(world["tenant_a"]).encode()).hexdigest()
+    catalog_funnel.record_link_view(db, world["tenant_a"], "tracking", token)
+    key = hashlib.sha256(token.encode()).hexdigest()
+    n = db.execute(text("SELECT count(*) FROM sys_public_link_views WHERE resource_key = :k"), {"k": key}).scalar()
+    assert n >= 1
+    assert db.execute(text("SELECT count(*) FROM sys_public_link_views WHERE resource_key = :k"), {"k": token}).scalar() == 0
+
+    url = f"/api/internal/creator/catalog-funnel?tenant_id={world['tenant_a']}"
+    assert client.get(url, headers=auth("creator")).status_code == 200
+
+    # Si la consulta de vistas falla, el resto del reporte sigue (savepoint)
+    real_execute = None
+
+    def broken(self, statement, *a, **k):
+        if "sys_public_link_views" in str(statement):
+            raise RuntimeError("tabla no disponible")
+        return real_execute(self, statement, *a, **k)
+
+    from sqlalchemy.orm import Session
+    real_execute = Session.execute
+    with mock.patch.object(Session, "execute", broken):
+        r = client.get(url, headers=auth("creator"))
+    assert r.status_code == 200, r.text

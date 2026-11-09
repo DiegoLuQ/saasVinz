@@ -15,6 +15,7 @@ contador histórico inv_catalog_tokens.views_count se conserva aparte.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 from datetime import datetime, timedelta
@@ -34,57 +35,33 @@ SESSION_RE = re.compile(r"^[A-Za-z0-9_-]{8,40}$")
 DELIVERED = "entregado"
 TOP_LIMIT = 10
 
-_link_views_table_ready = False
-
-
-def _ensure_link_views_table(db: Session) -> None:
-    """Crea de forma idempotente la tabla ligera de aperturas de links públicos (memorial y tracking)."""
-    global _link_views_table_ready
-    if _link_views_table_ready:
-        return
-    try:
-        db.execute(text("""
-            CREATE TABLE IF NOT EXISTS sys_public_link_views (
-                id SERIAL PRIMARY KEY,
-                tenant_id INTEGER NOT NULL,
-                kind VARCHAR(20) NOT NULL,
-                resource_key VARCHAR(64) NOT NULL,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-        """))
-        db.execute(text("""
-            CREATE INDEX IF NOT EXISTS idx_public_link_views_tenant_kind_date
-            ON sys_public_link_views (tenant_id, kind, created_at)
-        """))
-        db.commit()
-        _link_views_table_ready = True
-    except Exception as exc:
-        db.rollback()
-        logger.warning("No se pudo inicializar sys_public_link_views: %s", exc)
-
-
 def record_link_view(db: Session, tenant_id: int | None, kind: str, resource_key: str) -> None:
-    """Registra un ingreso al link público de un memorial ('memorial') o de seguimiento ('tracking')."""
+    """Registra un ingreso al link público de un memorial ('memorial') o de seguimiento ('tracking').
+
+    La tabla la crea la migración f3c5e7a9b140 (sin RLS). Se guarda la huella SHA-256 del
+    uuid/token (solo sirve para contar recursos distintos). Se escribe en una sesión propia:
+    si falla no aborta la transacción de la petición, y no hace commit sobre ella (eso
+    borraba el contexto RLS que el endpoint ya había fijado). `db` se mantiene por compatibilidad."""
     if not tenant_id or kind not in ("memorial", "tracking"):
         return
+    from app.database import SessionLocal
+
+    key = hashlib.sha256(str(resource_key or "").encode()).hexdigest()[:64]
+    own = SessionLocal()
     try:
-        _ensure_link_views_table(db)
-        db.execute(
+        own.execute(
             text("""
                 INSERT INTO sys_public_link_views (tenant_id, kind, resource_key, created_at)
                 VALUES (:tid, :kind, :rkey, :now)
             """),
-            {
-                "tid": int(tenant_id),
-                "kind": kind,
-                "rkey": str(resource_key or "")[:64],
-                "now": tz.get_now(),
-            },
+            {"tid": int(tenant_id), "kind": kind, "rkey": key, "now": tz.get_now()},
         )
-        db.commit()
+        own.commit()
     except Exception as exc:
-        db.rollback()
+        own.rollback()
         logger.warning("No se pudo registrar vista de %s: %s", kind, exc)
+    finally:
+        own.close()
 
 
 def _tenant_has_memorials(tenant: models.Tenant | None, memorials_total: int = 0) -> bool:
@@ -264,8 +241,10 @@ def _link_views_summary(
     date_to: datetime | None,
     tenant_id: int | None,
 ) -> tuple[dict[int, dict], dict[int, dict]]:
-    """Devuelve (views_period_by_tenant, views_total_by_tenant) para memorial y tracking."""
-    _ensure_link_views_table(db)
+    """Devuelve (views_period_by_tenant, views_total_by_tenant) para memorial y tracking.
+
+    En un SAVEPOINT: si la tabla falta o la consulta falla, el reporte sigue sin estos datos
+    (antes el error dejaba la transacción abortada y el reporte daba 500)."""
     where_total = ["1=1"]
     params_total: dict = {}
     if tenant_id:
@@ -284,32 +263,33 @@ def _link_views_summary(
     period_by_tenant: dict[int, dict] = {}
     total_by_tenant: dict[int, dict] = {}
     try:
-        rows_period = db.execute(
-            text(f"""
-                SELECT tenant_id, kind, COUNT(*) AS views, COUNT(DISTINCT resource_key) AS resources
-                FROM sys_public_link_views
-                WHERE {' AND '.join(where_period)}
-                GROUP BY tenant_id, kind
-            """),
-            params_period,
-        ).all()
-        for tid, kind, views, resources in rows_period:
-            slot = period_by_tenant.setdefault(int(tid), {})
-            slot[f"{kind}_views"] = int(views or 0)
-            slot[f"{kind}_resources"] = int(resources or 0)
+        with db.begin_nested():
+            rows_period = db.execute(
+                text(f"""
+                    SELECT tenant_id, kind, COUNT(*) AS views, COUNT(DISTINCT resource_key) AS resources
+                    FROM sys_public_link_views
+                    WHERE {' AND '.join(where_period)}
+                    GROUP BY tenant_id, kind
+                """),
+                params_period,
+            ).all()
+            for tid, kind, views, resources in rows_period:
+                slot = period_by_tenant.setdefault(int(tid), {})
+                slot[f"{kind}_views"] = int(views or 0)
+                slot[f"{kind}_resources"] = int(resources or 0)
 
-        rows_total = db.execute(
-            text(f"""
-                SELECT tenant_id, kind, COUNT(*) AS views
-                FROM sys_public_link_views
-                WHERE {' AND '.join(where_total)}
-                GROUP BY tenant_id, kind
-            """),
-            params_total,
-        ).all()
-        for tid, kind, views in rows_total:
-            slot = total_by_tenant.setdefault(int(tid), {})
-            slot[f"{kind}_views_total"] = int(views or 0)
+            rows_total = db.execute(
+                text(f"""
+                    SELECT tenant_id, kind, COUNT(*) AS views
+                    FROM sys_public_link_views
+                    WHERE {' AND '.join(where_total)}
+                    GROUP BY tenant_id, kind
+                """),
+                params_total,
+            ).all()
+            for tid, kind, views in rows_total:
+                slot = total_by_tenant.setdefault(int(tid), {})
+                slot[f"{kind}_views_total"] = int(views or 0)
     except Exception as exc:
         logger.warning("Error consultando sys_public_link_views: %s", exc)
 
