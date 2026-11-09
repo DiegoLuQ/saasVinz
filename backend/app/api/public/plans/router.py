@@ -187,6 +187,16 @@ def public_annual_discount(request: Request, response: Response, db: Session = D
     return get_annual_discount(db)
 
 
+@router.get("/tour")
+@limiter.limit("60/minute")
+def public_tour(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Contenido de vinzer.cl/tour (Admin → Configuración → «Tour del software»).
+    null = la página usa su contenido original."""
+    from app.services import tour_content
+    response.headers["Cache-Control"] = "public, max-age=60"
+    return {"content": tour_content.get(db)}
+
+
 @router.get("/plans/highlights")
 @limiter.limit("60/minute")
 def public_plan_highlights(request: Request, response: Response, db: Session = Depends(get_db)):

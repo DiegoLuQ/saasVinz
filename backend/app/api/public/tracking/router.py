@@ -165,6 +165,8 @@ def get_tracking_info(
         owner_data = submission.owner_data or {}
         owner_name = owner_data.get("fullName") or owner_data.get("name") or None
 
+        from app.services.catalog_funnel import record_link_view
+        record_link_view(db, tenant.id, "tracking", str(token))
         farewell_tpl = resolve_farewell_template(db, tenant.id)
 
         tenant_website = None
@@ -265,6 +267,8 @@ def get_tracking_info(
     
     owner_name = pet.customer.name if pet.customer else None
 
+    from app.services.catalog_funnel import record_link_view
+    record_link_view(db, tenant.id, "tracking", str(token))
     farewell_tpl = resolve_farewell_template(db, tenant.id)
 
     tenant_website = None

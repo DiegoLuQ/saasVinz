@@ -23,7 +23,14 @@ def test_kpis_cuentan_ordenes_por_ciudad_y_especie(client, auth):
 
     c = client.post("/api/internal/customers", headers=h, json={"name": f"Fam {tag}", "phone": "912345678", "city": city.lower()}).json()
     p = client.post("/api/internal/pets", headers=h, json={"name": f"Toby {tag}", "species": species, "customer_id": c["id"]}).json()
-    o = client.post("/api/internal/cremations", headers=h, json={"pet_id": p["id"], "status": "pendiente"})
+    pend = client.post("/api/internal/cremations", headers=h, json={"pet_id": p["id"], "status": "pendiente"})
+    assert pend.status_code in (200, 201), pend.text
+    # Solo se cuentan las entregadas
+    mid = _kpis(client, h, year=now.year, month=now.month)
+    assert mid["totals"]["orders"] == before["totals"]["orders"]
+    assert _find(mid["by_city"], city) is None
+
+    o = client.post("/api/internal/cremations", headers=h, json={"pet_id": p["id"], "status": "entregado"})
     assert o.status_code in (200, 201), o.text
 
     after = _kpis(client, h, year=now.year, month=now.month)

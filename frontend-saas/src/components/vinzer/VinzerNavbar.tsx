@@ -136,24 +136,6 @@ export function VinzerNavbar({
 
                     {/* Links de navegación Desktop */}
                     <div className="hidden lg:flex items-center gap-5 xl:gap-7">
-                        {/* Producto */}
-                        <a
-                            href="#producto"
-                            onClick={(e) => handleLinkClick(e, '#producto')}
-                            className={`relative text-[11px] font-bold tracking-widest uppercase transition-all duration-300 py-1 ${
-                                activeSection === 'producto' && isHomePage
-                                    ? isLight ? 'text-[#0284C7]' : 'text-[#19B5FE]'
-                                    : isLight
-                                        ? 'text-slate-600 hover:text-slate-900'
-                                        : 'text-[#C0C0C0] hover:text-white'
-                            }`}
-                        >
-                            Producto
-                            {activeSection === 'producto' && isHomePage && (
-                                <span className={`absolute bottom-0 inset-x-0 h-[2px] ${isLight ? 'bg-[#0284C7]' : 'bg-[#19B5FE]'}`} />
-                            )}
-                        </a>
-
                         {/* Trazabilidad */}
                         <a
                             href="#trazabilidad"
@@ -237,7 +219,7 @@ export function VinzerNavbar({
                                         : 'text-[#C0C0C0] hover:text-white'
                             }`}
                         >
-                            Diagnóstico gratis
+                            Diagnóstico
                         </Link>
 
                         {/* DROPDOWN GUÍAS (AL FINAL DEL MENÚ) */}
@@ -436,13 +418,6 @@ export function VinzerNavbar({
                         <div className="flex-1 flex flex-col justify-between py-6">
                             <nav className="flex flex-col gap-4">
                                 <a
-                                    href="#producto"
-                                    onClick={(e) => handleLinkClick(e, '#producto')}
-                                    className="text-xl font-bold py-2 border-b border-white/5"
-                                >
-                                    Producto
-                                </a>
-                                <a
                                     href="#trazabilidad"
                                     onClick={(e) => handleLinkClick(e, '#trazabilidad')}
                                     className="text-xl font-bold py-2 border-b border-white/5"
@@ -476,7 +451,7 @@ export function VinzerNavbar({
                                     onClick={() => setIsMobileMenuOpen(false)}
                                     className="text-xl font-bold py-2 border-b border-white/5"
                                 >
-                                    Diagnóstico gratis
+                                    Diagnóstico
                                 </Link>
 
                                 {/* Guías Móvil al final */}

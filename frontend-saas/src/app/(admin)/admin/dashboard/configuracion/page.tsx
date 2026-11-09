@@ -11,6 +11,8 @@ import BackupSettings from './BackupSettings';
 import AiProvidersSettings from './AiProvidersSettings';
 import PaymentSettings from './PaymentSettings';
 import DashboardBannerSettings from './DashboardBannerSettings';
+import TourContentSettings from './TourContentSettings';
+import { MonitorPlay } from 'lucide-react';
 import TestEmailButton from './TestEmailButton';
 import HeroAssetSelector from '@/components/admin/landing/HeroAssetSelector';
 import MediaSelector from '@/components/admin/media/MediaSelector';
@@ -329,6 +331,7 @@ export default function LandingConfigPage() {
                         { id: 'ai', label: 'Plataformas IA', icon: Bot },
                         { id: 'pagos', label: 'Datos de pago', icon: Landmark },
                         { id: 'panel', label: 'Banner del panel', icon: ImageIcon },
+                        { id: 'tour', label: 'Tour del software', icon: MonitorPlay },
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -359,6 +362,10 @@ export default function LandingConfigPage() {
 
                     {activeTab === 'panel' && (
                         <DashboardBannerSettings />
+                    )}
+
+                    {activeTab === 'tour' && (
+                        <TourContentSettings />
                     )}
 
                     {/* General & SEO */}

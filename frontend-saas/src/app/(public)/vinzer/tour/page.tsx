@@ -2,6 +2,7 @@ import React from 'react';
 import type { Metadata } from 'next';
 import VinzerTourClient from '@/components/vinzer/VinzerTourClient';
 import { SITE_URL, siteUrl } from '@/lib/vinzer/site';
+import { fetchTourContent, videoThumbnail } from '@/lib/vinzer/tourContent';
 
 export const metadata: Metadata = {
     metadataBase: new URL(SITE_URL),
@@ -45,7 +46,10 @@ export const metadata: Metadata = {
     },
 };
 
-export default function VinzerTourPage() {
+export default async function VinzerTourPage() {
+    // Contenido editable en Admin → Configuración → «Tour del software»
+    const content = await fetchTourContent();
+    const thumb = content.video_url ? videoThumbnail(content.video_url) : null;
     // JSON-LD Structured Data for high-rank Google indexing
     const jsonLd = {
         '@context': 'https://schema.org',
@@ -84,14 +88,14 @@ export default function VinzerTourPage() {
                     }
                 }
             },
-            {
+            ...(content.video_url ? [{
                 '@type': 'VideoObject',
                 'name': 'Demostración en Video del Sistema Vinzer',
                 'description': 'Paso a paso de cómo opera el sistema Vinzer: desde la admisión en recepción hasta la emisión del certificado de cremación en PDF.',
-                'thumbnailUrl': 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
+                ...(thumb ? { 'thumbnailUrl': thumb } : {}),
                 'uploadDate': '2026-01-15T08:00:00+00:00',
-                'embedUrl': 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ'
-            }
+                'embedUrl': content.video_url
+            }] : [])
         ]
     };
 
@@ -101,7 +105,7 @@ export default function VinzerTourPage() {
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
             />
-            <VinzerTourClient />
+            <VinzerTourClient content={content} />
         </>
     );
 }

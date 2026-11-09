@@ -282,6 +282,8 @@ class SaaSConfig(Base):
     # [{image_url, title, message, button_label, whatsapp_text, show_button}].
     # Ver services/dashboard_slides.py. NULL/vacío = banner fijo.
     dashboard_slides = Column(JSON, nullable=True)
+    # Página pública /tour: {"video_url", "modules": [...]}; NULL = contenido original (services/tour_content.py)
+    tour_content = Column(JSON, nullable=True)
     redes_sociales = Column(JSON, default=list) # [{"name": "Facebook", "link": "..."}]
     imagenes = Column(JSON, default=list) # ["url1", "url2"]
     

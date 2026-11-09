@@ -207,6 +207,8 @@ class CremationOCInDB(CremationOCBase):
     
     # Normalized & Partitioned relationships
     technical: Optional[CremationTechnicalInDB] = None
+    # Solo en la lista: la orden está en la última fase del flujo (o no hay flujo) → se puede finalizar
+    at_last_step: Optional[bool] = None
     commission: Optional[PartnerCommissionInDB] = None
     logistics: Optional[CremationLogisticsInDB] = None
     financial: Optional[CremationFinancialInDB] = None

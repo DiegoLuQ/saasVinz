@@ -3,7 +3,11 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { Filter, Link2, Loader2, ArrowUpRight, Info, Scale, BookOpen } from 'lucide-react';
+import {
+    Filter, Link2, Loader2, ArrowUpRight, Info, Scale, BookOpen,
+    Globe2, Building2, PawPrint, X, CheckCircle2, Heart, Compass,
+    Share2, FileText, CheckCircle, ChevronRight
+} from 'lucide-react';
 import { apiRequest } from '@/lib/admin/api';
 
 // --- GET /api/internal/creator/catalog-funnel (backend services/catalog_funnel.py) ---
@@ -16,21 +20,45 @@ interface AllForms { forms_all: number; orders_all: number; delivered_all: numbe
 interface TenantRow extends Funnel, AllForms {
     tenant_id: number; tenant_name: string; tenant_slug: string | null;
     links_total: number; links_period: number; views_total: number;
+    has_memorials?: boolean;
+    memorials_total?: number;
+    memorials_period?: number;
+    memorial_views?: number;
+    memorial_views_total?: number;
+    tracking_views?: number;
+    tracking_views_total?: number;
+    tracking_orders_viewed?: number;
+}
+interface SpeciesRow {
+    species: string;
+    catalog: number;
+    forms_all: number;
+    orders: number;
 }
 interface Report {
     totals: Funnel & AllForms;
     links_total: number;
     links_period: number;
+    has_memorials?: boolean;
+    memorials_total?: number;
+    memorials_period?: number;
+    memorial_views?: number;
+    memorial_views_total?: number;
+    tracking_views?: number;
+    tracking_views_total?: number;
+    tracking_orders_viewed?: number;
     by_tenant: TenantRow[];
     top_plans: { plan_id: number; plan_name: string; tenant_name: string | null; price: number | null; plan_request: number; whatsapp: number; total: number }[];
     top_sizes: { weight_tier: string; count: number; tenant_id: number; tenant_name: string }[];
+    by_species?: SpeciesRow[];
     tenants: { id: number; name: string }[];
 }
 
 const cardCls = 'bg-white/5 border border-white/10 rounded-2xl';
-const thCls = 'text-left text-[11px] font-bold uppercase tracking-wider text-white/40 px-4 py-3 whitespace-nowrap';
-const tdCls = 'px-4 py-3 text-sm text-white/80 align-top';
-const inputCls = 'bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-primary/60 [color-scheme:dark]';
+const inputCls = 'bg-[#0f172a] border border-white/25 rounded-xl px-3.5 py-2.5 text-sm font-medium text-white shadow-inner hover:border-white/40 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 [color-scheme:dark] transition-colors';
+const selectCls = 'bg-[#0f172a] border border-white/25 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-white shadow-inner hover:border-primary/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 [color-scheme:dark] transition-colors cursor-pointer';
+const optionCls = 'bg-[#0f172a] text-white py-2 font-medium';
+
 const clp = (n: number) => `$${Math.round(n).toLocaleString('es-CL')}`;
 const pct = (part: number, whole: number) => (whole > 0 ? `${Math.round((part / whole) * 100)} %` : '—');
 
@@ -106,45 +134,105 @@ export default function CatalogFunnelPage() {
     });
 
     const t = data?.totals;
+    const selectedTenantName = tenantId
+        ? data?.tenants.find(tn => String(tn.id) === String(tenantId))?.name || `Crematorio #${tenantId}`
+        : null;
+    const speciesList = data?.by_species ?? [];
+    const totalSpeciesForms = speciesList.reduce((acc, s) => acc + s.forms_all, 0);
+    const hasMemorials = data?.has_memorials !== false;
 
     return (
         <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-6">
-            <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-                    <BookOpen className="text-primary" size={28} /> KPIs del catálogo de planes
-                </h1>
-                <p className="text-white/50 mt-2 text-sm max-w-3xl">
-                    Cuántos catálogos comparten los crematorios y qué tan bien convierten: de la visita al formulario enviado y a la orden.
-                </p>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight flex items-center gap-3">
+                        <BookOpen className="text-primary" size={28} /> KPIs del catálogo de planes
+                    </h1>
+                    <p className="text-white/50 mt-2 text-sm max-w-3xl">
+                        Cuántos catálogos comparten los crematorios y qué tan bien convierten: de la visita al formulario enviado, orden, seguimiento y memorial.
+                    </p>
+                </div>
+
+                {/* Indicador activo Global vs Crematorio */}
+                <div className="flex items-center gap-2 bg-[#0f172a] border border-white/15 rounded-2xl px-3.5 py-2">
+                    {selectedTenantName ? (
+                        <>
+                            <Building2 size={16} className="text-primary shrink-0" />
+                            <span className="text-xs font-bold text-white">{selectedTenantName}</span>
+                            <button
+                                type="button"
+                                onClick={() => setTenantId('')}
+                                title="Volver a vista global"
+                                className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white/10 text-[11px] font-bold text-white/80 hover:bg-white/20 hover:text-white transition-colors"
+                            >
+                                <X size={12} /> Ver Global
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <Globe2 size={16} className="text-emerald-400 shrink-0" />
+                            <span className="text-xs font-bold text-emerald-300">Vista Global · Todos los crematorios</span>
+                        </>
+                    )}
+                </div>
             </div>
 
-            {/* Filtros */}
-            <div className={`${cardCls} p-4 flex flex-wrap items-end gap-3`}>
-                <Filter size={16} className="text-white/40 mb-2.5" />
-                <label className="flex flex-col gap-1 text-[11px] font-bold uppercase tracking-wider text-white/40">
+            {/* Filtros de alto contraste */}
+            <div className="bg-[#0b1120] border border-white/15 rounded-2xl p-4 sm:p-5 flex flex-wrap items-end gap-3.5 shadow-lg">
+                <div className="flex flex-col gap-1.5 min-w-[240px] flex-1 sm:flex-none sm:w-80">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-white/70 flex items-center gap-1.5">
+                        <Filter size={13} className="text-primary" /> Alcance (Global o por Crematorio)
+                    </span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setTenantId('')}
+                            className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 shrink-0 ${
+                                !tenantId
+                                    ? 'bg-primary text-white border-primary shadow-sm'
+                                    : 'bg-[#0f172a] text-white/70 border-white/20 hover:border-white/40 hover:text-white'
+                            }`}
+                        >
+                            <Globe2 size={14} /> Global
+                        </button>
+                        <select
+                            value={tenantId}
+                            onChange={e => setTenantId(e.target.value)}
+                            aria-label="Filtrar por crematorio"
+                            className={`${selectCls} flex-1 min-w-0`}
+                        >
+                            <option value="" className={optionCls}>🌎 Todos los crematorios (Global)</option>
+                            {data?.tenants.map(tn => (
+                                <option key={tn.id} value={tn.id} className={optionCls}>
+                                    🏢 {tn.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                <label className="flex flex-col gap-1.5 text-[11px] font-bold uppercase tracking-wider text-white/70">
                     Desde
                     <input type="date" value={dateFrom} max={dateTo || undefined} onChange={e => setDateFrom(e.target.value)} className={inputCls} />
                 </label>
-                <label className="flex flex-col gap-1 text-[11px] font-bold uppercase tracking-wider text-white/40">
+                <label className="flex flex-col gap-1.5 text-[11px] font-bold uppercase tracking-wider text-white/70">
                     Hasta
                     <input type="date" value={dateTo} min={dateFrom || undefined} onChange={e => setDateTo(e.target.value)} className={inputCls} />
                 </label>
-                <label className="flex flex-col gap-1 text-[11px] font-bold uppercase tracking-wider text-white/40 min-w-0 flex-1 sm:flex-none sm:w-64">
-                    Crematorio
-                    <select value={tenantId} onChange={e => setTenantId(e.target.value)} className={inputCls}>
-                        <option value="">Todos</option>
-                        {data?.tenants.map(tn => <option key={tn.id} value={tn.id}>{tn.name}</option>)}
-                    </select>
-                </label>
+
                 <div className="flex gap-1.5">
                     {[7, 30, 90].map(n => (
-                        <button key={n} type="button" onClick={() => { setDateFrom(daysAgo(n - 1)); setDateTo(isoDay(new Date())); }}
-                            className="px-3 py-2 rounded-xl text-xs font-bold bg-white/5 text-white/60 hover:bg-white/10 hover:text-white">
+                        <button
+                            key={n}
+                            type="button"
+                            onClick={() => { setDateFrom(daysAgo(n - 1)); setDateTo(isoDay(new Date())); }}
+                            className="px-3.5 py-2.5 rounded-xl text-xs font-bold bg-[#0f172a] border border-white/20 text-white/80 hover:bg-white/10 hover:border-white/40 hover:text-white transition-colors"
+                        >
                             {n} días
                         </button>
                     ))}
                 </div>
-                {isFetching && <Loader2 size={16} className="animate-spin text-primary mb-2.5" />}
+                {isFetching && <Loader2 size={18} className="animate-spin text-primary mb-2.5" />}
             </div>
 
             {isLoading && <div className="p-8 flex justify-center"><Loader2 className="animate-spin text-primary" size={28} /></div>}
@@ -154,11 +242,46 @@ export default function CatalogFunnelPage() {
 
             {data && t && (
                 <>
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4">
                         <Kpi label="Catálogos creados" value={String(data.links_period)} hint={`${data.links_total} en total`} />
-                        <Kpi label="Visitas" value={String(t.visitors)} hint="Personas distintas" />
+                        <Kpi label="Visitas catálogo" value={String(t.visitors)} hint="Personas distintas" />
                         <Kpi label="Formularios enviados" value={String(t.form_submit)} hint={`${pct(t.form_submit, t.visitors)} de las visitas`} />
-                        <Kpi label="Órdenes" value={String(t.order)} hint={`${pct(t.order, t.form_submit)} de los formularios · ${t.pending} pendientes`} />
+                        <Kpi label="Órdenes" value={String(t.order)} hint={`${pct(t.order, t.form_submit)} de los formularios · ${t.pending} pend.`} />
+
+                        {/* Contador de ingresos al link de Memoriales (si el tenant tiene el módulo) */}
+                        <div className={`${cardCls} p-5 border-rose-500/20 bg-rose-500/[0.03]`}>
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-rose-300/80 flex items-center gap-1.5">
+                                <Heart size={12} className="text-rose-400" /> Visitas a Memoriales
+                            </p>
+                            {hasMemorials ? (
+                                <>
+                                    <p className="text-2xl sm:text-3xl font-black mt-2 text-white">
+                                        {data.memorial_views ?? 0}
+                                    </p>
+                                    <p className="text-[11px] text-white/45 mt-1">
+                                        {data.memorials_period ?? 0} creados ({data.memorials_total ?? 0} total) · {data.memorial_views_total ?? 0} hist.
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="text-base font-bold mt-2.5 text-white/50">No habilitado</p>
+                                    <p className="text-[11px] text-white/35 mt-1">El plan del crematorio no incluye Memoriales</p>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Contador de ingresos al link de Tracking */}
+                        <div className={`${cardCls} p-5 border-sky-500/20 bg-sky-500/[0.03]`}>
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-sky-300/80 flex items-center gap-1.5">
+                                <Compass size={12} className="text-sky-400" /> Visitas a Tracking
+                            </p>
+                            <p className="text-2xl sm:text-3xl font-black mt-2 text-white">
+                                {data.tracking_views ?? 0}
+                            </p>
+                            <p className="text-[11px] text-white/45 mt-1">
+                                {data.tracking_orders_viewed ?? 0} seguimientos consultados · {data.tracking_views_total ?? 0} hist.
+                            </p>
+                        </div>
                     </div>
 
                     {/* Todos los formularios web: cuánto aporta el catálogo frente al formulario directo */}
@@ -183,30 +306,96 @@ export default function CatalogFunnelPage() {
                         </div>
                     </div>
 
-                    <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-                        <div className={`${cardCls} p-5`}>
-                            <h2 className="text-white font-bold">Embudo</h2>
-                            <p className="text-[11px] text-white/40 mt-1 mb-4">El % compara cada paso con el anterior. Consultas por WhatsApp: <span className="text-white/70 font-bold">{t.whatsapp}</span> ({pct(t.whatsapp, t.visitors)} de las visitas).</p>
-                            <FunnelChart data={t} />
+                    <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+                        <div className="space-y-4">
+                            <div className={`${cardCls} p-5`}>
+                                <h2 className="text-white font-bold">Embudo</h2>
+                                <p className="text-[11px] text-white/40 mt-1 mb-4">
+                                    El % compara cada paso con el anterior. Consultas por WhatsApp:{' '}
+                                    <span className="text-white/70 font-bold">{t.whatsapp}</span> ({pct(t.whatsapp, t.visitors)} de las visitas).
+                                </p>
+                                <FunnelChart data={t} />
+                            </div>
+
+                            {/* Métrica por especie */}
+                            <div className={`${cardCls} p-5`}>
+                                <div className="flex items-center justify-between gap-2">
+                                    <h2 className="text-white font-bold flex items-center gap-2">
+                                        <PawPrint size={16} className="text-primary" /> Métrica por especie
+                                    </h2>
+                                    <span className="text-[11px] text-white/40">
+                                        {totalSpeciesForms} {totalSpeciesForms === 1 ? 'registro' : 'registros'} en el periodo
+                                    </span>
+                                </div>
+                                <p className="text-[11px] text-white/40 mt-1">
+                                    Distribución de mascotas registradas desde catálogo y formularios web, y cuántas pasaron a orden.
+                                </p>
+                                {speciesList.length === 0 ? (
+                                    <p className="py-4 text-sm text-white/40">Sin registros por especie en el periodo seleccionado.</p>
+                                ) : (
+                                    <ul className="mt-4 space-y-3">
+                                        {speciesList.map(sp => {
+                                            const maxForms = Math.max(1, speciesList[0].forms_all);
+                                            const share = pct(sp.forms_all, totalSpeciesForms);
+                                            return (
+                                                <li key={sp.species} className="text-sm">
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <span className="font-bold text-white truncate">{sp.species}</span>
+                                                            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/10 text-white/80">
+                                                                {share}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-right text-xs whitespace-nowrap">
+                                                            <span className="font-bold text-white">{sp.catalog}</span>{' '}
+                                                            <span className="text-white/40">catálogo</span>
+                                                            <span className="text-white/25 mx-1.5">·</span>
+                                                            <span className="font-semibold text-white/80">{sp.forms_all}</span>{' '}
+                                                            <span className="text-white/40">form.</span>
+                                                            <span className="text-white/25 mx-1.5">·</span>
+                                                            <span className="font-semibold text-emerald-300">{sp.orders}</span>{' '}
+                                                            <span className="text-white/40">OC</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="h-2 mt-1.5 rounded-full bg-white/5 overflow-hidden">
+                                                        <div
+                                                            className="h-full rounded-full bg-primary/75 transition-all"
+                                                            style={{ width: `${Math.max(4, (sp.forms_all / maxForms) * 100)}%` }}
+                                                        />
+                                                    </div>
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                )}
+                            </div>
                         </div>
 
                         <div className="space-y-4">
                             <div className={`${cardCls} overflow-hidden`}>
-                                <h2 className="px-5 pt-5 text-white font-bold">Planes más pedidos</h2>
-                                <p className="px-5 text-[11px] text-white/40 mt-1">«Solicitar este plan» + WhatsApp</p>
+                                <div className="px-5 pt-5 flex items-center justify-between gap-2">
+                                    <h2 className="text-white font-bold">Planes activos más pedidos</h2>
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                        <CheckCircle2 size={11} /> Solo activos
+                                    </span>
+                                </div>
+                                <p className="px-5 text-[11px] text-white/40 mt-1">«Solicitar este plan» + WhatsApp (planes vigentes)</p>
                                 {data.top_plans.length === 0 ? (
-                                    <p className="px-5 py-6 text-sm text-white/40">Sin solicitudes en el periodo.</p>
+                                    <p className="px-5 py-6 text-sm text-white/40">Sin planes activos con solicitudes en el periodo.</p>
                                 ) : (
                                     <table className="w-full mt-2">
                                         <tbody>
                                             {data.top_plans.map(p => (
                                                 <tr key={p.plan_id} className="border-b border-white/5 last:border-0">
-                                                    <td className={tdCls}>
+                                                    <td className="px-4 py-3 text-sm text-white/80 align-top">
                                                         <span className="font-bold text-white">{p.plan_name}</span>
-                                                        <span className="block text-[11px] text-white/40">{[p.tenant_name, p.price ? clp(p.price) : null].filter(Boolean).join(' · ')}</span>
+                                                        <span className="block text-[11px] text-white/40">
+                                                            {[p.tenant_name, p.price ? clp(p.price) : null].filter(Boolean).join(' · ')}
+                                                        </span>
                                                     </td>
-                                                    <td className={`${tdCls} text-right whitespace-nowrap`}>
-                                                        <span className="font-bold text-white">{p.plan_request}</span> <span className="text-[11px] text-white/40">solicitar</span>
+                                                    <td className="px-4 py-3 text-sm text-white/80 align-top text-right whitespace-nowrap">
+                                                        <span className="font-bold text-white">{p.plan_request}</span>{' '}
+                                                        <span className="text-[11px] text-white/40">solicitar</span>
                                                         <span className="block text-[11px] text-white/40">{p.whatsapp} WhatsApp</span>
                                                     </td>
                                                 </tr>
@@ -246,52 +435,191 @@ export default function CatalogFunnelPage() {
                         </div>
                     </div>
 
-                    {/* Por crematorio */}
-                    <div className={`${cardCls} overflow-hidden`}>
-                        <h2 className="px-5 pt-5 text-white font-bold flex items-center gap-2"><Link2 size={16} className="text-primary" /> Por crematorio</h2>
+                    {/* Tabla rediseñada por crematorio con agrupaciones visuales */}
+                    <div className="bg-[#0b1120] border border-white/10 rounded-2xl overflow-hidden shadow-xl">
+                        <div className="p-5 border-b border-white/10 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-white/[0.04] to-transparent">
+                            <div>
+                                <h2 className="text-white font-bold text-base flex items-center gap-2.5">
+                                    <div className="p-1.5 rounded-lg bg-primary/20 text-primary">
+                                        <Building2 size={18} />
+                                    </div>
+                                    Métricas por Crematorio
+                                </h2>
+                                <p className="text-xs text-white/50 mt-1">
+                                    Desglose agrupado por Catálogo, Formularios Web y Enlaces Públicos (Tracking y Memoriales).
+                                </p>
+                            </div>
+                            <span className="text-[11px] font-medium text-white/40 bg-white/5 border border-white/10 px-3 py-1 rounded-full">
+                                Haz clic en una fila para filtrar las estadísticas de ese crematorio
+                            </span>
+                        </div>
+
                         {data.by_tenant.length === 0 ? (
-                            <p className="px-5 py-6 text-sm text-white/40">Sin catálogos ni formularios en el periodo.</p>
+                            <p className="p-8 text-center text-sm text-white/40">Sin catálogos ni formularios registrados en el periodo.</p>
                         ) : (
-                            <div className="overflow-x-auto mt-3">
-                                <table className="w-full min-w-[980px]">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
                                     <thead>
-                                        <tr className="border-b border-white/10">
-                                            <th className={thCls}>Crematorio</th>
-                                            <th className={`${thCls} text-right`}>Catálogos</th>
-                                            <th className={`${thCls} text-right`}>Visitas</th>
-                                            <th className={`${thCls} text-right`}>Solicitar</th>
-                                            <th className={`${thCls} text-right`}>WhatsApp</th>
-                                            <th className={`${thCls} text-right`}>Enviados</th>
-                                            <th className={`${thCls} text-right`}>Órdenes</th>
-                                            <th className={`${thCls} text-right`}>Conversión</th>
-                                            <th className={`${thCls} text-right border-l border-white/10`} title="Todos los formularios web enviados (con o sin catálogo)">Formularios</th>
-                                            <th className={`${thCls} text-right`} title="Formularios web que ya tienen orden de cremación">OC formulario</th>
-                                            <th className={`${thCls} text-right`} title="Parte de las OC desde formulario que vino del catálogo">% catálogo</th>
-                                            <th className={thCls} />
+                                        {/* Fila 1: Encabezados de grupo con badges */}
+                                        <tr className="border-b border-white/10 bg-white/[0.02]">
+                                            <th className="px-5 py-3 text-xs font-bold uppercase tracking-wider text-white/50 w-64">
+                                                Crematorio
+                                            </th>
+                                            <th colSpan={4} className="px-3 py-2 border-l border-white/10 text-center">
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider bg-primary/20 text-primary border border-primary/30">
+                                                    <Share2 size={11} /> Catálogo de Planes
+                                                </span>
+                                            </th>
+                                            <th colSpan={3} className="px-3 py-2 border-l border-white/10 text-center">
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                                    <FileText size={11} /> Formularios y Órdenes
+                                                </span>
+                                            </th>
+                                            <th colSpan={2} className="px-3 py-2 border-l border-white/10 text-center">
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                                                    <Compass size={11} /> Enlaces Públicos
+                                                </span>
+                                            </th>
+                                            <th className="px-3 py-2 w-12 border-l border-white/10" />
+                                        </tr>
+                                        {/* Fila 2: Columnas específicas */}
+                                        <tr className="border-b border-white/10 text-[11px] font-bold uppercase tracking-wider text-white/40 bg-white/[0.01]">
+                                            <th className="px-5 py-3">Nombre</th>
+                                            <th className="px-3 py-3 text-right border-l border-white/10" title="Catálogos creados en el periodo y en total">Catálogos</th>
+                                            <th className="px-3 py-3 text-right" title="Personas distintas que abrieron el catálogo">Visitas</th>
+                                            <th className="px-3 py-3 text-right" title="Interacciones: solicitudes de plan y clics a WhatsApp">Solicitudes</th>
+                                            <th className="px-3 py-3 text-right" title="Conversión: Formularios recibidos desde catálogo ÷ Visitas">Conv. Catálogo</th>
+
+                                            <th className="px-3 py-3 text-right border-l border-white/10" title="Total de formularios web recibidos">Formularios</th>
+                                            <th className="px-3 py-3 text-right" title="Órdenes de cremación generadas a partir de formularios">Órdenes (OC)</th>
+                                            <th className="px-3 py-3 text-right" title="% de órdenes que llegaron a través del catálogo">% vía Catálogo</th>
+
+                                            <th className="px-3 py-3 text-right border-l border-white/10" title="Aperturas del link de seguimiento y seguimientos consultados">Tracking</th>
+                                            <th className="px-3 py-3 text-right" title="Aperturas del link de memoriales y memoriales creados">Memoriales</th>
+                                            <th className="px-3 py-3 border-l border-white/10" />
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        {data.by_tenant.map(r => (
-                                            <tr key={r.tenant_id} className="border-b border-white/5 last:border-0">
-                                                <td className={tdCls}><span className="font-bold text-white">{r.tenant_name}</span></td>
-                                                <td className={`${tdCls} text-right`} title="Creados en el periodo / en total">{r.links_period} <span className="text-white/40">/ {r.links_total}</span></td>
-                                                <td className={`${tdCls} text-right`} title={`${r.views_total} vistas históricas (contador del enlace, incluye recargas)`}>{r.visitors}</td>
-                                                <td className={`${tdCls} text-right`}>{r.plan_request}</td>
-                                                <td className={`${tdCls} text-right`}>{r.whatsapp}</td>
-                                                <td className={`${tdCls} text-right`}>{r.form_submit}{r.pending > 0 && <span className="block text-[11px] text-amber-300/80">{r.pending} pend.</span>}</td>
-                                                <td className={`${tdCls} text-right`}>{r.order}{r.delivered > 0 && <span className="block text-[11px] text-emerald-300/80">{r.delivered} entreg.</span>}</td>
-                                                <td className={`${tdCls} text-right font-bold text-white`} title="Formularios enviados ÷ visitas">{pct(r.form_submit, r.visitors)}</td>
-                                                <td className={`${tdCls} text-right border-l border-white/10`}>{r.forms_all}</td>
-                                                <td className={`${tdCls} text-right`}>{r.orders_all}{r.delivered_all > 0 && <span className="block text-[11px] text-emerald-300/80">{r.delivered_all} entreg.</span>}</td>
-                                                <td className={`${tdCls} text-right`} title={`${r.order} de ${r.orders_all} OC vinieron del catálogo`}>{pct(r.order, r.orders_all)}</td>
-                                                <td className={`${tdCls} text-right`}>
-                                                    {r.tenant_slug && (
-                                                        <Link href={`/dashboard/tenants/${r.tenant_slug}`} title="Ver crematorio"
-                                                            className="inline-flex p-2 rounded-lg bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"><ArrowUpRight size={15} /></Link>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
+                                    <tbody className="divide-y divide-white/5">
+                                        {data.by_tenant.map(r => {
+                                            const isSelected = String(r.tenant_id) === String(tenantId);
+                                            const catalogOrdersShare = pct(r.order, r.orders_all);
+                                            return (
+                                                <tr
+                                                    key={r.tenant_id}
+                                                    onClick={() => setTenantId(isSelected ? '' : String(r.tenant_id))}
+                                                    className={`cursor-pointer transition-all ${
+                                                        isSelected
+                                                            ? 'bg-primary/20 hover:bg-primary/25'
+                                                            : 'hover:bg-white/[0.03]'
+                                                    }`}
+                                                >
+                                                    {/* Nombre del Crematorio */}
+                                                    <td className="px-5 py-3.5">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-bold text-white text-sm">
+                                                                {r.tenant_name}
+                                                            </span>
+                                                            {isSelected && (
+                                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary text-white shadow-sm">
+                                                                    Activo
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Grupo 1: Catálogo de Planes */}
+                                                    <td className="px-3 py-3.5 text-right border-l border-white/10 whitespace-nowrap">
+                                                        <span className="font-bold text-white">{r.links_period}</span>
+                                                        <span className="text-white/40 text-xs"> / {r.links_total}</span>
+                                                    </td>
+                                                    <td className="px-3 py-3.5 text-right whitespace-nowrap font-medium text-white">
+                                                        {r.visitors}
+                                                    </td>
+                                                    <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                                                        <span className="font-semibold text-white">{r.plan_request}</span>
+                                                        {r.whatsapp > 0 && (
+                                                            <span className="text-[11px] text-emerald-400 block font-normal">
+                                                                +{r.whatsapp} WA
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                                                        <span className="inline-block font-extrabold text-xs px-2 py-0.5 rounded bg-white/5 text-primary border border-primary/20">
+                                                            {pct(r.form_submit, r.visitors)}
+                                                        </span>
+                                                    </td>
+
+                                                    {/* Grupo 2: Formularios y Órdenes */}
+                                                    <td className="px-3 py-3.5 text-right border-l border-white/10 whitespace-nowrap">
+                                                        <span className="font-bold text-white">{r.forms_all}</span>
+                                                        {r.pending > 0 && (
+                                                            <span className="text-[10px] text-amber-300 block">
+                                                                {r.pending} pend.
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                                                        <span className="font-bold text-emerald-300">{r.orders_all}</span>
+                                                        {r.delivered_all > 0 && (
+                                                            <span className="text-[10px] text-white/40 block">
+                                                                {r.delivered_all} entregadas
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                                                        <span className="text-xs font-semibold text-white/80">
+                                                            {catalogOrdersShare}
+                                                        </span>
+                                                        <span className="text-[10px] text-white/40 block">
+                                                            ({r.order} de {r.orders_all})
+                                                        </span>
+                                                    </td>
+
+                                                    {/* Grupo 3: Enlaces Públicos (Tracking y Memoriales) */}
+                                                    <td className="px-3 py-3.5 text-right border-l border-white/10 whitespace-nowrap">
+                                                        <div className="flex items-center justify-end gap-1.5">
+                                                            <Compass size={13} className="text-sky-400" />
+                                                            <span className="font-bold text-sky-300">{r.tracking_views ?? 0}</span>
+                                                        </div>
+                                                        <span className="text-[10px] text-white/40 block">
+                                                            {r.tracking_orders_viewed ?? 0} consultas
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                                                        {r.has_memorials !== false ? (
+                                                            <>
+                                                                <div className="flex items-center justify-end gap-1.5">
+                                                                    <Heart size={13} className="text-rose-400" />
+                                                                    <span className="font-bold text-rose-300">{r.memorial_views ?? 0}</span>
+                                                                </div>
+                                                                <span className="text-[10px] text-white/40 block">
+                                                                    {r.memorials_period ?? 0} de {r.memorials_total ?? 0} mem.
+                                                                </span>
+                                                            </>
+                                                        ) : (
+                                                            <span className="text-[11px] text-white/30 italic">
+                                                                Sin módulo
+                                                            </span>
+                                                        )}
+                                                    </td>
+
+                                                    {/* Enlace al detalle del crematorio */}
+                                                    <td className="px-3 py-3.5 text-center border-l border-white/10" onClick={e => e.stopPropagation()}>
+                                                        {r.tenant_slug ? (
+                                                            <Link
+                                                                href={`/dashboard/tenants/${r.tenant_slug}`}
+                                                                title="Ver perfil del crematorio"
+                                                                className="inline-flex p-1.5 rounded-lg bg-white/5 text-white/50 hover:bg-white/15 hover:text-white transition-colors"
+                                                            >
+                                                                <ArrowUpRight size={15} />
+                                                            </Link>
+                                                        ) : (
+                                                            <ChevronRight size={15} className="text-white/20 mx-auto" />
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
@@ -300,7 +628,7 @@ export default function CatalogFunnelPage() {
 
                     <p className="text-[11px] text-white/40 flex items-start gap-1.5">
                         <Info size={13} className="shrink-0 mt-0.5" />
-                        Se mide desde que existe este reporte (1 nov 2026). Cada persona cuenta una vez por paso y enlace, aunque recargue la página. Sin datos personales: solo un identificador anónimo del navegador.
+                        Se mide desde que existe este reporte (1 nov 2026). Cada persona cuenta una vez por paso y enlace en el catálogo, y cada apertura de link de memorial o tracking suma al contador de su crematorio.
                     </p>
                 </>
             )}

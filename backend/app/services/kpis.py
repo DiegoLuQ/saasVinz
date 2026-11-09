@@ -1,7 +1,8 @@
 """Indicadores (KPIs) del crematorio: /dashboard/indicadores.
 
-Periodo = año completo o un mes, en la zona horaria del crematorio. Órdenes =
-oc_cremations no canceladas creadas en el periodo; ingresos = oc_financial.total_price.
+Periodo = año completo o un mes, en la zona horaria del crematorio. Órdenes = solo
+las ENTREGADAS (status entregado), por fecha de entrega (oc_scheduling.completed_at, o
+created_at si falta); ingresos = oc_financial.total_price.
 Rankings por plan, servicio, producto (+ compras externas del catálogo), ciudad,
 especie, convenio y veterinaria; memoriales creados y formularios recibidos
 (con su conversión a orden). La serie mensual es siempre del año elegido.
@@ -11,12 +12,11 @@ from __future__ import annotations
 from datetime import datetime
 
 import pytz
-from sqlalchemy import bindparam, text
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.utils.time import get_tenant_timezone_str
 
-CANCELED = ("cancelado", "canceled", "cancelled", "rejected", "rechazado", "rechazado_por_cliente")
 LIMIT = 50
 FULL_LIMIT = 1000  # productos / servicios: lista completa (pestaña propia)
 
@@ -31,11 +31,13 @@ def _window(tz_name: str, year: int, month: int | None) -> tuple[datetime, datet
     return zone.localize(start).astimezone(pytz.utc), zone.localize(end).astimezone(pytz.utc)
 
 
+# Solo órdenes entregadas; `created_at` aquí = fecha de entrega (la usan los rankings y la serie).
 ORDERS = """
-    SELECT c.id, c.pet_id, c.partner_link_id, c.created_at
+    SELECT c.id, c.pet_id, c.partner_link_id, coalesce(sch.completed_at, c.created_at) AS created_at
     FROM oc_cremations c
-    WHERE c.tenant_id = :tid AND c.created_at >= :s AND c.created_at < :e
-      AND lower(coalesce(c.status, '')) NOT IN :canceled
+    LEFT JOIN oc_scheduling sch ON sch.cremation_id = c.id
+    WHERE c.tenant_id = :tid AND lower(coalesce(c.status, '')) = 'entregado'
+      AND coalesce(sch.completed_at, c.created_at) >= :s AND coalesce(sch.completed_at, c.created_at) < :e
 """
 
 
@@ -50,11 +52,10 @@ def compute(db: Session, tenant_id: int, year: int, month: int | None) -> dict:
     tz_name = get_tenant_timezone_str(db, tenant_id)
     s, e = _window(tz_name, year, month)
     ys, ye = _window(tz_name, year, None)
-    p = {"tid": tenant_id, "s": s, "e": e, "canceled": CANCELED, "tz": tz_name}
+    p = {"tid": tenant_id, "s": s, "e": e, "tz": tz_name}
 
     def q(sql: str, params: dict | None = None) -> list[dict]:
-        stmt = text(sql).bindparams(bindparam("canceled", expanding=True)) if ":canceled" in sql else text(sql)
-        return [dict(r._mapping) for r in db.execute(stmt, params or p)]
+        return [dict(r._mapping) for r in db.execute(text(sql), params or p)]
 
     totals = q(f"""
         WITH o AS ({ORDERS})

@@ -4,6 +4,8 @@ import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 
 export interface Cremation {
     id: number;
+    /** La orden está en la última fase del flujo (o no hay flujo): se puede finalizar. */
+    at_last_step?: boolean | null;
     pet_id: number;
     service_id?: number;
     plan_id?: number;

@@ -8,6 +8,27 @@ from app import schemas, models, auth
 router = APIRouter()
 
 
+@router.get("/tour")
+def get_tour_content(
+    db: Session = Depends(get_db),
+    current_creator: models.User = Depends(auth.get_current_creator)
+):
+    """Contenido de vinzer.cl/tour (null = el original)."""
+    from app.services import tour_content
+    return {"content": tour_content.get(db), "max_modules": tour_content.MAX_MODULES}
+
+
+@router.put("/tour")
+def update_tour_content(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_creator: models.User = Depends(auth.get_current_creator)
+):
+    """Guarda el tour; {"content": null} vuelve al contenido original."""
+    from app.services import tour_content
+    return {"content": tour_content.save(db, payload.get("content")), "max_modules": tour_content.MAX_MODULES}
+
+
 @router.get("/dashboard-slides")
 def get_dashboard_slides(
     db: Session = Depends(get_db),

@@ -445,6 +445,8 @@ def get_public_memorial(
     memorial.lista_imagenes = [normalize_image_url(img) for img in (memorial.lista_imagenes or [])]
     memorial.main_image_url = normalize_image_url(memorial.main_image_url)
 
+    from app.services.catalog_funnel import record_link_view
+    record_link_view(db, memorial.id_tenant, "memorial", str(memorial.id_recuerdo))
     result = _apply_memorial_limit(memorial, db)
     # Al público solo se le entrega la melodía si el crematorio la dejó activa.
     if not (result.melody or {}).get("activa"):

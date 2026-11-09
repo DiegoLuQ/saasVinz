@@ -310,7 +310,7 @@ export default function IndicadoresPage() {
             <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2"><BarChart3 size={24} /> Indicadores</h1>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Órdenes no canceladas creadas en {period.toLowerCase()} (hora del crematorio).</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Solo órdenes entregadas en {period.toLowerCase()} (por fecha de entrega, hora del crematorio).</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <select aria-label="Año" value={year} onChange={e => setYear(Number(e.target.value))} className={selectCls}>

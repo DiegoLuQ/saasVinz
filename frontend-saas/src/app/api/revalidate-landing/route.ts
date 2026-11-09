@@ -8,6 +8,9 @@ export async function POST(request: NextRequest) {
         (revalidateTag as any)('public-plans');
         revalidatePath('/vinzer');
         revalidatePath('/vinzer/comparar-planes');
+        // Tour del software (Admin → Configuración → «Tour del software»)
+        (revalidateTag as any)('tour-content');
+        revalidatePath('/vinzer/tour');
         revalidatePath('/');
 
         return NextResponse.json({

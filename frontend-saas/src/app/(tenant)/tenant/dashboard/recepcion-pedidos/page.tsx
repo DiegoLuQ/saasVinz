@@ -41,7 +41,8 @@ import OperationsStatsCards, { type OpsFilter } from '@/components/tenant/operat
 import OperationsToolbar, { type StatusPillFilter } from '@/components/tenant/operations/OperationsToolbar';
 import OperationRow from '@/components/tenant/operations/OperationRow';
 import OrderSlideOver from '@/components/tenant/operations/OrderSlideOver';
-import { getImageUrl } from '@/lib/tenant/api';
+import { apiRequest, getImageUrl } from '@/lib/tenant/api';
+import { useQueryClient } from '@tanstack/react-query';
 import { PlanLimitModal } from '@/components/tenant/PlanLimitModal';
 import { usePermissions } from '@/app/(tenant)/tenant/context/PermissionContext';
 
@@ -83,6 +84,7 @@ export default function CremationsPage() {
     // ==========================================
     const { data: cremations = [], isLoading: loadingCremations } = useCremations();
     const updateStatusMutation = useUpdateCremationStatus();
+    const queryClient = useQueryClient();
 
     // ==========================================
     // Local state
@@ -258,6 +260,30 @@ export default function CremationsPage() {
         }
     };
 
+    // Finalizar (solo en la última fase): mismo endpoint que «Concluir» del Panel de Trabajo.
+    // Doble clic para confirmar: el primero pide «¿Confirmar?» durante 4 s.
+    const [confirmFinalizeId, setConfirmFinalizeId] = useState<number | null>(null);
+    const handleFinalize = async (cremationId: number) => {
+        if (confirmFinalizeId !== cremationId) {
+            setConfirmFinalizeId(cremationId);
+            setTimeout(() => setConfirmFinalizeId((cur) => (cur === cremationId ? null : cur)), 4000);
+            return;
+        }
+        setConfirmFinalizeId(null);
+        setUpdatingStatusId(cremationId);
+        try {
+            await apiRequest(`/api/internal/operations/ops/orders/${cremationId}/finalize`, { method: 'PATCH' });
+            showToast('Orden finalizada y entregada', 'success');
+            queryClient.invalidateQueries({ queryKey: ['cremations-simple'] });
+            queryClient.invalidateQueries({ queryKey: ['cremations'] });
+            queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
+        } catch (err: unknown) {
+            showToast((err as { message?: string } | null)?.message || 'No se pudo finalizar la orden', 'error');
+        } finally {
+            setUpdatingStatusId(null);
+        }
+    };
+
     const confirmCancellation = async () => {
         if (!idToCancel) return;
         try {
@@ -282,7 +308,7 @@ export default function CremationsPage() {
     };
 
     // Kanban Card Component
-    const KanbanCard = ({ item, nextStatus, nextLabel, icon: Icon, colorClass, glowColor, isSelected, onSelect }: any) => {
+    const KanbanCard = ({ item, nextStatus, nextLabel, icon: Icon, colorClass, glowColor, isSelected, onSelect, inProcess }: any) => {
         const isCompleted = ['delivered', 'completed', 'completado', 'entregado'].includes(normalizeStatus(item.status));
         const isCancelled = normalizeStatus(item.status) === 'cancelado';
         const partnerName = item.partner_name || item.partner_link?.veterinary?.name || item.partner?.veterinary?.name || item.partner?.nombre_clinica;
@@ -465,6 +491,32 @@ export default function CremationsPage() {
 
                 {/* Bottom Action bar */}
                 <div className="flex items-center gap-2 pt-2 border-t border-white/5 relative z-10">
+                    {/* En proceso: el detalle va al panel lateral; finalizar solo en la última fase */}
+                    {inProcess && (
+                        <button
+                            type="button"
+                            onClick={handleOpenDetail}
+                            className="flex-1 py-2 px-3 rounded-xl border border-blue-500/20 bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
+                        >
+                            Ver detalle
+                            <Eye size={14} />
+                        </button>
+                    )}
+                    {inProcess && item.at_last_step && (
+                        <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleFinalize(item.id); }}
+                            disabled={updatingStatusId === item.id}
+                            title="Está en la última fase: concluir y marcar entregada"
+                            className={`flex-1 py-2 px-3 rounded-xl border border-transparent text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${
+                                confirmFinalizeId === item.id ? 'bg-emerald-500 text-white' : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white'
+                            }`}
+                        >
+                            {updatingStatusId === item.id ? <Loader2 size={14} className="animate-spin" /> : null}
+                            {confirmFinalizeId === item.id ? '¿Confirmar?' : 'Finalizar'}
+                            {updatingStatusId !== item.id && <CheckCircle2 size={14} />}
+                        </button>
+                    )}
                     {nextStatus && (
                         <button
                             type="button"
@@ -682,7 +734,7 @@ export default function CremationsPage() {
                                                         key={c.id} item={c} 
                                                         isSelected={selectedId === c.id}
                                                         onSelect={() => setSelectedId(selectedId === c.id ? null : c.id)}
-                                                        nextStatus="entregado" nextLabel="Marcar Entregado" icon={CheckCircle2}
+                                                        nextStatus={null} nextLabel={null} icon={null} inProcess
                                                         colorClass="bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white"
                                                         glowColor="blue-500"
                                                     />

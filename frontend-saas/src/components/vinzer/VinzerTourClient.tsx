@@ -24,113 +24,16 @@ import {
     QrCode
 } from 'lucide-react';
 import { VinzerLogo } from './VinzerLogo';
+import type { TourContent } from '@/lib/vinzer/tourContent';
 
-interface ModuleItem {
-    id: string;
-    title: string;
-    subtitle: string;
-    badge: string;
-    description: string;
-    seoAlt: string;
-    seoCaption: string;
-    imageUrl: string;
-    tags: string[];
-    highlights: string[];
-}
 
-const TOUR_MODULES: ModuleItem[] = [
-    {
-        id: 'recepcion',
-        title: 'Recepción y Código de Verificación Único',
-        subtitle: 'Registro guiado de la mascota, el tutor y el servicio en una sola orden',
-        badge: 'Módulo 01 · Recepción',
-        description: 'Al registrar un servicio, Vinzer genera automáticamente un código de verificación único de 10 caracteres y un enlace privado de seguimiento. El formulario de recepción, organizado en 4 pestañas, reúne los datos de la mascota y del tutor, la logística, las fotografías y el detalle comercial, y guarda borradores automáticamente.',
-        seoAlt: 'Formulario de recepción de una orden de cremación con código de verificación único en Vinzer',
-        seoCaption: 'Formulario de recepción: datos de la mascota y del tutor, retiro programado, fotografías y detalle comercial en una sola orden.',
-        imageUrl: 'https://i.postimg.cc/mD9jZNX2/portada-1.webp',
-        tags: ['Código Único', 'Formulario en 4 Pestañas', 'Autoguardado'],
-        highlights: [
-            'Código de verificación único por servicio',
-            'Retiro programado, peso estimado y dirección de entrega',
-            'Hasta 3 fotografías y notas internas por orden',
-            'Enlace de seguimiento listo para compartir con la familia'
-        ]
-    },
-    {
-        id: 'bitacora-planta',
-        title: 'Operación por Etapas con Evidencia Fotográfica',
-        subtitle: 'Cada crematorio define sus etapas y registra cada avance',
-        badge: 'Módulo 02 · Operación de Planta',
-        description: 'Cada crematorio configura la secuencia real de su servicio (retiro, recepción, cremación, entrega o las que use). Desde el panel de Operaciones, el equipo ve las órdenes pendientes y avanza cada una dejando una fotografía y comentarios, con fecha y hora registradas.',
-        seoAlt: 'Panel de operaciones de Vinzer con avance por etapas y evidencia fotográfica',
-        seoCaption: 'Panel de operaciones: órdenes pendientes, avance por etapas configurables y registro de fotografías y comentarios.',
-        imageUrl: 'https://i.postimg.cc/mD9jZNX2/portada-1.webp',
-        tags: ['Etapas Configurables', 'Foto por Etapa', 'Fecha y Hora'],
-        highlights: [
-            'Etapas del servicio definidas por cada crematorio',
-            'Fotografía y comentarios en cada avance',
-            'Fecha y hora registradas automáticamente',
-            'Vista de órdenes pendientes para todo el equipo'
-        ]
-    },
-    {
-        id: 'portal-familias',
-        title: 'Portal de Seguimiento en Tiempo Real para Familias',
-        subtitle: 'Tranquilidad para los tutores desde su celular, sin llamadas ni contraseñas',
-        badge: 'Módulo 03 · Portal Público',
-        description: 'Cada familia recibe un enlace privado a un portal sobrio y responsive. Sin crear cuentas, ve las etapas del servicio de su mascota, cuál está en curso y las fotografías y comentarios de cada avance. También puede buscar su servicio con el código de verificación.',
-        seoAlt: 'Portal móvil de seguimiento de cremación de mascotas en tiempo real para familias',
-        seoCaption: 'Portal público para familias: línea de tiempo del servicio, etapa en curso y evidencias de cada avance con un diseño sereno.',
-        imageUrl: 'https://i.postimg.cc/mD9jZNX2/portada-1.webp',
-        tags: ['Sin Contraseñas', 'Línea de Tiempo en Vivo', 'Menos Llamadas'],
-        highlights: [
-            'Acceso con enlace privado, sin usuario ni contraseña',
-            'Búsqueda del servicio por código de verificación',
-            'Etapas, fotografías y comentarios de cada avance',
-            'Diseño responsive pensado para el celular'
-        ]
-    },
-    {
-        id: 'certificados-qr',
-        title: 'Certificados de Cremación en PDF Personalizables',
-        subtitle: 'Plantillas con el diseño de tu crematorio, listas para imprimir o enviar',
-        badge: 'Módulo 04 · Certificados',
-        description: 'Desde el plan NORMAL, Vinzer genera el certificado de cremación en PDF con los datos de la mascota y del servicio, usando plantillas con el logo, los colores, los textos, la marca de agua y el espacio de firma y sello de tu crematorio.',
-        seoAlt: 'Certificado de cremación de mascotas en PDF con plantilla personalizable',
-        seoCaption: 'Plantilla de certificado de cremación: personalizable con el logo, los colores, los textos y la firma de tu crematorio.',
-        imageUrl: 'https://i.postimg.cc/mD9jZNX2/portada-1.webp',
-        tags: ['Plantillas Editables', 'Marca de Agua', 'PDF Listo para Imprimir'],
-        highlights: [
-            'Plantillas con logo, colores y textos del crematorio',
-            'Marca de agua con el logo de fondo',
-            'Espacio de firma y sello personalizable',
-            'Formatos Carta y Oficio'
-        ]
-    },
-    {
-        id: 'inventario-anforas',
-        title: 'Inventario de Ánforas, Productos y Catálogo',
-        subtitle: 'Stock, precios y catálogo descargable en un solo lugar',
-        badge: 'Módulo 05 · Inventario',
-        description: 'Controla el stock de ánforas, relicarios y productos con su precio de costo y de venta. Las existencias se descuentan automáticamente cuando un producto se agrega a una orden, y el catálogo completo se puede descargar en PDF para compartirlo con familias y veterinarias.',
-        seoAlt: 'Inventario de ánforas y productos con control de stock en Vinzer',
-        seoCaption: 'Módulo de inventario y catálogo: stock disponible, precios de costo y venta, y catálogo descargable en PDF.',
-        imageUrl: 'https://i.postimg.cc/mD9jZNX2/portada-1.webp',
-        tags: ['Control de Stock', 'Descuento Automático', 'Catálogo PDF'],
-        highlights: [
-            'Stock, precio de costo y precio de venta por producto',
-            'Descuento automático al agregar productos a una orden',
-            'Catálogo de productos y servicios descargable en PDF',
-            'Planes, servicios y productos en un mismo catálogo'
-        ]
-    }
-];
-
-export default function VinzerTourClient() {
+export default function VinzerTourClient({ content }: { content: TourContent }) {
+    const TOUR_MODULES = content.modules;
+    const youtubeUrl = content.video_url;
+    const chapters = TOUR_MODULES.filter((m) => m.video_time);
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
-    const [activeModuleId, setActiveModuleId] = useState<string>('recepcion');
+    const [activeModuleId, setActiveModuleId] = useState<string>(content.modules[0]?.id || '');
     const [activeLightboxImg, setActiveLightboxImg] = useState<{ url: string; title: string; caption: string } | null>(null);
-    const [youtubeUrl, setYoutubeUrl] = useState<string>('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
 
     useEffect(() => {
         const saved = localStorage.getItem('vinzer-landing-theme') as 'dark' | 'light';
@@ -246,21 +149,21 @@ export default function VinzerTourClient() {
                                         : 'bg-white/5 hover:bg-cyan-500/10 border-white/10 hover:border-cyan-500/40 text-slate-300 hover:text-cyan-300'
                                 }`}
                             >
-                                {mod.title.split(' ')[0]} {mod.title.split(' ')[1]}
+                                {mod.short_label || mod.title}
                             </a>
                         ))}
-                        <a
+                        {youtubeUrl && <a
                             href="#video-demo"
                             className="text-xs font-semibold px-3 py-1.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 transition-all flex items-center gap-1.5"
                         >
                             <Play size={12} className="fill-cyan-300" />
                             <span>Ver Video Demo</span>
-                        </a>
+                        </a>}
                     </div>
                 </section>
 
-                {/* Video Demo Section (YouTube) */}
-                <section id="video-demo" className="py-12 max-w-5xl mx-auto px-4 sm:px-6">
+                {/* Video Demo Section (YouTube/Vimeo): solo con video configurado en Admin */}
+                {youtubeUrl && <section id="video-demo" className="py-12 max-w-5xl mx-auto px-4 sm:px-6">
                     <div className={`p-6 sm:p-8 rounded-3xl border shadow-2xl relative overflow-hidden ${
                         theme === 'light'
                             ? 'bg-white border-slate-200 shadow-slate-200/80'
@@ -296,38 +199,22 @@ export default function VinzerTourClient() {
                         </div>
 
                         {/* Video Key Chapters */}
+                        {chapters.length > 0 && (
                         <div className="mt-6 pt-6 border-t border-white/5 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <a
-                                href="#recepcion"
-                                className="p-3 rounded-xl bg-white/5 hover:bg-cyan-500/10 border border-white/5 hover:border-cyan-500/30 transition-all text-left group"
-                            >
-                                <div className="text-[10px] font-mono text-cyan-400">00:00 - Minuto 1</div>
-                                <div className="text-xs font-bold mt-1 group-hover:text-cyan-300">Admisión y Código</div>
-                            </a>
-                            <a
-                                href="#bitacora-planta"
-                                className="p-3 rounded-xl bg-white/5 hover:bg-cyan-500/10 border border-white/5 hover:border-cyan-500/30 transition-all text-left group"
-                            >
-                                <div className="text-[10px] font-mono text-cyan-400">01:15 - Minuto 2</div>
-                                <div className="text-xs font-bold mt-1 group-hover:text-cyan-300">Etapas y Fotos</div>
-                            </a>
-                            <a
-                                href="#portal-familias"
-                                className="p-3 rounded-xl bg-white/5 hover:bg-cyan-500/10 border border-white/5 hover:border-cyan-500/30 transition-all text-left group"
-                            >
-                                <div className="text-[10px] font-mono text-cyan-400">02:40 - Minuto 3</div>
-                                <div className="text-xs font-bold mt-1 group-hover:text-cyan-300">Portal Familias</div>
-                            </a>
-                            <a
-                                href="#certificados-qr"
-                                className="p-3 rounded-xl bg-white/5 hover:bg-cyan-500/10 border border-white/5 hover:border-cyan-500/30 transition-all text-left group"
-                            >
-                                <div className="text-[10px] font-mono text-cyan-400">03:50 - Minuto 4</div>
-                                <div className="text-xs font-bold mt-1 group-hover:text-cyan-300">Certificados QR</div>
-                            </a>
+                            {chapters.map((m) => (
+                                <a
+                                    key={m.id}
+                                    href={`#${m.id}`}
+                                    className="p-3 rounded-xl bg-white/5 hover:bg-cyan-500/10 border border-white/5 hover:border-cyan-500/30 transition-all text-left group"
+                                >
+                                    <div className="text-[10px] font-mono text-cyan-400">{m.video_time}</div>
+                                    <div className="text-xs font-bold mt-1 group-hover:text-cyan-300">{m.short_label || m.title}</div>
+                                </a>
+                            ))}
                         </div>
+                        )}
                     </div>
-                </section>
+                </section>}
 
                 {/* Modules Showcase */}
                 <section className="py-12 max-w-6xl mx-auto px-4 sm:px-6 space-y-20">
@@ -405,19 +292,25 @@ export default function VinzerTourClient() {
                                     {/* Screenshot Figure */}
                                     <figure className={`lg:col-span-6 space-y-3 ${isEven ? 'order-2' : 'order-2 lg:order-1'}`}>
                                         <div
-                                            onClick={() => setActiveLightboxImg({
-                                                url: module.imageUrl,
+                                            onClick={() => module.image_url && setActiveLightboxImg({
+                                                url: module.image_url,
                                                 title: module.title,
-                                                caption: module.seoCaption
+                                                caption: module.image_caption
                                             })}
                                             className="group relative aspect-[16/10] w-full rounded-2xl overflow-hidden bg-black/40 border border-cyan-500/20 cursor-pointer shadow-lg transition-transform hover:scale-[1.01]"
                                         >
-                                            <img
-                                                src={module.imageUrl}
-                                                alt={module.seoAlt}
-                                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                                loading="lazy"
-                                            />
+                                            {module.image_url ? (
+                                                <img
+                                                    src={module.image_url}
+                                                    alt={module.image_alt}
+                                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                                    loading="lazy"
+                                                />
+                                            ) : (
+                                                <div className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-slate-400">
+                                                    Captura próximamente
+                                                </div>
+                                            )}
                                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-4">
                                                 <span className="text-xs text-white font-medium flex items-center gap-1.5">
                                                     <Maximize2 size={14} className="text-cyan-400" />
@@ -428,11 +321,11 @@ export default function VinzerTourClient() {
                                                 </span>
                                             </div>
                                         </div>
-                                        <figcaption className={`text-[11px] italic px-1 ${
+                                        {module.image_caption && <figcaption className={`text-[11px] italic px-1 ${
                                             theme === 'light' ? 'text-slate-500' : 'text-slate-400'
                                         }`}>
-                                            <strong>Figura {index + 1}:</strong> {module.seoCaption}
-                                        </figcaption>
+                                            <strong>Figura {index + 1}:</strong> {module.image_caption}
+                                        </figcaption>}
                                     </figure>
                                 </div>
                             </article>

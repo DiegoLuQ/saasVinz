@@ -305,7 +305,11 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
         setActing(true);
         try {
             if (key === 'entregar') {
-                if (onUpdateStatus) await onUpdateStatus(cremation.id, 'entregado');
+                // Igual que «Concluir» del Panel de Trabajo: valida la última fase y avisa a la familia
+                await apiRequest(`/api/internal/operations/ops/orders/${cremation.id}/finalize`, { method: 'PATCH' });
+                showToast('Orden finalizada y entregada', 'success');
+                queryClient.invalidateQueries({ queryKey: ['cremations-simple'] });
+                queryClient.invalidateQueries({ queryKey: ['cremations'] });
             } else {
                 // Avanzar pide confirmación primero (modal); el avance se guarda al confirmar
                 setAskNotice(true);

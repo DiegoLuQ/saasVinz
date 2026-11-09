@@ -28,7 +28,7 @@ def obtener_cremaciones(
     _: bool = Depends(check_permission("ordenes", "view"))
 ):
     """Obtiene todas las OC del tenant con filtros granulares."""
-    return service.get_all(
+    rows = service.get_all(
         tenant_id=tenant_id,
         start_date=start_date,
         end_date=end_date,
@@ -36,6 +36,15 @@ def obtener_cremaciones(
         status=status,
         sort_order=sort_order
     )
+    # «Finalizar» en recepcion-pedidos: solo en la última fase activa (mismo criterio que /ops/orders/{id}/finalize)
+    from app.api.internal.operations import models as op_models
+    last = (service.db.query(op_models.WorkflowStep.id)
+            .filter(op_models.WorkflowStep.tenant_id == tenant_id, op_models.WorkflowStep.is_active == True)  # noqa: E712
+            .order_by(op_models.WorkflowStep.order_index.desc()).first())
+    for oc in rows:
+        tech = getattr(oc, "technical", None)
+        setattr(oc, "at_last_step", True if last is None else bool(tech and tech.step_id == last[0]))
+    return rows
 
 @router.post("", response_model=schemas.CremationOCInDB)
 def crear_cremacion(
