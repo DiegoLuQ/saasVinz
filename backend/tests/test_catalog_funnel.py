@@ -133,8 +133,15 @@ def test_reporte_cuenta_todos_los_formularios_y_tamanos_por_crematorio(client, d
     assert row["orders_all"] == before["orders_all"] + 1
     assert row["order"] == before["order"]          # el catálogo no se atribuye el formulario directo
     assert data["totals"]["orders_all"] >= row["orders_all"]
-    size = next(s for s in data["top_sizes"] if s["weight_tier"] == "Mediano")
-    assert size["tenant_id"] == world["tenant_a"] and size["tenant_name"]
+    # Tamaños más pedidos = órdenes en proceso/entregadas (no los clics del catálogo)
+    assert not any(s["weight_tier"] == "Mediano" for s in data["top_sizes"])
+    oc = db.query(models.CremationOC).filter(models.CremationOC.pet_id == pet).first()
+    oc.status = "en_proceso"
+    db.commit()
+    data = client.get(url, headers=auth("creator")).json()
+    size = next(s for s in data["top_sizes"] if s["weight_tier"] == "Pequeño")
+    assert size["tenant_id"] == world["tenant_a"] and size["tenant_name"] and size["count"] >= 1
+    assert sum(s["count"] for s in data["top_sizes"]) == data["top_sizes_orders"]
 
 
 def test_vistas_de_links_publicos_no_rompen_el_reporte(client, db, world, auth):

@@ -50,6 +50,8 @@ interface Report {
     by_tenant: TenantRow[];
     top_plans: { plan_id: number; plan_name: string; tenant_name: string | null; price: number | null; plan_request: number; whatsapp: number; total: number }[];
     top_sizes: { weight_tier: string; count: number; tenant_id: number; tenant_name: string }[];
+    /** Órdenes en proceso + entregadas del periodo (= suma de top_sizes). */
+    top_sizes_orders?: number;
     by_species?: SpeciesRow[];
     tenants: { id: number; name: string }[];
 }
@@ -407,13 +409,14 @@ export default function CatalogFunnelPage() {
 
                             <div className={`${cardCls} p-5`}>
                                 <h2 className="text-white font-bold flex items-center gap-2"><Scale size={16} className="text-primary" /> Tamaños más pedidos</h2>
-                                {!tenantId && data.top_sizes.length > 0 && (
-                                    <p className="text-[11px] text-white/40 mt-1">Cada crematorio tiene sus propios rangos: se muestran por crematorio.</p>
-                                )}
+                                <p className="text-[11px] text-white/40 mt-1">
+                                    {data.top_sizes_orders || 0} órdenes en proceso y entregadas del periodo (formulario, catálogo o panel), por el tamaño elegido o sus kg.
+                                    {!tenantId && data.top_sizes.length > 0 && ' Cada crematorio tiene sus propios rangos: se muestran por crematorio.'}
+                                </p>
                                 {data.top_sizes.length === 0 ? (
                                     <p className="py-3 text-sm text-white/40">Sin datos en el periodo.</p>
                                 ) : (
-                                    <ul className="mt-3 space-y-2">
+                                    <ul className="mt-3 space-y-2 max-h-80 overflow-y-auto pr-1">
                                         {data.top_sizes.map(s => {
                                             const max = data.top_sizes[0].count || 1;
                                             return (

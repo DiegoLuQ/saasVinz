@@ -235,6 +235,69 @@ def _species_breakdown(db: Session, sub_f: list) -> list[dict]:
     )
 
 
+NO_SIZE = "Sin tamaño (sin peso)"
+
+
+def _tier_text(t) -> str:
+    if getattr(t, "label", None):
+        return str(t.label)
+    lo = t.min_weight or 0
+    return f"{lo:g} kg o más" if t.max_weight is None else f"{lo:g} – {t.max_weight:g} kg"
+
+
+def _order_sizes(db: Session, date_from, date_to, tenant_id: int | None) -> tuple[list[dict], int]:
+    """Tamaños de las órdenes EN PROCESO o ENTREGADAS creadas en el periodo (todas, vengan o no
+    del catálogo): una orden = 1. Tamaño = el tramo que eligió la familia en el formulario
+    (snapshot pet_data.weightTier/size del registro de esa mascota); si no hay, el tramo de los kg
+    de la orden (tabla de precios de la orden o la General); sin nada = «Sin tamaño»."""
+    from app.api.internal.operations.operations.board import FINAL_STATUSES, IN_PROGRESS_STATUSES
+    from app.services.public_form_config import get_weight_tiers, tier_for_weight
+
+    C = models.CremationOC
+    statuses = [s.lower() for s in IN_PROGRESS_STATUSES + FINAL_STATUSES]
+    q = db.query(C).options(joinedload(C.financial)).filter(func.lower(C.status).in_(statuses))
+    if tenant_id:
+        q = q.filter(C.tenant_id == tenant_id)
+    if date_from:
+        q = q.filter(C.created_at >= date_from)
+    if date_to:
+        q = q.filter(C.created_at < date_to)
+    orders = q.all()
+    if not orders:
+        return [], 0
+
+    # Registro web de cada mascota (el más reciente no eliminado) → tramo elegido por la familia
+    pet_ids = list({o.pet_id for o in orders if o.pet_id})
+    chosen: dict[int, str] = {}
+    if pet_ids:
+        S = models.FormSubmission
+        for pid, pet_data in (db.query(S.pet_id, S.pet_data)
+                              .filter(S.pet_id.in_(pet_ids), func.coalesce(S.status, "") != "deleted")
+                              .order_by(S.created_at.asc()).all()):
+            pd = pet_data if isinstance(pet_data, dict) else {}
+            snap = pd.get("weightTier") if isinstance(pd.get("weightTier"), dict) else {}
+            text_ = str(snap.get("label") or pd.get("size") or "").strip()
+            if text_:
+                chosen[pid] = text_[:60]
+
+    tiers_cache: dict = {}
+    counts: dict[tuple[int, str], int] = {}
+    for o in orders:
+        label = chosen.get(o.pet_id)
+        if not label and o.weight:
+            pl = o.financial.price_list_id if o.financial else None
+            key = (o.tenant_id, pl)
+            if key not in tiers_cache:
+                tiers_cache[key] = get_weight_tiers(db, o.tenant_id, pl) or (get_weight_tiers(db, o.tenant_id) if pl else [])
+            t = tier_for_weight(tiers_cache[key], o.weight)
+            label = _tier_text(t) if t else None
+        k = (o.tenant_id, label or NO_SIZE)
+        counts[k] = counts.get(k, 0) + 1
+
+    rows = sorted(counts.items(), key=lambda kv: (kv[0][1] == NO_SIZE, -kv[1], kv[0][1]))
+    return [{"tenant_id": tid, "weight_tier": w, "count": n} for (tid, w), n in rows], len(orders)
+
+
 def _link_views_summary(
     db: Session,
     date_from: datetime | None,
@@ -486,21 +549,13 @@ def report(db: Session, date_from: datetime | None, date_to: datetime | None, te
         reverse=True,
     )[:TOP_LIMIT]
 
-    # Cada crematorio define sus propios rangos: el ranking es por crematorio + tamaño
-    n_sessions = func.count(distinct(CatalogEvent.session_id))
-    size_rows = (
-        db.query(CatalogEvent.tenant_id, CatalogEvent.weight_tier, n_sessions)
-        .filter(*ev_f, CatalogEvent.kind.in_(("plan_request", "whatsapp")), CatalogEvent.weight_tier.isnot(None))
-        .group_by(CatalogEvent.tenant_id, CatalogEvent.weight_tier)
-        .order_by(n_sessions.desc())
-        .limit(TOP_LIMIT).all()
-    )
+    # Tamaños más pedidos = órdenes reales en proceso o entregadas (antes contaba visitas del
+    # catálogo que pulsaban «Solicitar»/WhatsApp, aunque nunca hicieran una orden).
+    # Cada crematorio define sus propios rangos: el ranking es por crematorio + tamaño.
+    size_rows, sizes_orders = _order_sizes(db, date_from, date_to, tenant_id)
     top_sizes = [
-        {
-            "weight_tier": w, "count": n, "tenant_id": tid,
-            "tenant_name": tenants[tid].name if tid in tenants else f"#{tid}",
-        }
-        for tid, w, n in size_rows
+        {**r, "tenant_name": tenants[r["tenant_id"]].name if r["tenant_id"] in tenants else f"#{r['tenant_id']}"}
+        for r in size_rows
     ]
 
     # Métrica por especie (formularios desde catálogo, totales y órdenes generadas)
@@ -535,6 +590,7 @@ def report(db: Session, date_from: datetime | None, date_to: datetime | None, te
         "by_tenant": by_tenant,
         "top_plans": top_plans,
         "top_sizes": top_sizes,
+        "top_sizes_orders": sizes_orders,
         "by_species": by_species,
         "tenants": sorted(
             ({"id": t.id, "name": t.name} for t in tenants.values()), key=lambda r: r["name"] or ""
