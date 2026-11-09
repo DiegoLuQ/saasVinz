@@ -9,6 +9,7 @@ import {
     Share2, FileText, CheckCircle, ChevronRight
 } from 'lucide-react';
 import { apiRequest } from '@/lib/admin/api';
+import OfficialFormFunnel from '@/components/admin/catalog/OfficialFormFunnel';
 
 // --- GET /api/internal/creator/catalog-funnel (backend services/catalog_funnel.py) ---
 interface Funnel {
@@ -628,6 +629,8 @@ export default function CatalogFunnelPage() {
                             </div>
                         )}
                     </div>
+
+                    <OfficialFormFunnel dateFrom={dateFrom} dateTo={dateTo} tenantId={tenantId} />
 
                     <p className="text-[11px] text-white/40 flex items-start gap-1.5">
                         <Info size={13} className="shrink-0 mt-0.5" />

@@ -32,3 +32,19 @@ def catalog_funnel_report(
     # date_to es inclusivo: se cuenta hasta el final de ese día
     end = _start(date_to + timedelta(days=1)) if date_to else None
     return catalog_funnel.report(db, _start(date_from), end, tenant_id)
+
+
+@router.get("/form")
+def official_form_funnel(
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    tenant_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    _creator=Depends(get_current_creator),
+):
+    """Hasta dónde llegan las familias en el formulario oficial de cada crematorio (services/form_funnel.py)."""
+    from app.services import form_funnel
+
+    apply_bypass_rls(db)
+    end = _start(date_to + timedelta(days=1)) if date_to else None
+    return form_funnel.report(db, _start(date_from), end, tenant_id)

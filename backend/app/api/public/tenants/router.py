@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from pydantic import Field
+from app.core.rate_limiter import limiter
 from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from app import models
@@ -27,6 +29,8 @@ class TenantPublicInfo(BaseModel):
     show_vinzer_brand: bool = True
     # Catálogo de recuerdos (productos oficial) para la pantalla final; None = sin enlaces oficiales completos
     souvenir_store_url: str | None = None
+    # Este es el formulario oficial: el navegador envía sus métricas (services/form_funnel.py)
+    track_form: bool = False
 
     class Config:
         from_attributes = True
@@ -50,6 +54,8 @@ def get_tenant_by_slug(slug: str, token: str | None = None, form: str | None = N
     info.show_vinzer_brand = show_vinzer_brand(tenant)
     from app.services.official_links import store_url
     info.souvenir_store_url = store_url(db, tenant)
+    from app.services.form_funnel import is_official
+    info.track_form = is_official(tenant, form)
     info.form_config = form_config
     # Con la tabla por plan los tramos no llevan recargo (el precio va en cada plan).
     from app.services.price_lists import effective_for_request
@@ -64,6 +70,27 @@ def get_tenant_by_slug(slug: str, token: str | None = None, form: str | None = N
         # La tabla del enlace siempre cobra por plan y peso (sus rangos, sin recargo).
         info.form_config = {**info.form_config, "weight_pricing_mode": "table"}
     return info
+
+class FormEventIn(BaseModel):
+    session_id: str = Field(..., max_length=40)
+    kind: str = Field(..., max_length=30)
+    detail: str | None = Field(default=None, max_length=60)
+    form: str | None = Field(default=None, max_length=80)
+
+
+@router.post("/tenant/{slug}/form-events", status_code=204)
+@limiter.limit("120/minute")
+def track_form_event(request: Request, slug: str, data: FormEventIn, db: Session = Depends(get_db)):
+    """Métricas del formulario oficial (hasta dónde llega la familia). Siempre 204:
+    los eventos de otros formularios o inválidos se ignoran."""
+    from app.services import form_funnel
+
+    tenant = db.query(models.Tenant).filter(models.Tenant.slug == slug).first()
+    if tenant:
+        apply_tenant_rls(db, tenant.id)
+        form_funnel.record(db, tenant, data.form, data.session_id, data.kind, data.detail)
+    return Response(status_code=204)
+
 
 class ServicePublicInfo(BaseModel):
     id: str  # Changed to str for prefixed IDs

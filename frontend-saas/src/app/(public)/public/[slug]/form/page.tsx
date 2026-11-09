@@ -164,6 +164,7 @@ export default function TenantFormPage() {
         handleSubmit,
         farewellTemplate,
         customFormPreset,
+        trackFormEvent,
     } = useTenantForm(slug, token, partnerSlug, widgetKey);
     // Servicio fijado por el formulario específico (ej: Eutanasia), visible desde el encabezado.
     const fixedService = customFormPreset?.associated_service_id
@@ -498,6 +499,7 @@ export default function TenantFormPage() {
 
                             <a
                                 href={whatsappShareUrl}
+                                onClick={() => trackFormEvent('whatsapp_click')}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="mt-4 w-full inline-flex items-center justify-center gap-2.5 py-3 px-5 bg-[#25D366] hover:bg-[#20bd5a] text-white font-black text-[10px] uppercase tracking-[0.15em] rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-[#25D366]/20 cursor-pointer"
@@ -523,7 +525,7 @@ export default function TenantFormPage() {
                             ) : (
                                 <button
                                     type="button"
-                                    onClick={() => setWatchingEndVideo(true)}
+                                    onClick={() => { setWatchingEndVideo(true); trackFormEvent('welcome_video'); }}
                                     className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-slate-900 dark:bg-slate-950 dark:border dark:border-slate-800 text-white text-xs font-bold uppercase tracking-[0.15em] shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
                                 >
                                     <Play size={14} className="fill-current" /> {formConfig.welcome_modal?.video_button_text?.trim() || 'Ver video'}
@@ -584,6 +586,7 @@ export default function TenantFormPage() {
                                 Mientras nuestro equipo se dirige a retirar a <b className="text-slate-800 dark:text-slate-100">{petData.name || 'tu compañero'}</b>, puedes revisar con calma las opciones para llevar su recuerdo siempre contigo.
                             </p>
                             <a
+                                onClick={() => trackFormEvent('souvenir_click')}
                                 href={submissionCode ? `${tenant.souvenir_store_url}${tenant.souvenir_store_url.includes("?") ? "&" : "?"}ref=${encodeURIComponent(submissionCode)}` : tenant.souvenir_store_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
@@ -634,6 +637,7 @@ export default function TenantFormPage() {
                     {tenantWaUrl && (
                         <a
                             href={tenantWaUrl}
+                            onClick={() => trackFormEvent('whatsapp_click')}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="mb-3 w-full inline-flex items-center justify-center gap-2.5 py-4 px-5 bg-[#25D366] hover:bg-[#20bd5a] text-white font-black text-xs uppercase tracking-[0.15em] rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-[#25D366]/20 cursor-pointer"
@@ -689,6 +693,7 @@ export default function TenantFormPage() {
                         onClose={() => setShowWelcomeModal(false)}
                         tenant={tenant}
                         config={formConfig.welcome_modal}
+                        onWatchVideo={() => trackFormEvent('welcome_video')}
                     />
                 )}
 

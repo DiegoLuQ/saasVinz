@@ -17,11 +17,13 @@ interface Tenant {
 interface Props {
     isOpen: boolean;
     onClose: () => void;
+    /** Métricas: la familia pulsó «Ver video» */
+    onWatchVideo?: () => void;
     tenant: Tenant;
     config?: WelcomeModalConfig | null;
 }
 
-export default function CondolenceModal({ isOpen, onClose, tenant, config }: Props) {
+export default function CondolenceModal({ isOpen, onClose, tenant, config, onWatchVideo }: Props) {
     const [watching, setWatching] = useState(false);
     if (config?.enabled === false) {
         return null;
@@ -129,7 +131,7 @@ export default function CondolenceModal({ isOpen, onClose, tenant, config }: Pro
                         <div className="mt-8 relative z-10">
                             {video && (
                                 <button
-                                    onClick={() => setWatching(true)}
+                                    onClick={() => { setWatching(true); onWatchVideo?.(); }}
                                     className="mb-3 w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                                 >
                                     <Play size={14} className="fill-current" /> {videoButtonText}

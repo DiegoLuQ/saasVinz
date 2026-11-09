@@ -5,6 +5,7 @@ import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 import { compressImages } from '@/lib/clientImageCompressor';
 import { Service } from '@/components/public/ServiceSelectionStep';
 import { saveDraftImages, loadDraftImages, clearDraftImages } from '@/lib/formDraftImages';
+import { formSessionId, resetFormSession, sendFormEvent, type FormEventKind } from '@/lib/formEvents';
 import { MAX_MEMORIAL_PHOTOS } from '@/components/public/ImageUploadStep';
 import { mergeWelcomeModal, planFitsWeight, planPriceForTier, resolveFormConfig, tierForWeight, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
 
@@ -27,6 +28,8 @@ export interface Tenant {
     show_vinzer_brand?: boolean;
     /** Catálogo de recuerdos (productos oficial); null = enlaces oficiales incompletos */
     souvenir_store_url?: string | null;
+    /** Es el formulario oficial: se envían sus métricas (lib/formEvents.ts) */
+    track_form?: boolean;
 }
 
 export interface OwnerData {
@@ -143,6 +146,19 @@ export function useTenantForm(
     // Las fotos se guardan aparte (IndexedDB): no se escriben hasta haber
     // intentado restaurarlas, para no pisar el borrador con una lista vacía.
     const imagesRestoredRef = useRef(false);
+
+    // Métricas del formulario oficial: hasta dónde llega la familia (solo si track_form).
+    const metricsRef = useRef<{ on: boolean; sid: string; form: string | null }>({ on: false, sid: '', form: null });
+    const trackFormEvent = useCallback((kind: FormEventKind, detail?: string | null) => {
+        const m = metricsRef.current;
+        if (m.on) sendFormEvent(slug, m.sid, kind, detail, m.form);
+    }, [slug]);
+    useEffect(() => {
+        if (!tenant?.track_form || metricsRef.current.on) return;
+        const form = new URLSearchParams(window.location.search).get('form');
+        metricsRef.current = { on: true, sid: formSessionId(slug, form), form };
+        trackFormEvent('open');
+    }, [tenant, slug, trackFormEvent]);
 
     // 1. Carga de Tema
     useEffect(() => {
@@ -472,8 +488,9 @@ export function useTenantForm(
         if ((ownerData.rut || '').length > 13) errors.rut = 'RUT inválido';
 
         setOwnerErrors(errors);
+        Object.keys(errors).forEach((k) => trackFormEvent('field_error', k));
         return Object.keys(errors).length === 0;
-    }, [ownerData, formConfig]);
+    }, [ownerData, formConfig, trackFormEvent]);
 
     const validatePet = useCallback(() => {
         const errors: Record<string, string> = {};
@@ -521,8 +538,9 @@ export function useTenantForm(
         if ((petData.nickname || '').length > 30) errors.nickname = 'Máx 30 caracteres';
 
         setPetErrors(errors);
+        Object.keys(errors).forEach((k) => trackFormEvent('field_error', k));
         return Object.keys(errors).length === 0;
-    }, [petData, formConfig, weightTiers]);
+    }, [petData, formConfig, weightTiers, trackFormEvent]);
 
     // 6.1 Fases activas dinámicas
     const activeSteps = useMemo(() => {
@@ -579,10 +597,12 @@ export function useTenantForm(
         } else if (currentDef.id === 'recuerdos') {
             const mem = formConfig.memories;
             if (mem?.require_photos && images.length === 0) {
+                trackFormEvent('field_error', 'photos');
                 alert('Por favor sube al menos una fotografía para continuar');
                 return;
             }
             if (mem?.require_dedication && !petData.dedication?.trim()) {
+                trackFormEvent('field_error', 'dedication');
                 alert('Por favor escribe unas palabras de dedicatoria para continuar');
                 return;
             }
@@ -592,11 +612,21 @@ export function useTenantForm(
             setCurrentStep(prev => prev + 1);
             setMaxVisitedStep(prev => Math.max(prev, currentStep + 1));
         }
-    }, [currentStep, totalSteps, activeSteps, validateOwner, validatePet, formConfig.memories, images, petData.dedication]);
+    }, [currentStep, totalSteps, activeSteps, validateOwner, validatePet, formConfig.memories, images, petData.dedication, trackFormEvent]);
 
     const handleBack = useCallback(() => {
+        trackFormEvent('back', activeSteps[currentStep - 1]?.id);
         setCurrentStep(prev => Math.max(1, prev - 1));
-    }, []);
+    }, [trackFormEvent, activeSteps, currentStep]);
+
+    // Métricas: paso visto, tamaño elegido y fotos subidas (el backend guarda la primera vez)
+    useEffect(() => {
+        if (!loading && !isSuccess && currentStepKey) trackFormEvent('step_view', currentStepKey);
+    }, [currentStepKey, loading, isSuccess, trackFormEvent]);
+    const sizeChosen = !!(petData.weightTierId || petData.weightRange || petData.weightKg);
+    useEffect(() => { if (sizeChosen) trackFormEvent('size_select'); }, [sizeChosen, trackFormEvent]);
+    const hasPhotos = images.length > 0;
+    useEffect(() => { if (hasPhotos) trackFormEvent('photo_add'); }, [hasPhotos, trackFormEvent]);
 
     const handleEditFromSummary = useCallback((targetStep: number | string) => {
         if (typeof targetStep === 'string') {
@@ -628,6 +658,7 @@ export function useTenantForm(
     }, [currentStep, totalSteps, activeSteps, validateOwner, validatePet]);
 
     const toggleService = useCallback((id: string, singleSelect: boolean = false) => {
+        trackFormEvent('service_select');
         setSelectedServices(prev => {
             if (singleSelect) {
                 // Un solo ítem de su tipo (plan_*, svc_*…): los adicionales de otro tipo se mantienen.
@@ -637,7 +668,7 @@ export function useTenantForm(
             }
             return prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id];
         });
-    }, []);
+    }, [trackFormEvent]);
 
     // 8. Extender Token
     const handleExtend = async () => {
@@ -662,6 +693,7 @@ export function useTenantForm(
     const handleSubmit = async () => {
         if (!tenant) return;
         setIsSubmitting(true);
+        trackFormEvent('submit_click');
 
         try {
             // Optimizar imágenes antes del envío
@@ -745,6 +777,11 @@ export function useTenantForm(
             }
 
             setIsSuccess(true);
+            trackFormEvent('submitted');
+            if (metricsRef.current.on) {
+                resetFormSession(slug, metricsRef.current.form);
+                metricsRef.current = { ...metricsRef.current, on: false };
+            }
             // El borrador solo se borra al registrar con éxito.
             localStorage.removeItem(storageKey);
             clearDraftImages(storageKey);
@@ -752,6 +789,7 @@ export function useTenantForm(
 
         } catch (err: any) {
             console.error(err);
+            trackFormEvent('submit_error');
             alert(err.message || 'Hubo un error al enviar el formulario. Por favor intenta nuevamente.');
         } finally {
             setIsSubmitting(false);
@@ -801,5 +839,6 @@ export function useTenantForm(
         handleSubmit,
         farewellTemplate,
         customFormPreset,
+        trackFormEvent,
     };
 }
