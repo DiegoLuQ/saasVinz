@@ -6,12 +6,13 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
     ArrowLeft, ArrowUpRight, BellRing, CheckCircle2, Compass, ExternalLink, Heart, Link2, Loader2, Mail,
-    MessageCircle, Star, XCircle,
+    MessageCircle, Star, XCircle, FileDown,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/admin/api';
 import { getPublicMemorialPath } from '@/lib/memorialUrls';
 import { getMemorialBaseUrl } from '@/lib/publicUrls';
 import OfficialFormFunnel from '@/components/admin/catalog/OfficialFormFunnel';
+import { downloadTenantCatalogPdf } from '@/components/admin/catalog/buildCatalogReportPdf';
 
 // --- GET /api/internal/creator/catalog-funnel/tenant/{id} (backend services/tenant_tracking.py) ---
 interface LinkRow {
@@ -112,6 +113,7 @@ export default function TenantTrackingDetailPage() {
     const initialStage = sp.get('tracking_stage');
     const [stage, setStage] = useState<'in_progress' | 'delivered' | 'all'>(
         initialStage === 'delivered' || initialStage === 'all' ? initialStage : 'in_progress');
+    const [downloadingPdf, setDownloadingPdf] = useState(false);
     const qs = new URLSearchParams({ ...(dateFrom ? { date_from: dateFrom } : {}), ...(dateTo ? { date_to: dateTo } : {}), tracking_stage: stage }).toString();
 
     const { data, isLoading, error } = useQuery<Detail>({
@@ -124,11 +126,52 @@ export default function TenantTrackingDetailPage() {
     });
     const memorialBase = getMemorialBaseUrl();
 
+    const handleDownloadPdf = async () => {
+        if (!data) return;
+        try {
+            setDownloadingPdf(true);
+            let formFunnelData: any = null;
+            try {
+                const formParams = new URLSearchParams();
+                if (dateFrom) formParams.set('date_from', dateFrom);
+                if (dateTo) formParams.set('date_to', dateTo);
+                formParams.set('tenant_id', String(tenantId));
+                formFunnelData = await apiRequest(`/api/internal/creator/catalog-funnel/form?${formParams.toString()}`);
+            } catch (e) {
+                console.error('Error fetching form funnel for pdf:', e);
+            }
+
+            await downloadTenantCatalogPdf(data, rep || null, formFunnelData, {
+                dateFrom,
+                dateTo,
+                trackingStage: stage,
+                tenantName: data.tenant.name,
+            });
+        } catch (err) {
+            console.error('Error generating tenant catalog PDF:', err);
+        } finally {
+            setDownloadingPdf(false);
+        }
+    };
+
     return (
         <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
-            <Link href={`/dashboard/catalogos?${qs}`} className="inline-flex items-center gap-1.5 text-xs font-bold text-white/50 hover:text-white">
-                <ArrowLeft size={14} /> KPIs del catálogo
-            </Link>
+            <div className="flex items-center justify-between gap-4">
+                <Link href={`/dashboard/catalogos?${qs}`} className="inline-flex items-center gap-1.5 text-xs font-bold text-white/50 hover:text-white">
+                    <ArrowLeft size={14} /> KPIs del catálogo
+                </Link>
+
+                <button
+                    type="button"
+                    onClick={handleDownloadPdf}
+                    disabled={downloadingPdf || isLoading || !data}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-400 text-white text-xs font-bold shadow-lg shadow-primary/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    title="Descargar informe formal del crematorio en PDF"
+                >
+                    {downloadingPdf ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} />}
+                    <span>{downloadingPdf ? 'Generando PDF...' : 'Descargar PDF del crematorio'}</span>
+                </button>
+            </div>
 
             {isLoading ? (
                 <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-white/40" /></div>

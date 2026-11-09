@@ -190,6 +190,24 @@ export function VinzerNavbar({
                             )}
                         </a>
 
+                        {/* Propósito */}
+                        <a
+                            href="#proposito"
+                            onClick={(e) => handleLinkClick(e, '#proposito')}
+                            className={`relative text-[11px] font-bold tracking-widest uppercase transition-all duration-300 py-1 ${
+                                activeSection === 'proposito' && isHomePage
+                                    ? isLight ? 'text-[#0284C7]' : 'text-[#19B5FE]'
+                                    : isLight
+                                        ? 'text-slate-600 hover:text-slate-900'
+                                        : 'text-[#C0C0C0] hover:text-white'
+                            }`}
+                        >
+                            Propósito
+                            {activeSection === 'proposito' && isHomePage && (
+                                <span className={`absolute bottom-0 inset-x-0 h-[2px] ${isLight ? 'bg-[#0284C7]' : 'bg-[#19B5FE]'}`} />
+                            )}
+                        </a>
+
                         {/* FAQ */}
                         <a
                             href="#faqs"

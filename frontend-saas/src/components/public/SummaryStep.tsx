@@ -6,6 +6,7 @@ import { User, PawPrint, Package, Heart, Pencil, ImageIcon, Check, Sparkles, Gem
 import { motion, AnimatePresence } from 'framer-motion';
 import FarewellPreview from '@/app/(tenant)/tenant/dashboard/documentos/disenos/components/FarewellPreview';
 import { formatAge } from '@/lib/petAge';
+import { formatPartialDate } from '@/lib/petDates';
 import { DEFAULT_FORM_CONFIG, fieldLabel, formatCLP, tierDisplay, tierForWeight, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
 
 interface OwnerData {
@@ -87,8 +88,7 @@ const CONTACT_LABELS: Record<string, string> = {
 
 function formatDate(dateStr?: string): string {
     if (!dateStr) return '—';
-    const [y, m, d] = dateStr.split('-');
-    return `${d}/${m}/${y}`;
+    return formatPartialDate(dateStr) || '—';
 }
 
 function SectionCard({

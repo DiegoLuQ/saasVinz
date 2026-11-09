@@ -20,6 +20,7 @@ interface MonthRow { month: number; orders: number; revenue: number; forms: numb
 interface KpiData {
     year: number;
     month: number | null;
+    status?: string;
     years: number[];
     totals: {
         orders: number; revenue: number; avg_ticket: number; forms: number; forms_processed: number;
@@ -281,6 +282,21 @@ function RankTable({ title, icon: Icon, rows, countLabel, empty }: {
 }
 
 type Section = 'resumen' | 'catalogo';
+type OrderStatusFilter = 'entregados' | 'pendientes' | 'en_proceso' | 'todos';
+
+const STATUS_OPTIONS: { key: OrderStatusFilter; label: string }[] = [
+    { key: 'entregados', label: 'Entregados' },
+    { key: 'pendientes', label: 'Pendientes' },
+    { key: 'en_proceso', label: 'En proceso' },
+    { key: 'todos', label: 'Todos' },
+];
+
+const STATUS_SUBTITLES: Record<OrderStatusFilter, (period: string) => string> = {
+    entregados: (p) => `Solo órdenes entregadas en ${p.toLowerCase()} (por fecha de entrega, hora del crematorio).`,
+    pendientes: (p) => `Órdenes pendientes en ${p.toLowerCase()} (por fecha de ingreso, hora del crematorio).`,
+    en_proceso: (p) => `Órdenes en proceso en ${p.toLowerCase()} (por fecha de ingreso, hora del crematorio).`,
+    todos: (p) => `Todas las órdenes (pendientes, en proceso y entregadas) en ${p.toLowerCase()} (hora del crematorio).`,
+};
 
 export default function IndicadoresPage() {
     const currentUser = useCurrentUser();
@@ -288,11 +304,12 @@ export default function IndicadoresPage() {
     const now = new Date();
     const [year, setYear] = useState(now.getFullYear());
     const [month, setMonth] = useState<number | null>(now.getMonth() + 1);
+    const [status, setStatus] = useState<OrderStatusFilter>('entregados');
     const [section, setSection] = useState<Section>('resumen');
 
     const { data, isLoading, error } = useQuery<KpiData>({
-        queryKey: ['kpis', year, month],
-        queryFn: () => apiRequest(`/api/internal/kpis?year=${year}${month ? `&month=${month}` : ''}`),
+        queryKey: ['kpis', year, month, status],
+        queryFn: () => apiRequest(`/api/internal/kpis?year=${year}${month ? `&month=${month}` : ''}&status=${status}`),
         enabled: isOwner,
         placeholderData: prev => prev,
     });
@@ -310,9 +327,16 @@ export default function IndicadoresPage() {
             <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2"><BarChart3 size={24} /> Indicadores</h1>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Solo órdenes entregadas en {period.toLowerCase()} (por fecha de entrega, hora del crematorio).</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                        {STATUS_SUBTITLES[status]?.(period) ?? STATUS_SUBTITLES.entregados(period)}
+                    </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                    <select aria-label="Estado" value={status} onChange={e => setStatus(e.target.value as OrderStatusFilter)} className={selectCls}>
+                        {STATUS_OPTIONS.map(opt => (
+                            <option key={opt.key} value={opt.key}>{opt.label}</option>
+                        ))}
+                    </select>
                     <select aria-label="Año" value={year} onChange={e => setYear(Number(e.target.value))} className={selectCls}>
                         {years.map(y => <option key={y} value={y}>{y}</option>)}
                     </select>

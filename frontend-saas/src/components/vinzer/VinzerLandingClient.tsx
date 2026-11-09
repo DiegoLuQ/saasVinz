@@ -35,6 +35,7 @@ import { VinzerMemorialCard } from './VinzerMemorialCard';
 import { VinzerMemorialBanner } from './VinzerMemorialBanner';
 import { VinzerNavbar } from './VinzerNavbar';
 import { VinzerFooter } from './VinzerFooter';
+import { VinzerPurpose } from './VinzerPurpose';
 import ReCaptchaProvider from '@/components/captcha/ReCaptchaProvider';
 import type { PlanHighlight, PublicPlan } from '@/lib/api/plans';
 
@@ -91,7 +92,7 @@ export default function VinzerLandingClient({ initialConfig = null, initialPlans
 
     useEffect(() => {
         const handleScroll = () => {
-            const sections = ['inicio', 'producto', 'trazabilidad', 'como-funciona', 'planes', 'faqs'];
+            const sections = ['inicio', 'proposito', 'producto', 'trazabilidad', 'como-funciona', 'planes', 'faqs'];
             const scrollPosition = window.scrollY + 250; // offset
 
             for (const section of sections) {
@@ -283,6 +284,9 @@ export default function VinzerLandingClient({ initialConfig = null, initialPlans
             {/* El sitio web va ANTES de precios para que el visitante llegue
                 cargado a la tarjeta ULTRA */}
             <VinzerWebService theme={theme} />
+
+            {/* Manifiesto y Propósito institucional */}
+            <VinzerPurpose theme={theme} />
 
             <VinzerPricing theme={theme} initialPlans={initialPlans} initialHighlights={initialHighlights} />
 

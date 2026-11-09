@@ -11,7 +11,7 @@ interface PhaseItem { field?: string; key?: string; label: string; sessions: num
 interface Phase {
     key: string; label: string; reached: number; pct: number; lost_here: number; median_seconds: number | null;
     actions: PhaseItem[]; fields: PhaseItem[]; errors: PhaseItem[]; last_fields: PhaseItem[];
-    video_offered?: number; stuck_on_submit?: number;
+    video_offered?: number; video_configured?: boolean; stuck_on_submit?: number;
 }
 interface FormFunnel {
     sessions: number;
@@ -99,8 +99,17 @@ function PhaseCard({ phase, index, total }: { phase: Phase; index: number; total
                     <div>
                         <p className="text-[10px] uppercase tracking-wider text-white/40 mb-1.5 flex items-center gap-1"><MousePointerClick size={11} /> Qué hicieron</p>
                         <div className="flex flex-wrap gap-1.5">{phase.actions.map((a) => <Chip key={a.key} item={a} />)}</div>
-                        {phase.key === 'inicio' && !phase.video_offered && (
-                            <p className="mt-1 text-[11px] text-white/35">El formulario no ofrece video de bienvenida.</p>
+                        {phase.key === 'inicio' && (
+                            <>
+                                {!phase.video_configured && !phase.video_offered && (
+                                    <p className="mt-1 text-[11px] text-white/35">El formulario no tiene configurado un video de bienvenida.</p>
+                                )}
+                                {phase.video_configured && !phase.video_offered && (
+                                    <p className="mt-1 text-[11px] text-amber-300/70">
+                                        Video de bienvenida configurado y activo (sin reproducciones en este rango de fechas).
+                                    </p>
+                                )}
+                            </>
                         )}
                     </div>
                 )}

@@ -5,12 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
-    Filter, Link2, Loader2, ArrowUpRight, Info, Scale, BookOpen,
-    Globe2, Building2, PawPrint, X, CheckCircle2, Heart, Compass,
-    Share2, FileText, CheckCircle, ChevronRight
+    Filter, Loader2, ArrowUpRight, Info, BookOpen,
+    Globe2, Building2, PawPrint, X, Heart, Compass,
+    Share2, FileText, ChevronRight, FileDown
 } from 'lucide-react';
 import { apiRequest } from '@/lib/admin/api';
-import OfficialFormFunnel from '@/components/admin/catalog/OfficialFormFunnel';
+import { downloadGlobalCatalogPdf } from '@/components/admin/catalog/buildCatalogReportPdf';
 
 // --- GET /api/internal/creator/catalog-funnel (backend services/catalog_funnel.py) ---
 interface Funnel {
@@ -127,6 +127,7 @@ export default function CatalogFunnelPage() {
     const [tenantId, setTenantId] = useState('');
     // Aperturas de seguimiento: estado de la orden cuando la familia lo abrió
     const [trackingStage, setTrackingStage] = useState<'in_progress' | 'delivered' | 'all'>('in_progress');
+    const [downloadingPdf, setDownloadingPdf] = useState(false);
 
     const params = new URLSearchParams();
     if (dateFrom) params.set('date_from', dateFrom);
@@ -149,6 +150,23 @@ export default function CatalogFunnelPage() {
     const totalSpeciesForms = speciesList.reduce((acc, s) => acc + s.forms_all, 0);
     const hasMemorials = data?.has_memorials !== false;
 
+    const handleDownloadPdf = async () => {
+        if (!data) return;
+        try {
+            setDownloadingPdf(true);
+            await downloadGlobalCatalogPdf(data, {
+                dateFrom,
+                dateTo,
+                trackingStage,
+                tenantName: selectedTenantName,
+            });
+        } catch (err) {
+            console.error('Error generating global catalog PDF:', err);
+        } finally {
+            setDownloadingPdf(false);
+        }
+    };
+
     return (
         <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -161,27 +179,41 @@ export default function CatalogFunnelPage() {
                     </p>
                 </div>
 
-                {/* Indicador activo Global vs Crematorio */}
-                <div className="flex items-center gap-2 bg-[#0f172a] border border-white/15 rounded-2xl px-3.5 py-2">
-                    {selectedTenantName ? (
-                        <>
-                            <Building2 size={16} className="text-primary shrink-0" />
-                            <span className="text-xs font-bold text-white">{selectedTenantName}</span>
-                            <button
-                                type="button"
-                                onClick={() => setTenantId('')}
-                                title="Volver a vista global"
-                                className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white/10 text-[11px] font-bold text-white/80 hover:bg-white/20 hover:text-white transition-colors"
-                            >
-                                <X size={12} /> Ver Global
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            <Globe2 size={16} className="text-emerald-400 shrink-0" />
-                            <span className="text-xs font-bold text-emerald-300">Vista Global · Todos los crematorios</span>
-                        </>
-                    )}
+                <div className="flex flex-wrap items-center gap-3">
+                    {/* Indicador activo Global vs Crematorio */}
+                    <div className="flex items-center gap-2 bg-[#0f172a] border border-white/15 rounded-2xl px-3.5 py-2">
+                        {selectedTenantName ? (
+                            <>
+                                <Building2 size={16} className="text-primary shrink-0" />
+                                <span className="text-xs font-bold text-white">{selectedTenantName}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setTenantId('')}
+                                    title="Volver a vista global"
+                                    className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white/10 text-[11px] font-bold text-white/80 hover:bg-white/20 hover:text-white transition-colors cursor-pointer"
+                                >
+                                    <X size={12} /> Ver Global
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <Globe2 size={16} className="text-emerald-400 shrink-0" />
+                                <span className="text-xs font-bold text-emerald-300">Vista Global · Todos los crematorios</span>
+                            </>
+                        )}
+                    </div>
+
+                    {/* Botón Descargar PDF */}
+                    <button
+                        type="button"
+                        onClick={handleDownloadPdf}
+                        disabled={downloadingPdf || isLoading || !data}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-400 text-white text-xs font-bold shadow-lg shadow-primary/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        title="Descargar informe formal en PDF"
+                    >
+                        {downloadingPdf ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} />}
+                        <span>{downloadingPdf ? 'Generando PDF...' : 'Descargar PDF'}</span>
+                    </button>
                 </div>
             </div>
 
@@ -323,8 +355,7 @@ export default function CatalogFunnelPage() {
                         </div>
                     </div>
 
-                    <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-                        <div className="space-y-4">
+                    <div className="grid gap-4 lg:grid-cols-2">
                             <div className={`${cardCls} p-5`}>
                                 <h2 className="text-white font-bold">Embudo</h2>
                                 <p className="text-[11px] text-white/40 mt-1 mb-4">
@@ -386,71 +417,6 @@ export default function CatalogFunnelPage() {
                                     </ul>
                                 )}
                             </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div className={`${cardCls} overflow-hidden`}>
-                                <div className="px-5 pt-5 flex items-center justify-between gap-2">
-                                    <h2 className="text-white font-bold">Planes activos más pedidos</h2>
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                                        <CheckCircle2 size={11} /> Solo activos
-                                    </span>
-                                </div>
-                                <p className="px-5 text-[11px] text-white/40 mt-1">«Solicitar este plan» + WhatsApp (planes vigentes)</p>
-                                {data.top_plans.length === 0 ? (
-                                    <p className="px-5 py-6 text-sm text-white/40">Sin planes activos con solicitudes en el periodo.</p>
-                                ) : (
-                                    <table className="w-full mt-2">
-                                        <tbody>
-                                            {data.top_plans.map(p => (
-                                                <tr key={p.plan_id} className="border-b border-white/5 last:border-0">
-                                                    <td className="px-4 py-3 text-sm text-white/80 align-top">
-                                                        <span className="font-bold text-white">{p.plan_name}</span>
-                                                        <span className="block text-[11px] text-white/40">
-                                                            {[p.tenant_name, p.price ? clp(p.price) : null].filter(Boolean).join(' · ')}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm text-white/80 align-top text-right whitespace-nowrap">
-                                                        <span className="font-bold text-white">{p.plan_request}</span>{' '}
-                                                        <span className="text-[11px] text-white/40">solicitar</span>
-                                                        <span className="block text-[11px] text-white/40">{p.whatsapp} WhatsApp</span>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                )}
-                            </div>
-
-                            <div className={`${cardCls} p-5`}>
-                                <h2 className="text-white font-bold flex items-center gap-2"><Scale size={16} className="text-primary" /> Tamaños más pedidos</h2>
-                                <p className="text-[11px] text-white/40 mt-1">
-                                    {data.top_sizes_orders || 0} órdenes en proceso y entregadas del periodo (formulario, catálogo o panel), por el tamaño elegido o sus kg.
-                                    {!tenantId && data.top_sizes.length > 0 && ' Cada crematorio tiene sus propios rangos: se muestran por crematorio.'}
-                                </p>
-                                {data.top_sizes.length === 0 ? (
-                                    <p className="py-3 text-sm text-white/40">Sin datos en el periodo.</p>
-                                ) : (
-                                    <ul className="mt-3 space-y-2 max-h-80 overflow-y-auto pr-1">
-                                        {data.top_sizes.map(s => {
-                                            const max = data.top_sizes[0].count || 1;
-                                            return (
-                                                <li key={`${s.tenant_id}-${s.weight_tier}`} className="text-sm">
-                                                    <div className="flex justify-between gap-3 text-white/80">
-                                                        <span className="min-w-0 truncate">
-                                                            {s.weight_tier}
-                                                            {!tenantId && <span className="text-[11px] text-white/40"> · {s.tenant_name}</span>}
-                                                        </span>
-                                                        <span className="font-bold">{s.count}</span>
-                                                    </div>
-                                                    <div className="h-1.5 mt-1 rounded-full bg-white/5"><div className="h-full rounded-full bg-primary/60" style={{ width: `${(s.count / max) * 100}%` }} /></div>
-                                                </li>
-                                            );
-                                        })}
-                                    </ul>
-                                )}
-                            </div>
-                        </div>
                     </div>
 
                     {/* Tabla rediseñada por crematorio con agrupaciones visuales */}
@@ -644,8 +610,6 @@ export default function CatalogFunnelPage() {
                             </div>
                         )}
                     </div>
-
-                    <OfficialFormFunnel dateFrom={dateFrom} dateTo={dateTo} tenantId={tenantId} />
 
                     <p className="text-[11px] text-white/40 flex items-start gap-1.5">
                         <Info size={13} className="shrink-0 mt-0.5" />

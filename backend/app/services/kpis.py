@@ -31,14 +31,37 @@ def _window(tz_name: str, year: int, month: int | None) -> tuple[datetime, datet
     return zone.localize(start).astimezone(pytz.utc), zone.localize(end).astimezone(pytz.utc)
 
 
-# Solo órdenes entregadas; `created_at` aquí = fecha de entrega (la usan los rankings y la serie).
-ORDERS = """
-    SELECT c.id, c.pet_id, c.partner_link_id, coalesce(sch.completed_at, c.created_at) AS created_at
-    FROM oc_cremations c
-    LEFT JOIN oc_scheduling sch ON sch.cremation_id = c.id
-    WHERE c.tenant_id = :tid AND lower(coalesce(c.status, '')) = 'entregado'
-      AND coalesce(sch.completed_at, c.created_at) >= :s AND coalesce(sch.completed_at, c.created_at) < :e
-"""
+def _orders_query(status_filter: str | None) -> tuple[str, str]:
+    st = (status_filter or "entregados").strip().lower()
+    if st in ("entregado", "entregados"):
+        cond = "lower(coalesce(c.status, '')) IN ('entregado', 'delivered', 'completado', 'completed')"
+        date_expr = "coalesce(sch.completed_at, c.created_at)"
+        norm = "entregados"
+    elif st in ("pendiente", "pendientes"):
+        cond = "lower(coalesce(c.status, '')) IN ('pendiente', 'pending', 'recibido', 'received', 'coordinado', 'approved')"
+        date_expr = "c.created_at"
+        norm = "pendientes"
+    elif st in ("en_proceso", "en proceso", "proceso"):
+        cond = "lower(coalesce(c.status, '')) IN ('en_proceso', 'processing', 'in_progress', 'ready', 'listo')"
+        date_expr = "c.created_at"
+        norm = "en_proceso"
+    elif st in ("todos", "all"):
+        cond = "lower(coalesce(c.status, '')) NOT IN ('cancelado', 'canceled', 'cancelled', 'rejected', 'rechazado', 'rechazado_por_cliente')"
+        date_expr = "coalesce(sch.completed_at, c.created_at)"
+        norm = "todos"
+    else:
+        cond = "lower(coalesce(c.status, '')) IN ('entregado', 'delivered', 'completado', 'completed')"
+        date_expr = "coalesce(sch.completed_at, c.created_at)"
+        norm = "entregados"
+
+    sql = f"""
+        SELECT c.id, c.pet_id, c.partner_link_id, {date_expr} AS created_at
+        FROM oc_cremations c
+        LEFT JOIN oc_scheduling sch ON sch.cremation_id = c.id
+        WHERE c.tenant_id = :tid AND {cond}
+          AND {date_expr} >= :s AND {date_expr} < :e
+    """
+    return sql, norm
 
 
 def _rank(rows: list[dict], limit: int = LIMIT) -> list[dict]:
@@ -48,23 +71,24 @@ def _rank(rows: list[dict], limit: int = LIMIT) -> list[dict]:
     return out[:limit]
 
 
-def compute(db: Session, tenant_id: int, year: int, month: int | None) -> dict:
+def compute(db: Session, tenant_id: int, year: int, month: int | None, status: str | None = "entregados") -> dict:
     tz_name = get_tenant_timezone_str(db, tenant_id)
     s, e = _window(tz_name, year, month)
     ys, ye = _window(tz_name, year, None)
     p = {"tid": tenant_id, "s": s, "e": e, "tz": tz_name}
+    orders_sql, status_norm = _orders_query(status)
 
     def q(sql: str, params: dict | None = None) -> list[dict]:
         return [dict(r._mapping) for r in db.execute(text(sql), params or p)]
 
     totals = q(f"""
-        WITH o AS ({ORDERS})
+        WITH o AS ({orders_sql})
         SELECT count(*) AS orders, coalesce(sum(f.total_price), 0) AS revenue
         FROM o LEFT JOIN oc_financial f ON f.cremation_id = o.id
     """)[0]
 
     by_plan = q(f"""
-        WITH o AS ({ORDERS})
+        WITH o AS ({orders_sql})
         SELECT coalesce(sp.name, 'Plan eliminado') AS label, count(DISTINCT o.id) AS count,
                coalesce(sum(pl.precio_venta * coalesce(pl.cantidad, 1)), 0) AS revenue
         FROM o JOIN oc_plans pl ON pl.cremation_id = o.id
@@ -72,7 +96,7 @@ def compute(db: Session, tenant_id: int, year: int, month: int | None) -> dict:
         GROUP BY 1
     """)
     by_service = q(f"""
-        WITH o AS ({ORDERS})
+        WITH o AS ({orders_sql})
         SELECT coalesce(ss.name, 'Servicio eliminado') AS label, count(DISTINCT o.id) AS count,
                coalesce(sum(sv.precio_venta * coalesce(sv.cantidad, 1)), 0) AS revenue
         FROM o JOIN oc_services sv ON sv.cremation_id = o.id
@@ -80,7 +104,7 @@ def compute(db: Session, tenant_id: int, year: int, month: int | None) -> dict:
         GROUP BY 1
     """)
     by_product = q(f"""
-        WITH o AS ({ORDERS})
+        WITH o AS ({orders_sql})
         SELECT coalesce(ip.name, 'Producto eliminado') AS label, ip.id AS pid,
                coalesce(sum(pr.cantidad), 0) AS count,
                coalesce(sum(pr.precio_venta * coalesce(pr.cantidad, 1)), 0) AS revenue
@@ -113,7 +137,7 @@ def compute(db: Session, tenant_id: int, year: int, month: int | None) -> dict:
             external_revenue += qty * price
 
     by_city = q(f"""
-        WITH o AS ({ORDERS})
+        WITH o AS ({orders_sql})
         SELECT coalesce(nullif(initcap(trim(cu.city)), ''), 'Sin ciudad') AS label, count(*) AS count,
                coalesce(sum(f.total_price), 0) AS revenue
         FROM o LEFT JOIN crm_pets pe ON pe.id = o.pet_id
@@ -122,7 +146,7 @@ def compute(db: Session, tenant_id: int, year: int, month: int | None) -> dict:
         GROUP BY 1
     """)
     by_species = q(f"""
-        WITH o AS ({ORDERS})
+        WITH o AS ({orders_sql})
         SELECT coalesce(nullif(initcap(trim(pe.species)), ''), 'Sin especie') AS label, count(*) AS count,
                coalesce(sum(f.total_price), 0) AS revenue
         FROM o LEFT JOIN crm_pets pe ON pe.id = o.pet_id
@@ -130,7 +154,7 @@ def compute(db: Session, tenant_id: int, year: int, month: int | None) -> dict:
         GROUP BY 1
     """)
     by_agreement = q(f"""
-        WITH o AS ({ORDERS})
+        WITH o AS ({orders_sql})
         SELECT f.agreement_name AS label, count(*) AS count, coalesce(sum(f.total_price), 0) AS revenue,
                coalesce(sum(f.agreement_discount), 0) AS extra
         FROM o JOIN oc_financial f ON f.cremation_id = o.id
@@ -138,7 +162,7 @@ def compute(db: Session, tenant_id: int, year: int, month: int | None) -> dict:
         GROUP BY 1
     """)
     by_vet = q(f"""
-        WITH o AS ({ORDERS})
+        WITH o AS ({orders_sql})
         SELECT coalesce(v.name, 'Veterinaria') AS label, count(*) AS count, coalesce(sum(f.total_price), 0) AS revenue,
                coalesce(sum(f.commission), 0) AS extra
         FROM o JOIN ptn_partner_links pl ON pl.id = o.partner_link_id
@@ -161,7 +185,7 @@ def compute(db: Session, tenant_id: int, year: int, month: int | None) -> dict:
     yp = {**p, "s": ys, "e": ye}
     series = {m: {"month": m, "orders": 0, "revenue": 0.0, "forms": 0, "memorials": 0} for m in range(1, 13)}
     for r in q(f"""
-        WITH o AS ({ORDERS})
+        WITH o AS ({orders_sql})
         SELECT extract(month FROM o.created_at AT TIME ZONE :tz)::int AS m, count(*) AS n,
                coalesce(sum(f.total_price), 0) AS revenue
         FROM o LEFT JOIN oc_financial f ON f.cremation_id = o.id GROUP BY 1
@@ -182,7 +206,7 @@ def compute(db: Session, tenant_id: int, year: int, month: int | None) -> dict:
     revenue = float(totals["revenue"] or 0)
     forms_n = int(forms["n"] or 0)
     return {
-        "year": year, "month": month, "timezone": tz_name,
+        "year": year, "month": month, "status": status_norm, "timezone": tz_name,
         "totals": {
             "orders": orders, "revenue": revenue,
             "avg_ticket": round(revenue / orders) if orders else 0,

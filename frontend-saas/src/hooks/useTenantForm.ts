@@ -149,16 +149,31 @@ export function useTenantForm(
 
     // Métricas del formulario oficial: hasta dónde llega la familia (solo si track_form).
     const metricsRef = useRef<{ on: boolean; sid: string; form: string | null }>({ on: false, sid: '', form: null });
+    const openedRef = useRef(false);
+
+    const ensureSession = useCallback(() => {
+        if (!tenant?.track_form || typeof window === 'undefined') return null;
+        if (!metricsRef.current.on) {
+            const form = new URLSearchParams(window.location.search).get('form');
+            metricsRef.current = { on: true, sid: formSessionId(slug, form), form };
+        }
+        if (!openedRef.current && metricsRef.current.on) {
+            openedRef.current = true;
+            sendFormEvent(slug, metricsRef.current.sid, 'open', null, metricsRef.current.form);
+        }
+        return metricsRef.current.on ? metricsRef.current : null;
+    }, [tenant?.track_form, slug]);
+
     const trackFormEvent = useCallback((kind: FormEventKind, detail?: string | null) => {
-        const m = metricsRef.current;
-        if (m.on) sendFormEvent(slug, m.sid, kind, detail, m.form);
-    }, [slug]);
+        const m = ensureSession();
+        if (m) sendFormEvent(slug, m.sid, kind, detail, m.form);
+    }, [ensureSession, slug]);
+
     useEffect(() => {
-        if (!tenant?.track_form || metricsRef.current.on) return;
-        const form = new URLSearchParams(window.location.search).get('form');
-        metricsRef.current = { on: true, sid: formSessionId(slug, form), form };
-        trackFormEvent('open');
-    }, [tenant, slug, trackFormEvent]);
+        if (tenant?.track_form) {
+            ensureSession();
+        }
+    }, [tenant?.track_form, ensureSession]);
 
     // 1. Carga de Tema
     useEffect(() => {

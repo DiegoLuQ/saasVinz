@@ -94,16 +94,33 @@ def resolve_form_id(tenant, form: str | None) -> str:
     return "main"
 
 
-def official_form_id(tenant) -> str | None:
+def official_form_id(tenant) -> str:
     raw = tenant.official_links if isinstance(getattr(tenant, "official_links", None), dict) else {}
     form = raw.get("form")
-    if not form:
-        return None
+    if not form or str(form) == "main":
+        return "main"
     form = str(form)
-    if form == "main":
-        return form
     from app.services.official_links import form_options
-    return form if any(o["id"] == form for o in form_options(tenant)) else None
+    return form if any(o["id"] == form for o in form_options(tenant)) else "main"
+
+
+def tenant_has_welcome_video(tenant) -> bool:
+    if not tenant:
+        return False
+    from app.services.public_form_config import normalize_form_config
+    from app.services.form_video import tenant_can_use_form_video
+    if not tenant_can_use_form_video(tenant):
+        return False
+    cfg = normalize_form_config(tenant.form_config)
+    off_id = official_form_id(tenant)
+    if off_id and off_id != "main":
+        for cf in cfg.get("custom_forms") or []:
+            if str(cf.get("id")) == str(off_id):
+                wm = cf.get("welcome_modal") if isinstance(cf.get("welcome_modal"), dict) else None
+                if wm:
+                    return bool(wm.get("enabled", True) and wm.get("video") and wm.get("show_video_button"))
+    wm = cfg.get("welcome_modal") or {}
+    return bool(wm.get("enabled", True) and wm.get("video") and wm.get("show_video_button"))
 
 
 def is_official(tenant, form: str | None) -> bool:
@@ -186,7 +203,7 @@ def _count(sessions: list[dict], key: tuple[str, str]) -> int:
     return sum(1 for s in sessions if key in s["events"])
 
 
-def _phases(sessions: list[dict], abandon: dict[str, int], last_fields: dict[str, dict[str, int]]) -> list[dict]:
+def _phases(sessions: list[dict], abandon: dict[str, int], last_fields: dict[str, dict[str, int]], video_configured: bool = False) -> list[dict]:
     """Recorrido fase por fase: Inicio (bienvenida/video) → pasos del formulario → Enviado.
     En cada una: cuántos llegan, qué tocan, campos que llenan, errores y cuántos se quedaron ahí."""
     n = len(sessions)
@@ -196,17 +213,20 @@ def _phases(sessions: list[dict], abandon: dict[str, int], last_fields: dict[str
     # Inicio: abrió el formulario, mensaje de bienvenida y video
     shown = _count(sessions, ("welcome_shown", ""))
     offered = [s for s in sessions if ("welcome_video_offer", "") in s["events"]]
-    watched = sum(1 for s in offered if ("welcome_video", "") in s["events"])
+    watched = sum(1 for s in sessions if ("welcome_video", "") in s["events"])
+    total_offered = max(len(offered), watched)
     acts = [{"key": "welcome_shown", "label": "Vio el mensaje de bienvenida", "sessions": shown, "pct": pct(shown)}]
-    if offered:
+    if total_offered > 0 or video_configured:
         acts += [
-            {"key": "welcome_video", "label": "Vio el video", "sessions": watched, "pct": pct(watched, len(offered))},
-            {"key": "welcome_skip", "label": "Saltó el video", "sessions": len(offered) - watched,
-             "pct": pct(len(offered) - watched, len(offered))},
+            {"key": "welcome_video", "label": "Vio el video", "sessions": watched,
+             "pct": pct(watched, total_offered) if total_offered else 0.0},
+            {"key": "welcome_skip", "label": "Saltó el video", "sessions": max(total_offered - watched, 0),
+             "pct": pct(max(total_offered - watched, 0), total_offered) if total_offered else 0.0},
         ]
     out.append({"key": "inicio", "label": "Inicio", "reached": n, "pct": 100.0 if n else 0,
                 "lost_here": abandon.get("open", 0), "median_seconds": None, "actions": acts,
-                "video_offered": len(offered), "fields": [], "errors": [], "last_fields": []})
+                "video_offered": total_offered, "video_configured": video_configured,
+                "fields": [], "errors": [], "last_fields": []})
 
     prev_key = ("open", "")
     for st in STEPS:
@@ -259,7 +279,7 @@ def _phases(sessions: list[dict], abandon: dict[str, int], last_fields: dict[str
     return out
 
 
-def _summary(sessions: list[dict]) -> dict:
+def _summary(sessions: list[dict], video_configured: bool = False) -> dict:
     n_open = len(sessions)
     submitted = sum(1 for s in sessions if ("submitted", "") in s["events"])
 
@@ -306,7 +326,7 @@ def _summary(sessions: list[dict]) -> dict:
         for k, n in sorted(abandon.items(), key=lambda kv: (-kv[1], order.index(kv[0]) if kv[0] in order else 99))
     ]
 
-    phases = _phases(sessions, abandon, last_fields)
+    phases = _phases(sessions, abandon, last_fields, video_configured=video_configured)
 
     errors: dict[str, int] = {}
     clicks: dict[str, int] = {}
@@ -368,10 +388,14 @@ def report(db: Session, date_from, date_to, tenant_id: int | None) -> dict:
         per_tenant.setdefault(tid, []).append(s)
     tenants = {t.id: t for t in db.query(models.Tenant).filter(models.Tenant.id.in_(list(per_tenant))).all()} if per_tenant else {}
 
+    target_tenant = db.get(models.Tenant, tenant_id) if tenant_id else None
+    overall_video_configured = tenant_has_welcome_video(target_tenant) if target_tenant else any(tenant_has_welcome_video(t) for t in tenants.values())
+
     by_tenant = []
     for tid, sess in per_tenant.items():
-        summ = _summary(sess)
         t = tenants.get(tid)
+        t_has_vid = tenant_has_welcome_video(t)
+        summ = _summary(sess, video_configured=t_has_vid)
         forms = {s["form_id"] for s in sess}
         by_tenant.append({
             "tenant_id": tid,
@@ -393,4 +417,4 @@ def report(db: Session, date_from, date_to, tenant_id: int | None) -> dict:
         if t and not official_form_id(t):
             without.append({"tenant_id": t.id, "tenant_name": t.name})
 
-    return {**_summary(all_sessions), "by_tenant": by_tenant, "without_official": without}
+    return {**_summary(all_sessions, video_configured=overall_video_configured), "by_tenant": by_tenant, "without_official": without}

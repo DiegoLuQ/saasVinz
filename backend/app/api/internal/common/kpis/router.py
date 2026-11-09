@@ -26,6 +26,7 @@ def _owner(user: models.User) -> None:
 def get_kpis(
     year: Optional[int] = Query(default=None, ge=2000, le=2100),
     month: Optional[int] = Query(default=None, ge=1, le=12),
+    status: Optional[str] = Query(default="entregados"),
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
     current_user: models.User = Depends(get_current_user),
@@ -34,6 +35,6 @@ def get_kpis(
     _owner(current_user)
     tz_name = get_tenant_timezone_str(db, tenant_id)
     years = kpis.available_years(db, tenant_id, tz_name)
-    data = kpis.compute(db, tenant_id, year or years[0], month)
+    data = kpis.compute(db, tenant_id, year or years[0], month, status=status)
     data["years"] = years
     return data

@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import type { DiagnosticReport } from '@/lib/diagnostics';
 
 /** react-pdf no lee WebP: se pasa el logo a PNG con un canvas. */
-async function imageAsPng(src: string): Promise<string | null> {
+export async function imageAsPng(src: string): Promise<string | null> {
     try {
         const img = new Image();
         img.src = src;
