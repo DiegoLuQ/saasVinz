@@ -41,9 +41,19 @@ def obtener_cremaciones(
     last = (service.db.query(op_models.WorkflowStep.id)
             .filter(op_models.WorkflowStep.tenant_id == tenant_id, op_models.WorkflowStep.is_active == True)  # noqa: E712
             .order_by(op_models.WorkflowStep.order_index.desc()).first())
+    # Último certificado emitido de cada orden (modo lista: botón «Certificado»), en una sola consulta
+    certs: dict[int, dict] = {}
+    ids = [oc.id for oc in rows]
+    if ids:
+        C = op_models.Certificate
+        for cid, cert_id, number in (service.db.query(C.cremation_id, C.id, C.number)
+                                     .filter(C.tenant_id == tenant_id, C.cremation_id.in_(ids))
+                                     .order_by(C.created_at.asc(), C.id.asc()).all()):
+            certs[cid] = {"id": cert_id, "number": number}
     for oc in rows:
         tech = getattr(oc, "technical", None)
         setattr(oc, "at_last_step", True if last is None else bool(tech and tech.step_id == last[0]))
+        setattr(oc, "certificate", certs.get(oc.id))
     return rows
 
 @router.post("", response_model=schemas.CremationOCInDB)

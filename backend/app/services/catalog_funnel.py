@@ -35,7 +35,31 @@ SESSION_RE = re.compile(r"^[A-Za-z0-9_-]{8,40}$")
 DELIVERED = "entregado"
 TOP_LIMIT = 10
 
-def record_link_view(db: Session, tenant_id: int | None, kind: str, resource_key: str) -> None:
+TRACKING_STAGES = ("in_progress", "delivered", "cancelled")
+
+
+def tracking_stage(status: str | None) -> str:
+    """Estado de la orden al abrir su seguimiento (para filtrar los KPIs de tracking)."""
+    from app.api.internal.operations.operations.board import CANCELED_STATUSES, FINAL_STATUSES
+    s = (status or "").lower()
+    if s in {x.lower() for x in CANCELED_STATUSES}:
+        return "cancelled"
+    if s in {x.lower() for x in FINAL_STATUSES}:
+        return "delivered"
+    return "in_progress"
+
+
+def stage_filter(stage: str | None, alias: str = "") -> tuple[str, dict]:
+    """Condición SQL para las aperturas de tracking: 'in_progress' | 'delivered' | 'all'.
+    Los memoriales no se filtran."""
+    if stage not in ("in_progress", "delivered"):
+        return "", {}
+    a = f"{alias}." if alias else ""
+    return f" AND ({a}kind <> 'tracking' OR {a}stage = :stage)", {"stage": stage}
+
+
+def record_link_view(db: Session, tenant_id: int | None, kind: str, resource_key: str,
+                     stage: str | None = None) -> None:
     """Registra un ingreso al link público de un memorial ('memorial') o de seguimiento ('tracking').
 
     La tabla la crea la migración f3c5e7a9b140 (sin RLS). Se guarda la huella SHA-256 del
@@ -51,10 +75,11 @@ def record_link_view(db: Session, tenant_id: int | None, kind: str, resource_key
     try:
         own.execute(
             text("""
-                INSERT INTO sys_public_link_views (tenant_id, kind, resource_key, created_at)
-                VALUES (:tid, :kind, :rkey, :now)
+                INSERT INTO sys_public_link_views (tenant_id, kind, resource_key, stage, created_at)
+                VALUES (:tid, :kind, :rkey, :stage, :now)
             """),
-            {"tid": int(tenant_id), "kind": kind, "rkey": key, "now": tz.get_now()},
+            {"tid": int(tenant_id), "kind": kind, "rkey": key, "now": tz.get_now(),
+             "stage": (stage if stage in TRACKING_STAGES else "in_progress") if kind == "tracking" else None},
         )
         own.commit()
     except Exception as exc:
@@ -303,6 +328,7 @@ def _link_views_summary(
     date_from: datetime | None,
     date_to: datetime | None,
     tenant_id: int | None,
+    stage: str | None = "in_progress",
 ) -> tuple[dict[int, dict], dict[int, dict]]:
     """Devuelve (views_period_by_tenant, views_total_by_tenant) para memorial y tracking.
 
@@ -314,6 +340,10 @@ def _link_views_summary(
         where_total.append("tenant_id = :tid")
         params_total["tid"] = int(tenant_id)
 
+    st_sql, st_params = stage_filter(stage)
+    if st_sql:
+        where_total.append(st_sql[5:])  # sin el « AND »
+        params_total.update(st_params)
     where_period = list(where_total)
     params_period = dict(params_total)
     if date_from:
@@ -405,7 +435,8 @@ def _funnel(ev: dict, sb: dict) -> dict:
     }
 
 
-def report(db: Session, date_from: datetime | None, date_to: datetime | None, tenant_id: int | None) -> dict:
+def report(db: Session, date_from: datetime | None, date_to: datetime | None, tenant_id: int | None,
+           tracking_stage: str = "in_progress") -> dict:
     """KPIs del catálogo de planes para el SuperAdmin (RLS en bypass)."""
     ev_f, sub_f, tok_f = [], [], [CatalogShareToken.catalog_type == "plans"]
     mem_total_f, mem_period_f = [], []
@@ -461,7 +492,7 @@ def report(db: Session, date_from: datetime | None, date_to: datetime | None, te
     )
 
     # Aperturas de links públicos (Memoriales y Tracking)
-    lv_period, lv_total = _link_views_summary(db, date_from, date_to, tenant_id)
+    lv_period, lv_total = _link_views_summary(db, date_from, date_to, tenant_id, tracking_stage)
 
     ev_by_tenant = _event_counts(db, ev_f, CatalogEvent.tenant_id)
     sub_by_tenant = _submission_counts(db, sub_f, models.FormSubmission.tenant_id)
@@ -587,6 +618,7 @@ def report(db: Session, date_from: datetime | None, date_to: datetime | None, te
         "tracking_views": tracking_views_period,
         "tracking_views_total": tracking_views_total,
         "tracking_orders_viewed": tracking_orders_viewed,
+        "tracking_stage": tracking_stage if tracking_stage in ("in_progress", "delivered") else "all",
         "by_tenant": by_tenant,
         "top_plans": top_plans,
         "top_sizes": top_sizes,

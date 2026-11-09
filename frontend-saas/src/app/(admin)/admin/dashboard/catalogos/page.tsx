@@ -125,14 +125,17 @@ export default function CatalogFunnelPage() {
     const [dateFrom, setDateFrom] = useState(daysAgo(29));
     const [dateTo, setDateTo] = useState(isoDay(new Date()));
     const [tenantId, setTenantId] = useState('');
+    // Aperturas de seguimiento: estado de la orden cuando la familia lo abrió
+    const [trackingStage, setTrackingStage] = useState<'in_progress' | 'delivered' | 'all'>('in_progress');
 
     const params = new URLSearchParams();
     if (dateFrom) params.set('date_from', dateFrom);
     if (dateTo) params.set('date_to', dateTo);
     if (tenantId) params.set('tenant_id', tenantId);
+    params.set('tracking_stage', trackingStage);
 
     const { data, isLoading, error, isFetching } = useQuery<Report>({
-        queryKey: ['admin', 'catalog-funnel', dateFrom, dateTo, tenantId],
+        queryKey: ['admin', 'catalog-funnel', dateFrom, dateTo, tenantId, trackingStage],
         queryFn: () => apiRequest(`/api/internal/creator/catalog-funnel?${params.toString()}`),
         staleTime: 60_000,
         placeholderData: prev => prev,
@@ -223,6 +226,15 @@ export default function CatalogFunnelPage() {
                 <label className="flex flex-col gap-1.5 text-[11px] font-bold uppercase tracking-wider text-white/70">
                     Hasta
                     <input type="date" value={dateTo} min={dateFrom || undefined} onChange={e => setDateTo(e.target.value)} className={inputCls} />
+                </label>
+                <label className="flex flex-col gap-1.5 text-[11px] font-bold uppercase tracking-wider text-white/70"
+                    title="Estado de la orden cuando la familia abrió su seguimiento">
+                    Tracking de órdenes
+                    <select value={trackingStage} onChange={e => setTrackingStage(e.target.value as typeof trackingStage)} className={selectCls}>
+                        <option className={optionCls} value="in_progress">En proceso</option>
+                        <option className={optionCls} value="delivered">Entregadas</option>
+                        <option className={optionCls} value="all">Todas</option>
+                    </select>
                 </label>
 
                 <div className="flex gap-1.5">
@@ -512,7 +524,7 @@ export default function CatalogFunnelPage() {
                                             return (
                                                 <tr
                                                     key={r.tenant_id}
-                                                    onClick={() => router.push(`/dashboard/catalogos/${r.tenant_id}?${new URLSearchParams({ ...(dateFrom ? { date_from: dateFrom } : {}), ...(dateTo ? { date_to: dateTo } : {}) }).toString()}`)}
+                                                    onClick={() => router.push(`/dashboard/catalogos/${r.tenant_id}?${new URLSearchParams({ ...(dateFrom ? { date_from: dateFrom } : {}), ...(dateTo ? { date_to: dateTo } : {}), tracking_stage: trackingStage }).toString()}`)}
                                                     title="Ver el detalle de este crematorio"
                                                     className={`cursor-pointer transition-all ${
                                                         isSelected

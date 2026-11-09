@@ -42,7 +42,8 @@ def _safe(db: Session, sql: str, params: dict) -> list:
         return []
 
 
-def detail(db: Session, tenant_id: int, date_from: datetime | None, date_to: datetime | None) -> dict | None:
+def detail(db: Session, tenant_id: int, date_from: datetime | None, date_to: datetime | None,
+           stage: str = "in_progress") -> dict | None:
     from app.services import catalog_funnel, official_links
     from app.services.form_funnel import form_name, official_form_id
     from app.services.family_notices import tracking_url
@@ -73,6 +74,10 @@ def detail(db: Session, tenant_id: int, date_from: datetime | None, date_to: dat
     # --- Aperturas por día (seguimiento y memorial) ---
     p: dict = {"tid": tenant_id}
     where = _period("created_at", date_from, date_to, p)
+    st_sql, st_params = catalog_funnel.stage_filter(stage)
+    st_v, _ = catalog_funnel.stage_filter(stage, "v")
+    p.update(st_params)
+    where += st_sql
     daily: dict[str, dict] = {}
     for day, kind, n in _safe(db, f"""
         SELECT to_char(created_at AT TIME ZONE :tzn, 'YYYY-MM-DD') AS d, kind, count(*)
@@ -98,7 +103,7 @@ def detail(db: Session, tenant_id: int, date_from: datetime | None, date_to: dat
                AND encode(sha256(convert_to(d.tracking_token, 'UTF8')), 'hex') = v.resource_key
           JOIN oc_cremations oc ON oc.id = d.cremation_id
           LEFT JOIN crm_pets pe ON pe.id = oc.pet_id
-         WHERE v.tenant_id = :tid AND v.kind = 'tracking' {_period('v.created_at', date_from, date_to, p)}
+         WHERE v.tenant_id = :tid AND v.kind = 'tracking' {_period('v.created_at', date_from, date_to, p)}{st_v}
          GROUP BY oc.id, oc.verification_code, oc.oc_number, oc.status, pe.name
          ORDER BY count(v.id) DESC, max(v.created_at) DESC LIMIT {TOP}
     """, dict(p)):
@@ -127,13 +132,13 @@ def detail(db: Session, tenant_id: int, date_from: datetime | None, date_to: dat
     if date_to:
         oq = oq.filter(models.CremationOC.created_at < date_to)
     orders_period = oq.scalar() or 0
-    pv: dict = {"tid": tenant_id}
+    pv: dict = {"tid": tenant_id, **st_params}
     opened = _safe(db, f"""
         SELECT count(DISTINCT oc.id) FROM oc_cremations oc
           JOIN oc_details d ON d.cremation_id = oc.id
          WHERE oc.tenant_id = :tid {_period('oc.created_at', date_from, date_to, pv)}
            AND EXISTS (SELECT 1 FROM sys_public_link_views v WHERE v.tenant_id = oc.tenant_id AND v.kind = 'tracking'
-                       AND v.resource_key = encode(sha256(convert_to(d.tracking_token, 'UTF8')), 'hex'))
+                       AND v.resource_key = encode(sha256(convert_to(d.tracking_token, 'UTF8')), 'hex'){st_v})
     """, pv)
     orders_opened = int(opened[0][0]) if opened else 0
 
@@ -171,6 +176,7 @@ def detail(db: Session, tenant_id: int, date_from: datetime | None, date_to: dat
             "memorial": totals["memorial"], "memorial_distinct": distinct["memorial"],
             "daily": list(daily.values()),
         },
+        "tracking_stage": stage if stage in ("in_progress", "delivered") else "all",
         "orders_period": orders_period,
         "orders_opened": orders_opened,
         "top_orders": orders,

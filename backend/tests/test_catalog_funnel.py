@@ -194,3 +194,26 @@ def test_detalle_de_tracking_por_crematorio(client, db, world, auth):
     assert d["tenant"]["id"] == tid and d["views"]["tracking"] >= 1
     assert any(o["id"] == oc.id and o["views"] >= 1 for o in d["top_orders"])
     assert d["views"]["daily"] and "notices" in d and "links" in d
+
+
+def test_filtro_de_tracking_por_estado(client, db, world, auth):
+    """«En proceso» (por defecto) no suma las aperturas hechas con la orden ya entregada; «Todas» sí."""
+    from app.services import catalog_funnel
+    tid = world["tenant_a"]
+    tok = uuid.uuid4().hex
+    url = f"/api/internal/creator/catalog-funnel?tenant_id={tid}"
+    h = auth("creator")
+
+    def count(stage):
+        return client.get(f"{url}&tracking_stage={stage}", headers=h).json()["tracking_views"]
+
+    base = {s: count(s) for s in ("in_progress", "delivered", "all")}
+    catalog_funnel.record_link_view(db, tid, "tracking", tok, stage="in_progress")
+    catalog_funnel.record_link_view(db, tid, "tracking", tok, stage="delivered")
+    catalog_funnel.record_link_view(db, tid, "tracking", tok, stage="delivered")
+    assert count("in_progress") == base["in_progress"] + 1
+    assert count("delivered") == base["delivered"] + 2
+    assert count("all") == base["all"] + 3
+    assert client.get(f"{url}&tracking_stage=otra", headers=h).status_code == 422
+    d = client.get(f"/api/internal/creator/catalog-funnel/tenant/{tid}?tracking_stage=delivered", headers=h).json()
+    assert d["tracking_stage"] == "delivered" and d["views"]["tracking"] >= 2

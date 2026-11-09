@@ -267,8 +267,9 @@ def get_tracking_info(
     
     owner_name = pet.customer.name if pet.customer else None
 
-    from app.services.catalog_funnel import record_link_view
-    record_link_view(db, tenant.id, "tracking", str(token))
+    # Se guarda en qué estado estaba la orden (KPIs: En proceso / Entregadas / Todas).
+    from app.services.catalog_funnel import record_link_view, tracking_stage
+    record_link_view(db, tenant.id, "tracking", str(token), stage=tracking_stage(cremation.status))
     farewell_tpl = resolve_farewell_template(db, tenant.id)
 
     tenant_website = None

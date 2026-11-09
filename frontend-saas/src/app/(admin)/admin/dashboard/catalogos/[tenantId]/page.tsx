@@ -109,14 +109,17 @@ export default function TenantTrackingDetailPage() {
     const sp = useSearchParams();
     const [dateFrom, setDateFrom] = useState(sp.get('date_from') || daysAgo(29));
     const [dateTo, setDateTo] = useState(sp.get('date_to') || isoDay(new Date()));
-    const qs = new URLSearchParams({ ...(dateFrom ? { date_from: dateFrom } : {}), ...(dateTo ? { date_to: dateTo } : {}) }).toString();
+    const initialStage = sp.get('tracking_stage');
+    const [stage, setStage] = useState<'in_progress' | 'delivered' | 'all'>(
+        initialStage === 'delivered' || initialStage === 'all' ? initialStage : 'in_progress');
+    const qs = new URLSearchParams({ ...(dateFrom ? { date_from: dateFrom } : {}), ...(dateTo ? { date_to: dateTo } : {}), tracking_stage: stage }).toString();
 
     const { data, isLoading, error } = useQuery<Detail>({
-        queryKey: ['admin', 'tenant-tracking', tenantId, dateFrom, dateTo],
+        queryKey: ['admin', 'tenant-tracking', tenantId, dateFrom, dateTo, stage],
         queryFn: () => apiRequest(`/api/internal/creator/catalog-funnel/tenant/${tenantId}?${qs}`),
     });
     const { data: rep } = useQuery<Report>({
-        queryKey: ['admin', 'catalog-funnel', dateFrom, dateTo, String(tenantId)],
+        queryKey: ['admin', 'catalog-funnel', dateFrom, dateTo, String(tenantId), stage],
         queryFn: () => apiRequest(`/api/internal/creator/catalog-funnel?${qs}&tenant_id=${tenantId}`),
     });
     const memorialBase = getMemorialBaseUrl();
@@ -150,6 +153,13 @@ export default function TenantTrackingDetailPage() {
                             <label className="text-[11px] text-white/50 flex flex-col gap-1">Hasta
                                 <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} className={inputCls} />
                             </label>
+                            <label className="text-[11px] text-white/50 flex flex-col gap-1" title="Estado de la orden cuando la familia abrió su seguimiento">Tracking de órdenes
+                                <select value={stage} onChange={(e) => setStage(e.target.value as typeof stage)} className={inputCls}>
+                                    <option value="in_progress">En proceso</option>
+                                    <option value="delivered">Entregadas</option>
+                                    <option value="all">Todas</option>
+                                </select>
+                            </label>
                             {[7, 30, 90].map((n) => (
                                 <button key={n} type="button" onClick={() => { setDateFrom(daysAgo(n - 1)); setDateTo(isoDay(new Date())); }}
                                     className="rounded-xl border border-white/15 px-3 py-2.5 text-xs font-bold text-white/70 hover:bg-white/10">{n} días</button>
@@ -172,7 +182,10 @@ export default function TenantTrackingDetailPage() {
 
                     <div className={`${cardCls} p-5`}>
                         <h2 className="text-white font-bold">Aperturas por día</h2>
-                        <p className="text-[11px] text-white/40 mt-1 mb-3">Cada vez que alguien abre el link de seguimiento o de un memorial de este crematorio (recargar también suma).</p>
+                        <p className="text-[11px] text-white/40 mt-1 mb-3">
+                            Cada vez que alguien abre el link de seguimiento o de un memorial de este crematorio (recargar también suma).
+                            Seguimiento: {stage === 'in_progress' ? 'solo mientras la orden estaba en proceso' : stage === 'delivered' ? 'solo con la orden ya entregada' : 'todas las aperturas'}.
+                        </p>
                         <DailyChart rows={data.views.daily} />
                     </div>
 

@@ -172,3 +172,26 @@ def test_modal_propone_la_siguiente_etapa_y_acepta_mensaje(client, auth, db, wor
     w = client.post(f"/api/internal/operations/ops/orders/{order}/family-notices/whatsapp", headers=h,
                     json={"step_id": steps[0].id, "message": msg}).json()
     assert w["message"].startswith(msg) and "/track/" in w["message"]
+
+
+def test_aperturas_del_seguimiento_guardan_el_estado(client, db, order):
+    """KPIs: cada apertura guarda el estado de la orden (en proceso / entregada / cancelada)."""
+    import hashlib
+    from sqlalchemy import text
+    cr = db.query(models.Cremation).get(order)
+    db.refresh(cr)
+    token = cr.details.tracking_token
+    url = f"/api/public/tracking/crematorio-a/{cr.pet.name.replace(' ', '-')}/{token}"
+    key = hashlib.sha256(token.encode()).hexdigest()
+
+    def views(stage):
+        return db.execute(text("SELECT count(*) FROM sys_public_link_views WHERE resource_key = :k AND stage = :s"),
+                          {"k": key, "s": stage}).scalar()
+
+    before = {s: views(s) for s in ("in_progress", "delivered", "cancelled")}
+    assert client.get(url).status_code == 200
+    for status, stage in (("entregado", "delivered"), ("cancelado", "cancelled")):
+        cr.status = status
+        db.commit()
+        assert client.get(url).status_code == 200      # la familia puede seguir entrando
+    assert all(views(s) == before[s] + 1 for s in before)

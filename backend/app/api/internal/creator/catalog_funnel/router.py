@@ -25,13 +25,14 @@ def catalog_funnel_report(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
     tenant_id: Optional[int] = Query(None),
+    tracking_stage: str = Query("in_progress", pattern="^(in_progress|delivered|all)$"),
     db: Session = Depends(get_db),
     _creator=Depends(get_current_creator),
 ):
     apply_bypass_rls(db)
     # date_to es inclusivo: se cuenta hasta el final de ese día
     end = _start(date_to + timedelta(days=1)) if date_to else None
-    return catalog_funnel.report(db, _start(date_from), end, tenant_id)
+    return catalog_funnel.report(db, _start(date_from), end, tenant_id, tracking_stage)
 
 
 @router.get("/form")
@@ -55,6 +56,7 @@ def tenant_tracking_detail(
     tenant_id: int,
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
+    tracking_stage: str = Query("in_progress", pattern="^(in_progress|delivered|all)$"),
     db: Session = Depends(get_db),
     _creator=Depends(get_current_creator),
 ):
@@ -63,7 +65,7 @@ def tenant_tracking_detail(
 
     apply_bypass_rls(db)
     end = _start(date_to + timedelta(days=1)) if date_to else None
-    data = tenant_tracking.detail(db, tenant_id, _start(date_from), end)
+    data = tenant_tracking.detail(db, tenant_id, _start(date_from), end, tracking_stage)
     if data is None:
         raise HTTPException(status_code=404, detail="Crematorio no encontrado")
     return data

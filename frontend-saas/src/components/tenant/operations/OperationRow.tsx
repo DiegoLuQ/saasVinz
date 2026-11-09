@@ -1,8 +1,10 @@
 "use client";
 
-import React from 'react';
-import { Dog, MapPin, Calendar, Trash2, ArrowUpRight } from 'lucide-react';
-import { API_URL } from '@/lib/tenant/api';
+import React, { useState } from 'react';
+import { Dog, Calendar, Trash2, ArrowUpRight, FileDown, Loader2, Layers } from 'lucide-react';
+import { API_URL, apiRequest } from '@/lib/tenant/api';
+import { downloadHtmlAsPdf, pdfFileName } from '@/lib/certPdf';
+import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import StatusPillMenu from './StatusPillMenu';
 import type { Cremation } from '@/hooks/useCremations';
 
@@ -76,6 +78,29 @@ export default function OperationRow({
     const customerName = item.pet?.customer?.name?.split(' ')[0] || 'Desconocido';
     const petImg = item.pet?.image_url;
 
+    // Plan adquirido: el principal (o el primero) + cuántos más tiene la orden
+    const planes = item.planes || [];
+    const mainPlan = planes.find((p) => p.es_principal) || planes[0];
+    const planName = mainPlan?.plan?.name || (mainPlan ? `Plan #${mainPlan.plan_id}` : null);
+    const extraPlans = Math.max(planes.length - 1, 0);
+
+    // Descargar el último certificado emitido (PDF, igual que en el detalle de la orden)
+    const { showToast } = useToast();
+    const [downloading, setDownloading] = useState(false);
+    const cert = item.certificate;
+    const downloadCertificate = async () => {
+        if (!cert || downloading) return;
+        setDownloading(true);
+        try {
+            const res = await apiRequest(`/api/internal/ops-records/certificates/${cert.id}/content`);
+            await downloadHtmlAsPdf(res.html_content, pdfFileName(`certificado_${petName}_${cert.number}`));
+        } catch (err: unknown) {
+            showToast(err instanceof Error ? err.message : 'No se pudo descargar el certificado', 'error');
+        } finally {
+            setDownloading(false);
+        }
+    };
+
     const normalizedStatus = item.status ? item.status.trim().toLowerCase() : '';
     const canDelete = allowDelete && ['processing', 'en_proceso', 'pendiente', 'pending', 'received', 'cancelado', 'canceled'].includes(normalizedStatus);
 
@@ -109,17 +134,21 @@ export default function OperationRow({
                 <div className="min-w-0">
                     <p className="text-sm font-black text-white truncate">{petName}</p>
                     <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider truncate">
-                        {customerName}
+                        {customerName}{item.city ? ` · ${item.city}` : ''}
                     </p>
                 </div>
             </div>
 
-            {/* Ubicación */}
-            <div className="hidden lg:flex col-span-2 items-center gap-2 min-w-0">
-                <MapPin size={13} className="text-muted-foreground/60 shrink-0" aria-hidden="true" />
+            {/* Plan adquirido */}
+            <div className="hidden lg:flex col-span-2 items-center gap-2 min-w-0" title={planes.map((p) => p.plan?.name).filter(Boolean).join(' · ') || undefined}>
+                <Layers size={13} className="text-muted-foreground/60 shrink-0" aria-hidden="true" />
                 <div className="min-w-0">
-                    <p className="text-xs font-bold text-white truncate">{item.city || '—'}</p>
-                    <p className="text-[10px] text-muted-foreground truncate">{item.region || '—'}</p>
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.18em]">Plan</p>
+                    <p className="text-xs font-bold text-white truncate">
+                        {planName || <span className="text-muted-foreground font-medium">Sin plan</span>}
+                        {extraPlans > 0 && <span className="ml-1 text-[10px] text-muted-foreground">+{extraPlans}</span>}
+                    </p>
+                    {mainPlan?.plan?.group_name && <p className="text-[10px] text-muted-foreground truncate">{mainPlan.plan.group_name}</p>}
                 </div>
             </div>
 
@@ -159,6 +188,26 @@ export default function OperationRow({
                     onChange={(next) => onChangeStatus(item.id, next)}
                 />
                 
+                {/* Certificado: descarga el último emitido (slot fijo para no desalinear) */}
+                <div className="w-8 h-8 flex items-center justify-center shrink-0">
+                    {cert ? (
+                        <button
+                            type="button"
+                            onClick={downloadCertificate}
+                            disabled={downloading}
+                            className="p-1.5 rounded-xl text-emerald-400/70 hover:text-emerald-300 hover:bg-emerald-500/10 transition-all active:scale-90 disabled:opacity-50"
+                            aria-label={`Descargar certificado ${cert.number} de ${petName}`}
+                            title={`Descargar certificado ${cert.number} (PDF)`}
+                        >
+                            {downloading ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} aria-hidden="true" />}
+                        </button>
+                    ) : (
+                        <span className="p-1.5 text-white/15 cursor-not-allowed" title="Sin certificado emitido (emítelo en Gestionar)">
+                            <FileDown size={15} aria-hidden="true" />
+                        </span>
+                    )}
+                </div>
+
                 {/* 2. Gestionar */}
                 <button
                     type="button"
