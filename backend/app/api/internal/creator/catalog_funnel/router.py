@@ -4,7 +4,7 @@ Lógica en services/catalog_funnel.py."""
 from datetime import date, datetime, time, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_creator
@@ -48,3 +48,22 @@ def official_form_funnel(
     apply_bypass_rls(db)
     end = _start(date_to + timedelta(days=1)) if date_to else None
     return form_funnel.report(db, _start(date_from), end, tenant_id)
+
+
+@router.get("/tenant/{tenant_id}")
+def tenant_tracking_detail(
+    tenant_id: int,
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    db: Session = Depends(get_db),
+    _creator=Depends(get_current_creator),
+):
+    """Detalle de un crematorio: enlaces, aperturas de seguimiento/memorial, avisos (services/tenant_tracking.py)."""
+    from app.services import tenant_tracking
+
+    apply_bypass_rls(db)
+    end = _start(date_to + timedelta(days=1)) if date_to else None
+    data = tenant_tracking.detail(db, tenant_id, _start(date_from), end)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Crematorio no encontrado")
+    return data

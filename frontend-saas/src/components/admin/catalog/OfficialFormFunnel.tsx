@@ -12,7 +12,8 @@ interface FormFunnel {
     submitted: number;
     conversion: number;
     steps: Step[];
-    abandon: { key: string; label: string; sessions: number }[];
+    /** Fase donde se quedaron + último campo que tocaron en esa fase */
+    abandon: { key: string; label: string; sessions: number; fields?: { field: string; label: string; sessions: number }[] }[];
     field_errors: { field: string; label: string; sessions: number }[];
     clicks: { kind: string; label: string; sessions: number; pct: number }[];
     by_tenant: { tenant_id: number; tenant_name: string; form_name: string; sessions: number; submitted: number; conversion: number; main_abandon: string | null }[];
@@ -100,9 +101,34 @@ export default function OfficialFormFunnel({ dateFrom, dateTo, tenantId }: { dat
 
                             <div className={`${cardCls} p-5`}>
                                 <h3 className="text-white font-bold flex items-center gap-2"><LogOut size={15} className="text-primary" /> Dónde se quedaron</h3>
-                                <p className="text-[11px] text-white/40 mt-1">Último paso de las visitas que no enviaron.</p>
-                                {data.abandon.length === 0 ? <p className="py-3 text-sm text-white/40">Todas las visitas enviaron el formulario.</p>
-                                    : <Bars total={data.sessions - data.submitted} rows={data.abandon.map((a) => ({ label: a.label, value: a.sessions }))} />}
+                                <p className="text-[11px] text-white/40 mt-1">Fase donde dejaron el formulario (sin enviar) y el último campo que tocaron en ella.</p>
+                                {data.abandon.length === 0 ? <p className="py-3 text-sm text-white/40">Todas las visitas enviaron el formulario.</p> : (
+                                    <ul className="mt-3 space-y-3">
+                                        {data.abandon.map((a) => {
+                                            const lost = Math.max(data.sessions - data.submitted, 1);
+                                            const pct = Math.round((a.sessions / data.sessions) * 1000) / 10;
+                                            return (
+                                                <li key={a.key} className="text-sm">
+                                                    <div className="flex justify-between gap-3 text-white/85">
+                                                        <span className="font-bold">{a.label}</span>
+                                                        <span className="font-bold shrink-0">{a.sessions}<span className="ml-1.5 text-[11px] font-normal text-white/40">{pct}% de las visitas</span></span>
+                                                    </div>
+                                                    <div className="h-1.5 mt-1 rounded-full bg-white/5"><div className="h-full rounded-full bg-primary/60" style={{ width: `${(a.sessions / lost) * 100}%` }} /></div>
+                                                    {!!a.fields?.length && (
+                                                        <ul className="mt-1.5 pl-3 border-l border-white/10 space-y-0.5">
+                                                            {a.fields.map((f) => (
+                                                                <li key={f.field || 'none'} className="flex justify-between gap-3 text-xs text-white/55">
+                                                                    <span className="truncate">→ {f.label}</span>
+                                                                    <span className="shrink-0">{f.sessions}</span>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                )}
                             </div>
 
                             <div className={`${cardCls} p-5`}>

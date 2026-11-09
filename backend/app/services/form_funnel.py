@@ -8,8 +8,8 @@ Cada visita tiene un id de sesión anónimo (navegador, sin IP ni datos personal
 renueva al enviar). Tabla `web_form_events` (migración a5b7c9d1e246, RLS): una fila por
 sesión + formulario + evento + detalle (ON CONFLICT DO NOTHING → la primera vez; su hora
 mide el tiempo entre pasos). Eventos:
-  open · step_view:<paso> · field_error:<campo> · back:<paso> · size_select ·
-  service_select · photo_add · welcome_video · souvenir_click · whatsapp_click ·
+  open · step_view:<paso> · field_error:<campo> · field_touch:<paso>.<campo> · back:<paso> · size_select ·
+  service_select · photo_add · welcome_video · souvenir_click · card_download · whatsapp_click ·
   submit_click · submit_error · submitted
 """
 from __future__ import annotations
@@ -31,9 +31,9 @@ DETAIL_RE = re.compile(r"^[A-Za-z0-9_.-]{0,60}$")
 STEPS = ("familia", "angel", "camino", "recuerdos", "resumen")
 STEP_LABELS = {"familia": "Familia", "angel": "Ángel", "camino": "Camino", "recuerdos": "Recuerdos",
                "resumen": "Resumen", "submit_click": "Pulsó «Enviar»", "submitted": "Enviado"}
-WITH_DETAIL = {"step_view": STEPS, "back": STEPS, "field_error": None}
-KINDS = ("open", "step_view", "field_error", "back", "size_select", "service_select", "photo_add",
-         "welcome_video", "souvenir_click", "whatsapp_click", "submit_click", "submit_error", "submitted")
+WITH_DETAIL = {"step_view": STEPS, "back": STEPS, "field_error": None, "field_touch": None}
+KINDS = ("open", "step_view", "field_error", "field_touch", "back", "size_select", "service_select", "photo_add",
+         "welcome_video", "souvenir_click", "card_download", "whatsapp_click", "submit_click", "submit_error", "submitted")
 CLICK_LABELS = {
     "size_select": "Eligió tamaño",
     "service_select": "Eligió plan o servicio",
@@ -41,7 +41,8 @@ CLICK_LABELS = {
     "welcome_video": "Vio el video de bienvenida",
     "back": "Volvió a un paso anterior",
     "submit_error": "Error al enviar",
-    "souvenir_click": "Abrió la tiendita de recuerdos",
+    "souvenir_click": "Entró al catálogo de productos (tiendita de recuerdos)",
+    "card_download": "Descargó la imagen conmemorativa",
     "whatsapp_click": "Escribió por WhatsApp",
 }
 FIELD_LABELS = {
@@ -50,7 +51,8 @@ FIELD_LABELS = {
     "comments": "Comentarios", "name": "Nombre de la mascota", "type": "Especie", "nickname": "Apodo",
     "breed": "Raza", "birthDate": "Fecha de nacimiento", "deathDate": "Fecha de fallecimiento",
     "healthStatus": "Estado de salud", "weightRange": "Rango de peso", "weightKg": "Peso (kg)", "age": "Edad",
-    "photos": "Fotos", "dedication": "Dedicatoria",
+    "photos": "Fotos", "dedication": "Dedicatoria", "weight": "Peso / tamaño", "services": "Plan o servicio",
+    "photoConsent": "Autorización de fotos",
 }
 TOP_LIMIT = 10
 
@@ -104,6 +106,10 @@ def clean_event(kind: str, detail: str | None) -> tuple[str, str] | None:
     if kind in WITH_DETAIL:
         if not detail or not DETAIL_RE.match(detail) or (allowed is not None and detail not in allowed):
             return None
+        if kind == "field_touch":  # «<paso>.<campo>»
+            step, _, field = detail.partition(".")
+            if step not in STEPS or not field or "." in field:
+                return None
     else:
         detail = ""
     return kind, detail
@@ -179,13 +185,25 @@ def _summary(sessions: list[dict]) -> dict:
         prev_count, prev_key = len(hit), key
 
     abandon: dict[str, int] = {}
+    last_fields: dict[str, dict[str, int]] = {}
     for s in sessions:
         last = _last_step(s["events"])
-        if last != "submitted":
-            abandon[last] = abandon.get(last, 0) + 1
+        if last == "submitted":
+            continue
+        abandon[last] = abandon.get(last, 0) + 1
+        if last in STEPS:
+            # Último campo que tocó en esa fase (o «Sin tocar ningún campo»)
+            touched = [(at, d.split(".", 1)[1]) for (k, d), at in s["events"].items()
+                       if k == "field_touch" and d.startswith(f"{last}.")]
+            field = max(touched)[1] if touched else ""
+            last_fields.setdefault(last, {})[field] = last_fields.setdefault(last, {}).get(field, 0) + 1
     order = ["open", *STEPS, "submit_click"]
     abandon_list = [
-        {"key": k, "label": "Solo abrió" if k == "open" else STEP_LABELS.get(k, k), "sessions": n}
+        {"key": k, "label": "Solo abrió" if k == "open" else STEP_LABELS.get(k, k), "sessions": n,
+         "fields": [
+             {"field": f, "label": FIELD_LABELS.get(f, f) if f else "Sin tocar ningún campo", "sessions": c}
+             for f, c in sorted(last_fields.get(k, {}).items(), key=lambda kv: (kv[0] == "", -kv[1]))
+         ]}
         for k, n in sorted(abandon.items(), key=lambda kv: (-kv[1], order.index(kv[0]) if kv[0] in order else 99))
     ]
 

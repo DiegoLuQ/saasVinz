@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
     Filter, Link2, Loader2, ArrowUpRight, Info, Scale, BookOpen,
@@ -120,6 +121,7 @@ function Kpi({ label, value, hint }: { label: string; value: string; hint?: stri
 }
 
 export default function CatalogFunnelPage() {
+    const router = useRouter();
     const [dateFrom, setDateFrom] = useState(daysAgo(29));
     const [dateTo, setDateTo] = useState(isoDay(new Date()));
     const [tenantId, setTenantId] = useState('');
@@ -510,7 +512,8 @@ export default function CatalogFunnelPage() {
                                             return (
                                                 <tr
                                                     key={r.tenant_id}
-                                                    onClick={() => setTenantId(isSelected ? '' : String(r.tenant_id))}
+                                                    onClick={() => router.push(`/dashboard/catalogos/${r.tenant_id}?${new URLSearchParams({ ...(dateFrom ? { date_from: dateFrom } : {}), ...(dateTo ? { date_to: dateTo } : {}) }).toString()}`)}
+                                                    title="Ver el detalle de este crematorio"
                                                     className={`cursor-pointer transition-all ${
                                                         isSelected
                                                             ? 'bg-primary/20 hover:bg-primary/25'

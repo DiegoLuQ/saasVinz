@@ -5,7 +5,7 @@ import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 import { compressImages } from '@/lib/clientImageCompressor';
 import { Service } from '@/components/public/ServiceSelectionStep';
 import { saveDraftImages, loadDraftImages, clearDraftImages } from '@/lib/formDraftImages';
-import { formSessionId, resetFormSession, sendFormEvent, type FormEventKind } from '@/lib/formEvents';
+import { changedFields, formSessionId, resetFormSession, sendFormEvent, type FormEventKind } from '@/lib/formEvents';
 import { MAX_MEMORIAL_PHOTOS } from '@/components/public/ImageUploadStep';
 import { mergeWelcomeModal, planFitsWeight, planPriceForTier, resolveFormConfig, tierForWeight, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
 
@@ -628,6 +628,18 @@ export function useTenantForm(
     const hasPhotos = images.length > 0;
     useEffect(() => { if (hasPhotos) trackFormEvent('photo_add'); }, [hasPhotos, trackFormEvent]);
 
+    // Métricas: último campo que tocó en cada fase («se quedó en Ángel → Edad»).
+    // Se compara contra el estado ya cargado (el borrador restaurado no cuenta).
+    const lastValuesRef = useRef<Record<string, unknown> | null>(null);
+    useEffect(() => {
+        if (loading || isSuccess || !metricsRef.current.on) return;
+        const next: Record<string, unknown> = { ...ownerData, ...petData, photos: images.length };
+        const prev = lastValuesRef.current;
+        lastValuesRef.current = next;
+        if (!prev) return;
+        changedFields(prev, next).forEach((f) => trackFormEvent('field_touch', `${currentStepKey}.${f}`));
+    }, [ownerData, petData, images.length, loading, isSuccess, currentStepKey, trackFormEvent, tenant]);
+
     const handleEditFromSummary = useCallback((targetStep: number | string) => {
         if (typeof targetStep === 'string') {
             const idx = activeSteps.findIndex(s => s.id === targetStep);
@@ -659,6 +671,7 @@ export function useTenantForm(
 
     const toggleService = useCallback((id: string, singleSelect: boolean = false) => {
         trackFormEvent('service_select');
+        trackFormEvent('field_touch', `${currentStepKey}.services`);
         setSelectedServices(prev => {
             if (singleSelect) {
                 // Un solo ítem de su tipo (plan_*, svc_*…): los adicionales de otro tipo se mantienen.
@@ -668,7 +681,7 @@ export function useTenantForm(
             }
             return prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id];
         });
-    }, [trackFormEvent]);
+    }, [trackFormEvent, currentStepKey]);
 
     // 8. Extender Token
     const handleExtend = async () => {

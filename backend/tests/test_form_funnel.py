@@ -51,12 +51,17 @@ def test_reporte_hasta_donde_llegan(client, db, world, auth):
         _ev(client, sid, "open")
         _ev(client, sid, "step_view", "familia")
     _ev(client, a, "field_error", "phone")
+    _ev(client, b, "field_touch", "angel.name")
+    _ev(client, b, "field_touch", "angel.age")              # b se queda en Ángel → último campo Edad
+    _ev(client, b, "field_touch", "inventado.age")          # paso inválido → ignorado
     for sid in (a, b):
         _ev(client, sid, "step_view", "angel")
         _ev(client, sid, "size_select")
     _ev(client, a, "step_view", "resumen")
     _ev(client, a, "submit_click")
     _ev(client, a, "submitted")
+    _ev(client, a, "card_download")
+    _ev(client, a, "souvenir_click")
 
     url = f"/api/internal/creator/catalog-funnel/form?tenant_id={tid}"
     assert client.get(url, headers=auth("a")).status_code in (401, 403)
@@ -68,7 +73,11 @@ def test_reporte_hasta_donde_llegan(client, db, world, auth):
     assert steps["familia"]["sessions"] >= 3 and steps["angel"]["sessions"] >= 2
     assert "camino" not in steps                           # paso que no se usó no aparece
     assert any(x["key"] == "familia" for x in d["abandon"])  # c se quedó en Familia
+    angel = next(x for x in d["abandon"] if x["key"] == "angel")
+    assert any(f["field"] == "age" and f["label"] == "Edad" for f in angel["fields"])
     assert any(e["field"] == "phone" and e["label"] == "Teléfono" for e in d["field_errors"])
     assert next(x for x in d["clicks"] if x["kind"] == "size_select")["sessions"] >= 2
+    assert next(x for x in d["clicks"] if x["kind"] == "card_download")["sessions"] >= 1
+    assert next(x for x in d["clicks"] if x["kind"] == "souvenir_click")["sessions"] >= 1
     row = next(t for t in d["by_tenant"] if t["tenant_id"] == tid)
     assert row["form_name"] == "Formulario principal"

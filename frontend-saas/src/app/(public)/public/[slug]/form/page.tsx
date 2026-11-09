@@ -115,6 +115,7 @@ export default function TenantFormPage() {
             link.href = dataUrl;
             link.download = `homenaje-${(petData.name || 'angelito').replace(/\s+/g, '-').toLowerCase()}.png`;
             link.click();
+            trackFormEvent('card_download');
         } catch (err) {
             console.error('Error al exportar homenaje:', err);
         } finally {

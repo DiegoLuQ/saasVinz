@@ -9,8 +9,31 @@
  */
 export type FormEventKind =
     | 'open' | 'step_view' | 'field_error' | 'back' | 'size_select' | 'service_select'
-    | 'photo_add' | 'welcome_video' | 'souvenir_click' | 'whatsapp_click'
+    | 'photo_add' | 'field_touch' | 'welcome_video' | 'souvenir_click' | 'card_download' | 'whatsapp_click'
     | 'submit_click' | 'submit_error' | 'submitted';
+
+/** Campo del formulario → clave que se mide (varios inputs cuentan como un campo). */
+const FIELD_ALIAS: Record<string, string> = {
+    commune: 'address', region: 'address', pickupRegion: 'veterinary', pickupCommune: 'veterinary',
+    weightTierId: 'weight', weightRange: 'weight', weightKg: 'weight', ageUnit: 'age',
+};
+const TRACKED = new Set([
+    'fullName', 'phone', 'rut', 'email', 'contactPreference', 'address', 'veterinary', 'comments',
+    'name', 'nickname', 'type', 'breed', 'age', 'birthDate', 'deathDate', 'weight', 'healthStatus',
+    'dedication', 'photoConsent', 'photos',
+]);
+
+/** Campos que cambiaron entre dos estados del formulario (para «último campo que tocó»). */
+export function changedFields(prev: Record<string, unknown>, next: Record<string, unknown>): string[] {
+    const out = new Set<string>();
+    for (const k of Object.keys(next)) {
+        if (next[k] === prev[k]) continue;
+        if (k === 'age' && next.ageAuto) continue; // la edad calculada con las fechas no la escribió la familia
+        const field = FIELD_ALIAS[k] ?? k;
+        if (TRACKED.has(field)) out.add(field);
+    }
+    return [...out];
+}
 
 const SID_RE = /^[A-Za-z0-9_-]{8,40}$/;
 

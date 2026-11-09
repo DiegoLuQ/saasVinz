@@ -175,3 +175,22 @@ def test_vistas_de_links_publicos_no_rompen_el_reporte(client, db, world, auth):
     with mock.patch.object(Session, "execute", broken):
         r = client.get(url, headers=auth("creator"))
     assert r.status_code == 200, r.text
+
+
+def test_detalle_de_tracking_por_crematorio(client, db, world, auth):
+    """Detalle de un crematorio: la apertura del seguimiento de su orden se reconoce por la huella."""
+    from app.services import catalog_funnel
+    tid = world["tenant_a"]
+    oc = db.query(models.CremationOC).filter(models.CremationOC.tenant_id == tid).first()
+    if oc is None or not oc.details:
+        pytest.skip("sin órdenes en el escenario")
+    catalog_funnel.record_link_view(db, tid, "tracking", oc.details.tracking_token)
+    url = f"/api/internal/creator/catalog-funnel/tenant/{tid}"
+    assert client.get(url, headers=auth("a")).status_code in (401, 403)
+    assert client.get("/api/internal/creator/catalog-funnel/tenant/999999", headers=auth("creator")).status_code == 404
+    r = client.get(url, headers=auth("creator"))
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["tenant"]["id"] == tid and d["views"]["tracking"] >= 1
+    assert any(o["id"] == oc.id and o["views"] >= 1 for o in d["top_orders"])
+    assert d["views"]["daily"] and "notices" in d and "links" in d
