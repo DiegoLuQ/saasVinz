@@ -87,29 +87,40 @@ export default function MemorialOrderSection({
     }, [tenant, planName]);
 
     // Consulta de datos completos del memorial
+    // Solo lee: el memorial se crea con «Crear memorial» (antes abrir esta pestaña lo creaba).
     const { data: memorial, isLoading, refetch } = useQuery({
         queryKey: ['tenant', 'memorial', petId],
         queryFn: async () => {
             if (!petId) return null;
-            return await apiRequest('/api/internal/memorials', {
+            return await apiRequest(`/api/internal/memorials/by-pet/${petId}`);
+        },
+        enabled: !!petId,
+        staleTime: 30_000,
+    });
+    const [creating, setCreating] = useState(false);
+    const createMemorial = async () => {
+        if (!petId) return;
+        setCreating(true);
+        try {
+            await apiRequest('/api/internal/memorials', {
                 method: 'POST',
                 body: {
                     id_mascota: petId,
                     msg_despedida: `En memoria de nuestro querido ${petName}. Siempre vivirás en nuestros corazones.`,
                     es_privado: false,
-                    diseno: {
-                        tipo_diseno: 'normal',
-                        tema: 'claro',
-                        particulas: 'estrellas',
-                        color_fondo: '',
-                        portada_url: '',
-                    },
+                    diseno: { tipo_diseno: 'normal', tema: 'claro', particulas: 'estrellas', color_fondo: '', portada_url: '' },
                 },
             });
-        },
-        enabled: !!petId,
-        staleTime: 30_000,
-    });
+            await refetch();
+            if (onUpdated) onUpdated();
+            queryClient.invalidateQueries({ queryKey: ['expediente', orderId] });
+            setIsSetupOpen(true);
+        } catch (err: unknown) {
+            showToast((err as { message?: string } | null)?.message || 'No se pudo crear el memorial', 'error');
+        } finally {
+            setCreating(false);
+        }
+    };
 
     const activeUuid = memorial?.id_recuerdo || deliverableMemorial?.uuid;
     const activePin = memorial?.access_key || deliverableMemorial?.access_key;
@@ -245,6 +256,7 @@ export default function MemorialOrderSection({
                     </div>
                 </div>
 
+                {activeUuid && (
                 <div className="flex items-center gap-2">
                     <button
                         type="button"
@@ -255,6 +267,7 @@ export default function MemorialOrderSection({
                         <span>Configurar / Editar</span>
                     </button>
                 </div>
+                )}
             </div>
 
             {/* Contenido según si está cargando o ya disponible */}
@@ -411,7 +424,7 @@ export default function MemorialOrderSection({
                         </button>
 
                         <p className="text-[10px] text-muted-foreground italic">
-                            Los altares disponibles se ajustan automáticamente al plan {planName} de tu crematorio.
+                            Los escenarios disponibles dependen del plan del memorial ({memorial?.plan_name || 'Partner'}).
                         </p>
                     </div>
                 </div>
@@ -423,11 +436,12 @@ export default function MemorialOrderSection({
                     </p>
                     <button
                         type="button"
-                        onClick={() => setIsSetupOpen(true)}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-sm transition cursor-pointer"
+                        onClick={createMemorial}
+                        disabled={creating}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-sm transition cursor-pointer disabled:opacity-60"
                     >
-                        <Sparkles size={14} />
-                        <span>Activar y Configurar Memorial</span>
+                        {creating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                        <span>Crear memorial</span>
                     </button>
                     <p className="text-[10px] text-muted-foreground">
                         Incluye selección de altar (Santuario Sereno, Altar de Luz, Jardín Celestial o Constelación Eterna), velas de condolencia y dedicatoria personalizada.

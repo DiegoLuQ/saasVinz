@@ -136,6 +136,8 @@ def list_all_memorials(
         )
 
     memorials = query.order_by(Memorial.fecha.desc()).offset(skip).limit(limit).all()
+    from app.services.memorial_delete import dedication_counts
+    counts = dedication_counts(db, [m.id for m in memorials])
 
     return [
         schemas.AdminMemorialResponse(
@@ -159,10 +161,43 @@ def list_all_memorials(
             lista_imagenes=m.lista_imagenes,
             diseno=m.diseno,
             access_key=m.access_key,
-            created_at=m.fecha
+            created_at=m.fecha,
+            dedications_count=counts.get(m.id, 0),
         )
         for m in memorials
     ]
+
+
+class MemorialBulkDelete(BaseModel):
+    ids: List[int] = Field(..., min_length=1, max_length=100)
+
+
+@router.post("/bulk-delete")
+def bulk_delete_memorials(
+    payload: MemorialBulkDelete,
+    db: Session = Depends(get_db),
+    current_creator: models.User = Depends(auth.get_current_creator),
+):
+    """Elimina varios memoriales; los que tienen mensajes se omiten (ver services/memorial_delete.py)."""
+    from app.services.memorial_delete import delete_memorials
+    return delete_memorials(db, payload.ids)
+
+
+@router.delete("/{memorial_id}")
+def delete_memorial(
+    memorial_id: int,
+    db: Session = Depends(get_db),
+    current_creator: models.User = Depends(auth.get_current_creator),
+):
+    """Elimina un memorial sin mensajes (409 si tiene alguno)."""
+    from app.services.memorial_delete import delete_memorials
+    res = delete_memorials(db, [memorial_id])
+    if not res["deleted"]:
+        reason = res["skipped"][0]["reason"] if res["skipped"] else "No existe"
+        if reason == "No existe":
+            raise HTTPException(status_code=404, detail="Memorial no encontrado")
+        raise HTTPException(status_code=409, detail=f"No se puede eliminar: {reason.lower()}. Los mensajes de la familia se conservan.")
+    return res
 
 @router.patch("/{memorial_id}", response_model=schemas.AdminMemorialResponse)
 def update_memorial_admin(

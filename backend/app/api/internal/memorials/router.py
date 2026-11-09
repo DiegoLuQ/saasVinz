@@ -1,4 +1,5 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Request, File, UploadFile, Form
+from typing import Optional
 from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from app import models, auth
@@ -317,6 +318,29 @@ def _apply_memorial_limit(memorial: mem_models.Memorial, db: Session):
     setattr(memorial, "melody", melodies.resolve(db, memorial.diseno))
 
     return memorial
+
+@router.get("/by-pet/{pet_id}", response_model=Optional[mem_schemas.MemorialManageResponse])
+def get_memorial_by_pet(
+    pet_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """Memorial de una mascota del crematorio, o null si aún no tiene. Solo lee: el memorial
+    se crea a propósito con POST (botón «Crear memorial»), nunca al abrir una pantalla."""
+    m = db.query(mem_models.Memorial).options(
+        joinedload(mem_models.Memorial.pet),
+        joinedload(mem_models.Memorial.tenant).joinedload(models.Tenant.subscription_plan),
+        joinedload(mem_models.Memorial.dedications),
+    ).filter(
+        mem_models.Memorial.id_mascota == pet_id,
+        mem_models.Memorial.id_tenant == current_user.tenant_id,
+    ).first()
+    if not m:
+        return None
+    m.lista_imagenes = [normalize_image_url(img) for img in (m.lista_imagenes or [])]
+    m.main_image_url = normalize_image_url(m.main_image_url)
+    return _apply_memorial_limit(m, db)
+
 
 @router.post("", response_model=mem_schemas.MemorialManageResponse)
 def create_memorial(

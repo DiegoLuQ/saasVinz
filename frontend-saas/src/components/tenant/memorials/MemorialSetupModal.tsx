@@ -85,6 +85,9 @@ export default function MemorialSetupModal({
     const [copiedPin, setCopiedPin] = useState(false);
     const [resettingPin, setResettingPin] = useState(false);
     const [planBlockedMessage, setPlanBlockedMessage] = useState<string | null>(null);
+    // La mascota aún no tiene memorial: se crea solo con el botón «Crear memorial».
+    const [notCreated, setNotCreated] = useState(false);
+    const [creating, setCreating] = useState(false);
     const [saveFeedback, setSaveFeedback] = useState(false);
 
     // Notificaciones y Datos de Contacto
@@ -171,30 +174,62 @@ export default function MemorialSetupModal({
         setMelodyId(id);
     };
 
-    const fetchOrCreateMemorial = async () => {
-        setLoading(true);
-        setPlanBlockedMessage(null);
-        try {
-            const defaultEpitaph =
-                suggestedEpitaphs[0] ||
-                `En memoria de nuestro querido ${pet.name}. Siempre vivirás en nuestros corazones.`;
+    const defaultEpitaph =
+        suggestedEpitaphs[0] ||
+        `En memoria de nuestro querido ${pet?.name}. Siempre vivirás en nuestros corazones.`;
 
+    /** Crea el memorial (solo desde el botón «Crear memorial»). */
+    const createMemorial = async () => {
+        setCreating(true);
+        try {
             const data = await apiRequest("/api/internal/memorials", {
                 method: "POST",
                 body: {
                     id_mascota: pet.id,
                     msg_despedida: defaultEpitaph,
                     es_privado: false,
-                    diseno: {
-                        tipo_diseno: "normal",
-                        tema: "claro",
-                        particulas: "estrellas",
-                        color_fondo: "",
-                        portada_url: "",
-                    },
+                    diseno: { tipo_diseno: "normal", tema: "claro", particulas: "estrellas", color_fondo: "", portada_url: "" },
                 },
             });
+            setNotCreated(false);
+            applyMemorial(data);
+            if (onSuccess) onSuccess();
+        } catch (err: any) {
+            if (err?.status === 403) setPlanBlockedMessage(err.message || null);
+            else console.error("Error creating memorial:", err);
+        } finally {
+            setCreating(false);
+        }
+    };
 
+    /** Abre el memorial existente; si la mascota no tiene, muestra «Crear memorial» (no lo crea). */
+    const fetchOrCreateMemorial = async () => {
+        setLoading(true);
+        setPlanBlockedMessage(null);
+        setNotCreated(false);
+        try {
+            const data = await apiRequest(`/api/internal/memorials/by-pet/${pet.id}`);
+            if (!data) {
+                setMemorial(null);
+                setNotCreated(true);
+                return;
+            }
+            applyMemorial(data);
+        } catch (err: any) {
+            if (err?.status === 403) {
+                setPlanBlockedMessage(
+                    err.message ||
+                        "El entorno de Memoriales Conmemorativos está disponible exclusivamente para planes de crematorio PRO y ULTRA."
+                );
+            } else {
+                console.error("Error fetching memorial:", err);
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const applyMemorial = (data: any) => {
             if (data) {
                 setMemorial(data);
                 setMsgDespedida(data.msg_despedida || defaultEpitaph);
@@ -218,18 +253,6 @@ export default function MemorialSetupModal({
                 const rawDeath = data.mascota?.death_date || pet?.death_date || "";
                 setDeathDate(rawDeath ? String(rawDeath).slice(0, 10) : "");
             }
-        } catch (err: any) {
-            if (err?.status === 403) {
-                setPlanBlockedMessage(
-                    err.message ||
-                        "El entorno de Memoriales Conmemorativos está disponible exclusivamente para planes de crematorio PRO y ULTRA."
-                );
-            } else {
-                console.error("Error fetching memorial:", err);
-            }
-        } finally {
-            setLoading(false);
-        }
     };
 
     const handleSelectScenario = (id: MemorialScenarioId) => {
@@ -486,7 +509,7 @@ export default function MemorialSetupModal({
                     </div>
 
                     {/* Selector de Pestañas (Tabs) */}
-                    {!planBlockedMessage && isProOrUltra && (
+                    {!planBlockedMessage && !notCreated && isProOrUltra && (
                         <div className="flex items-center gap-2 p-1 bg-slate-200/60 dark:bg-black/40 rounded-2xl w-fit">
                             <button
                                 type="button"
@@ -545,6 +568,28 @@ export default function MemorialSetupModal({
                                 {planBlockedMessage ||
                                     "Los Memoriales Conmemorativos con 4 escenarios interactivos, encendido de velas, descarga de retratos y moderación familiar de hasta 20 comentarios están disponibles únicamente en los planes PRO y ULTRA."}
                             </p>
+                        </div>
+                    ) : notCreated ? (
+                        <div className="py-16 px-6 text-center max-w-lg mx-auto space-y-4">
+                            <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-500 flex items-center justify-center mx-auto">
+                                <Sparkles size={30} />
+                            </div>
+                            <h3 className="text-xl font-black text-slate-900 dark:text-white">
+                                {pet?.name} aún no tiene memorial
+                            </h3>
+                            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                                Crea su memorial online para que la familia encienda velas y deje mensajes. Se genera con su
+                                enlace y su PIN; después podrás elegir el escenario, la foto y la dedicatoria.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={createMemorial}
+                                disabled={creating}
+                                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm shadow-sm transition disabled:opacity-60"
+                            >
+                                {creating ? <RefreshCw size={15} className="animate-spin" /> : <Sparkles size={15} />}
+                                Crear memorial
+                            </button>
                         </div>
                     ) : activeTab === "diseno" ? (
                         /* ── PESTAÑA 1: DISEÑO Y ESCENARIO ── */
@@ -1081,7 +1126,7 @@ export default function MemorialSetupModal({
                         Cerrar
                     </button>
 
-                    {!planBlockedMessage && isProOrUltra && (
+                    {!planBlockedMessage && !notCreated && isProOrUltra && (
                         <button
                             type="button"
                             onClick={handleSave}

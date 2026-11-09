@@ -16,7 +16,7 @@ import {
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select';
-import { Loader2, Search, Edit, Calendar, Sparkles, Smartphone, Monitor, Plus, Link2, Tags } from 'lucide-react';
+import { Loader2, Search, Edit, Calendar, Sparkles, Smartphone, Monitor, Plus, Link2, Tags, Trash2, MessageSquareHeart } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getMemorialBaseUrl } from '@/lib/publicUrls';
@@ -26,6 +26,8 @@ import { MemorialInvitesModal, MemorialPlansStudio, NewMemorialModal } from '@/c
 interface Memorial {
     id: number;
     id_recuerdo: string;
+    /** Mensajes de la familia/visitas: con alguno el memorial no se puede eliminar. */
+    dedications_count?: number;
     pet_name: string;
     pet_image_url: string | null;
     customer_name: string;
@@ -135,6 +137,38 @@ export default function AdminMemorialsPage() {
     });
 
     const [newOpen, setNewOpen] = useState(false);
+    // Eliminar (individual o varios). Los memoriales con mensajes no se pueden eliminar.
+    const [selected, setSelected] = useState<Set<number>>(new Set());
+    const [toDelete, setToDelete] = useState<Memorial[] | null>(null);
+    const [deleting, setDeleting] = useState(false);
+    const deletable = (m: Memorial) => !(m.dedications_count || 0);
+    const toggleSelected = (id: number) =>
+        setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+    const deletableIds = memorials.filter(deletable).map((m) => m.id);
+    const allSelected = deletableIds.length > 0 && deletableIds.every((id) => selected.has(id));
+    const confirmDelete = async () => {
+        if (!toDelete?.length) return;
+        setDeleting(true);
+        try {
+            const res = await apiRequest('/api/internal/creator/memorials/bulk-delete', {
+                method: 'POST',
+                body: JSON.stringify({ ids: toDelete.map((m) => m.id) }),
+            });
+            const ok = res?.deleted?.length || 0;
+            const skipped = res?.skipped || [];
+            if (ok) showToast(`${ok} memorial${ok === 1 ? '' : 'es'} eliminado${ok === 1 ? '' : 's'}`, 'success');
+            if (skipped.length) {
+                showToast(`No se eliminaron ${skipped.length}: ${skipped.map((s: { name: string; reason: string }) => `${s.name} (${s.reason.toLowerCase()})`).join(', ')}`, 'error');
+            }
+            setSelected(new Set());
+            setToDelete(null);
+            fetchMemorials();
+        } catch (e) {
+            showToast((e as { message?: string } | null)?.message || 'No se pudieron eliminar los memoriales', 'error');
+        } finally {
+            setDeleting(false);
+        }
+    };
     const [invitesOpen, setInvitesOpen] = useState(false);
     const [plansOpen, setPlansOpen] = useState(false);
 
@@ -317,6 +351,20 @@ export default function AdminMemorialsPage() {
                 </div>
             </header>
             {newOpen && <NewMemorialModal onClose={() => setNewOpen(false)} onCreated={fetchMemorials} />}
+
+            {selected.size > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-500/25 bg-rose-500/10 px-4 py-3">
+                    <span className="text-sm font-bold text-rose-100">{selected.size} seleccionado{selected.size === 1 ? '' : 's'}</span>
+                    <div className="flex items-center gap-2">
+                        <button type="button" onClick={() => setSelected(new Set())}
+                            className="rounded-xl px-3 py-2 text-xs font-bold text-white/60 hover:bg-white/10 hover:text-white">Quitar selección</button>
+                        <button type="button" onClick={() => setToDelete(memorials.filter((m) => selected.has(m.id)))}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2 text-xs font-black text-white hover:bg-rose-500">
+                            <Trash2 size={14} /> Eliminar seleccionados
+                        </button>
+                    </div>
+                </div>
+            )}
             {invitesOpen && <MemorialInvitesModal onClose={() => setInvitesOpen(false)} />}
 
 
@@ -324,31 +372,46 @@ export default function AdminMemorialsPage() {
                 <Table>
                     <TableHeader className="bg-white/5">
                         <TableRow className="border-white/5 hover:bg-transparent">
+                            <TableHead className="w-10 h-14">
+                                <input type="checkbox" aria-label="Seleccionar todos los que se pueden eliminar"
+                                    title="Selecciona los memoriales sin mensajes"
+                                    checked={allSelected} disabled={!deletableIds.length}
+                                    onChange={() => setSelected(allSelected ? new Set() : new Set(deletableIds))}
+                                    className="h-4 w-4 accent-rose-500 cursor-pointer disabled:opacity-30" />
+                            </TableHead>
                             <TableHead className="text-[10px] uppercase font-bold text-white/40 h-14">Mascota</TableHead>
                             <TableHead className="text-[10px] uppercase font-bold text-white/40 h-14">Cliente</TableHead>
                             <TableHead className="text-[10px] uppercase font-bold text-white/40 h-14">Empresa</TableHead>
                             <TableHead className="text-[10px] uppercase font-bold text-white/40 h-14">Plan Actual</TableHead>
                             <TableHead className="text-[10px] uppercase font-bold text-white/40 h-14">Vence</TableHead>
                             <TableHead className="text-[10px] uppercase font-bold text-white/40 h-14">Estado</TableHead>
+                            <TableHead className="text-[10px] uppercase font-bold text-white/40 h-14">Mensajes</TableHead>
                             <TableHead className="text-[10px] uppercase font-bold text-white/40 h-14 text-right">Acciones</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {loading ? (
                             <TableRow className="border-white/5">
-                                <TableCell colSpan={7} className="h-32 text-center">
+                                <TableCell colSpan={9} className="h-32 text-center">
                                     <Loader2 className="animate-spin mx-auto text-primary" size={24} />
                                 </TableCell>
                             </TableRow>
                         ) : memorials.length === 0 ? (
                             <TableRow className="border-white/5">
-                                <TableCell colSpan={7} className="h-32 text-center text-white/30 italic">
+                                <TableCell colSpan={9} className="h-32 text-center text-white/30 italic">
                                     No se encontraron recuerdos que coincidan con tu búsqueda.
                                 </TableCell>
                             </TableRow>
                         ) : (
                             memorials.map((memorial) => (
                                 <TableRow key={memorial.id} className="border-white/5 hover:bg-white/5 transition-colors group">
+                                    <TableCell className="py-4">
+                                        <input type="checkbox" aria-label={`Seleccionar ${memorial.pet_name}`}
+                                            checked={selected.has(memorial.id)} disabled={!deletable(memorial)}
+                                            title={deletable(memorial) ? undefined : 'Tiene mensajes: no se puede eliminar'}
+                                            onChange={() => toggleSelected(memorial.id)}
+                                            className="h-4 w-4 accent-rose-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-30" />
+                                    </TableCell>
                                     <TableCell className="font-bold text-white text-base py-4 py-4">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-white/10 to-white/5 flex items-center justify-center text-white/50">
@@ -405,7 +468,17 @@ export default function AdminMemorialsPage() {
                                             {memorial.status === 'active' ? 'ACTIVE' : memorial.status === 'expired' ? 'EXPIRED' : memorial.status.toUpperCase()}
                                         </span>
                                     </TableCell>
+                                    <TableCell className="py-4">
+                                        {(memorial.dedications_count || 0) > 0 ? (
+                                            <span className="inline-flex items-center gap-1 text-xs font-bold text-white/70" title="Con mensajes no se puede eliminar">
+                                                <MessageSquareHeart size={13} className="text-rose-300" /> {memorial.dedications_count}
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-white/25">0</span>
+                                        )}
+                                    </TableCell>
                                     <TableCell className="text-right py-4">
+                                        <div className="flex items-center justify-end gap-1">
                                         <Button
                                             variant="ghost"
                                             size="sm"
@@ -414,6 +487,18 @@ export default function AdminMemorialsPage() {
                                         >
                                             <Edit size={16} />
                                         </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            disabled={!deletable(memorial)}
+                                            title={deletable(memorial) ? 'Eliminar memorial' : `Tiene ${memorial.dedications_count} mensaje(s): no se puede eliminar`}
+                                            aria-label={`Eliminar memorial de ${memorial.pet_name}`}
+                                            onClick={() => setToDelete([memorial])}
+                                            className="hover:bg-rose-500/10 text-white/30 hover:text-rose-400 rounded-lg transition-colors disabled:opacity-20"
+                                        >
+                                            <Trash2 size={16} />
+                                        </Button>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ))
@@ -422,6 +507,31 @@ export default function AdminMemorialsPage() {
                 </Table>
             </div>
 
+
+            <Dialog open={!!toDelete} onOpenChange={(o) => { if (!o && !deleting) setToDelete(null); }}>
+                <DialogContent className="bg-[#0f121d] border-white/10 text-white sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-bold">
+                            {toDelete?.length === 1 ? `¿Eliminar el memorial de ${toDelete[0].pet_name}?` : `¿Eliminar ${toDelete?.length || 0} memoriales?`}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3 text-sm text-white/70">
+                        <p>Se borran el memorial, su enlace, su línea de tiempo, video/voz y sus fotos que ya nadie use. <b className="text-white">No se puede deshacer.</b></p>
+                        <p className="text-xs text-white/50">La mascota, sus órdenes y sus fotos de la ficha no se tocan. Los memoriales con mensajes no se eliminan.</p>
+                        {toDelete && toDelete.length > 1 && (
+                            <ul className="max-h-40 overflow-y-auto rounded-xl border border-white/10 bg-white/5 p-2 text-xs">
+                                {toDelete.map((m) => <li key={m.id} className="py-0.5">{m.pet_name} · <span className="text-white/40">{m.tenant_name}</span></li>)}
+                            </ul>
+                        )}
+                    </div>
+                    <DialogFooter className="gap-2">
+                        <Button variant="ghost" onClick={() => setToDelete(null)} disabled={deleting} className="text-white/60 hover:bg-white/10">Cancelar</Button>
+                        <Button onClick={confirmDelete} disabled={deleting} className="bg-rose-600 hover:bg-rose-500 text-white font-bold">
+                            {deleting ? <Loader2 size={15} className="animate-spin mr-1.5" /> : <Trash2 size={15} className="mr-1.5" />} Eliminar
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
                 <DialogContent className="bg-[#0f121d] border-white/5 text-white sm:max-w-7xl max-h-[95vh] overflow-y-auto p-0 shadow-2xl">

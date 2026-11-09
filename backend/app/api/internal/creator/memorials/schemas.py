@@ -33,6 +33,8 @@ class AdminMemorialResponse(BaseModel):
     diseno: Optional[dict] = None
     access_key: Optional[str] = None
     created_at: datetime
+    # Mensajes (dedicatorias) en cualquier estado: con alguno, no se puede eliminar
+    dedications_count: int = 0
     
     class Config:
         from_attributes = True
