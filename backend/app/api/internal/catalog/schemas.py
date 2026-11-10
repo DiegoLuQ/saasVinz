@@ -266,6 +266,8 @@ class CatalogShareTokenCreate(BaseModel):
     plan_groups: Optional[List[str]] = None
     # Solo catálogo de planes: tabla de precios (None = General)
     price_list_id: Optional[int] = None
+    # Visualizar video de bienvenida en el catálogo
+    show_video: Optional[bool] = True
 
 class CatalogShareTokenPlanGroups(BaseModel):
     plan_groups: Optional[List[str]] = None
@@ -280,6 +282,7 @@ class CatalogShareTokenUpdate(BaseModel):
     message: Optional[str] = Field(default=None, max_length=CATALOG_MESSAGE_MAX)
     plan_groups: Optional[List[str]] = None
     price_list_id: Optional[int] = None
+    show_video: Optional[bool] = None
     renew_expiration: bool = False
     expires_in_hours: Optional[int] = None
 
@@ -288,6 +291,7 @@ class CatalogShareTokenBulkUpdate(BaseModel):
     catalog_type: CatalogType = "products"
     name: Optional[str] = Field(default=None, max_length=100)
     message: Optional[str] = Field(default=None, max_length=CATALOG_MESSAGE_MAX)
+    show_video: Optional[bool] = None
 
 class CatalogShareTokenInDB(BaseModel):
     id: int
@@ -298,6 +302,7 @@ class CatalogShareTokenInDB(BaseModel):
     message: Optional[str] = None
     plan_groups: Optional[List[str]] = None
     price_list_id: Optional[int] = None
+    show_video: bool = True
     price_list_name: Optional[str] = None
     price_list_status: Optional[str] = None  # activa | programada | vencida | pausada
     expires_at: Optional[datetime] = None

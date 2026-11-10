@@ -20,11 +20,15 @@ import {
     Folder,
     BadgePercent,
     Pencil,
+    Play,
+    Eye,
+    Video,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { buildCatalogUrl } from '@/lib/publicUrls';
 import { copyToClipboard } from '@/lib/clipboard';
+import FormVideoPlayer from '@/components/public/FormVideoPlayer';
 
 interface CatalogLink {
     id: number;
@@ -38,6 +42,7 @@ interface CatalogLink {
     price_list_id?: number | null;
     price_list_name?: string | null;
     price_list_status?: 'activa' | 'programada' | 'vencida' | 'pausada' | null;
+    show_video?: boolean;
     expires_at?: string | null;
     is_active: boolean;
     views_count: number;
@@ -138,6 +143,7 @@ interface LinkEdit {
     message: string;
     groups: string[];
     priceList: number | null;
+    showVideo: boolean;
     /** null = mantener la vigencia actual; si no, horas desde ahora (0 = permanente) */
     renewHours: number | null;
 }
@@ -166,6 +172,10 @@ export default function ShareCatalogModal({
     const [loadingLinks, setLoadingLinks] = useState(false);
     const [copiedToken, setCopiedToken] = useState<string | null>(null);
     const [recentCreatedUrl, setRecentCreatedUrl] = useState<string | null>(null);
+    // Video de bienvenida configurado por el SuperAdmin para este tenant
+    const [tenantVideo, setTenantVideo] = useState<{ has_video: boolean; video?: any } | null>(null);
+    const [newShowVideo, setNewShowVideo] = useState(true);
+    const [previewVideoOpen, setPreviewVideoOpen] = useState(false);
     // Grupos de planes del enlace nuevo ([] = todos) y edición de los de un enlace existente
     const [newGroups, setNewGroups] = useState<string[]>([]);
     const [editingGroups, setEditingGroups] = useState<{ id: number; value: string[] } | null>(null);
@@ -188,6 +198,10 @@ export default function ShareCatalogModal({
                 const pls = await apiRequest('/api/internal/price-lists').catch(() => []);
                 setPriceLists(Array.isArray(pls) ? pls : []);
             }
+            const vInfo = await apiRequest('/api/internal/catalog/links/video-info').catch(() => null);
+            if (vInfo && typeof vInfo.has_video === 'boolean') {
+                setTenantVideo(vInfo);
+            }
         } catch (err: any) {
             console.error('Error fetching catalog links:', err);
         } finally {
@@ -205,6 +219,8 @@ export default function ShareCatalogModal({
             setNewPriceList(null);
             setEditingGroups(null);
             setEditing(null);
+            setNewShowVideo(true);
+            setPreviewVideoOpen(false);
             setSelectedHours(EXPIRATION_OPTIONS[catalogType][0].value);
         }
     }, [isOpen, catalogType]);
@@ -228,6 +244,7 @@ export default function ShareCatalogModal({
                     message: isPlans ? linkMessage.trim() || undefined : undefined,
                     plan_groups: isPlans && newGroups.length ? newGroups : undefined,
                     price_list_id: isPlans && newPriceList ? newPriceList : undefined,
+                    show_video: newShowVideo,
                 }),
             });
 
@@ -242,6 +259,20 @@ export default function ShareCatalogModal({
             showToast(err.message || 'Error al generar el enlace', 'error');
         } finally {
             setIsGenerating(false);
+        }
+    };
+
+    const handleToggleVideo = async (link: CatalogLink) => {
+        const nextVal = link.show_video === false;
+        try {
+            const res = await apiRequest(`/api/internal/catalog/links/${link.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ show_video: nextVal }),
+            });
+            setLinks(prev => prev.map(l => (l.id === link.id ? { ...l, show_video: res.show_video } : l)));
+            showToast(nextVal ? 'Video de bienvenida activado para este enlace' : 'Video de bienvenida oculto para este enlace', 'info');
+        } catch (err: any) {
+            showToast(err?.message || 'Error al actualizar video del enlace', 'error');
         }
     };
 
@@ -289,6 +320,7 @@ export default function ShareCatalogModal({
             message: link.message || '',
             groups: link.plan_groups || [],
             priceList: link.price_list_id ?? null,
+            showVideo: link.show_video !== false,
             renewHours: null,
         });
     };
@@ -301,7 +333,10 @@ export default function ShareCatalogModal({
         }
         setSavingEdit(true);
         try {
-            const body: Record<string, unknown> = { name: editing.name.trim() || null };
+            const body: Record<string, unknown> = {
+                name: editing.name.trim() || null,
+                show_video: editing.showVideo,
+            };
             if (isPlans) {
                 body.message = editing.message.trim() || null;
                 body.price_list_id = editing.priceList;
@@ -525,6 +560,74 @@ export default function ShareCatalogModal({
                             </div>
                         )}
 
+                        {/* Opción de Video de Bienvenida */}
+                        <div className="p-3.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/[0.03] space-y-2">
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                                        tenantVideo?.has_video
+                                            ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                                            : 'bg-slate-100 text-slate-400 dark:bg-white/5 dark:text-slate-500'
+                                    }`}>
+                                        <Play size={14} className="fill-current ml-0.5" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                                                Video de bienvenida
+                                            </span>
+                                            {tenantVideo?.has_video ? (
+                                                <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold uppercase tracking-wider">
+                                                    Configurado {tenantVideo.video?.duration ? `(${Math.round(tenantVideo.video.duration)}s)` : ''}
+                                                </span>
+                                            ) : (
+                                                <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-400 font-medium">
+                                                    No configurado en SaaS
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                            {tenantVideo?.has_video
+                                                ? 'Muestra el botón para ver el video de bienvenida en este catálogo.'
+                                                : 'El video se configura desde el panel administrador (admin.vinzer.cl).'}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                    {tenantVideo?.has_video && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setPreviewVideoOpen(true)}
+                                            className="px-2.5 py-1.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300 text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                                            title="Previsualizar video de bienvenida"
+                                        >
+                                            <Eye size={13} />
+                                            <span>Visualizar</span>
+                                        </button>
+                                    )}
+
+                                    <button
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={newShowVideo}
+                                        disabled={!tenantVideo?.has_video}
+                                        onClick={() => setNewShowVideo(!newShowVideo)}
+                                        title={tenantVideo?.has_video ? (newShowVideo ? 'Video visible en este enlace' : 'Video oculto en este enlace') : 'No hay video cargado'}
+                                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${
+                                            newShowVideo && tenantVideo?.has_video ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'
+                                        }`}
+                                    >
+                                        <span
+                                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                                newShowVideo && tenantVideo?.has_video ? 'translate-x-5' : 'translate-x-0'
+                                            }`}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                         <button
                             type="submit"
                             disabled={isGenerating || (showGroups && newGroups.length === 0)}
@@ -704,6 +807,31 @@ export default function ShareCatalogModal({
                                                         ))}
                                                     </select>
                                                 </label>
+                                                <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.02]">
+                                                    <div className="flex items-center gap-2">
+                                                        <Play size={13} className="text-amber-500 fill-current" />
+                                                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                                                            Video de bienvenida
+                                                        </span>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        role="switch"
+                                                        aria-checked={editing.showVideo}
+                                                        disabled={!tenantVideo?.has_video}
+                                                        onClick={() => setEditing({ ...editing, showVideo: !editing.showVideo })}
+                                                        title={tenantVideo?.has_video ? (editing.showVideo ? 'Video activo' : 'Video oculto') : 'Sin video cargado'}
+                                                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${
+                                                            editing.showVideo && tenantVideo?.has_video ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'
+                                                        }`}
+                                                    >
+                                                        <span
+                                                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                                                editing.showVideo && tenantVideo?.has_video ? 'translate-x-4' : 'translate-x-0'
+                                                            }`}
+                                                        />
+                                                    </button>
+                                                </div>
                                                 <div className="flex items-center gap-2 pt-0.5">
                                                     <button type="button" onClick={handleSaveEdit}
                                                         disabled={savingEdit || (showGroups && editing.groups.length === 0)}
@@ -719,7 +847,7 @@ export default function ShareCatalogModal({
                                             </div>
                                             ) : (
                                             <div className="min-w-0 flex-1 space-y-1">
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-2 flex-wrap">
                                                     <span className="text-xs font-bold text-slate-900 dark:text-slate-50 truncate">
                                                         {link.name || copy.defaultName}
                                                     </span>
@@ -735,6 +863,21 @@ export default function ShareCatalogModal({
                                                         <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30">
                                                             Permanente
                                                         </span>
+                                                    )}
+                                                    {tenantVideo?.has_video && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleToggleVideo(link)}
+                                                            className={`px-2 py-0.5 rounded-full text-[9px] font-bold flex items-center gap-1 border transition-all cursor-pointer ${
+                                                                link.show_video !== false
+                                                                    ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-500/15 dark:border-amber-400/40 dark:text-amber-300'
+                                                                    : 'bg-slate-100 border-slate-200 text-slate-500 dark:bg-white/5 dark:border-white/10 dark:text-slate-400 hover:text-slate-700'
+                                                            }`}
+                                                            title={link.show_video !== false ? 'Video visible en este catálogo (clic para ocultar)' : 'Video oculto en este catálogo (clic para mostrar)'}
+                                                        >
+                                                            <Play size={8} className={link.show_video !== false ? 'fill-current' : ''} />
+                                                            <span>{link.show_video !== false ? 'Video activo' : 'Video oculto'}</span>
+                                                        </button>
                                                     )}
                                                 </div>
 
@@ -909,6 +1052,46 @@ export default function ShareCatalogModal({
                         Cerrar
                     </button>
                 </div>
+
+                {/* Modal de previsualización del video de bienvenida */}
+                {previewVideoOpen && tenantVideo?.video && (
+                    <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                        <div className="relative w-full max-w-2xl bg-slate-900 border border-white/10 rounded-2xl p-5 shadow-2xl space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-white">
+                                    <Play size={16} className="text-amber-500 fill-current" />
+                                    <h3 className="text-sm font-bold">Vista previa del video de bienvenida</h3>
+                                    {tenantVideo.video.duration ? (
+                                        <span className="text-xs text-amber-400 font-mono">({Math.round(tenantVideo.video.duration)}s)</span>
+                                    ) : null}
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setPreviewVideoOpen(false)}
+                                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                                    aria-label="Cerrar video"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+
+                            <div className="rounded-xl overflow-hidden bg-black border border-white/10">
+                                <FormVideoPlayer video={tenantVideo.video} autoPlay={true} />
+                            </div>
+
+                            <div className="flex items-center justify-between text-xs text-slate-400">
+                                <span>Botón en catálogo: <b className="text-white">{tenantVideo.video.button_text || 'Ver video de bienvenida'}</b></span>
+                                <button
+                                    type="button"
+                                    onClick={() => setPreviewVideoOpen(false)}
+                                    className="px-4 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold transition-colors cursor-pointer"
+                                >
+                                    Cerrar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -195,6 +195,8 @@ class CatalogShareToken(Base):
     plan_groups = Column(JSON, nullable=True)
     # Catálogo de planes: tabla de precios que usa (NULL = General)
     price_list_id = Column(Integer, ForeignKey("srv_price_lists.id", ondelete="SET NULL"), nullable=True)
+    # Visualizar video de bienvenida en este enlace (True por defecto)
+    show_video = Column(Boolean, nullable=False, default=True, server_default='true')
     expires_at = Column(DateTime(timezone=True), nullable=True) # None = sin vencimiento
     is_active = Column(Boolean, default=True)
     views_count = Column(Integer, default=0)

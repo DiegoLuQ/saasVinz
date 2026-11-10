@@ -66,6 +66,7 @@ def _to_dto(item: CatalogShareToken, now, stats: dict | None = None, price_lists
         catalog_type=item.catalog_type or "products",
         message=item.message,
         plan_groups=item.plan_groups if (item.catalog_type or "products") == "plans" else None,
+        show_video=item.show_video if item.show_video is not None else True,
         expires_at=item.expires_at,
         is_active=item.is_active,
         views_count=item.views_count or 0,
@@ -141,6 +142,7 @@ def create_catalog_share_link(
 
     # Genera token aleatorio URL-safe de 16 bytes (~22 chars)
     token_str = secrets.token_urlsafe(16)
+    show_video = True if data.show_video is None else bool(data.show_video)
 
     new_token = CatalogShareToken(
         tenant_id=tenant_id,
@@ -150,6 +152,7 @@ def create_catalog_share_link(
         message=message,
         plan_groups=groups,
         price_list_id=price_list.id if price_list else None,
+        show_video=show_video,
         expires_at=expires_at,
         is_active=True,
         views_count=0,
@@ -163,6 +166,27 @@ def create_catalog_share_link(
     return _to_dto(new_token, now, None, {price_list.id: price_list} if price_list else None)
 
 
+@router.get("/video-info")
+def get_catalog_video_info(
+    tenant_id: int = Depends(get_tenant_id),
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Devuelve si el tenant tiene video de bienvenida configurado y su metadata para previsualizar en el modal."""
+    from app.core.tenant_context import apply_tenant_rls, apply_bypass_rls
+    if current_user.role in ("creator", models.UserRole.creator):
+        apply_bypass_rls(db)
+    else:
+        apply_tenant_rls(db, tenant_id)
+    from app.api.internal.admin.models import Tenant
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    has_video = bool(tenant and tenant.catalog_video and tenant.catalog_video.get("url"))
+    return {
+        "has_video": has_video,
+        "video": tenant.catalog_video if has_video else None,
+    }
+
+
 @router.put("/bulk", response_model=List[schemas.CatalogShareTokenInDB])
 def bulk_update_catalog_share_links(
     data: CatalogShareTokenBulkUpdate,
@@ -170,7 +194,7 @@ def bulk_update_catalog_share_links(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Aplica la etiqueta y el mensaje indicados a todos los enlaces del tipo (vacío = quitar)."""
+    """Aplica la etiqueta, mensaje y configuración de video indicados a todos los enlaces del tipo."""
     _authorize(db, current_user, tenant_id, data.catalog_type, "edit")
 
     name = (data.name or "").strip() or None
@@ -189,6 +213,8 @@ def bulk_update_catalog_share_links(
         item.name = name
         if data.catalog_type == "plans":
             item.message = message
+        if data.show_video is not None:
+            item.show_video = bool(data.show_video)
     db.commit()
 
     now = tz.get_now()
@@ -236,6 +262,8 @@ def update_catalog_share_link(
     if "price_list_id" in sent and is_plans:
         pl = _price_list(db, tenant_id, data.price_list_id)
         item.price_list_id = pl.id if pl else None
+    if "show_video" in sent:
+        item.show_video = bool(data.show_video)
     if data.renew_expiration:
         hours = data.expires_in_hours or 0
         if is_plans and hours and hours not in PLANS_EXPIRATION_HOURS:

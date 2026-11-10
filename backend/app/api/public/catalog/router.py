@@ -86,7 +86,7 @@ def get_public_catalog(
         tenant_social=public_social,
         catalog_tagline=tenant.catalog_tagline,
         catalog_intro=tenant.catalog_intro,
-        catalog_video=tenant.catalog_video,
+        catalog_video=tenant.catalog_video if (getattr(share_token, "show_video", True) and tenant.catalog_video) else None,
         whatsapp=clean_whatsapp,
         expires_at=share_token.expires_at,
     )
