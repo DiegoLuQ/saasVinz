@@ -1720,7 +1720,7 @@ export function PublicFormTab() {
                                     <div>
                                         <p className="text-sm font-extrabold text-indigo-950 dark:text-white">Video para la familia (opcional)</p>
                                         <p className="text-[11px] text-indigo-900/80 dark:text-muted-foreground font-medium">
-                                            Un video corto (máx. 30 s) que la familia ve solo si pulsa el botón. No se reproduce solo.
+                                            Un video corto (máx. 60 s) que la familia ve solo si pulsa el botón. No se reproduce solo.
                                         </p>
                                     </div>
                                     <Toggle

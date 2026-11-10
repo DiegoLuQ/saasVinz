@@ -6,7 +6,7 @@ import { apiRequest } from '@/lib/tenant/api';
 import { type FormVideo } from '@/lib/publicFormConfig';
 import FormVideoPlayer from '@/components/public/FormVideoPlayer';
 
-export const MAX_VIDEO_SECONDS = 30;
+export const MAX_VIDEO_SECONDS = 60;
 const MAX_VIDEO_MB = 80;
 
 // Archivos elegidos y aún no subidos, por su URL local (blob:). Se suben al

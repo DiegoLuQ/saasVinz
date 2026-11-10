@@ -26,9 +26,9 @@ from fastapi import HTTPException
 from app import models
 from app.core.config import settings
 
-MAX_SECONDS = 30
-# Margen para redondeos de los contenedores (un video de "30 s" suele medir 30,03).
-DURATION_TOLERANCE = 0.6
+MAX_SECONDS = 60
+# Margen para redondeos de los contenedores (un video de "60 s" suele medir 60,03).
+DURATION_TOLERANCE = 1.0
 MAX_UPLOAD_BYTES = 80 * 1024 * 1024
 SOURCES = {"upload", "vimeo", "cloudflare"}
 DEFAULT_BUTTON_TEXT = "Ver video"

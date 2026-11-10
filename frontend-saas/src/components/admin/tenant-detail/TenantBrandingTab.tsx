@@ -397,7 +397,7 @@ export default function TenantBrandingTab({
                             {videoMode === 'upload' ? (
                                 <div className="space-y-3">
                                     <label className="block text-xs font-bold text-white/70">
-                                        Archivo de video (máximo 30 segundos, hasta 80 MB)
+                                        Archivo de video (máximo 60 segundos / 1 min, hasta 80 MB)
                                     </label>
                                     <div className="border-2 border-dashed border-white/10 hover:border-amber-400/40 rounded-2xl p-6 text-center transition-colors bg-white/[0.02]">
                                         <input
@@ -421,7 +421,7 @@ export default function TenantBrandingTab({
                                             ) : (
                                                 <div className="text-xs text-white/50">
                                                     <span className="text-amber-400 font-bold underline">Haz clic para elegir</span> o arrastra tu archivo aquí
-                                                    <p className="text-[10px] text-white/30 mt-1">MP4, MOV o WebM · Máximo 30 segundos</p>
+                                                    <p className="text-[10px] text-white/30 mt-1">MP4, MOV o WebM · Máximo 60 segundos</p>
                                                 </div>
                                             )}
                                         </label>
@@ -430,7 +430,7 @@ export default function TenantBrandingTab({
                             ) : (
                                 <div className="space-y-3">
                                     <label className="block text-xs font-bold text-white/70">
-                                        Enlace de Vimeo o Cloudflare Stream (máx. 30 segundos)
+                                        Enlace de Vimeo o Cloudflare Stream (máx. 60 segundos)
                                     </label>
                                     <input
                                         type="url"
