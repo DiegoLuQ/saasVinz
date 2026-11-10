@@ -30,6 +30,7 @@ import {
     FileText,
     ExternalLink,
     HelpCircle,
+    CheckCheck,
 } from 'lucide-react';
 import type { CustomFormPreset } from '@/lib/publicFormConfig';
 import Modal from '@/components/tenant/Modal';
@@ -238,6 +239,25 @@ export default function Navbar() {
         }
     };
 
+    const [isClearingNotifications, setIsClearingNotifications] = useState(false);
+
+    const handleClearAllNotifications = async () => {
+        if (notifications.length === 0) return;
+        setIsClearingNotifications(true);
+        try {
+            await apiRequest('/api/internal/notifications/clear-all', {
+                method: 'POST'
+            });
+            queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
+            showToast('Notificaciones marcadas como leídas', 'success');
+        } catch (err) {
+            console.error('Error clearing notifications:', err);
+            showToast('Error al limpiar las notificaciones', 'error');
+        } finally {
+            setIsClearingNotifications(false);
+        }
+    };
+
     const handleMarkAsRead = async (id: number) => {
         try {
             await apiRequest(`/api/internal/notifications/${id}`, {
@@ -409,8 +429,24 @@ export default function Navbar() {
                                         className="fixed sm:absolute left-1/2 sm:left-auto -translate-x-1/2 sm:translate-x-0 sm:right-0 top-[4.5rem] sm:top-auto sm:mt-3 p-0 w-[calc(100vw-1.5rem)] sm:w-[400px] max-w-[400px] bg-white rounded-3xl shadow-2xl z-[100] border border-slate-200 overflow-hidden dark:bg-slate-900 dark:border-slate-800"
                                     >
                                         <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white dark:border-slate-800 dark:bg-slate-900">
-                                            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Notificaciones</p>
-                                            <span className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full font-bold">{notifications.length}</span>
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Notificaciones</p>
+                                                <span className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 px-2.5 py-0.5 rounded-full font-bold tabular-nums">
+                                                    {notifications.length}
+                                                </span>
+                                            </div>
+                                            {notifications.length > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleClearAllNotifications}
+                                                    disabled={isClearingNotifications}
+                                                    className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400 transition-colors px-2.5 py-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer disabled:opacity-50"
+                                                    title="Marcar todas como leídas y limpiar la lista"
+                                                >
+                                                    <CheckCheck size={14} className="text-emerald-500" />
+                                                    <span>{isClearingNotifications ? 'Limpiando...' : 'Limpiar todas'}</span>
+                                                </button>
+                                            )}
                                         </div>
                                         <div className="max-h-[60vh] overflow-y-auto p-3 space-y-2.5 custom-scrollbar">
                                             {notifications.length > 0 ? (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Filter, Search, Bell, MessageCircle, User, Dog, Scissors, Eye, Check, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Filter, Search, Bell, MessageCircle, User, Dog, Scissors, Eye, Check, CheckCheck, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { apiRequest } from '@/lib/tenant/api';
@@ -41,6 +41,22 @@ export function NotificationsTab() {
         }
     };
 
+    const [isClearingAll, setIsClearingAll] = useState(false);
+
+    const handleClearAll = async () => {
+        setIsClearingAll(true);
+        try {
+            await apiRequest('/api/internal/notifications/clear-all', { method: 'POST' });
+            showToast('Todas las notificaciones marcadas como leídas', 'success');
+            queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
+            fetchNotifications();
+        } catch (err) {
+            showToast('Error al limpiar notificaciones', 'error');
+        } finally {
+            setIsClearingAll(false);
+        }
+    };
+
     const handleMarkAsRead = async (notificationId: number) => {
         try {
             await apiRequest(`/api/internal/notifications/${notificationId}`, {
@@ -79,9 +95,22 @@ export function NotificationsTab() {
 
     return (
         <div className="space-y-8 animate-fade-in">
-            <div className="border-b border-white/5 pb-6">
-                <h3 className="text-xl font-bold">Historial de Notificaciones</h3>
-                <p className="text-sm text-muted-foreground mt-1">Revisa todas las alertas y mensajes del sistema.</p>
+            <div className="border-b border-slate-200 dark:border-white/5 pb-6 flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                    <h3 className="text-xl font-bold">Historial de Notificaciones</h3>
+                    <p className="text-sm text-muted-foreground mt-1">Revisa todas las alertas y mensajes del sistema.</p>
+                </div>
+                {notifications.some(n => !n.is_read) && (
+                    <button
+                        type="button"
+                        onClick={handleClearAll}
+                        disabled={isClearingAll}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold hover:bg-emerald-100 dark:hover:bg-emerald-950/60 transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                        <CheckCheck size={15} />
+                        <span>{isClearingAll ? 'Limpiando...' : 'Marcar todas como leídas'}</span>
+                    </button>
+                )}
             </div>
 
             {/* Search and Filters */}

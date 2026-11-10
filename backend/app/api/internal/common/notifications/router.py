@@ -12,6 +12,7 @@ from app.database import get_db
 from app.api.deps import get_tenant_id
 from app.api.internal.admin.rbac.router import check_permission
 from app.api.internal.common.notifications import audience as aud
+from app.utils import tz
 
 router = APIRouter()
 
@@ -64,6 +65,48 @@ def get_my_notifications(
         "size": limit,
         "pages": math.ceil(total / limit) if limit > 0 else 1
     }
+
+
+@router.post("/clear-all")
+@router.post("/mark-all-read")
+def clear_all_notifications(
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    current_user: models.User = Depends(auth.get_current_user),
+):
+    """
+    Marca como leídas todas las notificaciones pendientes visibles para el usuario actual en su tenant.
+    """
+    audiences = aud.user_audiences(db, current_user)
+    notifs = aud.visible_notifications(db, current_user, audiences, include_read=False).all()
+
+    if not notifs:
+        return {"message": "No hay notificaciones pendientes", "count": 0}
+
+    notif_ids = [n.id for n in notifs]
+    now = tz.get_now()
+
+    existing_states = {
+        s.notification_id: s
+        for s in db.query(models.NotificationUserState).filter(
+            models.NotificationUserState.user_id == current_user.id,
+            models.NotificationUserState.notification_id.in_(notif_ids)
+        ).all()
+    }
+
+    for nid in notif_ids:
+        state = existing_states.get(nid)
+        if state:
+            state.read_at = now
+        else:
+            db.add(models.NotificationUserState(
+                notification_id=nid,
+                user_id=current_user.id,
+                read_at=now
+            ))
+
+    db.commit()
+    return {"message": f"{len(notif_ids)} notificaciones marcadas como leídas", "count": len(notif_ids)}
 
 
 @router.patch("/{notification_id}", response_model=schemas.NotificationInDB)
