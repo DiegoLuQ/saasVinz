@@ -53,3 +53,4 @@ def test_creator_save_and_delete_catalog_video(client, auth, db, world):
     r_pub2 = client.get(f"/api/public/catalog/crematorio-a/{token}")
     assert r_pub2.status_code == 200
     assert r_pub2.json()["catalog_video"] is None
+

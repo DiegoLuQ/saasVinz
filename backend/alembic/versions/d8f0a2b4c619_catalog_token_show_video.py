@@ -23,3 +23,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute("ALTER TABLE inv_catalog_tokens DROP COLUMN IF EXISTS show_video;")
+

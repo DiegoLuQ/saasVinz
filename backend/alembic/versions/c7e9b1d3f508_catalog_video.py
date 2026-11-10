@@ -23,3 +23,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute("ALTER TABLE sys_tenants DROP COLUMN IF EXISTS catalog_video;")
+

@@ -172,6 +172,8 @@ export default function ShareCatalogModal({
     const [loadingLinks, setLoadingLinks] = useState(false);
     const [copiedToken, setCopiedToken] = useState<string | null>(null);
     const [recentCreatedUrl, setRecentCreatedUrl] = useState<string | null>(null);
+    // Pestaña activa: 'links' (enlaces creados) o 'create' (generar nuevo enlace)
+    const [activeTab, setActiveTab] = useState<'links' | 'create'>('links');
     // Video de bienvenida configurado por el SuperAdmin para este tenant
     const [tenantVideo, setTenantVideo] = useState<{ has_video: boolean; video?: any } | null>(null);
     const [newShowVideo, setNewShowVideo] = useState(true);
@@ -193,6 +195,9 @@ export default function ShareCatalogModal({
             const res = await apiRequest(`/api/internal/catalog/links?type=${catalogType}`);
             if (Array.isArray(res)) {
                 setLinks(res);
+                if (res.length === 0) {
+                    setActiveTab('create');
+                }
             }
             if (catalogType === 'plans') {
                 const pls = await apiRequest('/api/internal/price-lists').catch(() => []);
@@ -221,6 +226,7 @@ export default function ShareCatalogModal({
             setEditing(null);
             setNewShowVideo(true);
             setPreviewVideoOpen(false);
+            setActiveTab('links');
             setSelectedHours(EXPIRATION_OPTIONS[catalogType][0].value);
         }
     }, [isOpen, catalogType]);
@@ -253,6 +259,7 @@ export default function ShareCatalogModal({
             showToast('Enlace de catálogo generado exitosamente', 'success');
             setLinkLabel('');
             setLinkMessage('');
+            setActiveTab('links');
             fetchLinks();
         } catch (err: any) {
             console.error('Error creating catalog link:', err);
@@ -431,251 +438,87 @@ export default function ShareCatalogModal({
                                 {copy.title}
                             </h3>
                             <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
-                                Genera enlaces privados con fecha de vencimiento y botón de WhatsApp
+                                Genera y comparte enlaces privados con fecha de vencimiento y WhatsApp
                             </p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-200/70 dark:text-slate-300 dark:hover:text-slate-50 dark:hover:bg-white/10 rounded-xl transition-colors" aria-label="Cerrar"
+                        className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-200/70 dark:text-slate-300 dark:hover:text-slate-50 dark:hover:bg-white/10 rounded-xl transition-colors cursor-pointer" aria-label="Cerrar"
                     >
                         <X size={18} />
                     </button>
                 </div>
 
-                {/* Body */}
-                <div className="p-6 overflow-y-auto space-y-6">
-                    {/* Generador de enlace nuevo */}
-                    <form onSubmit={handleCreateLink} className="space-y-4 bg-slate-50 border border-slate-200 dark:bg-white/[0.04] dark:border-white/10 rounded-2xl p-5">
-                        <div className="flex items-center justify-between">
-                            <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
-                                Vigencia del Enlace
-                            </label>
-                            <span className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
-                                {copy.expiredHint}
-                            </span>
-                        </div>
-
-                        {/* Opciones de expiración */}
-                        <div className={`grid gap-2.5 ${isPlans ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3'}`}>
-                            {expirationOptions.map((opt) => {
-                                const isSelected = selectedHours === opt.value;
-                                return (
-                                    <button
-                                        key={opt.label}
-                                        type="button"
-                                        onClick={() => setSelectedHours(opt.value)}
-                                        className={`py-3 px-3 rounded-xl text-left border transition-all cursor-pointer ${
-                                            isSelected
-                                                ? 'bg-amber-50 border-amber-400 text-amber-800 shadow-sm dark:bg-amber-500/15 dark:border-amber-400/60 dark:text-amber-200'
-                                                : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-100 dark:bg-white/[0.04] dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.08]'
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs font-bold">{opt.label}</span>
-                                            {opt.badge && (
-                                                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 font-black uppercase whitespace-nowrap">
-                                                    {opt.badge}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </button>
-                                );
-                            })}
-                        </div>
-
-                        {/* Etiqueta opcional del cliente */}
-                        <div className="space-y-1.5 pt-1">
-                            <label className="text-xs font-bold text-slate-700 dark:text-slate-200 ml-1">
-                                Etiqueta de referencia (opcional)
-                            </label>
-                            <input
-                                type="text"
-                                placeholder="Ej: Familia Rodríguez / Atención WhatsApp"
-                                value={linkLabel}
-                                onChange={(e) => setLinkLabel(e.target.value)}
-                                className="w-full bg-white border border-slate-300 dark:bg-slate-950/60 dark:border-white/15 rounded-xl py-2.5 px-3.5 text-xs text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-amber-500 transition-all"
-                            />
-                        </div>
-
-                        {/* Mensaje para la familia (solo catálogo de planes) */}
-                        {isPlans && (
-                            <div className="space-y-1.5">
-                                <div className="flex items-center justify-between ml-1">
-                                    <label htmlFor="catalog-message" className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                                        Mensaje para la familia (opcional)
-                                    </label>
-                                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                                        {linkMessage.length}/{MESSAGE_MAX}
-                                    </span>
-                                </div>
-                                <textarea
-                                    id="catalog-message"
-                                    rows={3}
-                                    maxLength={MESSAGE_MAX}
-                                    placeholder="Ej: Te acompañamos en este momento. Escríbenos y te ayudamos a elegir el plan adecuado."
-                                    value={linkMessage}
-                                    onChange={(e) => setLinkMessage(e.target.value.slice(0, MESSAGE_MAX))}
-                                    className="w-full resize-none bg-white border border-slate-300 dark:bg-slate-950/60 dark:border-white/15 rounded-xl py-2.5 px-3.5 text-xs text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-amber-500 transition-all"
-                                />
-                                <p className="text-[10px] text-slate-500 dark:text-slate-400 ml-1">
-                                    Aparece en negrita en el catálogo, entre &quot;¿Cuál es el peso aproximado de tu mascota?&quot;y los planes.
-                                </p>
-                            </div>
-                        )}
-
-                        {/* Grupos de planes que muestra el enlace */}
-                        {showGroups && (
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-bold text-slate-700 dark:text-slate-200 ml-1">
-                                    Grupo de planes que muestra este catálogo *
-                                </label>
-                                <GroupPicker groups={planGroups} value={newGroups} onChange={setNewGroups} />
-                                <p className="text-[10px] text-slate-500 dark:text-slate-400 ml-1">
-                                    Elige uno o varios grupos. La familia solo verá los planes activos de esos grupos.
-                                </p>
-                            </div>
-                        )}
-
-                        {/* Tabla de precios (promoción) del enlace */}
-                        {isPlans && priceLists.length > 0 && (
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-bold text-slate-700 dark:text-slate-200 ml-1" htmlFor="new-price-list">
-                                    Tabla de precios
-                                </label>
-                                <select
-                                    id="new-price-list"
-                                    value={newPriceList ?? ''}
-                                    onChange={e => setNewPriceList(e.target.value ? Number(e.target.value) : null)}
-                                    className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-800 dark:text-slate-100"
-                                >
-                                    <option value="">General</option>
-                                    {priceLists.map(pl => (
-                                        <option key={pl.id} value={pl.id}>{pl.name}{pl.status !== 'activa' ? ` (${pl.status})` : ''}</option>
-                                    ))}
-                                </select>
-                                <p className="text-[10px] text-slate-500 dark:text-slate-400 ml-1">
-                                    Las tablas se crean en Configuración → Formulario y Pesos → Pesos y precios. Fuera de su vigencia el enlace usa la General.
-                                </p>
-                            </div>
-                        )}
-
-                        {/* Opción de Video de Bienvenida */}
-                        <div className="p-3.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/[0.03] space-y-2">
-                            <div className="flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                                        tenantVideo?.has_video
-                                            ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                                            : 'bg-slate-100 text-slate-400 dark:bg-white/5 dark:text-slate-500'
-                                    }`}>
-                                        <Play size={14} className="fill-current ml-0.5" />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                                                Video de bienvenida
-                                            </span>
-                                            {tenantVideo?.has_video ? (
-                                                <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold uppercase tracking-wider">
-                                                    Configurado {tenantVideo.video?.duration ? `(${Math.round(tenantVideo.video.duration)}s)` : ''}
-                                                </span>
-                                            ) : (
-                                                <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-400 font-medium">
-                                                    No configurado en SaaS
-                                                </span>
-                                            )}
-                                        </div>
-                                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                                            {tenantVideo?.has_video
-                                                ? 'Muestra el botón para ver el video de bienvenida en este catálogo.'
-                                                : 'El video se configura desde el panel administrador (admin.vinzer.cl).'}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-2 shrink-0">
-                                    {tenantVideo?.has_video && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setPreviewVideoOpen(true)}
-                                            className="px-2.5 py-1.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300 text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                                            title="Previsualizar video de bienvenida"
-                                        >
-                                            <Eye size={13} />
-                                            <span>Visualizar</span>
-                                        </button>
-                                    )}
-
-                                    <button
-                                        type="button"
-                                        role="switch"
-                                        aria-checked={newShowVideo}
-                                        onClick={() => setNewShowVideo(!newShowVideo)}
-                                        title={newShowVideo ? 'Video visible en este enlace' : 'Video oculto en este enlace'}
-                                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                            newShowVideo ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'
-                                        }`}
-                                    >
-                                        <span
-                                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                                newShowVideo ? 'translate-x-5' : 'translate-x-0'
-                                            }`}
-                                        />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
+                {/* Tabs de navegación */}
+                <div className="px-6 bg-slate-100/70 dark:bg-slate-950/40 border-b border-slate-200 dark:border-white/10 flex items-center justify-between">
+                    <div className="flex items-center gap-1">
                         <button
-                            type="submit"
-                            disabled={isGenerating || (showGroups && newGroups.length === 0)}
-                            className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                            type="button"
+                            onClick={() => setActiveTab('links')}
+                            className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                                activeTab === 'links'
+                                    ? 'border-amber-500 text-amber-600 dark:text-amber-400 bg-white dark:bg-slate-900 rounded-t-xl'
+                                    : 'border-transparent text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                            }`}
                         >
-                            {isGenerating ? (
-                                <>
-                                    <Loader2 size={16} className="animate-spin" />
-                                    <span>Generando enlace seguro...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Plus size={16} />
-                                    <span>Generar Enlace de Catálogo</span>
-                                </>
-                            )}
+                            <Folder size={14} />
+                            <span>Enlaces Activos</span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                                activeTab === 'links'
+                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300'
+                                    : 'bg-slate-200 text-slate-600 dark:bg-white/10 dark:text-slate-300'
+                            }`}>
+                                {links.length}
+                            </span>
                         </button>
 
-                        {links.length > 0 && (
-                            <button
-                                type="button"
-                                onClick={handleUpdateAll}
-                                disabled={isUpdatingAll || isGenerating}
-                                className="w-full py-2.5 px-4 rounded-xl border border-amber-400 bg-amber-50 hover:bg-amber-100 text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 dark:text-amber-200 font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-                                title={isPlans ? 'Aplica la etiqueta y el mensaje a todos los enlaces generados' : 'Aplica la etiqueta a todos los enlaces generados'}
-                            >
-                                {isUpdatingAll ? (
-                                    <>
-                                        <Loader2 size={15} className="animate-spin" />
-                                        <span>Actualizando enlaces...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <RefreshCw size={15} />
-                                        <span>Actualizar todos los enlaces ({links.length})</span>
-                                    </>
-                                )}
-                            </button>
-                        )}
-                    </form>
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('create')}
+                            className={`flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                                activeTab === 'create'
+                                    ? 'border-amber-500 text-amber-600 dark:text-amber-400 bg-white dark:bg-slate-900 rounded-t-xl'
+                                    : 'border-transparent text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                            }`}
+                        >
+                            <Plus size={14} />
+                            <span>Crear Nuevo Enlace</span>
+                        </button>
+                    </div>
 
-                    {/* Enlace recién generado */}
+                    {activeTab === 'links' && links.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('create')}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs transition-all shadow-sm shadow-amber-500/20 cursor-pointer"
+                        >
+                            <Plus size={13} />
+                            <span>Nuevo enlace</span>
+                        </button>
+                    )}
+                </div>
+
+                {/* Body */}
+                <div className="p-6 overflow-y-auto space-y-6 flex-1">
+                    {/* Enlace recién generado (se muestra destacado) */}
                     {recentCreatedUrl && (
                         <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 dark:bg-emerald-500/10 dark:border-emerald-500/30 space-y-3 animate-in fade-in duration-300">
-                            <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
-                                <Sparkles size={16} />
-                                <span className="text-xs font-black uppercase tracking-wider">
-                                    ¡Enlace Generado y Listo para Compartir!
-                                </span>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
+                                    <Sparkles size={16} />
+                                    <span className="text-xs font-black uppercase tracking-wider">
+                                        ¡Enlace Generado y Listo para Compartir!
+                                    </span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setRecentCreatedUrl(null)}
+                                    className="p-1 rounded-lg text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-200 transition-colors"
+                                    title="Ocultar aviso"
+                                >
+                                    <X size={14} />
+                                </button>
                             </div>
                             <div className="flex items-center gap-2 bg-white dark:bg-slate-950/60 p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-500/25">
                                 <input
@@ -715,332 +558,611 @@ export default function ShareCatalogModal({
                         </div>
                     )}
 
-                    {/* Historial de enlaces activos */}
-                    <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
-                                Enlaces Generados ({links.length})
-                            </h4>
-                            <button
-                                type="button"
-                                onClick={fetchLinks}
-                                className="text-[11px] text-amber-700 dark:text-amber-300 hover:underline font-medium cursor-pointer"
-                            >
-                                Actualizar lista
-                            </button>
-                        </div>
-
-                        {loadingLinks ? (
-                            <div className="py-8 flex justify-center text-muted-foreground">
-                                <Loader2 size={24} className="animate-spin text-amber-500" />
-                            </div>
-                        ) : links.length === 0 ? (
-                            <div className="py-8 text-center text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-white/[0.03] rounded-2xl border border-dashed border-slate-300 dark:border-white/10">
-                                {copy.empty}
-                            </div>
-                        ) : (
-                            <div className={`space-y-2 overflow-y-auto pr-1 ${editing ? 'max-h-[28rem]' : 'max-h-60'}`}>
-                                {links.map((link) => {
-                                    const fullUrl = buildCatalogUrl(tenantSlug, link.token);
-                                    const isCopied = copiedToken === link.token;
-
-                                    return (
-                                        <div
-                                            key={link.id}
-                                            className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all ${
-                                                link.is_expired
-                                                    ? 'bg-rose-50 border-rose-200 opacity-80 dark:bg-rose-500/[0.06] dark:border-rose-500/25'
-                                                    : 'bg-white border-slate-200 hover:border-slate-300 dark:bg-white/[0.04] dark:border-white/10 dark:hover:border-white/20'
-                                            }`}
+                    {/* PESTAÑA 1: LISTADO DE ENLACES ACTIVOS */}
+                    {activeTab === 'links' && (
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                                    <span>Enlaces Generados</span>
+                                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 font-bold">
+                                        {links.length}
+                                    </span>
+                                </h4>
+                                <div className="flex items-center gap-3">
+                                    {links.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={handleUpdateAll}
+                                            disabled={isUpdatingAll || isGenerating}
+                                            className="text-[11px] text-amber-700 dark:text-amber-300 hover:underline font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                            title={isPlans ? 'Aplica la etiqueta y mensaje a todos' : 'Aplica la etiqueta a todos'}
                                         >
-                                            {editing?.id === link.id ? (
-                                            <div className="min-w-0 flex-1 space-y-2.5">
-                                                <p className="text-[11px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-300">Editar enlace</p>
-                                                <label className="block space-y-1">
-                                                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Etiqueta de referencia</span>
-                                                    <input value={editing.name} maxLength={100} placeholder={copy.defaultName}
-                                                        onChange={e => setEditing({ ...editing, name: e.target.value })} className={editInputCls} />
-                                                </label>
-                                                {isPlans && (
+                                            <RefreshCw size={12} className={isUpdatingAll ? 'animate-spin' : ''} />
+                                            <span>Sincronizar todos</span>
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={fetchLinks}
+                                        className="text-[11px] text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:underline font-medium cursor-pointer"
+                                    >
+                                        Actualizar
+                                    </button>
+                                </div>
+                            </div>
+
+                            {loadingLinks ? (
+                                <div className="py-12 flex justify-center text-muted-foreground">
+                                    <Loader2 size={28} className="animate-spin text-amber-500" />
+                                </div>
+                            ) : links.length === 0 ? (
+                                <div className="py-12 px-6 text-center space-y-4 bg-slate-50 dark:bg-white/[0.03] rounded-2xl border border-dashed border-slate-300 dark:border-white/10">
+                                    <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+                                        <Share2 size={24} />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                                            {copy.empty}
+                                        </p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                                            Genera un enlace para enviarlo por WhatsApp a las familias o compartirlo en tus redes.
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveTab('create')}
+                                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-amber-500/20 cursor-pointer"
+                                    >
+                                        <Plus size={15} />
+                                        <span>Crear mi primer enlace</span>
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="space-y-2.5">
+                                    {links.map((link) => {
+                                        const fullUrl = buildCatalogUrl(tenantSlug, link.token);
+                                        const isCopied = copiedToken === link.token;
+
+                                        return (
+                                            <div
+                                                key={link.id}
+                                                className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all ${
+                                                    link.is_expired
+                                                        ? 'bg-rose-50 border-rose-200 opacity-80 dark:bg-rose-500/[0.06] dark:border-rose-500/25'
+                                                        : 'bg-white border-slate-200 hover:border-slate-300 dark:bg-white/[0.04] dark:border-white/10 dark:hover:border-white/20'
+                                                }`}
+                                            >
+                                                {editing?.id === link.id ? (
+                                                <div className="min-w-0 flex-1 space-y-2.5">
+                                                    <p className="text-[11px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-300">Editar enlace</p>
                                                     <label className="block space-y-1">
-                                                        <span className="flex justify-between text-[11px] font-bold text-slate-700 dark:text-slate-200">
-                                                            Mensaje para la familia
-                                                            <span className="font-mono font-normal text-slate-500">{editing.message.length}/{MESSAGE_MAX}</span>
-                                                        </span>
-                                                        <textarea rows={2} value={editing.message} maxLength={MESSAGE_MAX}
-                                                            onChange={e => setEditing({ ...editing, message: e.target.value.slice(0, MESSAGE_MAX) })}
-                                                            className={`${editInputCls} resize-none`} />
+                                                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Etiqueta de referencia</span>
+                                                        <input value={editing.name} maxLength={100} placeholder={copy.defaultName}
+                                                            onChange={e => setEditing({ ...editing, name: e.target.value })} className={editInputCls} />
                                                     </label>
-                                                )}
-                                                {showGroups && (
-                                                    <div className="space-y-1">
-                                                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Grupo de planes *</span>
-                                                        <GroupPicker groups={planGroups} value={editing.groups} onChange={v => setEditing({ ...editing, groups: v })} />
-                                                    </div>
-                                                )}
-                                                {isPlans && (priceLists.length > 0 || editing.priceList !== null) && (
+                                                    {isPlans && (
+                                                        <label className="block space-y-1">
+                                                            <span className="flex justify-between text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                                                                Mensaje para la familia
+                                                                <span className="font-mono font-normal text-slate-500">{editing.message.length}/{MESSAGE_MAX}</span>
+                                                            </span>
+                                                            <textarea rows={2} value={editing.message} maxLength={MESSAGE_MAX}
+                                                                onChange={e => setEditing({ ...editing, message: e.target.value.slice(0, MESSAGE_MAX) })}
+                                                                className={`${editInputCls} resize-none`} />
+                                                        </label>
+                                                    )}
+                                                    {showGroups && (
+                                                        <div className="space-y-1">
+                                                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Grupo de planes *</span>
+                                                            <GroupPicker groups={planGroups} value={editing.groups} onChange={v => setEditing({ ...editing, groups: v })} />
+                                                        </div>
+                                                    )}
+                                                    {isPlans && (priceLists.length > 0 || editing.priceList !== null) && (
+                                                        <label className="block space-y-1">
+                                                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Tabla de precios</span>
+                                                            <select value={editing.priceList ?? ''} className={editInputCls}
+                                                                onChange={e => setEditing({ ...editing, priceList: e.target.value ? Number(e.target.value) : null })}>
+                                                                <option value="">General</option>
+                                                                {priceLists.map(pl => (
+                                                                    <option key={pl.id} value={pl.id}>{pl.name}{pl.status !== 'activa' ? ` (${pl.status})` : ''}</option>
+                                                                ))}
+                                                            </select>
+                                                        </label>
+                                                    )}
                                                     <label className="block space-y-1">
-                                                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Tabla de precios</span>
-                                                        <select value={editing.priceList ?? ''} className={editInputCls}
-                                                            onChange={e => setEditing({ ...editing, priceList: e.target.value ? Number(e.target.value) : null })}>
-                                                            <option value="">General</option>
-                                                            {priceLists.map(pl => (
-                                                                <option key={pl.id} value={pl.id}>{pl.name}{pl.status !== 'activa' ? ` (${pl.status})` : ''}</option>
+                                                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Vigencia</span>
+                                                        <select value={editing.renewHours === null ? 'keep' : String(editing.renewHours)} className={editInputCls}
+                                                            onChange={e => setEditing({ ...editing, renewHours: e.target.value === 'keep' ? null : Number(e.target.value) })}>
+                                                            <option value="keep">
+                                                                Mantener ({link.expires_at
+                                                                    ? `${link.is_expired ? 'venció' : 'vence'} ${new Date(link.expires_at).toLocaleDateString('es-CL')}`
+                                                                    : 'sin vencimiento'})
+                                                            </option>
+                                                            {expirationOptions.map(opt => (
+                                                                <option key={opt.label} value={opt.value ?? 0}>
+                                                                    {opt.value ? `Renovar: ${opt.label} desde hoy` : 'Permanente'}
+                                                                </option>
                                                             ))}
                                                         </select>
                                                     </label>
-                                                )}
-                                                <label className="block space-y-1">
-                                                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">Vigencia</span>
-                                                    <select value={editing.renewHours === null ? 'keep' : String(editing.renewHours)} className={editInputCls}
-                                                        onChange={e => setEditing({ ...editing, renewHours: e.target.value === 'keep' ? null : Number(e.target.value) })}>
-                                                        <option value="keep">
-                                                            Mantener ({link.expires_at
-                                                                ? `${link.is_expired ? 'venció' : 'vence'} ${new Date(link.expires_at).toLocaleDateString('es-CL')}`
-                                                                : 'sin vencimiento'})
-                                                        </option>
-                                                        {expirationOptions.map(opt => (
-                                                            <option key={opt.label} value={opt.value ?? 0}>
-                                                                {opt.value ? `Renovar: ${opt.label} desde hoy` : 'Permanente'}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </label>
-                                                <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.02]">
-                                                    <div className="flex items-center gap-2">
-                                                        <Play size={13} className="text-amber-500 fill-current" />
-                                                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
-                                                            Video de bienvenida
-                                                        </span>
-                                                        {!tenantVideo?.has_video && (
-                                                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
-                                                                (Pendiente de carga en admin)
+                                                    <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.02]">
+                                                        <div className="flex items-center gap-2">
+                                                            <Play size={13} className="text-amber-500 fill-current" />
+                                                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                                                                Video de bienvenida
                                                             </span>
-                                                        )}
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        role="switch"
-                                                        aria-checked={editing.showVideo}
-                                                        onClick={() => setEditing({ ...editing, showVideo: !editing.showVideo })}
-                                                        title={editing.showVideo ? 'Video activo' : 'Video oculto'}
-                                                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                                            editing.showVideo ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'
-                                                        }`}
-                                                    >
-                                                        <span
-                                                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                                                editing.showVideo ? 'translate-x-4' : 'translate-x-0'
-                                                            }`}
-                                                        />
-                                                    </button>
-                                                </div>
-                                                <div className="flex items-center gap-2 pt-0.5">
-                                                    <button type="button" onClick={handleSaveEdit}
-                                                        disabled={savingEdit || (showGroups && editing.groups.length === 0)}
-                                                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold cursor-pointer disabled:opacity-60">
-                                                        {savingEdit && <Loader2 size={12} className="animate-spin" />} Guardar cambios
-                                                    </button>
-                                                    <button type="button" onClick={() => setEditing(null)} disabled={savingEdit}
-                                                        className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10 cursor-pointer">
-                                                        Cancelar
-                                                    </button>
-                                                    <span className="text-[10px] text-slate-500 dark:text-slate-400">La URL no cambia.</span>
-                                                </div>
-                                            </div>
-                                            ) : (
-                                            <div className="min-w-0 flex-1 space-y-1">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="text-xs font-bold text-slate-900 dark:text-slate-50 truncate">
-                                                        {link.name || copy.defaultName}
-                                                    </span>
-                                                    {link.is_expired ? (
-                                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30">
-                                                            Expirado
-                                                        </span>
-                                                    ) : link.expires_at ? (
-                                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30">
-                                                            Vigente
-                                                        </span>
-                                                    ) : (
-                                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30">
-                                                            Permanente
-                                                        </span>
-                                                    )}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleToggleVideo(link)}
-                                                        className={`px-2 py-0.5 rounded-full text-[9px] font-bold flex items-center gap-1 border transition-all cursor-pointer ${
-                                                            link.show_video !== false
-                                                                ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-500/15 dark:border-amber-400/40 dark:text-amber-300'
-                                                                : 'bg-slate-100 border-slate-200 text-slate-500 dark:bg-white/5 dark:border-white/10 dark:text-slate-400 hover:text-slate-700'
-                                                        }`}
-                                                        title={link.show_video !== false ? 'Video activo en este catálogo (clic para ocultar)' : 'Video oculto en este catálogo (clic para activar)'}
-                                                    >
-                                                        <Play size={8} className={link.show_video !== false ? 'fill-current' : ''} />
-                                                        <span>{link.show_video !== false ? 'Video activo' : 'Video oculto'}</span>
-                                                    </button>
-                                                </div>
-
-                                                {link.message && (
-                                                    <p className="text-[11px] text-slate-600 dark:text-slate-300 italic truncate" title={link.message}>
-                                                        “{link.message}”
-                                                    </p>
-                                                )}
-
-                                                {isPlans && (showGroups || (link.plan_groups?.length ?? 0) > 0) && (
-                                                    editingGroups?.id === link.id ? (
-                                                        <div className="space-y-2 pt-1">
-                                                            <GroupPicker
-                                                                groups={planGroups}
-                                                                value={editingGroups.value}
-                                                                onChange={(v) => setEditingGroups({ id: link.id, value: v })}
-                                                            />
-                                                            <div className="flex items-center gap-2">
-                                                                <button type="button" onClick={handleSaveGroups} disabled={savingGroups || editingGroups.value.length === 0}
-                                                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold cursor-pointer disabled:opacity-60">
-                                                                    {savingGroups && <Loader2 size={12} className="animate-spin" />} Guardar
-                                                                </button>
-                                                                <button type="button" onClick={() => setEditingGroups(null)} disabled={savingGroups}
-                                                                    className="px-3 py-1 rounded-lg text-[11px] font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10 cursor-pointer">
-                                                                    Cancelar
-                                                                </button>
-                                                            </div>
+                                                            {!tenantVideo?.has_video && (
+                                                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+                                                                    (Pendiente de carga en admin)
+                                                                </span>
+                                                            )}
                                                         </div>
-                                                    ) : (
                                                         <button
                                                             type="button"
-                                                            onClick={() => setEditingGroups({ id: link.id, value: link.plan_groups || [] })}
-                                                            className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 hover:text-amber-700 dark:text-slate-300 dark:hover:text-amber-300 cursor-pointer"
-                                                            title="Cambiar los grupos de planes que muestra este enlace"
+                                                            role="switch"
+                                                            aria-checked={editing.showVideo}
+                                                            onClick={() => setEditing({ ...editing, showVideo: !editing.showVideo })}
+                                                            title={editing.showVideo ? 'Video activo' : 'Video oculto'}
+                                                            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                                                editing.showVideo ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'
+                                                            }`}
                                                         >
-                                                            <Folder size={12} className="text-amber-600 dark:text-amber-400" />
-                                                            {link.plan_groups?.length
-                                                                ? `Muestra: ${link.plan_groups.map(groupLabel).join(', ')}`
-                                                                : 'Muestra: todos los planes'}
+                                                            <span
+                                                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                                                    editing.showVideo ? 'translate-x-4' : 'translate-x-0'
+                                                                }`}
+                                                            />
                                                         </button>
-                                                    )
-                                                )}
-
-                                                {isPlans && (priceLists.length > 0 || !!link.price_list_id) && (
-                                                    <label className="inline-flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                                                        <BadgePercent size={12} className="text-fuchsia-600 dark:text-fuchsia-400" />
-                                                        Precios:
-                                                        <select
-                                                            value={link.price_list_id ?? ''}
-                                                            disabled={savingPriceList === link.id}
-                                                            onChange={e => handleChangePriceList(link.id, e.target.value ? Number(e.target.value) : null)}
-                                                            className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-1.5 py-0.5 text-[11px] text-slate-800 dark:text-slate-100 cursor-pointer disabled:opacity-60"
-                                                            title="Tabla de precios que usa este enlace"
-                                                        >
-                                                            <option value="">General</option>
-                                                            {priceLists.map(pl => (
-                                                                <option key={pl.id} value={pl.id}>{pl.name}</option>
-                                                            ))}
-                                                        </select>
-                                                        {link.price_list_status && link.price_list_status !== 'activa' && (
-                                                            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400" title="Mientras tanto el enlace usa la General">
-                                                                {link.price_list_status} · usa la General
-                                                            </span>
-                                                        )}
-                                                        {savingPriceList === link.id && <Loader2 size={12} className="animate-spin" />}
-                                                    </label>
-                                                )}
-
-                                                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                                                    <span>
-                                                        {link.expires_at ? (
-                                                            <>Vence: {new Date(link.expires_at).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</>
-                                                        ) : (
-                                                            'Sin vencimiento'
-                                                        )}
-                                                    </span>
-                                                    <span>·</span>
-                                                    {isPlans ? (
-                                                        // Misma métrica que el admin (KPIs del catálogo): personas distintas, no recargas
-                                                        <span title={`${link.views_count} aperturas en total (incluye recargas y visitas antes de medir)`}>
-                                                            {link.visitors ?? 0} visitante{(link.visitors ?? 0) !== 1 ? 's' : ''}
+                                                    </div>
+                                                    <div className="flex items-center gap-2 pt-0.5">
+                                                        <button type="button" onClick={handleSaveEdit}
+                                                            disabled={savingEdit || (showGroups && editing.groups.length === 0)}
+                                                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold cursor-pointer disabled:opacity-60">
+                                                            {savingEdit && <Loader2 size={12} className="animate-spin" />} Guardar cambios
+                                                        </button>
+                                                        <button type="button" onClick={() => setEditing(null)} disabled={savingEdit}
+                                                            className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10 cursor-pointer">
+                                                            Cancelar
+                                                        </button>
+                                                        <span className="text-[10px] text-slate-500 dark:text-slate-400">La URL no cambia.</span>
+                                                    </div>
+                                                </div>
+                                                ) : (
+                                                <div className="min-w-0 flex-1 space-y-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="text-xs font-bold text-slate-900 dark:text-slate-50 truncate">
+                                                            {link.name || copy.defaultName}
                                                         </span>
-                                                    ) : (
-                                                        <span>{link.views_count} vista{link.views_count !== 1 ? 's' : ''}</span>
+                                                        {link.is_expired ? (
+                                                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30">
+                                                                Expirado
+                                                            </span>
+                                                        ) : link.expires_at ? (
+                                                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30">
+                                                                Vigente
+                                                            </span>
+                                                        ) : (
+                                                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30">
+                                                                Permanente
+                                                            </span>
+                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleToggleVideo(link)}
+                                                            className={`px-2 py-0.5 rounded-full text-[9px] font-bold flex items-center gap-1 border transition-all cursor-pointer ${
+                                                                link.show_video !== false
+                                                                    ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-500/15 dark:border-amber-400/40 dark:text-amber-300'
+                                                                    : 'bg-slate-100 border-slate-200 text-slate-500 dark:bg-white/5 dark:border-white/10 dark:text-slate-400 hover:text-slate-700'
+                                                            }`}
+                                                            title={link.show_video !== false ? 'Video activo en este catálogo (clic para ocultar)' : 'Video oculto en este catálogo (clic para activar)'}
+                                                        >
+                                                            <Play size={8} className={link.show_video !== false ? 'fill-current' : ''} />
+                                                            <span>{link.show_video !== false ? 'Video activo' : 'Video oculto'}</span>
+                                                        </button>
+                                                    </div>
+
+                                                    {link.message && (
+                                                        <p className="text-[11px] text-slate-600 dark:text-slate-300 italic truncate" title={link.message}>
+                                                            “{link.message}”
+                                                        </p>
                                                     )}
+
+                                                    {isPlans && (showGroups || (link.plan_groups?.length ?? 0) > 0) && (
+                                                        editingGroups?.id === link.id ? (
+                                                            <div className="space-y-2 pt-1">
+                                                                <GroupPicker
+                                                                    groups={planGroups}
+                                                                    value={editingGroups.value}
+                                                                    onChange={v => setEditingGroups({ id: link.id, value: v })}
+                                                                />
+                                                                <div className="flex items-center gap-2">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={handleSaveGroups}
+                                                                        disabled={savingGroups || editingGroups.value.length === 0}
+                                                                        className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold cursor-pointer disabled:opacity-60"
+                                                                    >
+                                                                        {savingGroups ? 'Guardando...' : 'Guardar grupos'}
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setEditingGroups(null)}
+                                                                        disabled={savingGroups}
+                                                                        className="px-2 py-1 text-[10px] font-bold text-slate-600 hover:underline cursor-pointer"
+                                                                    >
+                                                                        Cancelar
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                                                                <Folder size={11} className="text-amber-500 shrink-0" />
+                                                                {(link.plan_groups && link.plan_groups.length > 0) ? (
+                                                                    link.plan_groups.map(g => (
+                                                                        <span key={g} className="px-1.5 py-0.2 rounded-md bg-amber-50 text-amber-900 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30 text-[9px] font-bold">
+                                                                            {groupLabel(g)}
+                                                                        </span>
+                                                                    ))
+                                                                ) : (
+                                                                    <span className="text-[10px] text-slate-500 dark:text-slate-400">Todos los grupos</span>
+                                                                )}
+                                                            </div>
+                                                        )
+                                                    )}
+
+                                                    {/* Tabla de precios (promoción) del enlace */}
                                                     {isPlans && (
-                                                        <>
-                                                            <span>·</span>
-                                                            <span title="Personas que tocaron «Solicitar este plan»">
-                                                                {link.plan_requests ?? 0} solicitud{(link.plan_requests ?? 0) !== 1 ? 'es' : ''}
-                                                            </span>
-                                                            <span>·</span>
-                                                            <span title="Formularios enviados desde este enlace">
-                                                                {link.forms_submitted ?? 0} formulario{(link.forms_submitted ?? 0) !== 1 ? 's' : ''} enviado{(link.forms_submitted ?? 0) !== 1 ? 's' : ''}
-                                                            </span>
-                                                            {(link.orders ?? 0) > 0 && (
-                                                                <>
-                                                                    <span>·</span>
-                                                                    <span title="Formularios de este enlace que ya tienen una orden de cremación">
-                                                                        {link.orders} con orden
-                                                                    </span>
-                                                                </>
+                                                        <div className="flex items-center gap-1.5 flex-wrap pt-0.5 text-[10px]">
+                                                            <BadgePercent size={11} className="text-amber-500 shrink-0" />
+                                                            {priceLists.length > 0 ? (
+                                                                <div className="inline-flex items-center gap-1">
+                                                                    <select
+                                                                        value={link.price_list_id ?? ''}
+                                                                        disabled={savingPriceList === link.id}
+                                                                        onChange={e => handleChangePriceList(link.id, e.target.value ? Number(e.target.value) : null)}
+                                                                        className="rounded-md border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-700 dark:text-slate-200 cursor-pointer disabled:opacity-60"
+                                                                        title="Cambiar tabla de precios de este enlace"
+                                                                    >
+                                                                        <option value="">Tabla: General</option>
+                                                                        {priceLists.map(pl => (
+                                                                            <option key={pl.id} value={pl.id}>
+                                                                                Tabla: {pl.name}{pl.status !== 'activa' ? ` (${pl.status})` : ''}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                    {savingPriceList === link.id && <Loader2 size={10} className="animate-spin text-amber-500" />}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-slate-500 dark:text-slate-400">
+                                                                    {link.price_list_name ? `Tabla: ${link.price_list_name}` : 'Tabla: General'}
+                                                                </span>
                                                             )}
-                                                            {(link.delivered ?? 0) > 0 && (
-                                                                <>
-                                                                    <span>·</span>
-                                                                    <span className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400"
-                                                                        title="Servicios completados: la orden llegó a «Entregado»">
-                                                                        <CheckCircle2 size={12} /> {link.delivered} completado{link.delivered !== 1 ? 's' : ''}
-                                                                    </span>
-                                                                </>
-                                                            )}
-                                                        </>
+                                                        </div>
                                                     )}
+
+                                                    <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 pt-0.5 flex-wrap">
+                                                        <span>
+                                                            {link.expires_at
+                                                                ? `${link.is_expired ? 'Expiró' : 'Expira'}: ${new Date(link.expires_at).toLocaleDateString('es-CL')}`
+                                                                : 'Sin vencimiento'}
+                                                        </span>
+                                                        <span>·</span>
+                                                        <span className="inline-flex items-center gap-1">
+                                                            {link.visitors ?? link.views_count ?? 0} {((link.visitors ?? link.views_count ?? 0) === 1) ? 'visitante' : 'visitantes'}
+                                                        </span>
+                                                        {isPlans && (
+                                                            <>
+                                                                {(link.plan_requests ?? 0) > 0 && (
+                                                                    <>
+                                                                        <span>·</span>
+                                                                        <span className="inline-flex items-center gap-1 font-semibold text-amber-700 dark:text-amber-300"
+                                                                            title="Familias que enviaron el formulario de solicitud desde este catálogo">
+                                                                            <Sparkles size={11} /> {link.plan_requests} solicitud{link.plan_requests !== 1 ? 'es' : ''}
+                                                                        </span>
+                                                                    </>
+                                                                )}
+                                                                {(link.forms_submitted ?? 0) > 0 && (
+                                                                    <>
+                                                                        <span>·</span>
+                                                                        <span className="font-medium text-slate-700 dark:text-slate-300"
+                                                                            title="Formularios de contratación completados">
+                                                                            {link.forms_submitted} formulario{link.forms_submitted !== 1 ? 's' : ''}
+                                                                        </span>
+                                                                    </>
+                                                                )}
+                                                                {(link.orders ?? 0) > 0 && (
+                                                                    <>
+                                                                        <span>·</span>
+                                                                        <span className="font-semibold text-slate-800 dark:text-slate-200"
+                                                                            title="Órdenes de cremación generadas desde este enlace">
+                                                                            {link.orders} con orden
+                                                                        </span>
+                                                                    </>
+                                                                )}
+                                                                {(link.delivered ?? 0) > 0 && (
+                                                                    <>
+                                                                        <span>·</span>
+                                                                        <span className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400"
+                                                                            title="Servicios completados: la orden llegó a «Entregado»">
+                                                                            <CheckCircle2 size={12} /> {link.delivered} completado{link.delivered !== 1 ? 's' : ''}
+                                                                        </span>
+                                                                    </>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                )}
+
+                                                <div className={`flex items-center gap-1.5 shrink-0 ${editing?.id === link.id ? 'self-start' : ''}`}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => (editing?.id === link.id ? setEditing(null) : startEdit(link))}
+                                                        className={`p-2 rounded-xl transition-colors cursor-pointer ${editing?.id === link.id
+                                                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
+                                                            : 'bg-slate-100 hover:bg-amber-100 text-slate-600 hover:text-amber-700 dark:bg-white/10 dark:hover:bg-amber-500/20 dark:text-slate-200 dark:hover:text-amber-300'}`}
+                                                        title="Editar enlace"
+                                                        aria-label="Editar enlace"
+                                                    >
+                                                        <Pencil size={14} />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleCopy(fullUrl, link.token)}
+                                                        className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 dark:bg-white/10 dark:hover:bg-white/20 dark:text-slate-200 dark:hover:text-slate-50 transition-colors cursor-pointer"
+                                                        title="Copiar enlace"
+                                                    >
+                                                        {isCopied ? <Check size={14} className="text-emerald-600 dark:text-emerald-400" /> : <Copy size={14} />}
+                                                    </button>
+                                                    <a
+                                                        href={fullUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 dark:bg-white/10 dark:hover:bg-white/20 dark:text-slate-200 dark:hover:text-slate-50 transition-colors cursor-pointer"
+                                                        title="Ver catálogo"
+                                                    >
+                                                        <ExternalLink size={14} />
+                                                    </a>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteLink(link.id)}
+                                                        className="p-2 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-600 dark:bg-white/10 dark:hover:bg-rose-500/20 dark:text-slate-200 dark:hover:text-rose-300 transition-colors cursor-pointer"
+                                                        title="Eliminar enlace"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
                                                 </div>
                                             </div>
-                                            )}
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
-                                            <div className={`flex items-center gap-1.5 shrink-0 ${editing?.id === link.id ? 'self-start' : ''}`}>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => (editing?.id === link.id ? setEditing(null) : startEdit(link))}
-                                                    className={`p-2 rounded-xl transition-colors cursor-pointer ${editing?.id === link.id
-                                                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'
-                                                        : 'bg-slate-100 hover:bg-amber-100 text-slate-600 hover:text-amber-700 dark:bg-white/10 dark:hover:bg-amber-500/20 dark:text-slate-200 dark:hover:text-amber-300'}`}
-                                                    title="Editar enlace"
-                                                    aria-label="Editar enlace"
-                                                >
-                                                    <Pencil size={14} />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleCopy(fullUrl, link.token)}
-                                                    className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 dark:bg-white/10 dark:hover:bg-white/20 dark:text-slate-200 dark:hover:text-slate-50 transition-colors cursor-pointer"
-                                                    title="Copiar enlace"
-                                                >
-                                                    {isCopied ? <Check size={14} className="text-emerald-600 dark:text-emerald-400" /> : <Copy size={14} />}
-                                                </button>
-                                                <a
-                                                    href={fullUrl}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 dark:bg-white/10 dark:hover:bg-white/20 dark:text-slate-200 dark:hover:text-slate-50 transition-colors cursor-pointer"
-                                                    title="Ver catálogo"
-                                                >
-                                                    <ExternalLink size={14} />
-                                                </a>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleDeleteLink(link.id)}
-                                                    className="p-2 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-600 dark:bg-white/10 dark:hover:bg-rose-500/20 dark:text-slate-200 dark:hover:text-rose-300 transition-colors cursor-pointer"
-                                                    title="Eliminar enlace"
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
+                    {/* PESTAÑA 2: GENERAR NUEVO ENLACE (DIVIDIDO EN SECCIONES) */}
+                    {activeTab === 'create' && (
+                        <form onSubmit={handleCreateLink} className="space-y-5">
+                            {/* SECCIÓN 1: Vigencia y Referencia */}
+                            <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 dark:bg-white/[0.04] dark:border-white/10 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                                        <Clock size={15} className="text-amber-500" />
+                                        <span>1. Vigencia y Referencia</span>
+                                    </h4>
+                                    <span className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
+                                        {copy.expiredHint}
+                                    </span>
+                                </div>
+
+                                {/* Opciones de expiración */}
+                                <div className={`grid gap-2.5 ${isPlans ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3'}`}>
+                                    {expirationOptions.map((opt) => {
+                                        const isSelected = selectedHours === opt.value;
+                                        return (
+                                            <button
+                                                key={opt.label}
+                                                type="button"
+                                                onClick={() => setSelectedHours(opt.value)}
+                                                className={`py-3 px-3 rounded-xl text-left border transition-all cursor-pointer ${
+                                                    isSelected
+                                                        ? 'bg-amber-50 border-amber-400 text-amber-800 shadow-sm dark:bg-amber-500/15 dark:border-amber-400/60 dark:text-amber-200'
+                                                        : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-100 dark:bg-white/[0.04] dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/[0.08]'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs font-bold">{opt.label}</span>
+                                                    {opt.badge && (
+                                                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 font-black uppercase whitespace-nowrap">
+                                                            {opt.badge}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Etiqueta opcional */}
+                                <div className="space-y-1.5 pt-1">
+                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-200 ml-1">
+                                        Etiqueta de referencia (opcional)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="Ej: Familia Rodríguez / Atención WhatsApp"
+                                        value={linkLabel}
+                                        onChange={(e) => setLinkLabel(e.target.value)}
+                                        className="w-full bg-white border border-slate-300 dark:bg-slate-950/60 dark:border-white/15 rounded-xl py-2.5 px-3.5 text-xs text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-amber-500 transition-all"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* SECCIÓN 2: Personalización del Catálogo */}
+                            <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 dark:bg-white/[0.04] dark:border-white/10 space-y-4">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                                    <Sparkles size={15} className="text-amber-500" />
+                                    <span>2. Personalización y Contenido</span>
+                                </h4>
+
+                                {/* Grupos de planes */}
+                                {showGroups && (
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-slate-700 dark:text-slate-200 ml-1">
+                                            Grupo de planes que muestra este catálogo *
+                                        </label>
+                                        <GroupPicker groups={planGroups} value={newGroups} onChange={setNewGroups} />
+                                        <p className="text-[10px] text-slate-500 dark:text-slate-400 ml-1">
+                                            Elige uno o varios grupos. La familia solo verá los planes activos de esos grupos.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Tabla de precios */}
+                                {isPlans && priceLists.length > 0 && (
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-slate-700 dark:text-slate-200 ml-1" htmlFor="new-price-list">
+                                            Tabla de precios (promoción)
+                                        </label>
+                                        <select
+                                            id="new-price-list"
+                                            value={newPriceList ?? ''}
+                                            onChange={e => setNewPriceList(e.target.value ? Number(e.target.value) : null)}
+                                            className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-800 dark:text-slate-100"
+                                        >
+                                            <option value="">General</option>
+                                            {priceLists.map(pl => (
+                                                <option key={pl.id} value={pl.id}>{pl.name}{pl.status !== 'activa' ? ` (${pl.status})` : ''}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
+                                {/* Mensaje para la familia */}
+                                {isPlans && (
+                                    <div className="space-y-1.5">
+                                        <div className="flex items-center justify-between ml-1">
+                                            <label htmlFor="catalog-message" className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                                                Mensaje para la familia (opcional)
+                                            </label>
+                                            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                                                {linkMessage.length}/{MESSAGE_MAX}
+                                            </span>
+                                        </div>
+                                        <textarea
+                                            id="catalog-message"
+                                            rows={2}
+                                            maxLength={MESSAGE_MAX}
+                                            placeholder="Ej: Te acompañamos en este momento. Escríbenos y te ayudamos a elegir el plan adecuado."
+                                            value={linkMessage}
+                                            onChange={(e) => setLinkMessage(e.target.value.slice(0, MESSAGE_MAX))}
+                                            className="w-full resize-none bg-white border border-slate-300 dark:bg-slate-950/60 dark:border-white/15 rounded-xl py-2.5 px-3.5 text-xs text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-amber-500 transition-all"
+                                        />
+                                        <p className="text-[10px] text-slate-500 dark:text-slate-400 ml-1">
+                                            Aparece en negrita en el catálogo, entre &quot;¿Cuál es el peso aproximado de tu mascota?&quot; y los planes.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Video de bienvenida */}
+                                <div className="p-3.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/[0.03] space-y-2">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                                                tenantVideo?.has_video
+                                                    ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                                                    : 'bg-slate-100 text-slate-400 dark:bg-white/5 dark:text-slate-500'
+                                            }`}>
+                                                <Play size={14} className="fill-current ml-0.5" />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                                                        Video de bienvenida
+                                                    </span>
+                                                    {tenantVideo?.has_video ? (
+                                                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 font-bold uppercase tracking-wider">
+                                                            Configurado {tenantVideo.video?.duration ? `(${Math.round(tenantVideo.video.duration)}s)` : ''}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-400 font-medium">
+                                                            No configurado en SaaS
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                                    {tenantVideo?.has_video
+                                                        ? 'Muestra el botón para ver el video de bienvenida en este catálogo.'
+                                                        : 'El video se configura desde el panel administrador (admin.vinzer.cl).'}
+                                                </p>
                                             </div>
                                         </div>
-                                    );
-                                })}
+
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            {tenantVideo?.has_video && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setPreviewVideoOpen(true)}
+                                                    className="px-2.5 py-1.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300 text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                                                    title="Previsualizar video de bienvenida"
+                                                >
+                                                    <Eye size={13} />
+                                                    <span>Visualizar</span>
+                                                </button>
+                                            )}
+
+                                            <button
+                                                type="button"
+                                                role="switch"
+                                                aria-checked={newShowVideo}
+                                                onClick={() => setNewShowVideo(!newShowVideo)}
+                                                title={newShowVideo ? 'Video visible en este enlace' : 'Video oculto en este enlace'}
+                                                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                                    newShowVideo ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'
+                                                }`}
+                                            >
+                                                <span
+                                                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                                        newShowVideo ? 'translate-x-5' : 'translate-x-0'
+                                                    }`}
+                                                />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        )}
-                    </div>
+
+                            {/* Botones de acción del formulario */}
+                            <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+                                <button
+                                    type="submit"
+                                    disabled={isGenerating || (showGroups && newGroups.length === 0)}
+                                    className="w-full sm:flex-1 py-3 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                                >
+                                    {isGenerating ? (
+                                        <>
+                                            <Loader2 size={16} className="animate-spin" />
+                                            <span>Generando enlace seguro...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Plus size={16} />
+                                            <span>Generar Enlace de Catálogo</span>
+                                        </>
+                                    )}
+                                </button>
+                                {links.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveTab('links')}
+                                        className="w-full sm:w-auto py-3 px-5 rounded-xl border border-slate-300 dark:border-white/15 text-slate-700 dark:text-slate-200 font-bold text-xs hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                                    >
+                                        Ver enlaces activos ({links.length})
+                                    </button>
+                                )}
+                            </div>
+                        </form>
+                    )}
                 </div>
 
                 {/* Footer */}
