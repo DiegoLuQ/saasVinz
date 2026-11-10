@@ -294,6 +294,7 @@ export function PublicFormTab() {
     const [priceListsKey, setPriceListsKey] = useState(0);
     // Tabla de precios del formulario principal (null = General)
     const [formPriceListId, setFormPriceListId] = useState<number | null>(null);
+    const [tiersAccordionOpen, setTiersAccordionOpen] = useState(false);
     const [priceListOptions, setPriceListOptions] = useState<PriceList[]>([]);
     useEffect(() => {
         apiRequest('/api/internal/price-lists')
@@ -1263,163 +1264,198 @@ export function PublicFormTab() {
                 {/* ============================================================== */}
                 {section === 'pesos' && (
                     <section className="space-y-6">
-                        {/* Tramos de peso */}
-                        <div className="glass-card p-5 sm:p-6 rounded-3xl space-y-5">
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <Scale size={18} className="text-amber-400" />
-                                    <h4 className="font-bold text-white">Rangos de peso</h4>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1 max-w-xl">
-                                    Hasta {MAX_TIERS} rangos. Escribe desde y hasta cuántos kg (ej. 0 – 4, 4,1 – 7). Deja vacío el “hasta” del último para “desde X kg”.
-                                    Se usan en el formulario, en el catálogo y para el precio de las órdenes.
-                                </p>
-                            </div>
-
-                            {/* Cómo cobra el peso */}
-                            <fieldset>
-                                <legend className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">¿Cómo cobras según el peso?</legend>
-                                <div className="grid gap-2 sm:grid-cols-2">
-                                    {([
-                                        { id: 'surcharge', title: 'Recargo por peso', desc: 'Cada rango suma un monto al plan o servicio elegido.' },
-                                        { id: 'table', title: 'Precio por plan y peso', desc: 'Cada plan tiene su propio precio en cada rango. Los servicios especiales no cambian con el peso.' },
-                                    ] as const).map(opt => {
-                                        const active = weightMode === opt.id;
-                                        return (
-                                            <label
-                                                key={opt.id}
-                                                className={`flex cursor-pointer gap-3 rounded-2xl border p-3.5 transition-colors ${active ? 'border-primary bg-primary/10' : 'border-foreground/10 hover:border-foreground/20'}`}
-                                            >
-                                                <input
-                                                    type="radio"
-                                                    name="weight-pricing-mode"
-                                                    value={opt.id}
-                                                    checked={active}
-                                                    onChange={() => setWeightMode(opt.id)}
-                                                    className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--primary)]"
-                                                />
-                                                <span className="min-w-0">
-                                                    <span className="block text-sm font-bold text-foreground">{opt.title}</span>
-                                                    <span className="mt-0.5 block text-xs text-muted-foreground">{opt.desc}</span>
-                                                </span>
-                                            </label>
-                                        );
-                                    })}
-                                </div>
-                            </fieldset>
-
-                            {tiers.length === 0 ? (
-                                <p className="text-sm text-muted-foreground py-4">
-                                    Sin rangos definidos: el formulario usa rangos genéricos (Pequeño, Mediano, Grande, Gigante) sin recargo.
-                                </p>
-                            ) : (
-                                <div className="space-y-3">
-                                    <div className={`hidden md:grid ${weightMode === 'table' ? TIER_GRID_MD_TABLE : TIER_GRID_MD} gap-3 px-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground`}>
-                                        <span>Nombre (opcional)</span>
-                                        <span>Desde</span>
-                                        <span>Hasta</span>
-                                        {weightMode !== 'table' && <span>Recargo</span>}
-                                        <span className="w-[7.5rem]" />
-                                    </div>
-                                    {tiers.map((t, idx) => {
-                                        const isLast = idx === tiers.length - 1;
-                                        return (
-                                            <div key={idx} className={`grid grid-cols-2 gap-x-3 gap-y-2.5 rounded-2xl border border-foreground/10 p-3 ${weightMode === 'table' ? TIER_GRID_MD_TABLE : TIER_GRID_MD} md:items-start md:gap-3 md:rounded-none md:border-0 md:p-0`}>
-                                                <div className="col-span-2 md:col-span-1 flex items-end gap-2 min-w-0">
-                                                    <div className="flex-1 min-w-0">
-                                                        <TierLabel>Rango {idx + 1} · Nombre (opcional)</TierLabel>
-                                                        <FormInputLite placeholder={`Ej: ${TIER_PLACEHOLDERS[idx] ?? `Rango ${idx + 1}`}`} value={t.label} maxLength={40} ariaLabel={`Rango ${idx + 1}: nombre`} onChange={v => updateTier(idx, { label: v })} />
-                                                    </div>
-                                                    <TierActions idx={idx} total={tiers.length} onMove={dir => moveTier(idx, dir)} onRemove={() => removeTier(idx)} className="flex md:hidden" />
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <TierLabel>Desde</TierLabel>
-                                                    <FormInputLite
-                                                        placeholder={idx === 0 ? '0' : tiers[idx - 1].max_weight || '…'}
-                                                        value={t.min_weight}
-                                                        inputMode="decimal"
-                                                        suffix="kg"
-                                                        ariaLabel={`Rango ${idx + 1}: desde (kg)`}
-                                                        onChange={v => updateTier(idx, { min_weight: v.replace(/[^\d.,]/g, '') })}
-                                                    />
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <TierLabel>Hasta</TierLabel>
-                                                    <FormInputLite
-                                                        placeholder={isLast ? 'o más' : 'ej. 4'}
-                                                        ariaLabel={`Rango ${idx + 1}: hasta (kg)`}
-                                                        value={t.max_weight}
-                                                        inputMode="decimal"
-                                                        suffix="kg"
-                                                        onChange={v => updateTier(idx, { max_weight: v.replace(/[^\d.,]/g, '') })}
-                                                    />
-                                                </div>
-                                                {weightMode !== 'table' && <div className="col-span-2 md:col-span-1 min-w-0">
-                                                    <TierLabel>Recargo</TierLabel>
-                                                    <FormInputLite
-                                                        placeholder="0"
-                                                        value={t.price}
-                                                        inputMode="numeric"
-                                                        prefix="$"
-                                                        ariaLabel={`Rango ${idx + 1}: recargo ($)`}
-                                                        onChange={v => updateTier(idx, { price: v.replace(/\D/g, '') })}
-                                                        hint={parseFloat(t.price) > 0 ? formatCLP(parseFloat(t.price)) : undefined}
-                                                    />
-                                                </div>}
-                                                <TierActions idx={idx} total={tiers.length} onMove={dir => moveTier(idx, dir)} onRemove={() => removeTier(idx)} className="hidden md:flex" />
-                                                {/* Tarjeta del tamaño en el catálogo de planes */}
-                                                <div className="col-span-2 md:col-span-full flex items-center gap-3 md:pb-3 md:border-b md:border-foreground/5">
-                                                    <TierIconField value={t.icon_url} label={`Rango ${idx + 1}`} onChange={url => updateTier(idx, { icon_url: url })} />
-                                                    <div className="flex-1 min-w-0">
-                                                        <FormInputLite
-                                                            placeholder="Ejemplos en el catálogo (opcional): Gatos, Chihuahuas"
-                                                            value={t.examples || ''}
-                                                            maxLength={60}
-                                                            ariaLabel={`Rango ${idx + 1}: ejemplos`}
-                                                            onChange={v => updateTier(idx, { examples: v })}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-
+                        {/* Tramos de peso (Acordeón colapsable para mantener la pantalla compacta) */}
+                        <div className="glass-card rounded-3xl overflow-hidden transition-all">
                             <button
                                 type="button"
-                                onClick={addTier}
-                                disabled={tiers.length >= MAX_TIERS}
-                                className="inline-flex items-center gap-2 text-sm font-bold text-primary hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                onClick={() => setTiersAccordionOpen(prev => !prev)}
+                                className="w-full p-5 sm:p-6 flex flex-wrap items-center justify-between gap-4 text-left cursor-pointer hover:bg-white/[0.02] transition-colors"
                             >
-                                <Plus size={16} />
-                                {tiers.length >= MAX_TIERS ? `Máximo ${MAX_TIERS} rangos` : 'Agregar rango de peso'}
+                                <div className="flex items-start sm:items-center gap-3.5">
+                                    <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+                                        <Scale size={20} />
+                                    </div>
+                                    <div>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <h4 className="font-bold text-white text-base">Rangos de peso (Tabla General)</h4>
+                                            <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                                                {tiers.length === 1 ? '1 rango' : `${tiers.length} rangos configurados`}
+                                            </span>
+                                            <span className="text-[10px] font-medium text-muted-foreground">
+                                                · {weightMode === 'table' ? 'Precio por plan y peso' : 'Recargo por peso'}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
+                                            {tiersAccordionOpen
+                                                ? 'Define los tramos en kg y la matriz de precios base de cada plan.'
+                                                : 'Haz clic para desplegar y editar los rangos de peso o modificar los precios de cada plan.'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-amber-400">
+                                        {tiersAccordionOpen ? 'Plegar' : 'Expandir y editar'}
+                                    </span>
+                                    <div className={`p-2 rounded-xl bg-white/5 text-white/70 transition-transform duration-200 ${tiersAccordionOpen ? 'rotate-180' : ''}`}>
+                                        <ChevronDown size={18} />
+                                    </div>
+                                </div>
                             </button>
+
+                            {tiersAccordionOpen && (
+                                <div className="p-5 sm:p-6 pt-0 space-y-6 border-t border-white/5">
+                                    {/* Cómo cobra el peso */}
+                                    <fieldset className="pt-4">
+                                        <legend className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">¿Cómo cobras según el peso?</legend>
+                                        <div className="grid gap-2 sm:grid-cols-2">
+                                            {([
+                                                { id: 'surcharge', title: 'Recargo por peso', desc: 'Cada rango suma un monto al plan o servicio elegido.' },
+                                                { id: 'table', title: 'Precio por plan y peso', desc: 'Cada plan tiene su propio precio en cada rango. Los servicios especiales no cambian con el peso.' },
+                                            ] as const).map(opt => {
+                                                const active = weightMode === opt.id;
+                                                return (
+                                                    <label
+                                                        key={opt.id}
+                                                        className={`flex cursor-pointer gap-3 rounded-2xl border p-3.5 transition-colors ${active ? 'border-primary bg-primary/10' : 'border-foreground/10 hover:border-foreground/20'}`}
+                                                    >
+                                                        <input
+                                                            type="radio"
+                                                            name="weight-pricing-mode"
+                                                            value={opt.id}
+                                                            checked={active}
+                                                            onChange={() => setWeightMode(opt.id)}
+                                                            className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--primary)]"
+                                                        />
+                                                        <span className="min-w-0">
+                                                            <span className="block text-sm font-bold text-foreground">{opt.title}</span>
+                                                            <span className="mt-0.5 block text-xs text-muted-foreground">{opt.desc}</span>
+                                                        </span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    </fieldset>
+
+                                    {tiers.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground py-4">
+                                            Sin rangos definidos: el formulario usa rangos genéricos (Pequeño, Mediano, Grande, Gigante) sin recargo.
+                                        </p>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <div className={`hidden md:grid ${weightMode === 'table' ? TIER_GRID_MD_TABLE : TIER_GRID_MD} gap-3 px-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground`}>
+                                                <span>Nombre (opcional)</span>
+                                                <span>Desde</span>
+                                                <span>Hasta</span>
+                                                {weightMode !== 'table' && <span>Recargo</span>}
+                                                <span className="w-[7.5rem]" />
+                                            </div>
+                                            {tiers.map((t, idx) => {
+                                                const isLast = idx === tiers.length - 1;
+                                                return (
+                                                    <div key={idx} className={`grid grid-cols-2 gap-x-3 gap-y-2.5 rounded-2xl border border-foreground/10 p-3 ${weightMode === 'table' ? TIER_GRID_MD_TABLE : TIER_GRID_MD} md:items-start md:gap-3 md:rounded-none md:border-0 md:p-0`}>
+                                                        <div className="col-span-2 md:col-span-1 flex items-end gap-2 min-w-0">
+                                                            <div className="flex-1 min-w-0">
+                                                                <TierLabel>Rango {idx + 1} · Nombre (opcional)</TierLabel>
+                                                                <FormInputLite placeholder={`Ej: ${TIER_PLACEHOLDERS[idx] ?? `Rango ${idx + 1}`}`} value={t.label} maxLength={40} ariaLabel={`Rango ${idx + 1}: nombre`} onChange={v => updateTier(idx, { label: v })} />
+                                                            </div>
+                                                            <TierActions idx={idx} total={tiers.length} onMove={dir => moveTier(idx, dir)} onRemove={() => removeTier(idx)} className="flex md:hidden" />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <TierLabel>Desde</TierLabel>
+                                                            <FormInputLite
+                                                                placeholder={idx === 0 ? '0' : tiers[idx - 1].max_weight || '…'}
+                                                                value={t.min_weight}
+                                                                inputMode="decimal"
+                                                                suffix="kg"
+                                                                ariaLabel={`Rango ${idx + 1}: desde (kg)`}
+                                                                onChange={v => updateTier(idx, { min_weight: v.replace(/[^\d.,]/g, '') })}
+                                                            />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <TierLabel>Hasta</TierLabel>
+                                                            <FormInputLite
+                                                                placeholder={isLast ? 'o más' : 'ej. 4'}
+                                                                ariaLabel={`Rango ${idx + 1}: hasta (kg)`}
+                                                                value={t.max_weight}
+                                                                inputMode="decimal"
+                                                                suffix="kg"
+                                                                onChange={v => updateTier(idx, { max_weight: v.replace(/[^\d.,]/g, '') })}
+                                                            />
+                                                        </div>
+                                                        {weightMode !== 'table' && <div className="col-span-2 md:col-span-1 min-w-0">
+                                                            <TierLabel>Recargo</TierLabel>
+                                                            <FormInputLite
+                                                                placeholder="0"
+                                                                value={t.price}
+                                                                inputMode="numeric"
+                                                                prefix="$"
+                                                                ariaLabel={`Rango ${idx + 1}: recargo ($)`}
+                                                                onChange={v => updateTier(idx, { price: v.replace(/\D/g, '') })}
+                                                                hint={parseFloat(t.price) > 0 ? formatCLP(parseFloat(t.price)) : undefined}
+                                                            />
+                                                        </div>}
+                                                        <TierActions idx={idx} total={tiers.length} onMove={dir => moveTier(idx, dir)} onRemove={() => removeTier(idx)} className="hidden md:flex" />
+                                                        {/* Tarjeta del tamaño en el catálogo de planes */}
+                                                        <div className="col-span-2 md:col-span-full flex items-center gap-3 md:pb-3 md:border-b md:border-foreground/5">
+                                                            <TierIconField value={t.icon_url} label={`Rango ${idx + 1}`} onChange={url => updateTier(idx, { icon_url: url })} />
+                                                            <div className="flex-1 min-w-0">
+                                                                <FormInputLite
+                                                                    placeholder="Ejemplos en el catálogo (opcional): Gatos, Chihuahuas"
+                                                                    value={t.examples || ''}
+                                                                    maxLength={60}
+                                                                    ariaLabel={`Rango ${idx + 1}: ejemplos`}
+                                                                    onChange={v => updateTier(idx, { examples: v })}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    <button
+                                        type="button"
+                                        onClick={addTier}
+                                        disabled={tiers.length >= MAX_TIERS}
+                                        className="inline-flex items-center gap-2 text-sm font-bold text-primary hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                    >
+                                        <Plus size={16} />
+                                        {tiers.length >= MAX_TIERS ? `Máximo ${MAX_TIERS} rangos` : 'Agregar rango de peso'}
+                                    </button>
+
+                                    {/* Precio por plan y peso dentro del acordeón */}
+                                    {weightMode === 'table' && (
+                                        <div className="pt-6 border-t border-white/5 space-y-4">
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <Layers size={18} className="text-amber-400" />
+                                                    <h4 className="font-bold text-white">Precio de cada plan según el peso</h4>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground mt-1 max-w-xl">
+                                                    Escribe el precio final de cada plan en cada rango (ya incluye el peso, no se suma recargo).
+                                                    Si dejas una celda vacía se usa el precio base del plan. Se aplica en el formulario, el catálogo y las órdenes nuevas.
+                                                </p>
+                                            </div>
+                                            <PlanWeightPriceTable
+                                                tiers={tiers}
+                                                plans={tablePlans}
+                                                values={tableValues}
+                                                onChange={updateTableCell}
+                                                onFillRow={fillRowWithBase}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
-                        {/* Precio por plan y peso */}
-                        {weightMode === 'table' && (
-                            <div className="glass-card p-5 sm:p-6 rounded-3xl space-y-4">
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <Layers size={18} className="text-amber-400" />
-                                        <h4 className="font-bold text-white">Precio de cada plan según el peso</h4>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground mt-1 max-w-xl">
-                                        Escribe el precio final de cada plan en cada rango (ya incluye el peso, no se suma recargo).
-                                        Si dejas una celda vacía se usa el precio base del plan. Se aplica en el formulario, el catálogo y las órdenes nuevas.
-                                    </p>
-                                </div>
-                                <PlanWeightPriceTable
-                                    tiers={tiers}
-                                    plans={tablePlans}
-                                    values={tableValues}
-                                    onChange={updateTableCell}
-                                    onFillRow={fillRowWithBase}
-                                />
-                            </div>
-                        )}
-                        <PriceListsSection reloadKey={priceListsKey} onChanged={() => setPriceListsKey(k => k + 1)} />
+                        <PriceListsSection
+                            reloadKey={priceListsKey}
+                            onChanged={() => setPriceListsKey(k => k + 1)}
+                            activeListId={formPriceListId}
+                            onSelectActiveList={setFormPriceListId}
+                        />
                         {/* Rangos de peso / precios que usa el formulario principal */}
                         <div className="glass-card p-5 sm:p-6 rounded-3xl space-y-3">
                             <div>

@@ -7,7 +7,7 @@
  * de planes elige su tabla. Se guardan solas (API /api/internal/price-lists).
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BadgePercent, CalendarRange, Copy, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { BadgePercent, CalendarRange, Copy, Loader2, Pencil, Plus, Star, Trash2, X } from 'lucide-react';
 import { apiRequest } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import PlanWeightPriceTable, { type PlanWeightRow } from './PlanWeightPriceTable';
@@ -69,11 +69,15 @@ const fmtDate = (d: string) => d.split('-').reverse().join('-');
 const errMsg = (err: unknown, fallback: string) => (err as { message?: string })?.message || fallback;
 const inputCls = 'w-full rounded-xl border border-foreground/10 bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary';
 
-export default function PriceListsSection({ reloadKey, onChanged }: {
+export default function PriceListsSection({ reloadKey, onChanged, activeListId, onSelectActiveList }: {
     /** Cambia después de guardar la configuración (recarga los planes). */
     reloadKey: number;
     /** Tras crear / editar / borrar una tabla (el selector del formulario se refresca). */
     onChanged?: () => void;
+    /** ID de la tabla oficial activa en el formulario principal (null = General). */
+    activeListId?: number | null;
+    /** Cambiar qué tabla usa el formulario principal. */
+    onSelectActiveList?: (id: number | null) => void;
 }) {
     const { showToast } = useToast();
     const [loading, setLoading] = useState(true);
@@ -266,6 +270,13 @@ export default function PriceListsSection({ reloadKey, onChanged }: {
                         ese enlace ve esos rangos y precios, y su solicitud y la orden los conservan. Fuera de las fechas de
                         vigencia el enlace usa la General.
                     </p>
+                    <div className="mt-2.5 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs">
+                        <span className="text-muted-foreground font-medium">Tabla oficial para el formulario principal:</span>
+                        <span className="font-black text-emerald-400 flex items-center gap-1">
+                            <Star size={13} className="fill-current" />
+                            {!activeListId ? 'General (rangos predeterminados)' : (lists.find(l => l.id === activeListId)?.name || 'Personalizada')}
+                        </span>
+                    </div>
                 </div>
                 {!draft && (
                     <button
@@ -284,17 +295,46 @@ export default function PriceListsSection({ reloadKey, onChanged }: {
             ) : (
                 <>
                     {/* Lista */}
-                    <div className="divide-y divide-foreground/5 rounded-2xl border border-foreground/10">
-                        <div className="flex items-center gap-3 px-4 py-3">
+                    <div className="divide-y divide-foreground/5 rounded-2xl border border-foreground/10 overflow-hidden">
+                        <div className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 ${!activeListId ? 'bg-emerald-500/[0.06]' : ''}`}>
                             <span className="font-semibold text-sm text-foreground">General</span>
+                            {!activeListId ? (
+                                <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                    <Star size={10} className="fill-current" /> Oficial · Formulario Principal
+                                </span>
+                            ) : onSelectActiveList ? (
+                                <button
+                                    type="button"
+                                    onClick={() => onSelectActiveList(null)}
+                                    className="text-[10px] font-bold text-muted-foreground hover:text-white hover:underline cursor-pointer"
+                                    title="Usar la tabla General en el formulario principal"
+                                >
+                                    Usar como oficial
+                                </button>
+                            ) : null}
                             <span className="text-[11px] text-muted-foreground">Rangos y precios de arriba · la usan los enlaces sin tabla</span>
                         </div>
                         {lists.map(pl => {
                             const st = PRICE_LIST_STATUS[pl.status];
+                            const isOfficial = activeListId === pl.id;
                             return (
-                                <div key={pl.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                                <div key={pl.id} className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 ${isOfficial ? 'bg-emerald-500/[0.06]' : ''}`}>
                                     <span className="font-semibold text-sm text-foreground">{pl.name}</span>
                                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${st.cls}`}>{st.label}</span>
+                                    {isOfficial ? (
+                                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                            <Star size={10} className="fill-current" /> Oficial · Formulario Principal
+                                        </span>
+                                    ) : onSelectActiveList && pl.status === 'activa' ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => onSelectActiveList(pl.id)}
+                                            className="text-[10px] font-bold text-muted-foreground hover:text-white hover:underline cursor-pointer"
+                                            title="Usar esta tabla en el formulario principal"
+                                        >
+                                            Usar como oficial
+                                        </button>
+                                    ) : null}
                                     {pl.status === 'pausada' && (
                                         <button type="button" onClick={() => activate(pl)} disabled={deleting === pl.id}
                                             title="Mientras está pausada, sus enlaces usan la General"
