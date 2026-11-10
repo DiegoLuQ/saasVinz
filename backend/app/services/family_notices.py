@@ -74,9 +74,12 @@ def tenant_brand(tenant) -> dict:
     web = (sm.get("website") or "").strip()
     if web and not web.startswith(("http://", "https://")):
         web = "https://" + web
+    address_parts = [p.strip() for p in (getattr(tenant, "address", None), getattr(tenant, "city", None)) if p and p.strip()]
+    address_line = ", ".join(address_parts) if address_parts else None
     return {
         "name": tenant.name, "logo": tenant.logo_url or None, "eslogan": None,
         "whatsapp": tenant.phone or None, "correo": tenant.email or None,
+        "address": address_line,
         "web": web or None, "redes": _social(tenant), "powered_by": _show_brand(tenant),
     }
 
@@ -196,7 +199,7 @@ async def send_step_email(db: Session, cremation_id: int, step_id: int, user_id:
 
 
 async def send_finish_email(db: Session, cremation_id: int, user_id: int | None = None, force: bool = False) -> dict:
-    """Correo de agradecimiento con el enlace a la encuesta, al concluir la orden."""
+    """Correo de agradecimiento y entrega formal con enlace de seguimiento y reseña de Google."""
     cremation = _load(db, cremation_id)
     if not cremation:
         return {"sent": False, "reason": "not_found"}
@@ -213,21 +216,52 @@ async def send_finish_email(db: Session, cremation_id: int, user_id: int | None 
 
     pet = cremation.pet.name if cremation.pet else "tu mascota"
     url = tracking_url(tenant, cremation)
-    # Ya no hay encuesta en el seguimiento: se invita solo a la reseña en Google
-    # (si el crematorio la configuró). ?encuesta=1 lleva directo a esa invitación.
+
     sm = tenant.social_media if isinstance(tenant.social_media, dict) else {}
-    has_review = bool((sm.get("google_review") or "").strip())
-    closing = ("Si nuestro acompañamiento te fue de ayuda, tu opinión puede orientar a otras familias en un momento difícil."
-               if has_review else "Puedes volver a ver el seguimiento del servicio cuando quieras.")
-    await _send(
-        tenant, customer.email.strip(),
-        f"Gracias por confiarnos a {pet} · {tenant.name}",
-        f"Gracias por confiarnos a {pet}",
-        [f"Hola {_first_name(customer.name)}:".replace("Hola :", "Hola:"),
-         f"Hemos concluido el servicio de {pet}. Sabemos que es un momento difícil y agradecemos que nos hayas permitido acompañarte.",
-         closing],
-        "Dejar mi opinión" if has_review else "Ver el seguimiento", f"{url}?encuesta=1" if url else None,
-        f"Recibes este correo porque {tenant.name} atendió el servicio de {pet}. {_no_reply_note(tenant)}",
+    google_review_url = (sm.get("google_review") or "").strip()
+
+    review_card = None
+    if google_review_url:
+        city_phrase = f"de {tenant.city.strip()} " if getattr(tenant, "city", None) and tenant.city.strip() else ""
+        review_card = {
+            "title": "¿Te brindamos tranquilidad en este proceso?",
+            "text": (
+                f"Cuando tengas un momento de calma, compartir tu experiencia o una foto de sus recuerdos en Google "
+                f"ayudará a otras familias {city_phrase}a despedir a sus compañeros con confianza."
+            ),
+            "button_label": "💬 Compartir mi opinión en Google",
+            "url": google_review_url,
+            "stars": "⭐ ⭐ ⭐ ⭐ ⭐",
+        }
+
+    first_name = _first_name(customer.name)
+    greeting = f"Hola, {first_name}:" if first_name else "Hola:"
+
+    paragraphs = [
+        greeting,
+        f"Te escribimos con profundo respeto y gratitud para contarte que hemos completado formalmente la entrega del ánfora y los recuerdos de {pet}.",
+        f"Agradecemos de corazón la confianza que depositaste en nosotros en un momento tan sensible. Cuidamos a {pet} con la máxima dedicación, cariño y transparencia en cada etapa del camino, y esperamos haber sido un verdadero apoyo y consuelo para tu familia.",
+        "Para que conserves su memoria intacta, en el siguiente enlace podrás descargar su Certificado Oficial de Cremación, su fotografía conmemorativa en alta resolución y volver a ver el registro completo de su homenaje cuando lo desees:",
+    ]
+
+    button_label = f"🐾 Ver recuerdos y certificado de {pet}" if url else None
+    footer = f"Con todo nuestro cariño y respeto,\nEl equipo de {tenant.name}."
+
+    from app.services.email import send_action_email
+    await send_action_email(
+        to=customer.email.strip(),
+        subject=f"{pet} ya descansa en casa · {tenant.name}",
+        title=f"{pet} ya descansa en casa",
+        paragraphs=paragraphs,
+        button_label=button_label,
+        button_url=url,
+        footer=footer,
+        kicker=f"Servicio conmemorativo completado · {tenant.name}",
+        brand=tenant_brand(tenant),
+        reply_to=tenant.email or None,
+        image_url=pet_photo(cremation),
+        preheader="Servicio conmemorativo completado con amor y respeto.",
+        review_card=review_card,
     )
     _record(db, cremation, "finish", "email", customer.email, None, user_id)
     return {"sent": True, "to": customer.email}

@@ -56,8 +56,8 @@ def test_avanzar_no_envia_correo_y_el_aviso_manual_si(client, auth, db, world, o
 
     r = client.patch(f"/api/internal/operations/ops/orders/{order}/finalize", headers=h)
     assert r.status_code == 200, r.text
-    assert len(sent_emails) == 2 and "Gracias" in sent_emails[1].subject
-    assert "?encuesta=1" in sent_emails[1].body
+    assert len(sent_emails) == 2 and "ya descansa en casa" in sent_emails[1].subject
+    assert "Ver recuerdos y certificado" in sent_emails[1].body
 
     avisos = client.get(f"/api/internal/operations/ops/orders/{order}/family-notices", headers=h).json()["notices"]
     assert {(n["kind"], n["channel"]) for n in avisos} == {("step", "email"), ("finish", "email")}
@@ -195,3 +195,34 @@ def test_aperturas_del_seguimiento_guardan_el_estado(client, db, order):
         db.commit()
         assert client.get(url).status_code == 200      # la familia puede seguir entrando
     assert all(views(s) == before[s] + 1 for s in before)
+
+
+def test_finish_email_template_completo(client, auth, db, world, order, sent_emails):
+    """Verifica que el correo de entrega contenga pre-encabezado, certificado, recuerdos y bloque de Google Reviews."""
+    h = auth("a")
+    tenant = db.query(models.Tenant).get(world["tenant_a"])
+    tenant.city = "Calama"
+    tenant.address = "Av. Balmaceda 3726"
+    tenant.social_media = {"google_review": "https://g.page/r/test-review"}
+    db.commit()
+
+    steps = db.query(models.WorkflowStep).filter(models.WorkflowStep.tenant_id == world["tenant_a"]) \
+        .order_by(models.WorkflowStep.order_index).all()
+    for _ in steps:
+        _advance(client, h, order)
+
+    r = client.patch(f"/api/internal/operations/ops/orders/{order}/finalize", headers=h)
+    assert r.status_code == 200, r.text
+    assert len(sent_emails) == 1
+    mail = sent_emails[0]
+    assert "ya descansa en casa" in mail.subject
+    assert "Servicio conmemorativo completado con amor y respeto." in mail.body
+    assert "entrega del ánfora y los recuerdos" in mail.body
+    assert "Certificado Oficial de Cremación" in mail.body
+    assert "🐾 Ver recuerdos y certificado de" in mail.body
+    assert "¿Te brindamos tranquilidad en este proceso?" in mail.body
+    assert "Calama" in mail.body
+    assert "💬 Compartir mi opinión en Google" in mail.body
+    assert "https://g.page/r/test-review" in mail.body
+    assert "Av. Balmaceda 3726" in mail.body
+

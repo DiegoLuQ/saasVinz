@@ -210,6 +210,8 @@ def render_vinzer_email(
     image_url: str | None = None,
     products: dict | None = None,
     highlight: dict | None = None,
+    preheader: str | None = None,
+    review_card: dict | None = None,
 ) -> str:
     """HTML del correo. Los textos son planos (se escapan).
 
@@ -297,14 +299,46 @@ def render_vinzer_email(
             f'<a href="{purl}" style="display: inline-block; padding: 11px 24px; font-weight: 700; font-size: 14px; color: {btn_color}; text-decoration: none;">'
             f'{esc(products.get("button_label") or "Ver catálogo")}</a></td></tr></table></div>'
         )
+
+    # Bloque de reseña (Google Reviews / Opinión)
+    review_html = ""
+    if review_card and review_card.get("url"):
+        r_url = esc(review_card["url"], quote=True)
+        r_title = esc(review_card.get("title") or "¿Te brindamos tranquilidad en este proceso?")
+        r_text = esc(review_card.get("text") or "")
+        r_btn = esc(review_card.get("button_label") or "Compartir mi opinión en Google")
+        stars = review_card.get("stars", "⭐ ⭐ ⭐ ⭐ ⭐")
+        review_html = (
+            '<div style="margin: 26px 0 16px 0; padding: 22px 20px; border-radius: 16px; '
+            'background: #fffbeb; border: 1px solid #fde68a; text-align: center;">'
+            f'<div style="font-size: 18px; margin-bottom: 8px; letter-spacing: 2px;">{stars}</div>'
+            f'<p style="margin: 0 0 8px 0; font-size: 16px; font-weight: 800; color: #78350f;">{r_title}</p>'
+            f'<p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.55; color: #92400e;">{r_text}</p>'
+            '<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto;"><tr>'
+            '<td style="border-radius: 12px; background: #d97706;">'
+            f'<a href="{r_url}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 12px 26px; font-weight: 700; '
+            f'font-size: 14px; color: #ffffff; text-decoration: none;">{r_btn}</a>'
+            '</td></tr></table>'
+            '</div>'
+        )
+
     note = (f'<p style="margin: 18px 0 0 0; padding-top: 16px; border-top: 1px solid #e2e8f0; '
-            f'font-size: 12px; color: #64748b;">{esc(footer)}</p>' if footer else "")
+            f'font-size: 13px; color: #64748b; white-space: pre-line;">{esc(footer)}</p>' if footer else "")
     kicker_html = (f'<p style="margin: 0 0 6px 0; font-size: 11px; font-weight: 700; letter-spacing: 2px; '
                    f'text-transform: uppercase; color: #0e7490;">{esc(kicker)}</p>' if kicker else "")
+
+    preheader_html = (
+        f'<div style="display: none; max-height: 0px; overflow: hidden; mso-hide: all; font-size: 1px; line-height: 1px; color: #fff; opacity: 0;">'
+        f'{esc(preheader)}'
+        f'</div>'
+        if preheader else ""
+    )
 
     # Canales de contacto del pie
     link_style = "color: #5eead4; text-decoration: none;"
     links = []
+    if b.get("address"):
+        links.append(f'<span style="color: #cbd5e1;">{esc(b["address"])}</span>')
     if b["whatsapp"]:
         digits = "".join(ch for ch in b["whatsapp"] if ch.isdigit())
         links.append(f'<a href="https://wa.me/{digits}" style="{link_style}">WhatsApp {esc(b["whatsapp"])}</a>')
@@ -333,6 +367,7 @@ def render_vinzer_email(
     return f"""<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
 <body style="margin: 0; padding: 0; background: #eef2f6;">
+{preheader_html}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background: #eef2f6; padding: 24px 12px;">
 <tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width: 580px; font-family: 'Segoe UI', Arial, sans-serif; background: #ffffff; border-radius: 18px; overflow: hidden; border: 1px solid #e2e8f0;">
@@ -343,7 +378,7 @@ def render_vinzer_email(
   <tr><td style="padding: 30px 28px 26px 28px; color: #0f172a; font-size: 15px; line-height: 1.65;">
     {kicker_html}
     <h1 style="margin: 0 0 18px 0; font-size: 22px; line-height: 1.3; color: #0A192F;">{esc(title)}</h1>
-    {body}{button}{shop}{note}
+    {body}{button}{review_html}{shop}{note}
   </td></tr>
   <tr><td style="background: #0A192F; padding: 24px 28px; text-align: center; font-size: 13px; line-height: 1.7; color: #94a3b8;">
     {eslogan}
@@ -373,13 +408,15 @@ async def send_action_email(
     attachments: list | None = None,
     products: dict | None = None,
     highlight: dict | None = None,
+    preheader: str | None = None,
+    review_card: dict | None = None,
 ) -> None:
     """Correo transaccional: título, párrafos (texto plano) y un botón opcional.
     Con `brand` sale con la marca de un crematorio («Crematorio X vía Vinzer»);
     `reply_to` = a quién llegan las respuestas. La cuenta que envía es no-reply,
     así que sin `reply_to` las respuestas van al correo de Vinzer (Datos del SaaS)."""
     html_body = render_vinzer_email(title, paragraphs, button_label, button_url, footer, kicker, brand, rows, image_url, products,
-                                    highlight)
+                                    highlight, preheader, review_card)
     if not reply_to:
         reply_to = _brand().get("correo") or None
     await fm.send_message(MessageSchema(
