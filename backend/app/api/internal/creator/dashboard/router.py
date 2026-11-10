@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from app.services.plan_features import PLAN_EXEMPT_MODULES
 from sqlalchemy.orm import Session
 import shutil
 import os
+import tempfile
 import uuid
 from datetime import datetime
 from app.utils import tz
@@ -124,6 +125,7 @@ class TenantResponse(BaseModel):
     demo_plan_id: int | None = None
     demo_plan_name: str | None = None
     demo_expires_at: datetime | None = None
+    catalog_video: Dict[str, Any] | None = None
 
     class Config:
         from_attributes = True
@@ -630,7 +632,8 @@ async def create_tenant(
         billing_notify_channels=new_tenant.billing_notify_channels,
         billing_discount=new_tenant.billing_discount,
         monthly_price=billing_info.monthly_price,
-        resources={} # New tenant has no resources
+        resources={}, # New tenant has no resources
+        catalog_video=None
     )
 
 
@@ -692,7 +695,8 @@ async def get_tenant_dashboard_bootstrap(
         current_period_end=tenant.current_period_end,
         demo_plan_id=tenant.demo_plan_id,
         demo_plan_name=(tenant.demo_plan.name if tenant.demo_plan_id and tenant.demo_plan else None),
-        demo_expires_at=tenant.demo_expires_at if tenant.demo_active else None
+        demo_expires_at=tenant.demo_expires_at if tenant.demo_active else None,
+        catalog_video=tenant.catalog_video
     )
 
     # Precise Expiration Fallbacks
@@ -818,7 +822,8 @@ async def get_tenant_detail(
         current_period_end=tenant.current_period_end,
         demo_plan_id=tenant.demo_plan_id,
         demo_plan_name=(tenant.demo_plan.name if tenant.demo_plan_id and tenant.demo_plan else None),
-        demo_expires_at=tenant.demo_expires_at if tenant.demo_active else None
+        demo_expires_at=tenant.demo_expires_at if tenant.demo_active else None,
+        catalog_video=tenant.catalog_video
     )
 
     # Precise Expiration Fallbacks
@@ -1081,7 +1086,8 @@ async def update_tenant(
         current_period_end=tenant.current_period_end,
         demo_plan_id=tenant.demo_plan_id,
         demo_plan_name=(tenant.demo_plan.name if tenant.demo_plan_id and tenant.demo_plan else None),
-        demo_expires_at=tenant.demo_expires_at if tenant.demo_active else None
+        demo_expires_at=tenant.demo_expires_at if tenant.demo_active else None,
+        catalog_video=tenant.catalog_video
     )
 
     # Precise Expiration Fallbacks
@@ -1234,6 +1240,136 @@ async def upload_tenant_logo(
     except Exception as e:
         print(f"Error uploading logo for tenant {tenant_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Error al subir el logo")
+
+
+@router.post("/tenants/{identifier}/catalog-video")
+async def save_tenant_catalog_video(
+    identifier: str,
+    file: UploadFile = File(None),
+    video_url: str = Form(None),
+    button_text: str = Form("Ver video de bienvenida"),
+    current_creator: User = Depends(get_current_creator),
+    db: Session = Depends(get_db)
+):
+    """
+    Sube y optimiza (o valida enlace externo) el video de bienvenida del catálogo público.
+    Solo accesible para el SuperAdmin / Dueño del SaaS (admin.vinzer.cl).
+    """
+    if identifier.isdigit():
+        tenant = db.query(Tenant).filter(Tenant.id == int(identifier)).first()
+    else:
+        tenant = db.query(Tenant).filter(Tenant.slug == identifier).first()
+
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant no encontrado")
+
+    from app.services.form_video import check_link, process_catalog_video_upload
+    from app.utils.r2 import delete_file_from_r2
+    from app.core.config import settings
+    import logging
+    _log = logging.getLogger(__name__)
+
+    old_video = tenant.catalog_video if isinstance(tenant.catalog_video, dict) else None
+    old_url = old_video.get("url") if old_video else None
+    btn_text = (button_text or "").strip() or "Ver video de bienvenida"
+
+    # 1. Caso archivo subido
+    if file and file.filename:
+        if not file.content_type.startswith("video/") and not file.filename.lower().endswith((".mp4", ".mov", ".webm", ".mkv")):
+            raise HTTPException(status_code=400, detail="El archivo debe ser un video (MP4, MOV, WebM)")
+
+        temp_dir = tempfile.gettempdir()
+        ext = os.path.splitext(file.filename)[1] or ".mp4"
+        temp_path = os.path.join(temp_dir, f"catvideo_{uuid.uuid4().hex}{ext}")
+
+        try:
+            with open(temp_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+
+            uploaded = process_catalog_video_upload(temp_path, tenant.id)
+            uploaded["button_text"] = btn_text
+
+            if old_video and old_video.get("source") == "upload" and old_url:
+                try:
+                    prefix = f"{settings.R2_PUBLIC_URL}/"
+                    if old_url.startswith(prefix):
+                        key = old_url[len(prefix):]
+                        delete_file_from_r2(settings.R2_BUCKET_NAME, key)
+                except Exception as ex:
+                    _log.warning("No se pudo eliminar el video anterior de R2: %s", ex)
+
+            tenant.catalog_video = uploaded
+            db.commit()
+            db.refresh(tenant)
+            return {"catalog_video": tenant.catalog_video}
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    # 2. Caso enlace externo (Vimeo o Cloudflare Stream)
+    elif video_url and video_url.strip():
+        checked = check_link(video_url.strip())
+        video_data = {
+            "source": checked["source"],
+            "url": checked["url"],
+            "duration": checked["duration"],
+            "button_text": btn_text
+        }
+
+        if old_video and old_video.get("source") == "upload" and old_url:
+            try:
+                prefix = f"{settings.R2_PUBLIC_URL}/"
+                if old_url.startswith(prefix):
+                    key = old_url[len(prefix):]
+                    delete_file_from_r2(settings.R2_BUCKET_NAME, key)
+            except Exception as ex:
+                _log.warning("No se pudo eliminar el video anterior de R2: %s", ex)
+
+        tenant.catalog_video = video_data
+        db.commit()
+        db.refresh(tenant)
+        return {"catalog_video": tenant.catalog_video}
+
+    else:
+        raise HTTPException(status_code=400, detail="Debes proporcionar un archivo de video o un enlace válido")
+
+
+@router.delete("/tenants/{identifier}/catalog-video")
+async def delete_tenant_catalog_video(
+    identifier: str,
+    current_creator: User = Depends(get_current_creator),
+    db: Session = Depends(get_db)
+):
+    """
+    Elimina el video de bienvenida del catálogo público del tenant.
+    """
+    if identifier.isdigit():
+        tenant = db.query(Tenant).filter(Tenant.id == int(identifier)).first()
+    else:
+        tenant = db.query(Tenant).filter(Tenant.slug == identifier).first()
+
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant no encontrado")
+
+    old_video = tenant.catalog_video if isinstance(tenant.catalog_video, dict) else None
+    if old_video and old_video.get("source") == "upload":
+        old_url = old_video.get("url")
+        if old_url:
+            from app.core.config import settings
+            from app.utils.r2 import delete_file_from_r2
+            import logging
+            try:
+                prefix = f"{settings.R2_PUBLIC_URL}/"
+                if old_url.startswith(prefix):
+                    key = old_url[len(prefix):]
+                    delete_file_from_r2(settings.R2_BUCKET_NAME, key)
+            except Exception as ex:
+                logging.getLogger(__name__).warning("No se pudo eliminar el video de R2: %s", ex)
+
+    tenant.catalog_video = None
+    db.commit()
+    db.refresh(tenant)
+    return {"message": "Video de catálogo eliminado correctamente"}
 
 # --- Subscription Plans Management ---
 

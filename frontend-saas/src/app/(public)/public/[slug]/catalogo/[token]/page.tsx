@@ -25,9 +25,11 @@ import {
     Flame,
     ShoppingBag,
     Plus,
+    Play,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PublicPlansCatalog, { type PublicPlan } from '@/components/public/catalog/PublicPlansCatalog';
+import FormVideoPlayer from '@/components/public/FormVideoPlayer';
 import type { WeightTier } from '@/lib/publicFormConfig';
 import { vinzerPromoUrl } from '@/lib/publicUrls';
 import ProductCart, { type CartLine } from '@/components/public/catalog/ProductCart';
@@ -76,6 +78,13 @@ interface PublicCatalogData {
     show_plan_request?: boolean;
     /** Abierto con ?ref= (correo / seguimiento): mascota y si se puede pedir */
     order_ref?: { pet_name?: string | null; can_request: boolean } | null;
+    /** Video de bienvenida configurado por el SuperAdmin */
+    catalog_video?: {
+        source: 'upload' | 'vimeo' | 'cloudflare';
+        url: string;
+        duration?: number;
+        button_text?: string;
+    } | null;
 }
 
 export default function PublicCatalogPage() {
@@ -86,6 +95,7 @@ export default function PublicCatalogPage() {
     const [data, setData] = useState<PublicCatalogData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [videoModalOpen, setVideoModalOpen] = useState(false);
 
     // Filters
     const [searchTerm, setSearchTerm] = useState('');
@@ -377,6 +387,7 @@ export default function PublicCatalogPage() {
                 weightTiers={data.weight_tiers ?? []}
                 message={data.catalog_message}
                 showRequestButton={data.show_plan_request !== false}
+                catalogVideo={data.catalog_video}
                 catalogToken={token}
                 getImageUrl={getImageUrl}
                 onShare={handleShareLink}
@@ -489,6 +500,36 @@ export default function PublicCatalogPage() {
                             Agrega los productos que quieras a tu solicitud y envíala: el crematorio la revisa y te contacta. También puedes consultarnos por WhatsApp.
                         </p>
                     </div>
+
+                    {/* Mensaje de bienvenida con video (no invasivo) */}
+                    {data.catalog_video && (
+                        <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            <div className="flex items-center gap-3.5">
+                                <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/20 flex items-center justify-center text-amber-500 shrink-0">
+                                    <Play size={18} className="fill-current ml-0.5" />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                                        Mensaje de bienvenida
+                                    </p>
+                                    <p className="text-sm font-semibold text-slate-800 dark:text-neutral-200">
+                                        Queremos acompañarte con transparencia y respeto en cada paso.
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setVideoModalOpen(true)}
+                                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs uppercase tracking-wider shadow-lg shadow-amber-500/10 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer shrink-0"
+                            >
+                                <Play size={13} className="fill-current" />
+                                <span>{data.catalog_video.button_text || 'Ver video de bienvenida'}</span>
+                                {data.catalog_video.duration ? (
+                                    <span className="opacity-75 text-[11px] font-mono">({Math.round(data.catalog_video.duration)}s)</span>
+                                ) : null}
+                            </button>
+                        </div>
+                    )}
 
                     {/* Search & Available Switch */}
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -961,6 +1002,38 @@ export default function PublicCatalogPage() {
                     )}
                 </div>
             </footer>
+
+            {/* Modal de video de bienvenida (lightbox no invasivo) */}
+            {videoModalOpen && data.catalog_video && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+                    onClick={() => setVideoModalOpen(false)}
+                >
+                    <div
+                        className="relative w-full max-w-2xl bg-white dark:bg-[#0a0d14] border border-slate-200 dark:border-white/10 rounded-3xl p-4 sm:p-6 shadow-2xl space-y-4"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-white/10">
+                            <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-sm">
+                                <Sparkles size={16} className="text-amber-500" />
+                                <span>{data.tenant_name}</span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setVideoModalOpen(false)}
+                                className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-white/5 dark:hover:bg-white/10 dark:text-white/70 dark:hover:text-white transition-colors cursor-pointer"
+                                aria-label="Cerrar video"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <FormVideoPlayer video={data.catalog_video as any} autoPlay={true} />
+                        <p className="text-center text-xs text-slate-500 dark:text-neutral-400 font-medium">
+                            {data.catalog_video.button_text || 'Mensaje de bienvenida y compromiso conmemorativo'}
+                        </p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

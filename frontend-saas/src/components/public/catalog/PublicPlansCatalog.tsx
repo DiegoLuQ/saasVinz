@@ -6,8 +6,9 @@ import { catalogSessionId, trackCatalogEvent, type CatalogEventKind } from '@/li
 import localFont from 'next/font/local';
 import { DEFAULT_CATALOG_INTRO } from '@/lib/catalogDefaults';
 import { planFitsWeight, type WeightTier } from '@/lib/publicFormConfig';
+import FormVideoPlayer from '@/components/public/FormVideoPlayer';
 import {
-    ArrowRight, Check, ChevronDown, Facebook, Feather, Globe, Info, Instagram, Mail, MapPin, MessageCircle, Phone, Plus, Search, Share2, X,
+    ArrowRight, Check, ChevronDown, Facebook, Feather, Globe, Info, Instagram, Mail, MapPin, MessageCircle, Phone, Play, Plus, Search, Share2, Sparkles, X,
     PawPrint,
 } from 'lucide-react';
 
@@ -80,6 +81,13 @@ interface Props {
     showVinzerBrand?: boolean;
     /** Botón «Solicitar este plan» (Configuración → Formulario y Pesos); false = solo WhatsApp */
     showRequestButton?: boolean;
+    /** Video de bienvenida configurado por el SuperAdmin para este crematorio */
+    catalogVideo?: {
+        source: 'upload' | 'vimeo' | 'cloudflare';
+        url: string;
+        duration?: number;
+        button_text?: string;
+    } | null;
 }
 
 // Paleta cálida y luminosa, igual para todos los tenants: el catálogo lo abren
@@ -176,8 +184,9 @@ interface PlanView {
 }
 
 /** Catálogo público de planes: diseño sobrio y cálido; los datos son los de cada tenant. */
-export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare, copiedLink, catalogToken, weightTiers = [], message, showVinzerBrand = true, showRequestButton = true }: Props) {
+export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare, copiedLink, catalogToken, weightTiers = [], message, showVinzerBrand = true, showRequestButton = true, catalogVideo }: Props) {
     const [searchTerm, setSearchTerm] = useState('');
+    const [videoModalOpen, setVideoModalOpen] = useState(false);
     const sizes = useMemo<SizeOption[]>(
         () => (weightTiers.length > 0 ? tierSizes(weightTiers) : PET_SIZES.map(s => ({ ...s, display: s.label, price: 0 }))),
         [weightTiers]
@@ -301,6 +310,21 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                     <p className="mt-6 text-[15px] leading-relaxed text-[var(--cat-muted)] whitespace-pre-line">
                         {tenant.intro || DEFAULT_CATALOG_INTRO}
                     </p>
+                    {catalogVideo && (
+                        <div className="mt-8 flex justify-center">
+                            <button
+                                type="button"
+                                onClick={() => setVideoModalOpen(true)}
+                                className="inline-flex items-center gap-2.5 px-6 py-3 rounded-full bg-[var(--cat-gold-deep)] hover:bg-[var(--cat-gold)] text-white text-xs font-bold uppercase tracking-wider shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+                            >
+                                <Play size={14} className="fill-current" />
+                                <span>{catalogVideo.button_text || 'Ver video de bienvenida'}</span>
+                                {catalogVideo.duration ? (
+                                    <span className="opacity-80 text-[11px] font-mono">({Math.round(catalogVideo.duration)}s)</span>
+                                ) : null}
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {plans.length > SEARCH_THRESHOLD && (
@@ -532,6 +556,38 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                     </div>
                 </div>
             </footer>
+
+            {/* Modal de video conmemorativo (no invasivo, se activa solo a petición del usuario) */}
+            {videoModalOpen && catalogVideo && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+                    onClick={() => setVideoModalOpen(false)}
+                >
+                    <div
+                        className="relative w-full max-w-2xl bg-white rounded-3xl p-6 shadow-2xl space-y-4"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between pb-3 border-b border-[var(--cat-line)]">
+                            <div className="flex items-center gap-2 text-[var(--cat-ink)] font-semibold text-base">
+                                <Sparkles size={16} className="text-[var(--cat-gold)]" />
+                                <span>{tenant.name}</span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setVideoModalOpen(false)}
+                                className="p-1.5 rounded-full bg-[var(--cat-sand)] hover:bg-[var(--cat-line)] text-[var(--cat-muted)] hover:text-[var(--cat-ink)] transition-colors cursor-pointer"
+                                aria-label="Cerrar video"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <FormVideoPlayer video={catalogVideo as any} autoPlay={true} />
+                        <p className="text-center text-xs text-[var(--cat-muted)] font-medium">
+                            {catalogVideo.button_text || 'Mensaje de bienvenida y compromiso conmemorativo'}
+                        </p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

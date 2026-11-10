@@ -88,6 +88,8 @@ class Tenant(Base):
     # Catálogo público de planes: lema e introducción (opcionales)
     catalog_tagline = Column(String(120), nullable=True)
     catalog_intro = Column(Text, nullable=True)
+    # Catálogo público: video de bienvenida ({source, url, duration, button_text})
+    catalog_video = Column(JSON, nullable=True)
     # Formulario público: campos visibles/obligatorios y precio de tramos.
     # NULL = valores por defecto (app/services/public_form_config.py).
     form_config = Column(JSON, nullable=True)

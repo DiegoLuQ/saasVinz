@@ -252,6 +252,28 @@ def process_upload(src_path: str, tenant_id: int) -> dict:
             os.remove(out_path)
 
 
+def process_catalog_video_upload(src_path: str, tenant_id: int) -> dict:
+    """Valida la duración, recomprime a MP4 720p y sube a R2 en la carpeta catalog-video."""
+    from app.utils.r2 import upload_file_to_r2
+
+    duration = probe_duration(src_path)
+    if duration <= 0:
+        raise HTTPException(status_code=400, detail="El archivo no parece ser un video válido.")
+    if _too_long(duration):
+        raise _too_long_error(duration)
+
+    out_path, duration = transcode(src_path)
+    try:
+        key = f"tenant_{tenant_id}/catalog-video/{uuid.uuid4().hex}.mp4"
+        url = upload_file_to_r2(out_path, settings.R2_BUCKET_NAME, key)
+        if not url:
+            raise HTTPException(status_code=502, detail="No se pudo guardar el video en R2. Inténtalo de nuevo.")
+        return {"source": "upload", "url": url, "duration": duration}
+    finally:
+        if os.path.exists(out_path):
+            os.remove(out_path)
+
+
 # ===== Recorrido de la configuración =====
 
 def config_videos(cfg: dict) -> list[dict]:

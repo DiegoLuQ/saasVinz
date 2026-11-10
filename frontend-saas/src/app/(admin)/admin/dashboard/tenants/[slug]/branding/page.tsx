@@ -15,7 +15,7 @@ export default function TenantBrandingPage() {
 
     const { data } = useTenantDetail(tenantSlug);
 
-    const handleLogoUpdated = () => {
+    const handleUpdated = () => {
         queryClient.invalidateQueries({ queryKey: ['tenant-detail', tenantSlug] });
     };
 
@@ -24,7 +24,9 @@ export default function TenantBrandingPage() {
             tenantSlug={tenantSlug}
             tenantId={data?.tenant?.id}
             logoUrl={data?.tenant?.logo_url || ''}
-            onLogoUpdated={handleLogoUpdated}
+            catalogVideo={data?.tenant?.catalog_video}
+            onLogoUpdated={handleUpdated}
+            onVideoUpdated={handleUpdated}
             onShowToast={(text, type) => showToast(text, type || 'success')}
         />
     );

@@ -381,4 +381,6 @@ class PublicCatalogResponse(BaseModel):
     # Catálogo de productos abierto con ?ref= (enlace de seguimiento / correo):
     # {pet_name, can_request}. None = sin orden (compra externa).
     order_ref: Optional[dict] = None
+    # Video de bienvenida del catálogo ({source, url, duration, button_text})
+    catalog_video: Optional[dict] = None
 

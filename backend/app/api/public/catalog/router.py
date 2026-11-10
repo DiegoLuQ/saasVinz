@@ -86,6 +86,7 @@ def get_public_catalog(
         tenant_social=public_social,
         catalog_tagline=tenant.catalog_tagline,
         catalog_intro=tenant.catalog_intro,
+        catalog_video=tenant.catalog_video,
         whatsapp=clean_whatsapp,
         expires_at=share_token.expires_at,
     )
