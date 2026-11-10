@@ -611,16 +611,15 @@ export default function ShareCatalogModal({
                                         type="button"
                                         role="switch"
                                         aria-checked={newShowVideo}
-                                        disabled={!tenantVideo?.has_video}
                                         onClick={() => setNewShowVideo(!newShowVideo)}
-                                        title={tenantVideo?.has_video ? (newShowVideo ? 'Video visible en este enlace' : 'Video oculto en este enlace') : 'No hay video cargado'}
-                                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${
-                                            newShowVideo && tenantVideo?.has_video ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'
+                                        title={newShowVideo ? 'Video visible en este enlace' : 'Video oculto en este enlace'}
+                                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                            newShowVideo ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'
                                         }`}
                                     >
                                         <span
                                             className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                                newShowVideo && tenantVideo?.has_video ? 'translate-x-5' : 'translate-x-0'
+                                                newShowVideo ? 'translate-x-5' : 'translate-x-0'
                                             }`}
                                         />
                                     </button>
@@ -813,21 +812,25 @@ export default function ShareCatalogModal({
                                                         <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
                                                             Video de bienvenida
                                                         </span>
+                                                        {!tenantVideo?.has_video && (
+                                                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+                                                                (Pendiente de carga en admin)
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <button
                                                         type="button"
                                                         role="switch"
                                                         aria-checked={editing.showVideo}
-                                                        disabled={!tenantVideo?.has_video}
                                                         onClick={() => setEditing({ ...editing, showVideo: !editing.showVideo })}
-                                                        title={tenantVideo?.has_video ? (editing.showVideo ? 'Video activo' : 'Video oculto') : 'Sin video cargado'}
-                                                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${
-                                                            editing.showVideo && tenantVideo?.has_video ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'
+                                                        title={editing.showVideo ? 'Video activo' : 'Video oculto'}
+                                                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                                            editing.showVideo ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'
                                                         }`}
                                                     >
                                                         <span
                                                             className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                                                editing.showVideo && tenantVideo?.has_video ? 'translate-x-4' : 'translate-x-0'
+                                                                editing.showVideo ? 'translate-x-4' : 'translate-x-0'
                                                             }`}
                                                         />
                                                     </button>
@@ -864,21 +867,19 @@ export default function ShareCatalogModal({
                                                             Permanente
                                                         </span>
                                                     )}
-                                                    {tenantVideo?.has_video && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleToggleVideo(link)}
-                                                            className={`px-2 py-0.5 rounded-full text-[9px] font-bold flex items-center gap-1 border transition-all cursor-pointer ${
-                                                                link.show_video !== false
-                                                                    ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-500/15 dark:border-amber-400/40 dark:text-amber-300'
-                                                                    : 'bg-slate-100 border-slate-200 text-slate-500 dark:bg-white/5 dark:border-white/10 dark:text-slate-400 hover:text-slate-700'
-                                                            }`}
-                                                            title={link.show_video !== false ? 'Video visible en este catálogo (clic para ocultar)' : 'Video oculto en este catálogo (clic para mostrar)'}
-                                                        >
-                                                            <Play size={8} className={link.show_video !== false ? 'fill-current' : ''} />
-                                                            <span>{link.show_video !== false ? 'Video activo' : 'Video oculto'}</span>
-                                                        </button>
-                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleToggleVideo(link)}
+                                                        className={`px-2 py-0.5 rounded-full text-[9px] font-bold flex items-center gap-1 border transition-all cursor-pointer ${
+                                                            link.show_video !== false
+                                                                ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-500/15 dark:border-amber-400/40 dark:text-amber-300'
+                                                                : 'bg-slate-100 border-slate-200 text-slate-500 dark:bg-white/5 dark:border-white/10 dark:text-slate-400 hover:text-slate-700'
+                                                        }`}
+                                                        title={link.show_video !== false ? 'Video activo en este catálogo (clic para ocultar)' : 'Video oculto en este catálogo (clic para activar)'}
+                                                    >
+                                                        <Play size={8} className={link.show_video !== false ? 'fill-current' : ''} />
+                                                        <span>{link.show_video !== false ? 'Video activo' : 'Video oculto'}</span>
+                                                    </button>
                                                 </div>
 
                                                 {link.message && (
