@@ -1341,7 +1341,7 @@ export default function MemorialClientPage({ initialData, uuid: uuidProp }: { in
                     )}
                 </div>
             </div>
-            <HuellasFooter locale={locale} t={t} />
+            <HuellasFooter locale={locale} t={t} isDarkMode={isDarkMode} transparent={true} />
 
             {/* Expiration Modal */}
             <ExpirationModal
