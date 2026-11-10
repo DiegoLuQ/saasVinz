@@ -405,6 +405,75 @@ export default function MemorialSetupModal({
         }
     };
 
+    const handleSendToOwner = async () => {
+        if (!memorial?.id_recuerdo || sendingEmail || saving) return;
+        let target = customerEmail.trim();
+        if (!target) {
+            const prompted = window.prompt("Ingresa el correo electrónico del dueño para enviarle el Memorial:");
+            if (!prompted || !prompted.trim()) return;
+            target = prompted.trim();
+            setCustomerEmail(target);
+        }
+
+        // 1. Guardar primero para que los últimos cambios (altar, fotos, música) queden registrados
+        setSaving(true);
+        try {
+            const updated = await apiRequest(`/api/internal/memorials/${memorial.id_recuerdo}/manage`, {
+                method: "PATCH",
+                headers: memorial.access_key ? { "access-key": memorial.access_key } : {},
+                body: {
+                    msg_despedida: msgDespedida,
+                    es_privado: esPrivado,
+                    main_image_url: mainImageUrl || undefined,
+                    customer_email: target,
+                    death_date: deathDate ? `${deathDate}T00:00:00` : undefined,
+                    diseno: {
+                        ...(memorial.diseno || {}),
+                        tipo_diseno: scenarioId,
+                        particulas,
+                        tema,
+                        color_fondo: memorial.diseno?.color_fondo || "",
+                        portada_url: memorial.diseno?.portada_url || "",
+                    },
+                },
+            });
+
+            const melodyChanged =
+                (memorial.melody?.id ?? null) !== melodyId || Boolean(memorial.melody?.activa) !== (melodyActive && Boolean(melodyId));
+            const withMelody = melodyChanged
+                ? await apiRequest(`/api/internal/memorials/${memorial.id_recuerdo}/melody`, {
+                      method: "PUT",
+                      body: { media_id: melodyId, activa: melodyActive && Boolean(melodyId) },
+                  })
+                : null;
+
+            if (updated) {
+                setMemorial((prev: any) => ({ ...prev, ...updated, ...(withMelody || {}) }));
+                if (onSuccess) onSuccess();
+            }
+        } catch (err) {
+            console.error("Error guardando memorial previo al envío:", err);
+        } finally {
+            setSaving(false);
+        }
+
+        // 2. Enviar el correo formal con acceso a memorial.vinzer.cl y PIN al dueño
+        setSendingEmail(true);
+        setEmailSentSuccess(false);
+        try {
+            await apiRequest(`/api/internal/memorials/${memorial.id_recuerdo}/send-credentials`, {
+                method: "POST",
+                body: { email: target },
+            });
+            setEmailSentSuccess(true);
+            setTimeout(() => setEmailSentSuccess(false), 5000);
+        } catch (err: any) {
+            alert(err.message || "Error al enviar el memorial al dueño.");
+        } finally {
+            setSendingEmail(false);
+        }
+    };
+
     const handleShareWhatsAppToFamily = () => {
         if (!memorial) return;
         const publicUrl = getMemorialUrl();
@@ -1117,7 +1186,7 @@ export default function MemorialSetupModal({
                 {/* ═══════════════════════════════════════════════════════
                     FOOTER ELEGANTE CON BOTÓN DE GUARDADO PRINCIPAL
                 ═══════════════════════════════════════════════════════ */}
-                <div className="px-6 py-4 bg-slate-50 dark:bg-white/[0.02] border-t border-slate-200 dark:border-white/10 flex items-center justify-between gap-3">
+                <div className="px-6 py-4 bg-slate-50 dark:bg-white/[0.02] border-t border-slate-200 dark:border-white/10 flex items-center justify-between gap-3 flex-wrap">
                     <button
                         type="button"
                         onClick={onClose}
@@ -1126,27 +1195,60 @@ export default function MemorialSetupModal({
                         Cerrar
                     </button>
 
-                    {!planBlockedMessage && !notCreated && isProOrUltra && (
-                        <button
-                            type="button"
-                            onClick={handleSave}
-                            disabled={saving || loading}
-                            className="px-7 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-amber-500/20 flex items-center gap-2 transition-all disabled:opacity-50 active:scale-95"
-                        >
-                            {saving ? (
-                                <RefreshCw className="animate-spin" size={15} />
-                            ) : saveFeedback ? (
-                                <Check size={15} />
-                            ) : (
-                                <Sparkles size={15} />
-                            )}
-                            {saving
-                                ? "Guardando..."
-                                : saveFeedback
-                                ? "¡Memorial Actualizado!"
-                                : "Guardar Configuración"}
-                        </button>
-                    )}
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                        {!planBlockedMessage && !notCreated && isProOrUltra && (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={handleSendToOwner}
+                                    disabled={sendingEmail || saving || loading}
+                                    className={`px-5 py-3 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all shadow-md active:scale-95 disabled:opacity-50 cursor-pointer ${
+                                        emailSentSuccess
+                                            ? "bg-emerald-600 text-white shadow-emerald-600/30"
+                                            : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20"
+                                    }`}
+                                    title="Guardar cambios y enviar el memorial al correo del tutor"
+                                >
+                                    {sendingEmail ? (
+                                        <>
+                                            <RefreshCw size={15} className="animate-spin" />
+                                            <span>Enviando al Dueño...</span>
+                                        </>
+                                    ) : emailSentSuccess ? (
+                                        <>
+                                            <Check size={15} strokeWidth={3} />
+                                            <span>¡Memorial Enviado!</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Send size={15} />
+                                            <span>Enviar al Dueño</span>
+                                        </>
+                                    )}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={handleSave}
+                                    disabled={saving || loading || sendingEmail}
+                                    className="px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-amber-500/20 flex items-center gap-2 transition-all disabled:opacity-50 active:scale-95 cursor-pointer"
+                                >
+                                    {saving ? (
+                                        <RefreshCw className="animate-spin" size={15} />
+                                    ) : saveFeedback ? (
+                                        <Check size={15} />
+                                    ) : (
+                                        <Sparkles size={15} />
+                                    )}
+                                    {saving
+                                        ? "Guardando..."
+                                        : saveFeedback
+                                        ? "¡Memorial Actualizado!"
+                                        : "Guardar Configuración"}
+                                </button>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

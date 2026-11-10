@@ -106,28 +106,34 @@ async def send_memorial_welcome_email(
     pin = memorial.access_key or "------"
     first_name = _first_name(customer.name if customer else None)
 
-    subject = f"🕊️ Memorial digital de {pet.name} — Credenciales de acceso"
+    subject = f"🕊️ El memorial digital de {pet.name} ya está en línea · {tenant.name}"
     title = f"El santuario conmemorativo de {pet.name} está listo"
 
     paragraphs = [
-        f"Hola {first_name}:",
-        f"Con profundo respeto y cariño, hemos preparado un espacio digital único y perpetuo para honrar la vida y el recuerdo inolvidable de {pet.name}.",
-        f"A través de este santuario virtual, tu familia y amigos podrán encender velas, dejar flores y compartir palabras de apoyo en su honor.",
-        f"Tu código PIN privado de administración es: {pin}",
-        "Con este código puedes ingresar como administrador para moderar dedicatorias recibidas (aprobar o eliminar mensajes) y personalizar la música o detalles de su altar.",
+        f"Hola, {first_name}:",
+        f"Con profundo respeto y cariño, hemos preparado un espacio digital en el portal conmemorativo memorial.vinzer.cl para honrar y preservar el recuerdo inolvidable de {pet.name}.",
+        f"En este santuario virtual, tu familia y seres queridos podrán visitar su altar, encender velitas perpetuas y dejar palabras de afecto y homenaje en su honor.",
+        f"Tu código PIN privado de gestión familiar es: {pin}",
+        "Con este código puedes ingresar como administrador para moderar dedicatorias recibidas (aprobar o eliminar mensajes), personalizar la música de fondo y seleccionar sus fotos preferidas.",
+        "Además, en memorial.vinzer.cl podrás conocer todas las opciones para enriquecer aún más su memorial: agregar su historia de vida (línea de tiempo), recuerdos en video y audio con su voz, o solicitar una placa conmemorativa con código QR para su ánfora.",
     ]
 
-    support_info = f"{tenant.email or ''} · WhatsApp: {tenant.phone or ''} o soporte central en contacto@vinzer.cl"
+    support_info = f"{tenant.email or ''} · WhatsApp: {tenant.phone or ''} · Portal: memorial.vinzer.cl"
     footer = (
-        f"En caso de extravío de este PIN o cualquier consulta, puedes responder a este correo, "
-        f"contactar al crematorio vía WhatsApp o escribirnos a contacto@vinzer.cl."
+        f"Con todo nuestro cariño y respeto,\nEl equipo de {tenant.name}.\n"
+        f"En caso de consultas o para conocer más opciones de memoriales y homenajes, puedes responder a este correo o visitar memorial.vinzer.cl."
     )
 
     rows = [
         ("Mascota", pet.name),
-        ("PIN de Administración", pin),
-        ("Soporte y Contacto", support_info),
+        ("Código PIN", pin),
+        ("Portal Conmemorativo", "memorial.vinzer.cl"),
+        ("Gestión Familiar", urls["portal_url"]),
     ]
+
+    photo_url = memorial.main_image_url or (pet.image_url if pet else None)
+    if photo_url and not photo_url.startswith(("http://", "https://")):
+        photo_url = None
 
     try:
         await send_action_email(
@@ -135,13 +141,15 @@ async def send_memorial_welcome_email(
             subject=subject,
             title=title,
             paragraphs=paragraphs,
-            button_label=f"Visitar Memorial de {pet.name}",
+            button_label=f"🕊️ Visitar el Memorial de {pet.name}",
             button_url=urls["public_url"],
             footer=footer,
-            kicker=f"Memorial · {tenant.name}",
+            kicker=f"Memorial Digital · {tenant.name}",
             brand=tenant_brand(tenant),
             reply_to=tenant.email or None,
             rows=rows,
+            image_url=photo_url,
+            preheader=f"Un espacio eterno para recordar y honrar a {pet.name} en memorial.vinzer.cl.",
         )
         return {"sent": True, "email": target_email}
     except Exception as e:
