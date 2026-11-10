@@ -11,7 +11,7 @@ from app.models import PetStatus
 class CustomerBase(BaseModel):
     rut: Optional[str] = None
     name: str
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
     region: Optional[str] = None
@@ -21,8 +21,10 @@ class CustomerBase(BaseModel):
     @field_validator('email', mode='before')
     @classmethod
     def empty_str_to_none(cls, v: Any) -> Any:
-        if isinstance(v, str) and not v.strip():
-            return None
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return None
         return v
 
 class CustomerCreate(CustomerBase):
@@ -31,12 +33,21 @@ class CustomerCreate(CustomerBase):
 class CustomerUpdate(BaseModel):
     rut: Optional[str] = None
     name: Optional[str] = None
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
     region: Optional[str] = None
     city: Optional[str] = None
     country: Optional[str] = None
+
+    @field_validator('email', mode='before')
+    @classmethod
+    def empty_str_to_none(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return None
+        return v
 
 class CustomerInDB(CustomerBase):
     id: int
