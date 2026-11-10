@@ -10,7 +10,7 @@ import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
     BarChart3, Building2, ClipboardList, Dog, Flame, Heart, Loader2, MapPin, Package, Receipt, Stethoscope, Wallet, Wrench, Layers,
-    Search, ArrowDown,
+    Search, ArrowDown, Scale,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/tenant/api';
 import { useCurrentUser } from '@/hooks/useSessionBootstrap';
@@ -27,7 +27,7 @@ interface KpiData {
         form_conversion: number | null; memorials: number; external_product_units: number; external_product_revenue: number;
     };
     by_plan: RankRow[]; by_service: RankRow[]; by_product: RankRow[]; by_city: RankRow[];
-    by_species: RankRow[]; by_agreement: RankRow[]; by_veterinary: RankRow[];
+    by_species: RankRow[]; by_weight?: RankRow[]; by_agreement: RankRow[]; by_veterinary: RankRow[];
     monthly: MonthRow[];
 }
 
@@ -387,8 +387,9 @@ export default function IndicadoresPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                         <RankCard title="Por plan" icon={Layers} rows={data.by_plan} countLabel="Órdenes" empty="Sin planes en el periodo" />
-                        <RankCard title="Por ciudad" icon={MapPin} rows={data.by_city} countLabel="Órdenes" empty="Sin órdenes en el periodo" />
+                        <RankCard title="Por peso / tamaño" icon={Scale} rows={data.by_weight || []} countLabel="Órdenes" empty="Sin órdenes con peso en el periodo" />
                         <RankCard title="Por especie" icon={Dog} rows={data.by_species} countLabel="Órdenes" empty="Sin órdenes en el periodo" />
+                        <RankCard title="Por ciudad" icon={MapPin} rows={data.by_city} countLabel="Órdenes" empty="Sin órdenes en el periodo" />
                         <RankCard title="Por convenio" icon={Building2} rows={data.by_agreement} countLabel="Órdenes" extraLabel="Descuento" empty="Ninguna orden con convenio" />
                         <RankCard title="Por veterinaria" icon={Stethoscope} rows={data.by_veterinary} countLabel="Órdenes" extraLabel="Comisión" empty="Ninguna orden derivada por veterinarias" />
                     </div>

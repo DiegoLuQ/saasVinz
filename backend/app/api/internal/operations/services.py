@@ -69,9 +69,9 @@ class CremationService:
             joinedload(models.CremationOC.financial),
             joinedload(models.CremationOC.details),
             joinedload(models.CremationOC.scheduling),
-            joinedload(models.CremationOC.servicios),
-            joinedload(models.CremationOC.planes),
-            joinedload(models.CremationOC.productos)
+            joinedload(models.CremationOC.servicios).joinedload(models.ServicioOC.service),
+            joinedload(models.CremationOC.planes).joinedload(models.PlanOC.plan),
+            joinedload(models.CremationOC.productos).joinedload(models.ProductoOC.product)
         ).filter(models.CremationOC.tenant_id == tenant_id)
 
         if status and status != "all":

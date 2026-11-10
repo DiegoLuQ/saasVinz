@@ -171,6 +171,57 @@ def compute(db: Session, tenant_id: int, year: int, month: int | None, status: s
         GROUP BY 1
     """)
 
+    # Ranking por peso / tamaño (tramo del formulario, peso en kg de la OC o tamaño de la mascota)
+    order_weights = q(f"""
+        WITH o AS ({orders_sql})
+        SELECT o.id, o.pet_id, c.weight, pe.size AS pet_size, f.total_price, f.price_list_id
+        FROM o JOIN oc_cremations c ON c.id = o.id
+        LEFT JOIN crm_pets pe ON pe.id = o.pet_id
+        LEFT JOIN oc_financial f ON f.cremation_id = o.id
+    """)
+    from app.services.public_form_config import get_weight_tiers, tier_for_weight
+
+    pet_ids = [r["pet_id"] for r in order_weights if r["pet_id"]]
+    form_sizes: dict[int, str] = {}
+    if pet_ids:
+        form_rows = db.execute(text("""
+            SELECT pet_id, pet_data FROM web_form_submissions
+            WHERE tenant_id = :tid AND pet_id = ANY(:pids) AND coalesce(status, '') <> 'deleted'
+            ORDER BY created_at ASC
+        """), {"tid": tenant_id, "pids": pet_ids}).all()
+        for fr in form_rows:
+            pd = fr.pet_data if isinstance(fr.pet_data, dict) else {}
+            snap = pd.get("weightTier") if isinstance(pd.get("weightTier"), dict) else {}
+            t_label = str(snap.get("label") or pd.get("size") or "").strip()
+            if t_label:
+                form_sizes[fr.pet_id] = t_label[:60]
+
+    tiers_cache: dict = {}
+    weight_map: dict[str, dict] = {}
+    for r in order_weights:
+        label = form_sizes.get(r["pet_id"])
+        if not label and r.get("weight") is not None and float(r["weight"]) > 0:
+            w_val = float(r["weight"])
+            pl = r.get("price_list_id")
+            if pl not in tiers_cache:
+                tiers_cache[pl] = get_weight_tiers(db, tenant_id, pl) or (get_weight_tiers(db, tenant_id) if pl else [])
+            t = tier_for_weight(tiers_cache[pl], w_val)
+            if t:
+                lo = t.min_weight or 0
+                label = f"{lo:g} kg o más" if t.max_weight is None else f"{lo:g} – {t.max_weight:g} kg"
+            else:
+                label = f"{w_val:g} kg"
+        if not label and r.get("pet_size"):
+            label = str(r["pet_size"]).strip().capitalize()
+        if not label:
+            label = "Sin peso registrado"
+
+        slot = weight_map.setdefault(label, {"label": label, "count": 0, "revenue": 0.0})
+        slot["count"] += 1
+        slot["revenue"] += float(r.get("total_price") or 0)
+
+    by_weight = list(weight_map.values())
+
     memorials = q("""
         SELECT count(*) AS n FROM rec_recuerdos WHERE id_tenant = :tid AND fecha >= :s AND fecha < :e
     """)[0]["n"]
@@ -220,6 +271,7 @@ def compute(db: Session, tenant_id: int, year: int, month: int | None, status: s
         "by_product": _rank(list(prod_map.values()), FULL_LIMIT),
         "by_city": _rank(by_city),
         "by_species": _rank(by_species),
+        "by_weight": _rank(by_weight),
         "by_agreement": _rank(by_agreement),
         "by_veterinary": _rank(by_vet),
         "monthly": [series[m] for m in range(1, 13)],

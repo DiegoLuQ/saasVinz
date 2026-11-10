@@ -255,6 +255,7 @@ export default function PetsPage() {
                 birth_date_precision: currentPet?.birth_date ? (currentPet.birth_date_precision || 'day') : 'day',
                 death_date_precision: currentPet?.death_date ? (currentPet.death_date_precision || 'day') : 'day',
                 breed: currentPet?.breed && currentPet.breed.trim() !== '' ? currentPet.breed.trim() : null,
+                size: currentPet?.size && currentPet.size.trim() !== '' ? currentPet.size.trim() : null,
                 images: imageUrls,
                 image_url: imageUrls[0] || undefined,
                 status: currentPet?.status ? currentPet.status.toLowerCase() : 'received'
@@ -529,18 +530,19 @@ export default function PetsPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Tamaño</label>
+                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Tamaño (Opcional)</label>
                             <SearchableSelect
                                 options={[
+                                    { value: '', label: 'Sin especificar (Opcional)' },
                                     { value: 'pequeño', label: 'Pequeño' },
                                     { value: 'mediano', label: 'Mediano' },
                                     { value: 'normal', label: 'Normal' },
                                     { value: 'grande', label: 'Grande' },
                                     { value: 'muy grande', label: 'Muy Grande' }
                                 ]}
-                                value={currentPet?.size || 'normal'}
-                                onChange={(val) => setCurrentPet({ ...currentPet, size: String(val) })}
-                                placeholder="Seleccionar tamaño..."
+                                value={currentPet?.size || ''}
+                                onChange={(val) => setCurrentPet({ ...currentPet, size: val ? String(val) : '' })}
+                                placeholder="Seleccionar tamaño... (Opcional)"
                                 icon={<Tag size={16} />}
                             />
                         </div>
@@ -878,15 +880,23 @@ export default function PetsPage() {
                 title={currentPet?.id ? 'Editar Mascota' : 'Registrar Nueva Mascota'}
                 maxWidth="max-w-4xl"
             >
-                <form onSubmit={handleSave} className="space-y-6">
-                    {/* Image Upload Section - Gallery */}
-                    <div className="flex flex-col items-center justify-center pb-4 border-b border-white/5">
-                        <p className="text-xs font-bold text-muted-foreground uppercase mb-1">Fotos de la Mascota (mín 1, máx 3)</p>
-                        <p className="text-[10px] text-muted-foreground mb-3">La primera es la principal (certificado, diseños, IA y memorial). Toca ⭐ para cambiarla.</p>
-                        <div className="flex gap-3">
+                <form onSubmit={handleSave} className="space-y-5">
+                    {/* Sección Fotografías */}
+                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 dark:bg-white/[0.03] dark:border-white/10 space-y-3.5">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                                <Camera size={15} className="text-amber-500" />
+                                <span>Fotos de la Mascota ({imagePreviews.length}/3)</span>
+                            </span>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                                1:1 recomendado · Primera es la principal
+                            </span>
+                        </div>
+
+                        <div className="flex items-center justify-center gap-3 py-1 flex-wrap">
                             {imagePreviews.map((preview, idx) => (
                                 <div key={idx} className="relative group">
-                                    <div className="w-24 h-24 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
+                                    <div className="w-24 h-24 rounded-2xl bg-white dark:bg-white/5 border-2 border-slate-200 dark:border-white/10 flex items-center justify-center overflow-hidden shadow-sm">
                                         <img src={getImageUrl(preview)} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
                                     </div>
                                     {imagePreviews.length > 1 && (
@@ -908,32 +918,36 @@ export default function PetsPage() {
                                                 isRemote
                                             });
                                         }}
-                                        className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all"
+                                        className="absolute -top-2 -right-2 bg-rose-500 hover:bg-rose-600 text-white p-1 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                                        title="Eliminar foto"
                                     >
                                         <Trash2 size={12} />
                                     </button>
                                 </div>
                             ))}
                             {imagePreviews.length < 3 && (
-                                <div className="relative group cursor-pointer" onClick={() => document.getElementById('pet-image-upload')?.click()}>
-                                    <div className="w-24 h-24 rounded-2xl bg-white/5 border-2 border-dashed border-white/10 flex items-center justify-center transition-all group-hover:border-primary/50">
-                                        <div className="text-center">
-                                            <Camera size={24} className="mx-auto text-muted-foreground mb-1" />
-                                            <span className="text-[9px] font-bold text-muted-foreground uppercase">Agregar</span>
-                                        </div>
-                                    </div>
-                                    <div className="absolute -bottom-2 -right-2 bg-primary text-primary-foreground p-1.5 rounded-xl shadow-lg opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100">
-                                        <Plus size={12} />
-                                    </div>
-                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => document.getElementById('pet-image-upload')?.click()}
+                                    className="w-24 h-24 rounded-2xl border-2 border-dashed border-slate-300 hover:border-amber-500 dark:border-white/15 dark:hover:border-amber-400 bg-white/50 dark:bg-white/[0.02] flex flex-col items-center justify-center gap-1 transition-all group cursor-pointer"
+                                    title="Agregar foto"
+                                >
+                                    <Camera size={22} className="text-slate-400 group-hover:text-amber-500 transition-colors" />
+                                    <span className="text-[10px] font-bold text-slate-500 group-hover:text-amber-600 dark:text-slate-400 uppercase tracking-wider">Subir</span>
+                                </button>
                             )}
                         </div>
-                        <label className="mt-4 flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-                            <input type="checkbox" checked={currentPet?.photo_consent === true}
+
+                        <label className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs text-slate-700 dark:text-slate-300 cursor-pointer hover:border-emerald-300 dark:hover:border-emerald-500/30 transition-all">
+                            <input
+                                type="checkbox"
+                                checked={currentPet?.photo_consent === true}
                                 onChange={(e) => setCurrentPet({ ...currentPet, photo_consent: e.target.checked })}
-                                className="h-4 w-4 accent-emerald-500" />
-                            La familia autoriza usar su foto en homenajes (collage del mes)
+                                className="h-4 w-4 rounded accent-emerald-500 cursor-pointer"
+                            />
+                            <span>La familia autoriza usar su foto en homenajes (collage del mes y redes sociales)</span>
                         </label>
+
                         {/* Modal de Confirmación para eliminar imagen */}
                         <Modal
                             isOpen={!!imageToDelete}
@@ -943,29 +957,30 @@ export default function PetsPage() {
                             zIndex="z-[400]"
                         >
                             <div className="space-y-4">
-                                <p className="text-muted-foreground">
+                                <p className="text-sm text-slate-600 dark:text-slate-300">
                                     {imageToDelete?.isRemote
                                         ? "Esta acción eliminará la imagen permanentemente del servidor. ¿Estás seguro?"
                                         : "¿Estás seguro de que quieres descartar esta imagen antes de guardar?"}
                                 </p>
-                                <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
+                                <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-200 dark:border-white/10">
                                     <button
                                         type="button"
                                         onClick={() => setImageToDelete(null)}
-                                        className="px-4 py-2 rounded-xl hover:bg-white/5 font-medium transition-all"
+                                        className="px-4 py-2 rounded-xl border border-slate-300 dark:border-white/15 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 transition-all cursor-pointer"
                                     >
                                         Cancelar
                                     </button>
                                     <button
                                         type="button"
                                         onClick={handleConfirmDeleteImage}
-                                        className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold transition-all shadow-lg hover:shadow-red-500/20"
+                                        className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
                                     >
                                         Eliminar
                                     </button>
                                 </div>
                             </div>
                         </Modal>
+
                         <input
                             id="pet-image-upload"
                             type="file"
@@ -973,113 +988,158 @@ export default function PetsPage() {
                             onChange={handleImageChange}
                             className="hidden"
                         />
-                        <p className="text-[10px] text-muted-foreground mt-3 uppercase font-bold tracking-widest">Formato 1:1 recomendado</p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-muted-foreground ml-1">Nombre de la Mascota</label>
-                            <input
-                                required
-                                value={currentPet?.name || ''}
-                                onChange={(e) => setCurrentPet({ ...currentPet, name: e.target.value })}
-                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-primary/50"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <label className="text-sm font-bold text-muted-foreground ml-1">Dueño (Cliente)</label>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsQuickCustomerModalOpen(true)}
-                                    className="text-xs text-primary hover:underline font-semibold flex items-center gap-1"
-                                >
-                                    <Plus size={12} />
-                                    Nuevo Cliente
-                                </button>
+                    {/* Bloque 1: Identificación y Tutor */}
+                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 dark:bg-white/[0.03] dark:border-white/10 space-y-4">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                            <Dog size={15} className="text-amber-500" />
+                            <span>1. Identificación y Tutor</span>
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* Nombre */}
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                                    <span>Nombre de la Mascota</span>
+                                    <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    required
+                                    value={currentPet?.name || ''}
+                                    onChange={(e) => setCurrentPet({ ...currentPet, name: e.target.value })}
+                                    placeholder="Ej: Mía, Rocky..."
+                                    className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-white/15 rounded-xl py-2.5 px-3.5 text-sm text-slate-900 dark:text-white outline-none focus:border-amber-500 transition-colors"
+                                />
                             </div>
-                            <SearchableSelect
-                                options={customers.map(c => ({
-                                    value: c.id,
-                                    label: `${c.name} (${c.rut || 'Sin RUT'})`
-                                }))}
-                                value={currentPet?.customer_id || 0}
-                                onChange={(val) => setCurrentPet({ ...currentPet, customer_id: Number(val) })}
-                                placeholder="Seleccionar un cliente..."
-                                icon={<User size={16} />}
-                            />
-                        </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-muted-foreground ml-1">Especie</label>
-                            <SearchableSelect
-                                options={[
-                                    { value: 'canino', label: 'Canino' },
-                                    { value: 'felino', label: 'Felino' },
-                                    { value: 'ave', label: 'Ave' },
-                                    { value: 'mamifero', label: 'Mamífero Pequeño' },
-                                    { value: 'reptil', label: 'Reptil / Anfibio' },
-                                    { value: 'exotico', label: 'Exótico' },
-                                    { value: 'otro', label: 'Otro' }
-                                ]}
-                                value={currentPet?.species || 'canino'}
-                                onChange={(val) => setCurrentPet({ ...currentPet, species: String(val) })}
-                                placeholder="Seleccionar especie..."
-                                icon={<Dog size={16} />}
-                            />
-                        </div>
+                            {/* Dueño / Cliente */}
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                                        <span>Dueño (Cliente)</span>
+                                        <span className="text-rose-500">*</span>
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsQuickCustomerModalOpen(true)}
+                                        className="text-xs text-amber-600 hover:text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1 hover:underline cursor-pointer"
+                                    >
+                                        <Plus size={12} />
+                                        Nuevo Cliente
+                                    </button>
+                                </div>
+                                <SearchableSelect
+                                    options={customers.map(c => ({
+                                        value: c.id,
+                                        label: `${c.name} (${c.rut || 'Sin RUT'})`
+                                    }))}
+                                    value={currentPet?.customer_id || 0}
+                                    onChange={(val) => setCurrentPet({ ...currentPet, customer_id: Number(val) })}
+                                    placeholder="Seleccionar un cliente..."
+                                    icon={<User size={16} />}
+                                />
+                            </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-muted-foreground ml-1">Raza (Opcional)</label>
-                            <input
-                                value={currentPet?.breed || ''}
-                                onChange={(e) => setCurrentPet({ ...currentPet, breed: e.target.value })}
-                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-primary/50"
-                                placeholder="Ej: Labrador, Persa..."
-                            />
-                        </div>
+                            {/* Especie */}
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                    Especie
+                                </label>
+                                <SearchableSelect
+                                    options={[
+                                        { value: 'canino', label: 'Canino' },
+                                        { value: 'felino', label: 'Felino' },
+                                        { value: 'ave', label: 'Ave' },
+                                        { value: 'mamifero', label: 'Mamífero Pequeño' },
+                                        { value: 'reptil', label: 'Reptil / Anfibio' },
+                                        { value: 'exotico', label: 'Exótico' },
+                                        { value: 'otro', label: 'Otro' }
+                                    ]}
+                                    value={currentPet?.species || 'canino'}
+                                    onChange={(val) => setCurrentPet({ ...currentPet, species: String(val) })}
+                                    placeholder="Seleccionar especie..."
+                                    icon={<Dog size={16} />}
+                                />
+                            </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-muted-foreground ml-1">Tamaño</label>
-                            <SearchableSelect
-                                options={[
-                                    { value: 'pequeño', label: 'Pequeño' },
-                                    { value: 'mediano', label: 'Mediano' },
-                                    { value: 'normal', label: 'Normal' },
-                                    { value: 'grande', label: 'Grande' },
-                                    { value: 'muy grande', label: 'Muy Grande' }
-                                ]}
-                                value={currentPet?.size || 'normal'}
-                                onChange={(val) => setCurrentPet({ ...currentPet, size: String(val) })}
-                                placeholder="Seleccionar tamaño..."
-                                icon={<Tag size={16} />}
-                            />
-                        </div>
+                            {/* Raza (Opcional) */}
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                    Raza (Opcional)
+                                </label>
+                                <input
+                                    value={currentPet?.breed || ''}
+                                    onChange={(e) => setCurrentPet({ ...currentPet, breed: e.target.value })}
+                                    className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-white/15 rounded-xl py-2.5 px-3.5 text-sm text-slate-900 dark:text-white outline-none focus:border-amber-500 transition-colors"
+                                    placeholder="Ej: Labrador, Mestizo..."
+                                />
+                            </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-muted-foreground ml-1">Fecha de Nacimiento (Opcional)</label>
-                            <PetDateInput
-                                value={currentPet?.birth_date?.split('T')[0] || ''}
-                                precision={asPrecision(currentPet?.birth_date_precision)}
-                                max={new Date().toISOString().slice(0, 10)}
-                                onChange={(v, p) => setCurrentPet({ ...currentPet, birth_date: v, birth_date_precision: p })}
-                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-primary/50"
-                            />
+                            {/* Tamaño (Opcional) */}
+                            <div className="space-y-1.5 sm:col-span-2">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                    Tamaño (Opcional)
+                                </label>
+                                <SearchableSelect
+                                    options={[
+                                        { value: '', label: 'Sin especificar (Opcional)' },
+                                        { value: 'pequeño', label: 'Pequeño' },
+                                        { value: 'mediano', label: 'Mediano' },
+                                        { value: 'normal', label: 'Normal' },
+                                        { value: 'grande', label: 'Grande' },
+                                        { value: 'muy grande', label: 'Muy Grande' }
+                                    ]}
+                                    value={currentPet?.size || ''}
+                                    onChange={(val) => setCurrentPet({ ...currentPet, size: val ? String(val) : '' })}
+                                    placeholder="Seleccionar tamaño... (Opcional)"
+                                    icon={<Tag size={16} />}
+                                />
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-muted-foreground ml-1">Fecha de Fallecimiento (Opcional)</label>
-                            <PetDateInput
-                                value={currentPet?.death_date?.split('T')[0] || ''}
-                                precision={asPrecision(currentPet?.death_date_precision)}
-                                max={new Date().toISOString().slice(0, 10)}
-                                onChange={(v, p) => setCurrentPet({ ...currentPet, death_date: v, death_date_precision: p })}
-                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-primary/50"
-                            />
+                    </div>
+
+                    {/* Bloque 2: Cronología y Fechas */}
+                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 dark:bg-white/[0.03] dark:border-white/10 space-y-4">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                            <Calendar size={15} className="text-amber-500" />
+                            <span>2. Cronología y Fechas</span>
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                    Fecha de Nacimiento (Opcional)
+                                </label>
+                                <PetDateInput
+                                    value={currentPet?.birth_date?.split('T')[0] || ''}
+                                    precision={asPrecision(currentPet?.birth_date_precision)}
+                                    max={new Date().toISOString().slice(0, 10)}
+                                    onChange={(v, p) => setCurrentPet({ ...currentPet, birth_date: v, birth_date_precision: p })}
+                                    className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-white/15 rounded-xl py-2.5 px-3.5 text-sm text-slate-900 dark:text-white outline-none focus:border-amber-500 transition-colors"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                    Fecha de Fallecimiento (Opcional)
+                                </label>
+                                <PetDateInput
+                                    value={currentPet?.death_date?.split('T')[0] || ''}
+                                    precision={asPrecision(currentPet?.death_date_precision)}
+                                    max={new Date().toISOString().slice(0, 10)}
+                                    onChange={(v, p) => setCurrentPet({ ...currentPet, death_date: v, death_date_precision: p })}
+                                    className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-white/15 rounded-xl py-2.5 px-3.5 text-sm text-slate-900 dark:text-white outline-none focus:border-amber-500 transition-colors"
+                                />
+                            </div>
                         </div>
-                        {currentPet?.id && (
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold text-muted-foreground ml-1">Estado</label>
+                    </div>
+
+                    {/* Bloque 3: Estado Operativo (al editar) */}
+                    {currentPet?.id && (
+                        <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 dark:bg-white/[0.03] dark:border-white/10 space-y-3">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                                <Activity size={15} className="text-amber-500" />
+                                <span>3. Estado Operativo</span>
+                            </h4>
+                            <div className="max-w-sm">
                                 <SearchableSelect
                                     options={[
                                         { value: 'received', label: 'Recibido' },
@@ -1092,24 +1152,25 @@ export default function PetsPage() {
                                     icon={<Activity size={16} />}
                                 />
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
 
-                    <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
+                    {/* Botones de acción Footer */}
+                    <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-white/10">
                         <button
                             type="button"
                             onClick={() => setIsModalOpen(false)}
-                            className="px-6 py-3 rounded-2xl hover:bg-white/5 font-bold transition-all"
+                            className="px-5 py-2.5 rounded-xl border border-slate-300 dark:border-white/15 text-xs font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-all cursor-pointer"
                         >
                             Cancelar
                         </button>
                         <button
                             type="submit"
                             disabled={isSaving}
-                            className="bg-primary text-primary-foreground px-8 py-3 rounded-2xl font-bold shadow-lg shadow-primary/20 hover:opacity-90 transition-all flex items-center"
+                            className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider shadow-lg shadow-amber-500/20 hover:opacity-95 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60"
                         >
-                            {isSaving && <Loader2 className="animate-spin mr-2" size={18} />}
-                            {currentPet?.id ? 'Guardar Cambios' : 'Registrar Mascota'}
+                            {isSaving && <Loader2 className="animate-spin" size={15} />}
+                            <span>{currentPet?.id ? 'Guardar Cambios' : 'Registrar Mascota'}</span>
                         </button>
                     </div>
                 </form>

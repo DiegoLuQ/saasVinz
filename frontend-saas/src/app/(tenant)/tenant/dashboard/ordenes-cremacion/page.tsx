@@ -648,7 +648,9 @@ export default function OrdersPage() {
             const speciesBreed = [c.pet?.species, c.pet?.breed].filter(Boolean).join(' - ') || 'Mascota';
             const customer = c.customer_name || c.pet?.customer?.name || 'Sin cliente';
             const partner = getPartnerName(c) || 'Directo (Sin convenio)';
-            const planOrService = c.cremation_type || c.planes?.[0]?.nombre || c.servicios?.[0]?.nombre || 'Cremación';
+            const planName = c.planes?.[0]?.plan?.name || c.planes?.[0]?.nombre || c.planes?.[0]?.name;
+            const serviceName = c.servicios?.[0]?.service?.name || c.servicios?.[0]?.nombre || c.servicios?.[0]?.name;
+            const planOrService = planName || serviceName || c.cremation_type || 'Cremación';
             const st = statusMap[normalizeStatus(c.status)]?.label || c.status;
             const total = getPrice(c);
             const comm = getCommissionAmount(c);
@@ -1380,7 +1382,9 @@ export default function OrdersPage() {
                                         const species = cremation.pet?.species || 'Mascota';
                                         const breed = cremation.pet?.breed || null;
                                         const customerName = cremation.customer_name || cremation.pet?.customer?.name || 'Cliente directo';
-                                        const serviceType = cremation.cremation_type || cremation.planes?.[0]?.nombre || cremation.servicios?.[0]?.nombre || 'Cremación';
+                                        const planName = cremation.planes?.[0]?.plan?.name || cremation.planes?.[0]?.nombre || cremation.planes?.[0]?.name;
+                                        const serviceName = cremation.servicios?.[0]?.service?.name || cremation.servicios?.[0]?.nombre || cremation.servicios?.[0]?.name;
+                                        const serviceType = planName || serviceName || cremation.cremation_type || 'Cremación';
                                         const ocCode = cremation.oc_number ? `#OC-${cremation.oc_number}` : `#${cremation.id}`;
                                         const verifCode = cremation.verification_code || null;
 
@@ -1455,10 +1459,15 @@ export default function OrdersPage() {
                                                 {/* 4. Detalle Servicio */}
                                                 <td className="px-6 py-4">
                                                     <div>
-                                                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                                                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 block" title={serviceType}>
                                                             {serviceType}
                                                         </span>
                                                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                                            {planName && cremation.cremation_type && (
+                                                                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-slate-400 capitalize">
+                                                                    {cremation.cremation_type}
+                                                                </span>
+                                                            )}
                                                             {cremation.weight_price > 0 && (
                                                                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">
                                                                     +Peso
