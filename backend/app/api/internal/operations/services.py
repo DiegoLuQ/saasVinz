@@ -629,34 +629,34 @@ class CremationService:
         if not db_cremation:
             raise HTTPException(status_code=404, detail="OC no encontrada")
         
-        # Files Cleanup
+        # Recopilar URLs antes de eliminar la orden; se limpian después del commit
+        # solo si ningún otro registro (mascota, solicitud, diseño, memorial) las sigue usando.
+        candidate_urls: list[str] = []
         if db_cremation.details and db_cremation.details.images:
-            for img_url in db_cremation.details.images or []:
-                MediaService.delete_media_by_url(self.db, img_url)
+            candidate_urls.extend(u for u in (db_cremation.details.images or []) if isinstance(u, str) and u)
 
         if db_cremation.evidence:
-             for ev in db_cremation.evidence:
+            for ev in db_cremation.evidence:
                 if ev.photo_url:
-                    MediaService.delete_media_by_url(self.db, ev.photo_url)
+                    candidate_urls.append(ev.photo_url)
 
         if db_cremation.technical and db_cremation.technical.evidence_url:
-            MediaService.delete_media_by_url(self.db, db_cremation.technical.evidence_url)
+            candidate_urls.append(db_cremation.technical.evidence_url)
 
         if db_cremation.logistics_tasks:
             for task in db_cremation.logistics_tasks:
                 if task.evidence_image_url:
-                    MediaService.delete_media_by_url(self.db, task.evidence_image_url)
+                    candidate_urls.append(task.evidence_image_url)
                 if task.signature_url:
-                    MediaService.delete_media_by_url(self.db, task.signature_url)
+                    candidate_urls.append(task.signature_url)
 
         if db_cremation.documents:
             for doc in db_cremation.documents:
                 if doc.file_url:
-                    MediaService.delete_media_by_url(self.db, doc.file_url)
+                    candidate_urls.append(doc.file_url)
 
-        # Las fotos de la mascota NO se tocan: la mascota sigue existiendo (y su
-        # registro web, tarjeta y diseños las usan). Para borrar también la mascota
-        # está el alcance "pet"/"all" del endpoint (pets/purge.py).
+        # Las fotos de la mascota NO se tocan mientras siga existiendo (pets/purge.py
+        # se encarga cuando se borra la mascota explícitamente).
 
         # Restore Stock
         for p_assoc in db_cremation.productos:
@@ -667,6 +667,11 @@ class CremationService:
         
         self.db.delete(db_cremation)
         self.db.commit()
+
+        if candidate_urls:
+            from app.api.internal.crm.pets.purge import delete_unused_files
+            delete_unused_files(self.db, candidate_urls, label=f"order {cremation_id}")
+
         return {"status": "success", "message": "Orden de Cremación eliminada correctamente"}
 
     async def upload_image(self, tenant_id: int, cremation_id: int, file: UploadFile) -> str:
