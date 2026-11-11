@@ -27,6 +27,7 @@ import type {
     AspectRatio, CollageLayer, ImageTemplateCreate, Layer, PhotoLayer, PhotoSlot, StickerLayer, TemplateDefinition, TemplateKind,
     TextBinding, TextLayer,
 } from '@/lib/admin/imageTemplates/types';
+import { TEXT_BG_DEFAULTS } from '@/lib/admin/imageTemplates/types';
 
 const STAGE_MAX = 560;
 const SAMPLE_PHOTO_3_URL =
@@ -50,6 +51,11 @@ const labelCls = 'block text-[11px] font-bold uppercase tracking-wider text-whit
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
     return <div><label className={labelCls}>{label}</label>{children}</div>;
+}
+
+/** Quita las claves sin valor (para no pisar los valores por defecto). */
+function stripUndefined<T extends object>(o: T): Partial<T> {
+    return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>;
 }
 
 function Slider({ label, value, min, max, step = 1, onChange, suffix = '' }: {
@@ -298,6 +304,33 @@ function TextProps({ layer, onChange, aiPreview, onAiPreview, maxChars, onMaxCha
             <Slider label="Interlineado" value={layer.line_height || 1.25} min={0.8} max={2.5} step={0.05} onChange={(v) => onChange({ line_height: v })} />
             <Toggle label="Cursiva" checked={layer.italic} onChange={(v) => onChange({ italic: v })} />
             <Toggle label="Sombra" checked={layer.shadow} onChange={(v) => onChange({ shadow: v })} />
+            <Toggle label="Fondo detrás del texto" hint="Una caja de color para que el texto se lea sobre cualquier imagen."
+                checked={!!layer.bg_enabled}
+                onChange={(v) => onChange(v ? { ...TEXT_BG_DEFAULTS, ...stripUndefined({
+                    bg_color: layer.bg_color, bg_opacity: layer.bg_opacity, bg_padding: layer.bg_padding,
+                    bg_radius: layer.bg_radius, bg_fit: layer.bg_fit,
+                }), bg_enabled: true } : { bg_enabled: false })} />
+            {layer.bg_enabled && (
+                <div className="space-y-3 p-3 rounded-lg bg-white/5 border border-white/10">
+                    <ColorInput label="Color del fondo" value={layer.bg_color || TEXT_BG_DEFAULTS.bg_color} onChange={(v) => onChange({ bg_color: v })} />
+                    <Slider label="Opacidad del fondo" value={layer.bg_opacity ?? TEXT_BG_DEFAULTS.bg_opacity} min={0} max={100} step={1} suffix="%"
+                        onChange={(v) => onChange({ bg_opacity: v })} />
+                    <Slider label="Espacio interior" value={layer.bg_padding ?? TEXT_BG_DEFAULTS.bg_padding} min={0} max={1.5} step={0.05}
+                        onChange={(v) => onChange({ bg_padding: v })} />
+                    <Slider label="Esquinas redondeadas" value={layer.bg_radius ?? TEXT_BG_DEFAULTS.bg_radius} min={0} max={100} step={1} suffix="%"
+                        onChange={(v) => onChange({ bg_radius: v })} />
+                    <Field label="Tamaño del fondo">
+                        <div className="flex gap-1">
+                            {([['text', 'Al texto'], ['box', 'Ancho de la capa']] as const).map(([k, l]) => (
+                                <button key={k} type="button" onClick={() => onChange({ bg_fit: k })}
+                                    className={`flex-1 py-2 rounded-lg text-xs font-bold ${(layer.bg_fit ?? TEXT_BG_DEFAULTS.bg_fit) === k ? 'bg-primary text-white' : 'bg-white/5 text-white/60'}`}>
+                                    {l}
+                                </button>
+                            ))}
+                        </div>
+                    </Field>
+                </div>
+            )}
             <Toggle label="Ajustar a una caja" hint="Define un alto máximo: la letra se achica si el texto no cabe (recomendado para texto IA)."
                 checked={!!layer.height} onChange={(v) => onChange({ height: v ? 25 : undefined })} />
             <Slider label="Ancho" value={layer.width} min={5} max={100} step={0.5} suffix="%" onChange={(v) => onChange({ width: v })} />

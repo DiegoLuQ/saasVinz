@@ -7,6 +7,7 @@ import type {
     TemplateDefinition, Layer, TextLayer, PhotoLayer, StickerLayer, PhotoFills, PhotoFill, TextBinding, ImageBinding,
     CollageLayer, CollagePhoto,
 } from '@/lib/admin/imageTemplates/types';
+import { TEXT_BG_DEFAULTS } from '@/lib/admin/imageTemplates/types';
 import { sampleCollagePhotos } from '@/lib/admin/imageTemplates/constants';
 
 /** Valores de los datos: textos por TextBinding y URLs de imagen por ImageBinding. */
@@ -339,10 +340,37 @@ function TextNode({ layer, value, ...common }: NodeCommon & { layer: TextLayer; 
         return fs;
     }, [boxH, shown, baseSize, maxWidth, layer.font_family, fontStyle, layer.letter_spacing, lineHeight]);
 
+    // Fondo detrás del texto: medir el bloque real (ancho de la línea más larga y alto).
+    const bg = useMemo(() => {
+        if (!layer.bg_enabled || !shown) return null;
+        const probe = new Konva.Text({
+            text: shown, width: maxWidth, fontFamily: layer.font_family, fontStyle, fontSize,
+            letterSpacing: layer.letter_spacing || 0, lineHeight, wrap: 'word',
+        });
+        const textW = Math.min(maxWidth, probe.getTextWidth());
+        const textH = probe.height();
+        probe.destroy();
+        const pad = (layer.bg_padding ?? TEXT_BG_DEFAULTS.bg_padding) * fontSize;
+        const fitBox = (layer.bg_fit ?? TEXT_BG_DEFAULTS.bg_fit) === 'box';
+        const w = fitBox ? maxWidth : textW;
+        const h = fitBox && boxH ? boxH : Math.min(textH, boxH ?? textH);
+        const x = fitBox || layer.align === 'left' ? 0 : layer.align === 'right' ? maxWidth - w : (maxWidth - w) / 2;
+        const y = boxH && !(fitBox && boxH) ? (boxH - h) / 2 : 0;
+        const rw = w + pad * 2, rh = h + pad * 2;
+        const radius = ((layer.bg_radius ?? TEXT_BG_DEFAULTS.bg_radius) / 100) * Math.min(rw, rh) / 2;
+        return { x: x - pad, y: y - pad, w: rw, h: rh, radius };
+    }, [layer.bg_enabled, layer.bg_padding, layer.bg_fit, layer.bg_radius, layer.align, layer.font_family, layer.letter_spacing,
+        shown, maxWidth, fontStyle, fontSize, lineHeight, boxH]);
+
     // Sin alto fijo se mantiene el anclaje histórico: la primera línea centrada en y.
     const groupH = boxH ?? fontSize;
     return (
         <LayerGroup layer={layer} w={maxWidth} h={groupH} {...common}>
+            {bg && (
+                <Rect x={bg.x} y={bg.y} width={bg.w} height={bg.h} cornerRadius={bg.radius}
+                    fill={layer.bg_color || TEXT_BG_DEFAULTS.bg_color}
+                    opacity={(layer.bg_opacity ?? TEXT_BG_DEFAULTS.bg_opacity) / 100} />
+            )}
             <Text
                 width={maxWidth}
                 height={boxH ?? undefined}

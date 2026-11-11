@@ -55,7 +55,20 @@ export interface TextLayer {
     letter_spacing: number;
     line_height?: number;
     shadow: boolean;
+    /** Fondo detrás del texto (contraste). Sin definir = sin fondo. */
+    bg_enabled?: boolean;
+    bg_color?: string;
+    /** 0–100 %. */
+    bg_opacity?: number;
+    /** Espacio interior, en veces el tamaño de letra (0–1.5). */
+    bg_padding?: number;
+    /** Esquinas: 0 = rectas, 100 = forma de pastilla. */
+    bg_radius?: number;
+    /** 'text' = se ajusta al texto; 'box' = ancho completo de la capa. */
+    bg_fit?: 'text' | 'box';
 }
+
+export const TEXT_BG_DEFAULTS = { bg_color: '#000000', bg_opacity: 60, bg_padding: 0.35, bg_radius: 30, bg_fit: 'text' as const };
 
 export type PhotoSource = 'pet' | 'ai';
 
