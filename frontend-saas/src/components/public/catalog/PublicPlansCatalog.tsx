@@ -252,7 +252,7 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
         >
             {/* Barra superior */}
             <header className="sticky top-0 z-40 bg-[var(--cat-bg)]/90 backdrop-blur-md border-b border-[var(--cat-line)]">
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+                <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-8 lg:px-12 h-16 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                         {logoUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -291,11 +291,11 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
             </header>
 
             {/* Contenedor Superior: Hero + Calculador en 2 columnas (>= 960px) y 1 columna en móvil/tablet */}
-            <section className="w-full max-w-6xl mx-auto px-4 sm:px-6 pt-8 pb-8 sm:pt-12 sm:pb-12">
+            <section className="w-full max-w-[1440px] mx-auto px-4 sm:px-8 lg:px-12 pt-8 pb-8 sm:pt-12 sm:pb-12">
                 <div
                     className={`grid grid-cols-1 ${
-                        plans.length > 0 ? 'min-[960px]:grid-cols-2' : ''
-                    } items-center gap-8 min-[960px]:gap-12`}
+                        plans.length > 0 ? 'min-[960px]:grid-cols-[1fr_1.15fr] xl:grid-cols-[1fr_1.2fr]' : ''
+                    } items-center gap-8 min-[960px]:gap-12 xl:gap-16`}
                 >
                     {/* Columna Izquierda: Presentación alineada a la izquierda */}
                     <div className="flex flex-col items-start text-left">
@@ -310,7 +310,7 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--cat-gold-deep)]">
                             Nuestros planes
                         </p>
-                        <h1 className="mt-2.5 [font-family:var(--cat-serif)] text-4xl sm:text-5xl font-semibold leading-tight text-[var(--cat-ink)]">
+                        <h1 className="mt-2.5 [font-family:var(--cat-serif)] text-4xl sm:text-5xl lg:text-[52px] font-semibold leading-tight text-[var(--cat-ink)]">
                             {tenant.name}
                         </h1>
                         {tenant.tagline && (
@@ -318,8 +318,8 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                                 {tenant.tagline}
                             </p>
                         )}
-                        <div className="mt-5 h-px w-14 bg-[var(--cat-gold)]/50" />
-                        <p className="mt-5 text-[15px] leading-relaxed text-[var(--cat-muted)] whitespace-pre-line max-w-xl">
+                        <div className="mt-5 h-px w-16 bg-[var(--cat-gold)]/50" />
+                        <p className="mt-5 text-[15px] sm:text-base leading-relaxed text-[var(--cat-muted)] whitespace-pre-line max-w-2xl">
                             {tenant.intro || DEFAULT_CATALOG_INTRO}
                         </p>
                         {catalogVideo && (
@@ -337,7 +337,7 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                                 </button>
                             </div>
                         )}
-                        <div className="mt-7 pt-5 border-t border-[var(--cat-line)] w-full max-w-md flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-medium text-[var(--cat-muted)]">
+                        <div className="mt-7 pt-5 border-t border-[var(--cat-line)] w-full max-w-xl flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-medium text-[var(--cat-muted)]">
                             <span className="inline-flex items-center gap-1.5">
                                 <Check size={14} className="text-[var(--cat-gold-deep)]" />
                                 Atención cercana
@@ -349,10 +349,10 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                         </div>
                     </div>
 
-                    {/* Columna Derecha: Tarjeta del calculador/selector interactivo en grilla 2x2 */}
+                    {/* Columna Derecha: Tarjeta del calculador/selector interactivo (3x2 si hay >=5 tamaños, 2x2 si <=4) */}
                     {plans.length > 0 && (
-                        <div className="w-full rounded-3xl bg-white border border-[var(--cat-line)] shadow-[0_14px_36px_-22px_rgba(43,39,36,0.35)] p-5 sm:p-7 text-left">
-                            <h2 id="pet-size-title" className="[font-family:var(--cat-serif)] text-2xl sm:text-[26px] leading-snug font-semibold text-[var(--cat-ink)]">
+                        <div className="w-full rounded-3xl bg-white border border-[var(--cat-line)] shadow-[0_14px_36px_-22px_rgba(43,39,36,0.35)] p-5 sm:p-8 text-left">
+                            <h2 id="pet-size-title" className="[font-family:var(--cat-serif)] text-2xl sm:text-[28px] leading-snug font-semibold text-[var(--cat-ink)]">
                                 ¿Cuál es el tamaño aproximado de tu mascota?
                             </h2>
                             <p className="mt-1.5 text-xs sm:text-sm text-[var(--cat-muted)]">
@@ -361,7 +361,9 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                             <div
                                 role="radiogroup"
                                 aria-labelledby="pet-size-title"
-                                className="mt-5 grid grid-cols-2 gap-3 sm:gap-3.5"
+                                className={`mt-5 grid grid-cols-2 ${
+                                    sizes.length >= 5 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
+                                } gap-3 sm:gap-3.5`}
                             >
                                 {sizes.map(size => {
                                     const active = size.key === sizeKey;
@@ -423,7 +425,7 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
             </section>
 
             {/* Contenedor Inferior: Resultados / Planes */}
-            <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 pb-16">
+            <main className="flex-1 w-full max-w-[1440px] mx-auto px-4 sm:px-8 lg:px-12 pb-16">
                 {plans.length > SEARCH_THRESHOLD && (
                     <div className="relative max-w-md mx-auto mb-8">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--cat-muted)]" size={17} />
@@ -442,9 +444,9 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                     </div>
                 )}
 
-                {/* Mensaje del crematorio para este enlace: entre el selector y los planes */}
+                {/* Mensaje del crematorio para este enlace: al ancho del contenedor */}
                 {message?.trim() && (
-                    <div className="mb-8 mx-auto max-w-3xl rounded-2xl border border-[var(--cat-gold)]/30 bg-[var(--cat-gold)]/[0.06] px-5 py-4 sm:px-7 text-center">
+                    <div className="mb-8 w-full rounded-2xl border border-[var(--cat-gold)]/30 bg-[var(--cat-gold)]/[0.06] px-5 py-4 sm:px-7 text-center">
                         <p className="text-[15px] sm:text-base font-bold leading-relaxed text-[var(--cat-ink)] whitespace-pre-line">
                             {message.trim()}
                         </p>
@@ -506,7 +508,7 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
 
             {/* Pie: datos de contacto del tenant (cada dato se muestra solo si existe) */}
             <footer className="border-t border-[var(--cat-line)] bg-white">
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-8 sm:grid-cols-2 text-sm">
+                <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-8 lg:px-12 py-10 grid gap-8 sm:grid-cols-2 text-sm">
                     <div>
                         <p className="[font-family:var(--cat-serif)] text-2xl font-semibold">{tenant.name}</p>
                         {tenant.tagline && <p className="mt-1 [font-family:var(--cat-serif)] italic text-[var(--cat-gold-deep)]">{tenant.tagline}</p>}
@@ -566,7 +568,7 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                 </div>
                 {/* Firma de Vinzer: leve en todos los planes (FREE la muestra un poco más visible) */}
                 <div className="border-t border-[var(--cat-line)]">
-                    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex justify-center">
+                    <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-8 lg:px-12 py-4 flex justify-center">
                         <a
                             href={vinzerPromoUrl('catalogo_planes')}
                             target="_blank"
@@ -643,7 +645,7 @@ function PlanCard({ view, cover, waUrl, formUrl, sizeLabel, tierPrice = 0, onReq
             }`}
         >
             {/* Columna Izquierda: Portada compacta */}
-            <div className="relative w-full min-[960px]:w-60 xl:w-64 shrink-0 aspect-[16/10] sm:aspect-[2/1] min-[960px]:aspect-auto min-[960px]:min-h-[240px] bg-[var(--cat-sand)]">
+            <div className="relative w-full min-[960px]:w-64 xl:w-72 shrink-0 aspect-[16/10] sm:aspect-[2/1] min-[960px]:aspect-auto min-[960px]:min-h-[240px] bg-[var(--cat-sand)]">
                 {featured && (
                     <span className="absolute top-3.5 left-3.5 z-10 px-3.5 py-1 rounded-full bg-[var(--cat-gold-deep)] text-white text-xs font-semibold tracking-wide shadow-md whitespace-nowrap">
                         Más solicitado
@@ -659,16 +661,16 @@ function PlanCard({ view, cover, waUrl, formUrl, sizeLabel, tierPrice = 0, onReq
                 )}
             </div>
 
-            {/* Columna Central: Nombre, descripción y qué incluye (en 2 sub-columnas) */}
-            <div className="flex-1 flex flex-col p-6 sm:p-7 min-w-0">
+            {/* Columna Central: Nombre, descripción y qué incluye (en 2 o 3 sub-columnas en pantallas anchas) */}
+            <div className="flex-1 flex flex-col p-6 sm:p-8 min-w-0">
                 <div className="flex flex-wrap items-center gap-2.5">
-                    <h2 className="[font-family:var(--cat-serif)] text-[26px] sm:text-[28px] leading-tight font-semibold text-[var(--cat-ink)]">
+                    <h2 className="[font-family:var(--cat-serif)] text-[26px] sm:text-[30px] leading-tight font-semibold text-[var(--cat-ink)]">
                         {plan.name}
                     </h2>
                 </div>
 
                 {plan.description && (
-                    <p className={`mt-2 text-[14px] leading-relaxed text-[var(--cat-muted)] ${longDesc && !expanded ? 'line-clamp-2' : ''}`}>
+                    <p className={`mt-2 text-[14px] sm:text-[15px] leading-relaxed text-[var(--cat-muted)] ${longDesc && !expanded ? 'line-clamp-2' : ''}`}>
                         {plan.description}
                     </p>
                 )}
@@ -685,7 +687,7 @@ function PlanCard({ view, cover, waUrl, formUrl, sizeLabel, tierPrice = 0, onReq
                         <p className="text-[12px] font-bold uppercase tracking-wider text-[var(--cat-muted)] mb-2.5">
                             Incluye
                         </p>
-                        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-2">
+                        <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-2">
                             {visible.map((item, i) => (
                                 <li key={`${item.name}-${i}`} className="flex items-start gap-2 text-[13.5px] leading-snug text-[var(--cat-ink)]">
                                     <Check size={15} strokeWidth={2.25} className="mt-0.5 shrink-0 text-[var(--cat-gold)]" />
@@ -699,7 +701,7 @@ function PlanCard({ view, cover, waUrl, formUrl, sizeLabel, tierPrice = 0, onReq
                 {expanded && optional.length > 0 && (
                     <div className="mt-4 rounded-2xl bg-[var(--cat-sand)]/60 px-4 py-3">
                         <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cat-muted)] mb-2">Opcionales</p>
-                        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-1.5">
+                        <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-1.5">
                             {optional.map((item, i) => (
                                 <li key={`${item.name}-${i}`} className="flex items-start gap-2 text-[13px] leading-snug text-[var(--cat-muted)]">
                                     <Plus size={14} className="mt-0.5 shrink-0 text-[var(--cat-gold)]" />
@@ -724,7 +726,7 @@ function PlanCard({ view, cover, waUrl, formUrl, sizeLabel, tierPrice = 0, onReq
             </div>
 
             {/* Columna Derecha: Precio estimado y Botones de acción */}
-            <div className="w-full min-[960px]:w-72 xl:w-80 shrink-0 flex flex-col justify-between gap-4 p-6 sm:p-7 border-t min-[960px]:border-t-0 min-[960px]:border-l border-[var(--cat-line)] bg-[var(--cat-bg)]/50">
+            <div className="w-full min-[960px]:w-76 xl:w-84 shrink-0 flex flex-col justify-between gap-4 p-6 sm:p-7 border-t min-[960px]:border-t-0 min-[960px]:border-l border-[var(--cat-line)] bg-[var(--cat-bg)]/50">
                 <div>
                     {isAmount ? (
                         <div className="p-4 rounded-2xl bg-white border border-[var(--cat-line)] shadow-xs">
