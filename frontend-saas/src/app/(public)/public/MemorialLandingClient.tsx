@@ -15,11 +15,9 @@ import {
   MapPin,
   MessageCircle,
   Sparkles,
-  Search,
   Lock,
   Flower2,
   Star,
-  ArrowRight,
 } from 'lucide-react';
 import type { Locale } from '@/lib/translations';
 import { getLandingContent, whatsappLink } from '@/lib/memorialLanding';
@@ -112,7 +110,6 @@ export default function MemorialLandingClient() {
   const [activeScenarioId, setActiveScenarioId] = useState<string>('altar');
   const [heroCandleLit, setHeroCandleLit] = useState(true);
   const [heroCandleCount, setHeroCandleCount] = useState(28);
-  const [searchQuery, setSearchQuery] = useState('');
 
   // Preferencia de tema (por defecto light; recuerda la última elección del visitante)
   useEffect(() => {
@@ -183,29 +180,6 @@ export default function MemorialLandingClient() {
       setHeroCandleLit(false);
     }
   };
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = searchQuery.trim();
-    if (!q) return;
-    // Si parece un PIN de 6 dígitos, ir directo al login de memorial
-    if (/^\d{6}$/.test(q)) {
-      window.location.href = `/memorials/login?pin=${q}`;
-      return;
-    }
-    // Desplazar a la galería de homenajes
-    const el = document.getElementById('galeria');
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const filteredMemorials = memorials.filter((m) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase().trim();
-    return (
-      m.pet_name.toLowerCase().includes(q) ||
-      m.tenant_name.toLowerCase().includes(q)
-    );
-  });
 
   const c = getLandingContent(locale);
   const pointIcons = [ClipboardCheck, KeyRound, Route];
@@ -304,56 +278,6 @@ export default function MemorialLandingClient() {
               Preserva el recuerdo eterno de tu angelito con velas perpetuas, retratos ceremoniales,
               estrellas en el firmamento y palabras de consuelo que trascienden el tiempo.
             </motion.p>
-
-            {/* Barra de Búsqueda Rápida de Memorial o PIN Familiar */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="pt-2 max-w-xl mx-auto lg:mx-0"
-            >
-              <form
-                onSubmit={handleSearchSubmit}
-                className={`relative flex items-center rounded-2xl p-1.5 backdrop-blur-md focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-500/20 transition-all border ${
-                  isDark
-                    ? 'bg-slate-900/80 border-amber-500/30 shadow-xl shadow-black/40'
-                    : 'bg-white border-amber-600/25 shadow-xl shadow-stone-900/5'
-                }`}
-              >
-                <div className={`pl-3.5 pr-2 shrink-0 ${isDark ? 'text-amber-400/80' : 'text-amber-600'}`}>
-                  <Search size={18} />
-                </div>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar por nombre de mascota o código PIN..."
-                  className={`w-full bg-transparent text-sm placeholder:text-slate-400 outline-none pr-2 font-sans ${
-                    isDark ? 'text-white' : 'text-slate-900'
-                  }`}
-                />
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-slate-950 font-bold text-xs uppercase tracking-wider shadow-md transition-all shrink-0 cursor-pointer"
-                >
-                  Buscar
-                </button>
-              </form>
-
-              <div className={`flex items-center justify-between text-[11px] mt-2.5 px-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                <span className="flex items-center gap-1.5">
-                  <Lock size={12} className={isDark ? 'text-amber-400' : 'text-amber-600'} /> Acceso familiar privado con PIN de 6 dígitos
-                </span>
-                <a
-                  href="#galeria"
-                  className={`hover:underline flex items-center gap-1 font-semibold ${
-                    isDark ? 'text-amber-300 hover:text-amber-200' : 'text-amber-700 hover:text-amber-800'
-                  }`}
-                >
-                  Ver galería <ArrowRight size={11} />
-                </a>
-              </div>
-            </motion.div>
 
             {/* Botones de Acción */}
             <motion.div
@@ -730,34 +654,13 @@ export default function MemorialLandingClient() {
             dark={isDark}
           />
 
-          {searchQuery.trim() && (
-            <div className="flex items-center justify-center gap-2.5 mb-8">
-              <span
-                className={`px-3.5 py-1 rounded-full border text-xs ${
-                  isDark
-                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-                    : 'bg-amber-500/10 border-amber-600/25 text-amber-800'
-                }`}
-              >
-                Resultados para: <strong>"{searchQuery}"</strong> ({filteredMemorials.length})
-              </span>
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className={`text-xs underline ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'}`}
-              >
-                Limpiar filtro
-              </button>
-            </div>
-          )}
-
           {loading ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {Array.from({ length: GALLERY_SIZE }).map((_, i) => (
                 <div key={i} className={`aspect-[4/5] rounded-3xl animate-pulse ${isDark ? 'bg-white/5' : 'bg-stone-200/70'}`} />
               ))}
             </div>
-          ) : filteredMemorials.length === 0 ? (
+          ) : memorials.length === 0 ? (
             <div
               className={`text-center py-16 rounded-[2.5rem] border border-dashed max-w-lg mx-auto ${
                 isDark ? 'bg-white/[0.02] border-white/15' : 'bg-white/80 border-stone-300'
@@ -765,14 +668,12 @@ export default function MemorialLandingClient() {
             >
               <Heart size={32} className="mx-auto mb-4 text-amber-500/60" />
               <p className={`font-serif italic text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                {searchQuery.trim()
-                  ? `No se encontraron homenajes con "${searchQuery}".`
-                  : 'Pronto verás aquí los primeros homenajes públicos.'}
+                Pronto verás aquí los primeros homenajes públicos.
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-7">
-              {filteredMemorials.map((m, i) => {
+              {memorials.map((m, i) => {
                 const years = yearsTogether(m.pet_birth_date, m.pet_death_date);
                 return (
                   <motion.div
