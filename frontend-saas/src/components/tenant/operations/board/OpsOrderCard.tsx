@@ -57,8 +57,12 @@ export default function OpsOrderCard({
         <button
             type="button"
             onClick={() => onOpen(order)}
-            className={`glass-card text-left w-full rounded-2xl border p-4 flex flex-col gap-3 transition-colors hover:border-primary/40 ${
-                schedule?.overdue ? 'border-red-500/40' : order.priority_plan && !finished ? 'border-rose-500/50 ring-1 ring-rose-500/20' : 'border-foreground/10'
+            className={`glass-card text-left w-full rounded-2xl border p-4 flex flex-col gap-3 transition-colors ${
+                schedule?.overdue
+                    ? 'border-red-500/40 hover:border-red-500/60'
+                    : order.priority_plan && !finished
+                        ? 'border-orange-500/75 ring-1 ring-orange-500/30 hover:border-orange-500'
+                        : 'border-foreground/10 hover:border-primary/40'
             }`}
         >
             <div className="flex items-start justify-between gap-3">
@@ -68,13 +72,25 @@ export default function OpsOrderCard({
                         {[order.pet_species, order.pet_breed, order.weight ? `${order.weight} kg` : null].filter(Boolean).join(' · ')}
                     </p>
                 </div>
-                <div className="flex flex-col items-end gap-1 shrink-0">
-                    <span className="text-[11px] font-mono font-bold text-muted-foreground bg-foreground/5 px-2 py-1 rounded-md">
-                        #{order.oc_number ?? order.id}
+                <span className="text-[11px] font-mono font-bold text-muted-foreground bg-foreground/5 px-2 py-1 rounded-md shrink-0">
+                    #{order.oc_number ?? order.id}
+                </span>
+            </div>
+
+            {(order.cremation_type || order.priority_plan) && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                    <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
+                            order.priority_plan
+                                ? 'bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/30'
+                                : 'bg-foreground/5 text-muted-foreground border-foreground/10'
+                        }`}
+                    >
+                        {order.cremation_type || order.priority_plan}
                     </span>
                     <PriorityBadge plan={order.priority_plan} />
                 </div>
-            </div>
+            )}
 
             {schedule && (
                 <p className={`text-sm font-bold flex items-center gap-1.5 ${schedule.overdue ? 'text-red-500' : 'text-foreground'}`}>

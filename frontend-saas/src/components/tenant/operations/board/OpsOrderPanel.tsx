@@ -231,8 +231,13 @@ export default function OpsOrderPanel({
                                     <Info size={16} />
                                 </span>
                             </div>
-                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm text-muted-foreground">
+                            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-1 text-sm text-muted-foreground">
                                 <span className="font-mono">#{order.oc_number ?? order.id}</span>
+                                {(order.cremation_type || order.priority_plan) && (
+                                    <span className="text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-foreground/5 text-foreground/80 border border-foreground/10">
+                                        {order.cremation_type || order.priority_plan}
+                                    </span>
+                                )}
                                 <PriorityBadge plan={order.priority_plan} size="md" />
                                 <span className="flex items-center gap-1"><User size={14} /> {order.customer_name}</span>
                                 {order.partner_name && <span>· {order.partner_name}</span>}
