@@ -35,8 +35,7 @@ import EvidenceModal from '@/components/public/EvidenceModal';
 import FeedbackSurvey from '@/components/public/FeedbackSurvey';
 import { vinzerPromoUrl } from '@/lib/publicUrls';
 import html2canvas from 'html2canvas';
-import FarewellPreview from '@/app/(tenant)/tenant/dashboard/documentos/disenos/components/FarewellPreview';
-import PublicAiDesignCard from '@/components/public/PublicAiDesignCard';
+import PublicTributeCarousel from '@/components/public/PublicTributeCarousel';
 
 const getStepIcon = (index: number) => {
     switch (index) {
@@ -633,132 +632,19 @@ export default function TrackingPage() {
                         transition={{ duration: 0.5 }}
                         className="max-w-2xl mx-auto space-y-7"
                     >
-                        {/* 1. Tarjeta de Homenaje Central (Protagonista) */}
-                        {farewellConfig && (
-                            <div className={`p-6 sm:p-8 rounded-[2.5rem] border backdrop-blur-md transition-all duration-300 flex flex-col items-center text-center shadow-xl ${
-                                isDarkMode 
-                                    ? 'bg-[#0f1a35]/70 border-amber-500/30 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.7)]' 
-                                    : 'bg-gradient-to-b from-white/95 via-amber-50/40 to-white/95 border-amber-200/90 shadow-[0_20px_50px_-15px_rgba(217,119,6,0.1)]'
-                            }`}>
-                                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 mb-5">
-                                    <Sparkles size={14} className="text-amber-500" />
-                                    <span className="text-[11px] font-black uppercase tracking-wider">
-                                        Homenaje Conmemorativo
-                                    </span>
-                                </div>
-
-                                {(() => {
-                                    const baseHeight = 550;
-                                    const fmt = farewellConfig.format || '3:4';
-                                    let dims = { width: baseHeight * (3 / 4), height: baseHeight };
-                                    if (fmt === '9:16') dims = { width: baseHeight * (9 / 16), height: baseHeight };
-                                    else if (fmt === '3:4') dims = { width: baseHeight * (3 / 4), height: baseHeight };
-                                    else if (fmt === '4:3') dims = { width: baseHeight, height: baseHeight * (3 / 4) };
-                                    else if (fmt === '1:1') dims = { width: baseHeight, height: baseHeight };
-
-                                    const targetWidth = 340;
-                                    const scale = Math.min(0.76, targetWidth / dims.width);
-
-                                    return (
-                                        <>
-                                            {/* Off-screen HD Target para exportación limpia */}
-                                            <div 
-                                                style={{ 
-                                                    position: 'fixed', 
-                                                    left: '-9999px', 
-                                                    top: '-9999px', 
-                                                    width: `${dims.width}px`, 
-                                                    height: `${dims.height}px`, 
-                                                    pointerEvents: 'none', 
-                                                    zIndex: -999 
-                                                }}
-                                            >
-                                                <FarewellPreview ref={cardExportRef} config={farewellConfig} />
-                                            </div>
-
-                                            {/* Tarjeta Visual Escalada */}
-                                            <div 
-                                                style={{ 
-                                                    width: `${dims.width * scale}px`, 
-                                                    height: `${dims.height * scale}px` 
-                                                }}
-                                                className="rounded-2xl overflow-hidden shadow-2xl border border-amber-500/30 relative flex-shrink-0 my-2 bg-black/40"
-                                            >
-                                                <div 
-                                                    style={{
-                                                        transform: `scale(${scale})`,
-                                                        transformOrigin: 'top left',
-                                                        width: `${dims.width}px`,
-                                                        height: `${dims.height}px`,
-                                                    }}
-                                                    className="absolute inset-0"
-                                                >
-                                                    <FarewellPreview config={farewellConfig} />
-                                                </div>
-                                            </div>
-                                        </>
-                                    );
-                                })()}
-
-                                <p className="text-xs text-slate-500 dark:text-neutral-400 italic mt-3 max-w-md">
-                                    Inmortalizando con amor la memoria y el legado de {data.pet_name}.
-                                </p>
-
-                                {/* Botones de Acción */}
-                                <div className="flex flex-col sm:flex-row items-center gap-3 w-full mt-6 pt-5 border-t border-amber-500/15">
-                                    <button
-                                        type="button"
-                                        onClick={handleDownloadCard}
-                                        disabled={isDownloadingCard}
-                                        className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 py-3.5 px-5 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 cursor-pointer"
-                                    >
-                                        {isDownloadingCard ? (
-                                            <>
-                                                <Loader2 size={16} className="animate-spin" />
-                                                <span>Generando en HD...</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Download size={16} />
-                                                <span>Descargar Recuerdo (HD)</span>
-                                            </>
-                                        )}
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={handleShare}
-                                        className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all border cursor-pointer ${
-                                            copiedLink
-                                                ? 'bg-sky-500 text-white border-sky-500'
-                                                : isDarkMode
-                                                    ? 'bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border-neutral-700'
-                                                    : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200 shadow-sm'
-                                        }`}
-                                    >
-                                        {copiedLink ? (
-                                            <>
-                                                <Check size={16} />
-                                                <span>¡Enlace Copiado!</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Share2 size={16} />
-                                                <span>Compartir</span>
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* 1b. Plantilla Conmemorativa con IA (si existe) */}
-                        {data.ai_design && (
-                            <PublicAiDesignCard
-                                design={data.ai_design}
+                        {/* 1. Carrusel de Homenaje Conmemorativo + Recuerdo Especial */}
+                        {(farewellConfig || data.ai_design) && (
+                            <PublicTributeCarousel
+                                farewellConfig={farewellConfig}
+                                aiDesign={data.ai_design}
                                 petName={data.pet_name}
                                 isDarkMode={isDarkMode}
                                 variant="central"
+                                cardExportRef={cardExportRef}
+                                isDownloadingCard={isDownloadingCard}
+                                onDownloadCard={handleDownloadCard}
+                                copiedLink={copiedLink}
+                                onShare={handleShare}
                             />
                         )}
 
@@ -1115,102 +1001,17 @@ export default function TrackingPage() {
                                     )}
                                 </div>
 
-                                {/* Tarjeta 4: Homenaje Conmemorativo (Permanente con Descarga HD) */}
-                                {farewellConfig && (
-                                    <div className={`p-5 rounded-[2rem] border backdrop-blur-md transition-all duration-300 flex flex-col items-center text-center overflow-hidden ${
-                                        isDarkMode ? 'bg-[#0f1a35]/60 border-amber-500/30' : 'bg-gradient-to-br from-amber-50/70 to-white border-amber-200/80 shadow-md shadow-amber-500/5'
-                                    }`}>
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <Sparkles size={16} className="text-amber-500" />
-                                            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
-                                                Homenaje Conmemorativo
-                                            </span>
-                                        </div>
-
-                                        {(() => {
-                                            const baseHeight = 550;
-                                            const fmt = farewellConfig.format || '3:4';
-                                            let dims = { width: baseHeight * (3 / 4), height: baseHeight };
-                                            if (fmt === '9:16') dims = { width: baseHeight * (9 / 16), height: baseHeight };
-                                            else if (fmt === '3:4') dims = { width: baseHeight * (3 / 4), height: baseHeight };
-                                            else if (fmt === '4:3') dims = { width: baseHeight, height: baseHeight * (3 / 4) };
-                                            else if (fmt === '1:1') dims = { width: baseHeight, height: baseHeight };
-
-                                            const targetWidth = 260;
-                                            const scale = Math.min(0.58, targetWidth / dims.width);
-                                            return (
-                                                <>
-                                                    {/* Off-screen HD Target */}
-                                                    <div 
-                                                        style={{ 
-                                                            position: 'fixed', 
-                                                            left: '-9999px', 
-                                                            top: '-9999px', 
-                                                            width: `${dims.width}px`, 
-                                                            height: `${dims.height}px`, 
-                                                            pointerEvents: 'none', 
-                                                            zIndex: -999, 
-                                                        }}
-                                                    >
-                                                        <FarewellPreview ref={cardExportRef} config={farewellConfig} />
-                                                    </div>
-
-                                                    {/* Visual Scaled Card */}
-                                                    <div 
-                                                        style={{ 
-                                                            width: `${dims.width * scale}px`, 
-                                                            height: `${dims.height * scale}px`, 
-                                                        }}
-                                                        className="rounded-2xl overflow-hidden shadow-2xl border border-amber-500/30 relative flex-shrink-0 my-1 bg-black/40"
-                                                    >
-                                                        <div 
-                                                            style={{
-                                                                transform: `scale(${scale})`,
-                                                                transformOrigin: 'top left',
-                                                                width: `${dims.width}px`,
-                                                                height: `${dims.height}px`,
-                                                            }}
-                                                            className="absolute inset-0"
-                                                        >
-                                                            <FarewellPreview config={farewellConfig} />
-                                                        </div>
-                                                    </div>
-                                                </>
-                                            );
-                                        })()}
-
-                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 italic mt-2.5">
-                                            Inmortalizando la memoria de {data.pet_name}.
-                                        </p>
-
-                                        <button
-                                            type="button"
-                                            onClick={handleDownloadCard}
-                                            disabled={isDownloadingCard}
-                                            className="mt-4 w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 cursor-pointer"
-                                        >
-                                            {isDownloadingCard ? (
-                                                <>
-                                                    <Loader2 size={15} className="animate-spin" />
-                                                    <span>Generando en HD...</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Download size={15} />
-                                                    <span>Guardar / Descargar (HD)</span>
-                                                </>
-                                            )}
-                                        </button>
-                                    </div>
-                                )}
-
-                                {/* Tarjeta 4b: Plantilla Conmemorativa con IA (si existe) */}
-                                {data.ai_design && (
-                                    <PublicAiDesignCard
-                                        design={data.ai_design}
+                                {/* Tarjeta 4: Carrusel de Homenaje Conmemorativo + Recuerdo Especial */}
+                                {(farewellConfig || data.ai_design) && (
+                                    <PublicTributeCarousel
+                                        farewellConfig={farewellConfig}
+                                        aiDesign={data.ai_design}
                                         petName={data.pet_name}
                                         isDarkMode={isDarkMode}
                                         variant="compact"
+                                        cardExportRef={cardExportRef}
+                                        isDownloadingCard={isDownloadingCard}
+                                        onDownloadCard={handleDownloadCard}
                                     />
                                 )}
 

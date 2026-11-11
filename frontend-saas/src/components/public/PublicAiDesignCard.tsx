@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Download, Loader2, Sparkles } from 'lucide-react';
+import { Download, Heart, Loader2 } from 'lucide-react';
 import TemplateCanvas from '@/components/admin/imageTemplates/TemplateCanvas';
 import { OffscreenSocial } from '@/components/tenant/registros/OffscreenRenderers';
 import { ASPECT_RATIOS, TEMPLATE_FONTS_URL } from '@/lib/admin/imageTemplates/constants';
@@ -51,11 +51,13 @@ export default function PublicAiDesignCard({
     petName,
     isDarkMode,
     variant = 'compact',
+    embedded = false,
 }: {
     design: PublicAiDesignData;
     petName: string;
     isDarkMode: boolean;
     variant?: 'central' | 'compact';
+    embedded?: boolean;
 }) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [box, setBox] = useState({ w: 0, h: 0 });
@@ -106,7 +108,7 @@ export default function PublicAiDesignCard({
         canvasH = Math.floor(size.rh * s);
     }
 
-    const baseFilename = `recuerdo-ia-${(petName || 'angelito').replace(/\s+/g, '-').toLowerCase()}`;
+    const baseFilename = `recuerdo-${(petName || 'angelito').replace(/\s+/g, '-').toLowerCase()}`;
 
     const handleDownload = async () => {
         if (downloading) return;
@@ -145,18 +147,22 @@ export default function PublicAiDesignCard({
 
     return (
         <div
-            className={`${
-                isCentral ? 'p-6 sm:p-8 rounded-[2.5rem] shadow-xl' : 'p-5 rounded-[2rem] shadow-md shadow-violet-500/5'
-            } border backdrop-blur-md transition-all duration-300 flex flex-col items-center text-center overflow-hidden ${
-                isDarkMode
-                    ? 'bg-[#0f1a35]/65 border-violet-400/25'
-                    : 'bg-gradient-to-br from-violet-50/70 via-white to-amber-50/30 border-violet-200/80'
-            }`}
+            className={
+                embedded
+                    ? 'flex flex-col items-center text-center w-full overflow-hidden'
+                    : `${
+                        isCentral ? 'p-6 sm:p-8 rounded-[2.5rem] shadow-xl' : 'p-5 rounded-[2rem] shadow-md shadow-violet-500/5'
+                    } border backdrop-blur-md transition-all duration-300 flex flex-col items-center text-center overflow-hidden ${
+                        isDarkMode
+                            ? 'bg-[#0f1a35]/65 border-violet-400/25'
+                            : 'bg-gradient-to-br from-violet-50/70 via-white to-amber-50/30 border-violet-200/80'
+                    }`
+            }
         >
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-600 dark:text-violet-300 mb-3.5">
-                <Sparkles size={14} className="text-violet-500" />
+                <Heart size={14} className="text-violet-500" />
                 <span className="text-[11px] font-bold uppercase tracking-wider">
-                    {design.kind === 'illustration' ? 'Ilustración Conmemorativa IA' : 'Diseño Especial con IA'}
+                    {design.kind === 'illustration' ? 'Ilustración Conmemorativa' : 'Recuerdo Especial'}
                 </span>
             </div>
 
@@ -186,7 +192,7 @@ export default function PublicAiDesignCard({
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                         src={resolveImageUrl(design.url)}
-                        alt={design.title || `Recuerdo IA de ${petName}`}
+                        alt={design.title || `Recuerdo especial de ${petName}`}
                         className="w-full h-auto block object-contain"
                     />
                 </div>
@@ -216,7 +222,7 @@ export default function PublicAiDesignCard({
                 ) : (
                     <>
                         <Download size={15} />
-                        <span>Descargar Diseño IA (HD)</span>
+                        <span>Descargar Recuerdo (HD)</span>
                     </>
                 )}
             </button>
