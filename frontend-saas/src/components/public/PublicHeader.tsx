@@ -100,8 +100,8 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
         return () => window.removeEventListener('keydown', onKey);
     }, [isMobileMenuOpen]);
 
-    const toggleLocale = () => {
-        const next: Locale = locale === 'es' ? 'en' : 'es';
+    const selectLocale = (next: Locale) => {
+        if (next === locale) return;
         setLocale(next);
         localStorage.setItem('preferred_locale', next);
         // All public pages/components listen for this event and re-render in place — no reload needed
@@ -279,22 +279,40 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                             </button>
                         )}
 
-                        {/* Language Toggle Compacto */}
-                        <button
-                            onClick={toggleLocale}
-                            aria-label={locale === 'es' ? 'Cambiar idioma a inglés' : 'Switch language to Spanish'}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all duration-200 cursor-pointer
+                        {/* Language Selector Segmented Pill */}
+                        <div
+                            role="group"
+                            aria-label={locale === 'es' ? 'Seleccionar idioma' : 'Select language'}
+                            className={`flex items-center gap-0.5 p-1 rounded-full border transition-all duration-200
                             ${effectiveIsDark
-                                ? 'border-white/10 bg-white/5 hover:bg-white/10 hover:border-[#c5a059]/40'
-                                : 'border-stone-200 bg-stone-50/80 hover:bg-stone-100 hover:border-[#c5a059]/40'}`}
+                                ? 'border-white/10 bg-white/5'
+                                : 'border-stone-200 bg-stone-100/80'}`}
                         >
-                            <Globe size={13} className="text-[#b58938] dark:text-[#c5a059]" />
-                            <span className="text-[10px] font-bold uppercase tracking-wider">
-                                <span className={locale === 'es' ? (effectiveIsDark ? 'text-amber-300' : 'text-amber-800') : 'text-slate-400'}>ES</span>
-                                <span className="mx-1 text-slate-300 dark:text-slate-600">/</span>
-                                <span className={locale === 'en' ? (effectiveIsDark ? 'text-amber-300' : 'text-amber-800') : 'text-slate-400'}>EN</span>
-                            </span>
-                        </button>
+                            <Globe size={12} className="ml-2 mr-1 text-[#b58938] dark:text-[#c5a059] shrink-0" aria-hidden="true" />
+                            {(['es', 'en'] as const).map((code) => {
+                                const active = locale === code;
+                                return (
+                                    <button
+                                        key={code}
+                                        type="button"
+                                        onClick={() => selectLocale(code)}
+                                        aria-pressed={active}
+                                        aria-label={code === 'es' ? 'Español' : 'English'}
+                                        className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-200 cursor-pointer ${
+                                            active
+                                                ? effectiveIsDark
+                                                    ? 'bg-amber-400 text-slate-950 shadow-sm'
+                                                    : 'bg-white text-slate-900 shadow-xs'
+                                                : effectiveIsDark
+                                                    ? 'text-slate-400 hover:text-white'
+                                                    : 'text-slate-500 hover:text-slate-900'
+                                        }`}
+                                    >
+                                        {code.toUpperCase()}
+                                    </button>
+                                );
+                            })}
+                        </div>
 
                         {/* Botón CTA */}
                         <Link
@@ -405,19 +423,37 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                             </nav>
 
                             {/* Idioma y Tema */}
-                            <motion.div variants={itemVariants} className="flex items-center justify-center gap-6 py-6">
-                                <div className="flex items-center gap-3">
-                                    <span className={`text-xs font-bold uppercase tracking-widest ${locale === 'es' ? 'text-[#b58938] dark:text-[#c5a059]' : 'text-slate-400'}`}>ES</span>
-                                    <button
-                                        onClick={toggleLocale}
-                                        aria-label={locale === 'es' ? 'Cambiar idioma a inglés' : 'Switch language to Spanish'}
-                                        className={`w-12 h-6 rounded-full relative border transition-colors ${
-                                            isDark ? 'bg-white/10 border-white/10' : 'bg-stone-200 border-stone-300'
-                                        }`}
-                                    >
-                                        <div className={`absolute top-0.5 w-4 h-4 rounded-full shadow-sm transition-all ${locale === 'en' ? 'left-7 bg-white' : 'left-1 bg-[#c5a059]'}`} />
-                                    </button>
-                                    <span className={`text-xs font-bold uppercase tracking-widest ${locale === 'en' ? 'text-[#b58938] dark:text-[#c5a059]' : 'text-slate-400'}`}>EN</span>
+                            <motion.div variants={itemVariants} className="flex items-center justify-center gap-4 py-6">
+                                <div
+                                    role="group"
+                                    aria-label={locale === 'es' ? 'Seleccionar idioma' : 'Select language'}
+                                    className={`inline-flex items-center gap-0.5 p-1 rounded-full border ${
+                                        isDark ? 'bg-white/5 border-white/10' : 'bg-stone-200/70 border-stone-300/80'
+                                    }`}
+                                >
+                                    <Globe size={13} className="ml-2 mr-1 text-[#b58938] dark:text-[#c5a059]" aria-hidden="true" />
+                                    {(['es', 'en'] as const).map((code) => {
+                                        const active = locale === code;
+                                        return (
+                                            <button
+                                                key={code}
+                                                type="button"
+                                                onClick={() => selectLocale(code)}
+                                                aria-pressed={active}
+                                                className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                                    active
+                                                        ? isDark
+                                                            ? 'bg-amber-400 text-slate-950 shadow-sm'
+                                                            : 'bg-white text-slate-900 shadow-xs'
+                                                        : isDark
+                                                            ? 'text-slate-400'
+                                                            : 'text-slate-600'
+                                                }`}
+                                            >
+                                                {code.toUpperCase()}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
 
                                 {onToggleTheme && (
@@ -431,7 +467,9 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                                         }`}
                                     >
                                         {isDark ? <Sun size={14} /> : <Moon size={14} />}
-                                        <span>{isDark ? 'Claro' : 'Oscuro'}</span>
+                                        <span>
+                                            {locale === 'en' ? (isDark ? 'Light' : 'Dark') : (isDark ? 'Claro' : 'Oscuro')}
+                                        </span>
                                     </button>
                                 )}
                             </motion.div>

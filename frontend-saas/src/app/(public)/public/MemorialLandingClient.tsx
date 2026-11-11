@@ -187,6 +187,7 @@ export default function MemorialLandingClient() {
 
   const currentScenario =
     MEMORIAL_SCENARIOS.find((s) => s.id === activeScenarioId) || MEMORIAL_SCENARIOS[1];
+  const currentScenarioCopy = c.scenarios.items[currentScenario.id];
 
   // Qué plan incluye cada diseño (Admin → Memoriales → Planes y precios).
   const memorialPlans = useMemorialPlans();
@@ -197,9 +198,9 @@ export default function MemorialLandingClient() {
     return p ? p.name : null;
   };
   const scenarioPlanText = (id: string) => {
-    if (scenarioInAll(id)) return 'Incluido en todos los planes';
+    if (scenarioInAll(id)) return c.scenarios.included_all;
     const p = planWithScenario(memorialPlans, id);
-    return p ? `Desde el plan ${p.name}` : 'Incluido';
+    return p ? c.scenarios.from_plan(p.name) : c.scenarios.included;
   };
 
   return (
@@ -244,7 +245,7 @@ export default function MemorialLandingClient() {
               }`}
             >
               <Sparkles size={12} className={isDark ? 'text-amber-400' : 'text-amber-600'} />
-              <span>SANTUARIO DIGITAL CONMEMORATIVO · RED VINZER</span>
+              <span>{c.hero.badge}</span>
             </motion.div>
 
             <motion.h1
@@ -255,7 +256,7 @@ export default function MemorialLandingClient() {
                 isDark ? 'text-white' : 'text-slate-900'
               }`}
             >
-              Un espacio sagrado donde su amor{' '}
+              {c.hero.title}
               <span
                 className={`bg-gradient-to-r bg-clip-text text-transparent italic ${
                   isDark
@@ -263,7 +264,7 @@ export default function MemorialLandingClient() {
                     : 'from-amber-700 via-amber-600 to-amber-800'
                 }`}
               >
-                vive por siempre
+                {c.hero.highlight}
               </span>
             </motion.h1>
 
@@ -275,8 +276,7 @@ export default function MemorialLandingClient() {
                 isDark ? 'text-slate-300/90 font-light' : 'text-slate-600'
               }`}
             >
-              Preserva el recuerdo eterno de tu angelito con velas perpetuas, retratos ceremoniales,
-              estrellas en el firmamento y palabras de consuelo que trascienden el tiempo.
+              {c.hero.subtitle}
             </motion.p>
 
             {/* Botones de Acción */}
@@ -291,7 +291,7 @@ export default function MemorialLandingClient() {
                 className="px-6 py-3.5 rounded-full bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 text-xs font-black uppercase tracking-[0.2em] shadow-lg shadow-amber-500/25 transition-all flex items-center gap-2"
               >
                 <Sparkles size={14} />
-                <span>Explorar los 4 Escenarios</span>
+                <span>{c.hero.cta_scenarios}</span>
               </a>
               <a
                 href="#galeria"
@@ -302,7 +302,7 @@ export default function MemorialLandingClient() {
                 }`}
               >
                 <Flame size={14} className={isDark ? 'text-amber-400' : 'text-amber-600'} />
-                <span>Homenajes en Vivo</span>
+                <span>{c.hero.cta_gallery}</span>
               </a>
             </motion.div>
           </div>
@@ -333,9 +333,9 @@ export default function MemorialLandingClient() {
                 }`}>
                   <span className={`flex items-center gap-1.5 font-bold ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    Vista Previa Oficial
+                    {c.hero_card.preview_badge}
                   </span>
-                  <span>Escenario: Altar de Luz</span>
+                  <span>{c.hero_card.scenario_tag}</span>
                 </div>
 
                 {/* Retrato del Angelito */}
@@ -343,7 +343,7 @@ export default function MemorialLandingClient() {
                   <div className="w-full h-full rounded-full overflow-hidden bg-slate-950 relative">
                     <img
                       src="https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=600&auto=format&fit=crop"
-                      alt="Angelito Conmemorativo"
+                      alt="UNIVERSE"
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/35 via-transparent to-transparent pointer-events-none" />
@@ -363,7 +363,7 @@ export default function MemorialLandingClient() {
                     UNIVERSE
                   </h3>
                   <p className={`text-xs font-serif italic ${isDark ? 'text-amber-200/80' : 'text-amber-700'}`}>
-                    2018 — 2026 · 8 años de amor incondicional
+                    {c.hero_card.years_line}
                   </p>
                 </div>
 
@@ -371,8 +371,7 @@ export default function MemorialLandingClient() {
                 <p className={`text-xs sm:text-sm font-serif italic leading-relaxed px-2 ${
                   isDark ? 'text-slate-300/90 font-light' : 'text-slate-600'
                 }`}>
-                  “Gracias por cada momento, cada alegría y por ser nuestro fiel guardián. Tu recuerdo
-                  brillará por siempre.”
+                  {c.hero_card.quote}
                 </p>
 
                 {/* Vela Interactiva de Homenaje */}
@@ -413,10 +412,10 @@ export default function MemorialLandingClient() {
                     <span className={`mt-2.5 text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${
                       isDark ? 'text-amber-300 group-hover:text-amber-200' : 'text-amber-700 group-hover:text-amber-800'
                     }`}>
-                      {heroCandleLit ? 'Luz Perpetua Encendida' : 'Clic para Encender Vela'}
+                      {heroCandleLit ? c.hero_card.candle_lit : c.hero_card.candle_off}
                     </span>
                     <span className={`text-xs font-serif italic mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                      🕯️ {heroCandleCount} velas encendidas por visitantes
+                      {c.hero_card.candles_count(heroCandleCount)}
                     </span>
                   </button>
                 </div>
@@ -438,9 +437,9 @@ export default function MemorialLandingClient() {
         <div id="experiencia" className="scroll-mt-28" />
         <div className="max-w-7xl mx-auto relative z-10">
           <SectionHeading
-            label="ESCENARIOS OFICIALES"
-            title="Cuatro Maneras Únicas de Honrar su Memoria"
-            subtitle="Cada memorial es un santuario personalizado según el plan del crematorio o la elección de la familia."
+            label={c.scenarios.label}
+            title={c.scenarios.title}
+            subtitle={c.scenarios.subtitle}
             dark={isDark}
           />
 
@@ -448,6 +447,7 @@ export default function MemorialLandingClient() {
           <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mb-12">
             {MEMORIAL_SCENARIOS.map((sc) => {
               const active = sc.id === activeScenarioId;
+              const scCopy = c.scenarios.items[sc.id];
               const icons: Record<string, string> = {
                 normal: '🕯️',
                 altar: '🏛️',
@@ -469,7 +469,7 @@ export default function MemorialLandingClient() {
                   }`}
                 >
                   <span className="text-base sm:text-lg">{icons[sc.id]}</span>
-                  <span>{sc.name}</span>
+                  <span>{scCopy.name}</span>
                   {scenarioPlanTag(sc.id) && (
                     <span
                       className={`text-[9px] px-1.5 py-0.5 rounded-full uppercase font-black tracking-widest ${
@@ -504,26 +504,26 @@ export default function MemorialLandingClient() {
                     : 'bg-amber-500/10 border-amber-600/25 text-amber-800'
                 }`}
               >
-                <span>{currentScenario.levelLabel}</span> · <span>{scenarioPlanText(currentScenario.id)}</span>
+                <span>{currentScenarioCopy.levelLabel}</span> · <span>{scenarioPlanText(currentScenario.id)}</span>
               </div>
 
               <h3 className={`text-3xl sm:text-4xl font-serif font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                {currentScenario.name}
+                {currentScenarioCopy.name}
               </h3>
               <p className={`text-sm sm:text-base font-serif italic ${isDark ? 'text-amber-200/90' : 'text-amber-700'}`}>
-                “{currentScenario.subtitle}”
+                “{currentScenarioCopy.subtitle}”
               </p>
               <p className={`leading-relaxed text-sm sm:text-base ${isDark ? 'text-slate-300 font-light' : 'text-slate-600'}`}>
-                {currentScenario.description}
+                {currentScenarioCopy.description}
               </p>
 
               {/* Atributos Incluidos */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
                 {[
-                  { icon: <Flame size={16} className={isDark ? 'text-amber-400' : 'text-amber-600'} />, label: 'Vela perpetua interactiva' },
-                  { icon: <Camera size={16} className={isDark ? 'text-sky-400' : 'text-sky-600'} />, label: 'Descarga de retrato oficial' },
-                  { icon: <Lock size={16} className={isDark ? 'text-emerald-400' : 'text-emerald-600'} />, label: 'Moderación familiar con PIN' },
-                  { icon: <MessageCircle size={16} className={isDark ? 'text-amber-400' : 'text-amber-600'} />, label: 'Hasta 20 dedicatorias de amor' },
+                  { icon: <Flame size={16} className={isDark ? 'text-amber-400' : 'text-amber-600'} />, label: c.scenarios.perks.candle },
+                  { icon: <Camera size={16} className={isDark ? 'text-sky-400' : 'text-sky-600'} />, label: c.scenarios.perks.download },
+                  { icon: <Lock size={16} className={isDark ? 'text-emerald-400' : 'text-emerald-600'} />, label: c.scenarios.perks.pin },
+                  { icon: <MessageCircle size={16} className={isDark ? 'text-amber-400' : 'text-amber-600'} />, label: c.scenarios.perks.dedications },
                 ].map((attr) => (
                   <div
                     key={attr.label}
@@ -554,10 +554,10 @@ export default function MemorialLandingClient() {
                     {activeScenarioId === 'normal' && '🕯️'}
                   </span>
                   <h4 className="text-xl font-serif font-bold text-white uppercase tracking-wider">
-                    {currentScenario.name}
+                    {currentScenarioCopy.name}
                   </h4>
                   <p className="text-xs text-amber-200/90 font-serif italic max-w-xs mx-auto">
-                    {currentScenario.subtitle}
+                    {currentScenarioCopy.subtitle}
                   </p>
                 </div>
               </div>
@@ -576,39 +576,21 @@ export default function MemorialLandingClient() {
       >
         <div className="max-w-7xl mx-auto">
           <SectionHeading
-            label="GESTOS DE CONSUELO"
-            title="Cuatro Maneras de Acompañar a la Familia"
-            subtitle="Amigos y familiares pueden rendir homenaje en cualquier momento desde cualquier lugar del mundo."
+            label={c.rituals.label}
+            title={c.rituals.title}
+            subtitle={c.rituals.subtitle}
             dark={isDark}
           />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              {
-                icon: <Flame size={24} className={isDark ? 'text-amber-400' : 'text-amber-600'} />,
-                title: 'Luz Perpetua',
-                desc: 'Enciende una vela en el altar. Su llama permanece viva como símbolo de amor eterno.',
-                badge: 'Vela de consuelo',
-              },
-              {
-                icon: <Flower2 size={24} className={isDark ? 'text-rose-400' : 'text-rose-500'} />,
-                title: 'Flores & Pétalos',
-                desc: 'Ofrenda flores virtuales al retrato ceremonial para honrar su paso por nuestras vidas.',
-                badge: 'Tributo floral',
-              },
-              {
-                icon: <Star size={24} className={isDark ? 'text-sky-400' : 'text-sky-600'} />,
-                title: 'Estrellas Celestiales',
-                desc: 'Enciende un astro en el firmamento con tu nombre y deseos de paz para la familia.',
-                badge: 'Cosmos eterno',
-              },
-              {
-                icon: <Heart size={24} className={isDark ? 'text-pink-400' : 'text-pink-500'} />,
-                title: 'Destellos de Amor',
-                desc: 'Envía abrazos y besos virtuales que se suman al contador visible de cariño familiar.',
-                badge: 'Gesto de cariño',
-              },
-            ].map((ritual, idx) => (
+              <Flame key="flame" size={24} className={isDark ? 'text-amber-400' : 'text-amber-600'} />,
+              <Flower2 key="flower" size={24} className={isDark ? 'text-rose-400' : 'text-rose-500'} />,
+              <Star key="star" size={24} className={isDark ? 'text-sky-400' : 'text-sky-600'} />,
+              <Heart key="heart" size={24} className={isDark ? 'text-pink-400' : 'text-pink-500'} />,
+            ].map((icon, idx) => {
+              const ritual = c.rituals.items[idx];
+              return (
               <div
                 key={idx}
                 className={`rounded-3xl border p-7 space-y-4 transition-all group ${
@@ -622,7 +604,7 @@ export default function MemorialLandingClient() {
                     isDark ? 'bg-white/5 border-white/10' : 'bg-amber-50/70 border-amber-200/70'
                   }`}
                 >
-                  {ritual.icon}
+                  {icon}
                 </div>
                 <span className={`text-[10px] font-black uppercase tracking-widest block ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
                   {ritual.badge}
@@ -632,7 +614,8 @@ export default function MemorialLandingClient() {
                   {ritual.desc}
                 </p>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -648,9 +631,9 @@ export default function MemorialLandingClient() {
       >
         <div className="max-w-7xl mx-auto">
           <SectionHeading
-            label="MEMORIALES EN VIVO"
-            title="Recuerdos que Siguen Brillando"
-            subtitle="Homenajes públicos creados junto a los crematorios autorizados de nuestra red."
+            label={c.gallery.label}
+            title={c.gallery.title}
+            subtitle={c.gallery.subtitle}
             dark={isDark}
           />
 
@@ -668,7 +651,7 @@ export default function MemorialLandingClient() {
             >
               <Heart size={32} className="mx-auto mb-4 text-amber-500/60" />
               <p className={`font-serif italic text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                Pronto verás aquí los primeros homenajes públicos.
+                {c.gallery.empty}
               </p>
             </div>
           ) : (
@@ -711,7 +694,7 @@ export default function MemorialLandingClient() {
                           )}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent opacity-60" />
                           <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-[9px] font-bold text-amber-300">
-                            🕯️ Homenaje
+                            {c.gallery.badge}
                           </span>
                         </div>
 
@@ -725,7 +708,7 @@ export default function MemorialLandingClient() {
                           </h3>
                           {years !== null && (
                             <p className={`text-[11px] font-serif italic truncate ${isDark ? 'text-amber-200/70' : 'text-amber-700'}`}>
-                              {years} {years === 1 ? 'año' : 'años'} de amor
+                              {c.gallery.years_short(years)}
                             </p>
                           )}
                         </div>
@@ -773,9 +756,9 @@ export default function MemorialLandingClient() {
 
         <div className="max-w-6xl mx-auto relative z-10">
           <SectionHeading
-            label="RED OFICIAL DE CREMATORIOS"
-            title="Garantía de Respeto, Solemne Custodia y Veracidad"
-            subtitle="Cada homenaje proviene de crematorios verificados que entregan el código de acceso oficial a las familias."
+            label={c.network.label}
+            title={c.network.title}
+            subtitle={c.network.subtitle}
             dark={isDark}
           />
 
@@ -869,9 +852,9 @@ export default function MemorialLandingClient() {
       >
         <div className="max-w-7xl mx-auto">
           <SectionHeading
-            label="PROCESO SENCILLO"
-            title="Cómo Crear o Activar tu Santuario"
-            subtitle="Tres simples pasos para inmortalizar el amor de tu compañero eterno."
+            label={c.steps.label}
+            title={c.steps.title}
+            subtitle={c.steps.subtitle}
             dark={isDark}
           />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -934,9 +917,9 @@ export default function MemorialLandingClient() {
       >
         <div className="max-w-3xl mx-auto">
           <SectionHeading
-            label="RESOLVEMOS TUS DUDAS"
-            title="Preguntas Frecuentes"
-            subtitle="Todo lo que necesitas saber sobre el funcionamiento de los memoriales digitales."
+            label={c.faq.label}
+            title={c.faq.title}
+            subtitle={c.faq.subtitle}
             dark={isDark}
           />
           <div className="space-y-3.5">

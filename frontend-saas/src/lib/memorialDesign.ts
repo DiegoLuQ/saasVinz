@@ -35,7 +35,7 @@ export const MEMORIAL_SCENARIOS: MemorialScenarioConfig[] = [
         levelLabel: 'Escenario Básico',
         name: 'Santuario Sereno',
         subtitle: 'Clásico, cálido y solemne',
-        description: 'Portada conmemorativa con retrato enmarcado, encendido de vela de homenaje, dedicatoria principal, descarga de tarjeta y muro de hasta 20 comentarios.',
+        description: 'Portada conmemorativa con retrato enmarcado, encendido de vela de homenaje, dedicatoria principal, descarga de tarjeta y muro de entre 20 y 250 dedicatorias según el plan.',
         defaultTheme: 'claro',
         defaultParticles: 'ninguna',
         requiresUltraPlan: false,
