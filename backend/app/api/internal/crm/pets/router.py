@@ -276,9 +276,11 @@ def delete_image(
     image_path: str,
     pet_id: int,
     db: Session = Depends(get_db),
-    tenant_id: int = Depends(get_tenant_id)
+    tenant_id: int = Depends(get_tenant_id),
+    _: bool = Depends(check_permission("mascotas", "edit"))
 ):
-    """Elimina una imagen física y actualiza la mascota (solo si pertenece al tenant)."""
+    """Quita una foto de la mascota y borra el archivo solo si nada más lo usa
+    (p. ej. el registro web del que vino la foto la conserva)."""
     # 1. Verificar que la mascota pertenezca al tenant
     db_pet = db.query(models.Pet).filter(
         models.Pet.id == pet_id,
@@ -293,29 +295,20 @@ def delete_image(
     if not db_pet.images or image_path not in db_pet.images:
         raise HTTPException(status_code=403, detail="La imagen no pertenece a esta mascota")
 
-    # 3. Eliminar imagen (soporta R2 y MediaLibrary)
-    from app.api.internal.common.models import MediaLibrary
-    media_item = db.query(MediaLibrary).filter(MediaLibrary.url == image_path).first()
-    
-    if media_item:
-        MediaService.delete_media(db, media_item)
-    else:
-        # Fallback para imágenes legacy que no están en MediaLibrary
-        from app.utils.images import delete_physical_file
-        delete_physical_file(image_path)
-
-    # 4. Actualizar base de datos
+    # 3. Quitar la foto de la mascota (primero la base; recién después el archivo)
     new_images = [img for img in db_pet.images if img != image_path]
     db_pet.images = new_images
-    
-    # Si la imagen borrada era la principal, actualizar image_url con la siguiente disponible o None
+    # Si era la principal, pasa a serlo la siguiente disponible (o ninguna)
     if db_pet.image_url == image_path:
         db_pet.image_url = new_images[0] if new_images else None
-        
     db.commit()
-    db.refresh(db_pet)
 
-    return {"status": "deleted"}
+    # 4. Borrar el archivo si ya nadie lo usa. Si no existe en R2 (o falla), la foto
+    # igual queda quitada de la mascota.
+    from app.api.internal.crm.pets.purge import delete_unused_files
+    files = delete_unused_files(db, [image_path], label=f"pet {pet_id} image")
+
+    return {"status": "deleted", "file_deleted": files["deleted"] == 1, "file_kept_shared": files["kept_shared"] == 1}
 
 def _customer_to_delete(db: Session, tenant_id: int, pet: models.Pet, current_user) -> Optional[models.Customer]:
     """El cliente de la mascota se borra con ella si no tiene otras mascotas y el usuario
