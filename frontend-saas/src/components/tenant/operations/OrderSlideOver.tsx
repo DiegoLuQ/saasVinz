@@ -1,5 +1,6 @@
 "use client";
 
+import { parseServerDate } from '@/lib/dates';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -7,7 +8,7 @@ import {
     Activity, User, Dog, Copy, Check, FileText, ExternalLink, Loader2, Edit, Building2,
     MessageCircle, Compass, ArrowRight, CircleDot,
     BookHeart, Receipt, AlertCircle, Lock, Download, Undo2, Calendar,
-    Scale, MapPin, StickyNote, Printer, Phone, Mail, Sparkles, Pencil, Percent
+    Scale, MapPin, StickyNote, Printer, Phone, Mail, Heart, Pencil, Percent
 } from 'lucide-react';
 import SlideOver from '@/components/tenant/SlideOver';
 import EditWeightModal from '@/components/tenant/EditWeightModal';
@@ -383,7 +384,7 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                 </div>
                                 <Link
                                     href={`/dashboard/recepcion-pedidos/registro?id=${cremation.id}`}
-                                    className="shrink-0 px-3.5 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white border border-orange-400/60 shadow-md shadow-orange-500/30 hover:shadow-lg hover:shadow-orange-500/40 dark:from-orange-500 dark:to-amber-400 dark:hover:from-orange-400 dark:hover:to-amber-300 dark:text-slate-950 dark:border-amber-300/40 dark:shadow-amber-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background text-xs font-black transition-all flex items-center gap-1.5"
+                                    className="shrink-0 px-3.5 py-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white border border-sky-400/60 shadow-md shadow-sky-500/25 hover:shadow-lg hover:shadow-sky-500/35 dark:bg-sky-400 dark:hover:bg-sky-300 dark:text-slate-950 dark:border-sky-300/50 dark:shadow-sky-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background text-xs font-black transition-all flex items-center gap-1.5"
                                 >
                                     <Edit size={14} /> Editar orden
                                 </Link>
@@ -484,7 +485,7 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                         : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
                                 }`}
                             >
-                                <Sparkles size={13} className="text-amber-500 shrink-0" />
+                                <Heart size={13} className="text-rose-500 shrink-0" />
                                 <span className="truncate">Recuerdos</span>
                                 {certsCount > 0 && (
                                     <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-black">
@@ -936,7 +937,7 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
 
                         {/* Origen */}
                         <p className="text-[11px] text-slate-400 dark:text-muted-foreground text-center pt-1">
-                            Creada el {exp.order.created_at ? new Date(exp.order.created_at).toLocaleString('es-CL') : '—'}
+                            Creada el {parseServerDate(exp.order.created_at)?.toLocaleString('es-CL', { timeZone: 'America/Santiago' }) ?? '—'}
                             {exp.origin.submission_code ? ` · Solicitud ${exp.origin.submission_code}` : ''}
                         </p>
                     </>
