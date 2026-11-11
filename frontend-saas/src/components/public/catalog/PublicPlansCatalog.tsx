@@ -8,7 +8,7 @@ import { DEFAULT_CATALOG_INTRO } from '@/lib/catalogDefaults';
 import { planFitsWeight, type WeightTier } from '@/lib/publicFormConfig';
 import FormVideoPlayer from '@/components/public/FormVideoPlayer';
 import {
-    ArrowRight, Check, ChevronDown, Facebook, Feather, Globe, Info, Instagram, Mail, MapPin, MessageCircle, Phone, Play, Plus, Search, Share2, Sparkles, X,
+    ArrowRight, Check, ChevronDown, Facebook, Feather, Globe, Heart, Info, Instagram, Mail, MapPin, MessageCircle, Phone, Play, Plus, Search, Share2, X,
     PawPrint,
 } from 'lucide-react';
 
@@ -599,7 +599,7 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                     >
                         <div className="flex items-center justify-between pb-3 border-b border-[var(--cat-line)]">
                             <div className="flex items-center gap-2 text-[var(--cat-ink)] font-semibold text-base">
-                                <Sparkles size={16} className="text-[var(--cat-gold)]" />
+                                <Heart size={16} className="text-[var(--cat-gold)] fill-[var(--cat-gold)]/15" />
                                 <span>{tenant.name}</span>
                             </div>
                             <button
