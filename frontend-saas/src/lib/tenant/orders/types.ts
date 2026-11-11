@@ -66,6 +66,9 @@ export interface Cremation {
     discount?: number;
     weight?: number;
     weight_price?: number;
+    /** Traslado por comuna (retiro + entrega, lib/transport.ts); como el recargo por peso */
+    transport_price?: number;
+    transport_detail?: { pickup?: import('@/lib/transport').TransportLeg | null; delivery?: import('@/lib/transport').TransportLeg | null } | null;
     partner_id?: number;
     partner_link_id?: number;
     partner_name?: string;

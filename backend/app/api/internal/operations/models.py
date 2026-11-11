@@ -214,6 +214,10 @@ class CremationFinancial(Base):
     total_cost = Column(Float, default=0.0)
     discount = Column(Float, default=0.0)
     weight_price = Column(Float, default=0.0)
+    # Traslado (retiro + entrega según la zona de cada comuna, app/services/transport.py).
+    # Como el recargo por peso: el convenio no lo rebaja; el % manual sí.
+    transport_price = Column(Float, nullable=False, default=0.0, server_default="0")
+    transport_detail = Column(JSON, nullable=True)  # {"pickup": {...}, "delivery": {...}}
     commission = Column(Float, default=0.0)
     # Convenio con empresa (crm_agreements): copia de condiciones + monto descontado
     # (app/services/agreements.py). agreement_name se conserva si se borra el convenio.

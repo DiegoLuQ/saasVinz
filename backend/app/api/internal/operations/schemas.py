@@ -106,6 +106,8 @@ class CremationFinancialInDB(BaseModel):
     total_cost: Optional[float] = 0.0
     discount: Optional[float] = 0.0
     weight_price: Optional[float] = 0.0
+    transport_price: Optional[float] = 0.0
+    transport_detail: Optional[dict] = None
     commission: Optional[float] = 0.0
     agreement_id: Optional[int] = None
     agreement_name: Optional[str] = None
@@ -156,6 +158,8 @@ class CremationOCBase(BaseModel):
     discount: Optional[float] = 0.0
     weight: Optional[float] = None
     weight_price: Optional[float] = 0.0
+    transport_price: Optional[float] = 0.0
+    transport_detail: Optional[dict] = None
     
     tracking_token: Optional[str] = None
     partner_id: Optional[int] = None # Legacy: mapped to partner_link_id
@@ -189,6 +193,8 @@ class CremationOCUpdate(BaseModel):
     discount: Optional[float] = None
     weight: Optional[float] = None
     weight_price: Optional[float] = None
+    transport_price: Optional[float] = None
+    transport_detail: Optional[dict] = None
     partner_id: Optional[int] = None
     partner_link_id: Optional[int] = None
     agreement_id: Optional[int] = None  # null = quitar convenio
@@ -233,6 +239,8 @@ class CremationOCInDB(CremationOCBase):
     total_cost: Optional[float] = None
     discount: Optional[float] = None
     weight_price: Optional[float] = None
+    transport_price: Optional[float] = None
+    transport_detail: Optional[dict] = None
     commission: Optional[float] = None
     agreement_name: Optional[str] = None
     agreement_discount: Optional[float] = None
@@ -278,6 +286,8 @@ class CremationOCInDB(CremationOCBase):
             if self.total_cost is None: self.total_cost = self.financial.total_cost
             if self.discount is None: self.discount = self.financial.discount
             if self.weight_price is None: self.weight_price = self.financial.weight_price
+            if self.transport_price is None: self.transport_price = self.financial.transport_price
+            if self.transport_detail is None: self.transport_detail = self.financial.transport_detail
             if self.commission is None: self.commission = self.financial.commission
             if self.agreement_id is None: self.agreement_id = self.financial.agreement_id
             if self.agreement_name is None: self.agreement_name = self.financial.agreement_name

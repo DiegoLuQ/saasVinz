@@ -83,6 +83,24 @@ async def send_submission_notifications(
             extra_items = [s for s in enriched_services if s.get("type") != "plan"]
             extras_total = sum(float(s.get("price") or 0.0) for s in extra_items)
             total_price = plan_price + extras_total + tier_price
+            # Traslado por comuna congelado al enviar (services/transport.py)
+            transport = owner_dict.get("transport") if isinstance(owner_dict.get("transport"), dict) else None
+            transport_total = float((transport or {}).get("total") or 0)
+            transport_show = bool((transport or {}).get("show_prices"))
+            transport_uncovered = bool((transport or {}).get("uncovered"))
+
+            def _transport_text(with_price: bool) -> str:
+                # Un solo cobro para retiro + entrega (services/transport.py)
+                from app.services.transport import places_text
+                places = places_text(transport)
+                places = places[:1].upper() + places[1:]
+                if transport_uncovered:
+                    value = "a cotizar"
+                elif not with_price:
+                    value = None
+                else:
+                    value = format_clp(transport_total) if transport_total else "sin cargo"
+                return places + (f" — {value}" if value else "")
             # «Precio a cotizar» y notas importantes de los servicios (constancia del aviso)
             on_request = [s.get("name") for s in extra_items if s.get("price_on_request")]
             notes = [(s.get("name"), s.get("important_note")) for s in extra_items if s.get("important_note")]
@@ -111,8 +129,13 @@ async def send_submission_notifications(
                     family_rows.append(("Tramo de peso", f"{tier_name} — {format_clp(tier_price)}" if tier_price > 0 else tier_name))
                 if extra_items:
                     family_rows.append(("Servicios adicionales", ", ".join(_extra_label(s, False) for s in extra_items)))
-                if total_price > 0:
-                    family_rows.append(("Total estimado", format_clp(total_price) + (" + servicios a cotizar" if on_request else "")))
+                if transport:
+                    family_rows.append(("Traslado", _transport_text(transport_show)))
+                family_total = total_price + (transport_total if transport_show else 0)
+                if family_total > 0:
+                    family_rows.append(("Total estimado", format_clp(family_total)
+                                        + (" + servicios a cotizar" if on_request else "")
+                                        + (" + traslado a cotizar" if transport and (transport_uncovered or not transport_show) else "")))
                 for name, note in notes:
                     family_rows.append((f"Importante · {name}", note))
 
@@ -178,8 +201,12 @@ async def send_submission_notifications(
                     tenant_rows.append(("Plan elegido", f"{plan_name} ({format_clp(plan_price)})" if plan_price > 0 else plan_name))
                 if extra_items:
                     tenant_rows.append(("Servicios adicionales", ", ".join(_extra_label(s, True) for s in extra_items)))
+                if transport:
+                    tenant_rows.append(("Traslado", _transport_text(True)))
                 if total_price > 0:
-                    tenant_rows.append(("Total estimado", format_clp(total_price) + (" + servicios a cotizar" if on_request else "")))
+                    tenant_rows.append(("Total estimado", format_clp(total_price + transport_total)
+                                        + (" + servicios a cotizar" if on_request else "")
+                                        + (" + traslado a cotizar" if transport_uncovered else "")))
                 if on_request:
                     tenant_rows.append(("Por cotizar", "Informa a la familia el valor de: " + ", ".join(on_request)))
                 for name, note in notes:

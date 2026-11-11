@@ -99,6 +99,8 @@ export function mapCremationToFormState(
                 : [],
         discount: cremationData.discount || 0,
         weight_price: cremationData.weight_price || 0,
+        transport_price: cremationData.transport_price || 0,
+        transport_detail: cremationData.transport_detail || null,
         region: normalizeRegion(cremationData.region),
         city: cremationData.city || '',
         address: cremationData.address || '',

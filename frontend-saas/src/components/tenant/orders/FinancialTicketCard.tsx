@@ -8,6 +8,7 @@ import ReceiptPreviewModal from '@/components/tenant/orders/ReceiptPreviewModal'
 import { API_URL } from '@/lib/tenant/api';
 import type { Cremation, Service, Plan, Product, SelectedProduct, SelectedService, SelectedPlan } from '@/lib/tenant/orders/types';
 import { describeTerms, type AgreementOption, type AgreementTerms, type AgreementBreakdown } from '@/lib/tenant/orders/agreements';
+import { transportLabel } from '@/lib/transport';
 
 interface FinancialTicketCardProps {
     // Catalog
@@ -406,6 +407,33 @@ export default function FinancialTicketCard({
                                             onClick={() => setCurrentCremation(prev => ({ ...prev, weight_price: 0 }))}
                                             className="opacity-0 group-hover:opacity-100 text-red-500/40 hover:text-red-500 p-1 rounded transition-all"
                                             aria-label="Remover cargo por peso"
+                                        >
+                                            <Trash2 size={12} />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Traslado por comuna (retiro + entrega): editable; el convenio no lo descuenta */}
+                            {(currentCremation?.transport_price ?? 0) > 0 && (
+                                <div className="flex justify-between items-center pt-3 border-t border-dashed border-white/[0.05] group gap-3">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0" aria-hidden="true" />
+                                        <span className="text-[10px] font-black text-sky-500 uppercase tracking-tight truncate" title={transportLabel(currentCremation.transport_detail)}>
+                                            {transportLabel(currentCremation.transport_detail)}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <PriceCell
+                                            value={currentCremation.transport_price || 0}
+                                            onChange={(v) => setCurrentCremation(prev => ({ ...prev, transport_price: v }))}
+                                            accentClass="text-sky-500"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setCurrentCremation(prev => ({ ...prev, transport_price: 0 }))}
+                                            className="opacity-0 group-hover:opacity-100 text-red-500/40 hover:text-red-500 p-1 rounded transition-all"
+                                            aria-label="Quitar traslado"
                                         >
                                             <Trash2 size={12} />
                                         </button>

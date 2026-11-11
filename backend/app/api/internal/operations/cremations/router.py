@@ -203,6 +203,12 @@ def obtener_expediente(
             size = getattr(oc.pet, "size", None) if getattr(oc, "pet", None) else None
             label = f"Recargo por peso ({size})" if size else "Recargo por peso"
         items.append({"tipo": "peso", "nombre": label, "cantidad": 1, "precio": weight_price})
+    # Traslado por comuna (retiro + entrega, services/transport.py)
+    transport_price = float((oc.financial.transport_price or 0) if oc.financial else 0)
+    if transport_price:
+        from app.services.transport import detail_label
+        items.append({"tipo": "traslado", "nombre": detail_label(oc.financial.transport_detail),
+                      "cantidad": 1, "precio": transport_price})
 
     # Etapas del crematorio con su evidencia (misma lógica que el seguimiento público).
     steps = db.query(models.WorkflowStep).filter(

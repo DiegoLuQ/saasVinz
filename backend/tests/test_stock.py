@@ -114,3 +114,33 @@ def test_procesar_registro_deja_el_anfora_en_la_orden(client, auth, db, world, s
     # Antes el stock no volvía al eliminar estas órdenes.
     assert client.delete(f"/api/internal/cremations/{oc.id}?scope=order", headers=h).status_code == 200
     assert _stock(db, setup["urn"]) == 5
+
+
+def test_procesar_registro_sin_stock_queda_pendiente(client, auth, db, world, setup):
+    """Sin stock el registro se procesa igual: el producto queda «pendiente de stock»."""
+    h = auth("a")
+    prod = db.query(models.Product).get(setup["urn"])
+    prod.stock = 0
+    db.commit()
+    sub = models.FormSubmission(
+        tenant_id=world["tenant_a"], slug="crematorio-a", status="pending",
+        owner_data={"fullName": f"Fam sin stock {setup['tag']}", "phone": "+56912345678"},
+        pet_data={"name": f"Sol {setup['tag']}", "species": "Canino"},
+        selected_services=[{"type": "plan", "id": setup["plan"], "name": "Plan", "price": 100000, "cost": 0,
+                            "items": [{"type": "product", "id": setup["urn"], "quantity": 1}]}],
+    )
+    db.add(sub)
+    db.commit()
+    cust = client.post(f"/api/internal/submissions/{sub.id}/create-customer", headers=h).json()["customer_id"]
+    pet = client.post(f"/api/internal/submissions/{sub.id}/create-pet?customer_id={cust}", headers=h).json()["pet_id"]
+    r = client.post(f"/api/internal/submissions/{sub.id}/create-services?pet_id={pet}", headers=h)
+    assert r.status_code == 200, r.text
+    pending = r.json()["stock_pending"]
+    assert [(p["product_id"], p["missing"]) for p in pending] == [(setup["urn"], 1)]
+    assert _stock(db, setup["urn"]) == -1  # 1 unidad por reponer
+
+    oc = db.query(models.CremationOC).filter(models.CremationOC.pet_id == pet).one()
+    assert db.query(models.ProductoOC).filter(models.ProductoOC.cremation_id == oc.id).count() == 1
+    # Eliminar la orden devuelve la unidad reservada
+    assert client.delete(f"/api/internal/cremations/{oc.id}?scope=order", headers=h).status_code == 200
+    assert _stock(db, setup["urn"]) == 0

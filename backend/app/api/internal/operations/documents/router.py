@@ -21,6 +21,11 @@ from app.utils import tz
 from app.utils.certificates import certificate_owner, generate_certificate_json, generate_image_certificate_html
 from app.api.internal.common.media_service import MediaService
 
+
+def _transport_label(detail) -> str:
+    from app.services.transport import detail_label
+    return detail_label(detail)
+
 router = APIRouter()
 
 
@@ -639,6 +644,8 @@ def generar_recibo(
             discount_percent=cremation.financial.discount if cremation.financial else 0.0,
             total_price=cremation.financial.total_price if cremation.financial else 0.0,
             weight_price=(cremation.financial.weight_price or 0.0) if cremation.financial else 0.0,
+            transport_price=(cremation.financial.transport_price or 0.0) if cremation.financial else 0.0,
+            transport_label=_transport_label(cremation.financial.transport_detail if cremation.financial else None),
             agreement_name=cremation.financial.agreement_name if cremation.financial else None,
             agreement_discount=(cremation.financial.agreement_discount or 0.0) if cremation.financial else 0.0,
             scheduled_at=cremation.scheduling.scheduled_at if cremation.scheduling else None,
@@ -692,6 +699,8 @@ class ReceiptPreviewRequest(BaseModel):
     products: List[ReceiptPreviewItem] = []
     weight: Optional[float] = None
     weight_price: float = 0.0
+    transport_price: float = 0.0
+    transport_detail: Optional[dict] = None
     discount: float = 0.0
     agreement_id: Optional[int] = None
     scheduled_at: Optional[datetime] = None
@@ -758,7 +767,7 @@ def previsualizar_recibo(
     )
 
     pct = max(0.0, min(100.0, req.discount or 0.0))
-    subtotal = sum(pr for _, pr in lines) + sum(p.price * p.quantity for p in req.products) + (req.weight_price or 0.0)
+    subtotal = sum(pr for _, pr in lines) + sum(p.price * p.quantity for p in req.products) + (req.weight_price or 0.0) + (req.transport_price or 0.0)
     net = subtotal - agreement_discount
     total = net - net * pct / 100
 
@@ -783,6 +792,8 @@ def previsualizar_recibo(
         discount_percent=pct,
         total_price=total,
         weight_price=req.weight_price or 0.0,
+        transport_price=req.transport_price or 0.0,
+        transport_label=_transport_label(req.transport_detail),
         scheduled_at=req.scheduled_at,
         issue_date=datetime.now(),
         receipt_number=number,

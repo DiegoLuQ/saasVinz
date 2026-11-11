@@ -61,7 +61,7 @@ interface Expediente {
         pickup_address?: string | null; pickup_city?: string | null; pickup_region?: string | null;
         address?: string | null; city?: string | null; region?: string | null;
     };
-    items: { tipo: 'servicio' | 'plan' | 'producto' | 'peso'; nombre: string; cantidad: number; precio: number; incluye?: string[] }[];
+    items: { tipo: 'servicio' | 'plan' | 'producto' | 'peso' | 'traslado'; nombre: string; cantidad: number; precio: number; incluye?: string[] }[];
     financial: {
         subtotal?: number; total: number; discount?: number;
         agreement?: { id: number | null; name: string | null; discount: number } | null;
@@ -858,7 +858,7 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                                 <div className="flex items-center justify-between gap-3">
                                                     <span className="text-slate-800 dark:text-white font-medium truncate">
                                                         {it.cantidad > 1 ? `${it.cantidad} × ` : ''}{it.nombre}
-                                                        {it.tipo !== 'peso' && (
+                                                        {it.tipo !== 'peso' && it.tipo !== 'traslado' && (
                                                             <span className="ml-2 text-[10px] uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-muted-foreground font-bold">
                                                                 {it.tipo}
                                                             </span>

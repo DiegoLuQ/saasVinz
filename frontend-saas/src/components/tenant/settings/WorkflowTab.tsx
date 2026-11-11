@@ -9,7 +9,7 @@ export function WorkflowTab() {
     const [workflowSteps, setWorkflowSteps] = useState<any[]>([]);
     const [newStep, setNewStep] = useState({ name: '', order_index: 0 });
     // Avisos a la familia (services/family_notices.py): enabled = el plan los incluye.
-    const [notices, setNotices] = useState<{ on_finish: boolean; enabled: boolean } | null>(null);
+    const [notices, setNotices] = useState<{ on_finish: boolean; enabled: boolean; google_review?: boolean } | null>(null);
 
     const fetchNotices = async () => {
         try {
@@ -104,8 +104,13 @@ export function WorkflowTab() {
                             <span className="flex items-start gap-3">
                                 <Star size={18} className="text-amber-500 mt-0.5 shrink-0" />
                                 <span>
-                                    <span className="block text-sm font-bold">Al concluir: agradecimiento y encuesta</span>
-                                    <span className="block text-xs text-muted-foreground">La familia recibe un correo de agradecimiento con una encuesta de 1 a 5 estrellas. El promedio aparece en tu Dashboard.</span>
+                                    <span className="block text-sm font-bold">Al concluir: agradecimiento y reseña en Google</span>
+                                    <span className="block text-xs text-muted-foreground">Al finalizar la orden, la familia recibe un correo de agradecimiento con un botón para dejar su opinión en tu ficha de Google.</span>
+                                    {notices.google_review === false && (
+                                        <span className="block text-xs font-semibold text-amber-700 dark:text-amber-400 mt-1">
+                                            Aún no tienes el enlace de reseñas de Google: agrégalo en <a href="/dashboard/perfil" className="underline">Perfil → Redes y reseñas</a>. Sin él, el correo solo agradece.
+                                        </span>
+                                    )}
                                 </span>
                             </span>
                             <input type="checkbox" checked={notices.on_finish} onChange={toggleOnFinish} className="w-5 h-5 accent-sky-500 shrink-0" />

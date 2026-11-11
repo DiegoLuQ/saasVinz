@@ -820,6 +820,7 @@ export default function TenantFormPage() {
                                         tenantCountry={tenant.country}
                                         tenantRegion={tenant.region}
                                         formConfig={formConfig}
+                                        transport={tenant.transport}
                                     />
                                 )}
                                 {currentStepKey === 'angel' && (
@@ -861,6 +862,7 @@ export default function TenantFormPage() {
                                         farewellTemplate={farewellTemplate}
                                         formConfig={formConfig}
                                         weightTiers={weightTiers}
+                                        transport={tenant.transport}
                                     />
                                 )}
                                 {currentStepKey === 'resumen' && images.length > 0 && (

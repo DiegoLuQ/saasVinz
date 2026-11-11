@@ -658,6 +658,8 @@ def generate_receipt_html(
     receipt_number: str = "REC-001",
     base_url: str = "http://localhost:8000",
     weight_price: float = 0.0,
+    transport_price: float = 0.0,
+    transport_label: str = "Traslado",
     agreement_name: str = None,
     agreement_discount: float = 0.0,
     show_vinzer_brand: bool = True,
@@ -712,6 +714,17 @@ def generate_receipt_html(
                 <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">1</td>
                 <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">{format_currency(weight_price)}</td>
                 <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">{format_currency(weight_price)}</td>
+            </tr>
+        """
+
+    # Traslado por comuna (retiro + entrega): también suma al total.
+    if transport_price and transport_price > 0:
+        items_html += f"""
+            <tr>
+                <td style="padding: 10px; border-bottom: 1px solid #eee;">{html_lib.escape(transport_label or 'Traslado')}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">1</td>
+                <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">{format_currency(transport_price)}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">{format_currency(transport_price)}</td>
             </tr>
         """
 

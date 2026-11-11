@@ -43,6 +43,8 @@ export default function ReceiptPreviewModal({
                     products: selectedProducts.map(p => ({ id: p.product_id, price: p.unit_price || 0, quantity: p.quantity || 1, plan_id: p.plan_id ?? null })),
                     weight: currentCremation.weight || null,
                     weight_price: currentCremation.weight_price || 0,
+                    transport_price: currentCremation.transport_price || 0,
+                    transport_detail: currentCremation.transport_detail || null,
                     discount: currentCremation.discount || 0,
                     agreement_id: currentCremation.agreement_id || null,
                     scheduled_at: currentCremation.scheduled_at || null,

@@ -37,6 +37,7 @@ import Modal from '@/components/tenant/Modal';
 import GenerateAllPanel, { type ProcessResult, type StepKey } from '@/components/tenant/registros/GenerateAllPanel';
 import { formatPartialDate } from '@/lib/petDates';
 import { formatAge } from '@/lib/petAge';
+import { transportPlaces } from '@/lib/transport';
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
     <svg
@@ -200,6 +201,7 @@ export default function SubmissionDetailPage() {
         if (!ids.cremation_id && isOrderLimitReached) limitHit('Recursos', 'Alcanzaste el límite de órdenes de tu plan');
 
         let current: 'cliente' | 'mascota' | 'orden' = 'cliente';
+        let stockPending: { name: string; missing: number }[] = [];
         try {
             if (!ids.customer_id) {
                 onStep('cliente', { state: 'running' });
@@ -223,6 +225,7 @@ export default function SubmissionDetailPage() {
                 onStep('orden', { state: 'running' });
                 const res = await apiRequest(`/api/internal/submissions/${submission.id}/create-services?pet_id=${ids.pet_id}`, { method: 'POST' });
                 ids.cremation_id = res.cremation_id;
+                stockPending = (res.stock_pending || []) as { name: string; missing: number }[];
                 setWorkflowStep(prev => ({ ...prev, cremation_id: res.cremation_id }));
                 apiRequest(`/api/internal/notifications/archive-by-submission/${submission.id}`, { method: 'POST' })
                     .catch(err => console.error('Error archiving notification:', err));
@@ -230,7 +233,16 @@ export default function SubmissionDetailPage() {
                 queryClient.invalidateQueries({ queryKey: ['cremations-simple'] });
                 queryClient.invalidateQueries({ queryKey: ['cremations'] });
             }
-            onStep('orden', { state: 'done', href: `/dashboard/recepcion-pedidos?orden=${ids.cremation_id}` });
+            // Productos sin stock: la orden se crea igual y quedan «pendientes de stock».
+            const pendingText = stockPending.map(p => `${p.name}${p.missing > 1 ? ` (faltan ${p.missing})` : ''}`).join(', ');
+            onStep('orden', {
+                state: 'done',
+                href: `/dashboard/recepcion-pedidos?orden=${ids.cremation_id}`,
+                ...(pendingText ? { detail: `Pendiente de stock: ${pendingText}` } : {}),
+            });
+            if (pendingText) {
+                showToast(`Orden creada. Quedó pendiente de stock: ${pendingText}. Repón el stock en Inventario.`, 'info');
+            }
         } catch (err) {
             onStep(current, { state: 'error', detail: (err as Error).message });
             throw err;
@@ -576,6 +588,7 @@ export default function SubmissionDetailPage() {
                         tenant={tenant}
                         onAvailableChange={setGenerateAllAvailable}
                         processRequest={processRequest}
+                        hasPhoto={(submission.images?.length ?? 0) > 0}
                         processRegistro={async (onStep) => {
                             const res = await processRegistro((k, st) => {
                                 setProcessSteps(prev => ({ ...prev, [k]: st }));
@@ -667,6 +680,23 @@ export default function SubmissionDetailPage() {
                                             </td>
                                         </tr>
                                     )}
+                                    {/* Traslado por comuna congelado al enviar (incluido en el total; «a cotizar» = sin zona). */}
+                                    {submission.transport_charge && (submission.transport_charge.pickup || submission.transport_charge.delivery) && (() => {
+                                        const t = submission.transport_charge!;
+                                        const uncovered = (t.uncovered || []).length > 0;
+                                        const places = transportPlaces(t);
+                                        return (
+                                            <tr className="hover:bg-muted/40 transition-colors">
+                                                <td className="px-5 py-3.5">
+                                                    <p className="font-bold text-foreground">Traslado</p>
+                                                    <p className="text-[9px] text-muted-foreground uppercase">{places}{t.zone ? ` · ${t.zone}` : uncovered ? ' · sin zona' : ''}</p>
+                                                </td>
+                                                <td className={`px-5 py-3.5 text-right font-black text-sm ${uncovered ? 'text-amber-600 dark:text-orange-400' : 'text-sky-600 dark:text-sky-400'}`}>
+                                                    {uncovered ? 'A cotizar' : t.total ? `$${t.total.toLocaleString()}` : 'Sin cargo'}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })()}
                                 </tbody>
                                 {submission.total > 0 && (
                                     <tfoot>
@@ -731,7 +761,7 @@ export default function SubmissionDetailPage() {
                                     onClick={() => router.push(`/dashboard/recepcion-pedidos?orden=${workflowStep.cremation_id}`)}
                                     className="w-full py-3.5 px-4 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm"
                                 >
-                                    <ExternalLink size={15} /> Ver orden
+                                    <ExternalLink size={15} /> Ir a Recepción y Pedidos
                                 </button>
                             ) : (
                                 <button

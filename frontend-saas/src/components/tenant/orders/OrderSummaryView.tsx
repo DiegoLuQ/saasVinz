@@ -39,6 +39,12 @@ export default function OrderSummaryView({ s }: { s: OrderSummary }) {
                         <span className="font-mono tabular-nums text-foreground">{fmtCLP(s.weightPrice)}</span>
                     </div>
                 )}
+                {s.transportPrice > 0 && (
+                    <div className="flex justify-between gap-3">
+                        <span className="text-foreground truncate">{s.transportLabel}</span>
+                        <span className="font-mono tabular-nums text-foreground">{fmtCLP(s.transportPrice)}</span>
+                    </div>
+                )}
                 {s.agreement && (
                     <div className="flex justify-between gap-3 text-sky-700 dark:text-sky-300">
                         <span className="truncate">Convenio {s.agreement.name}</span>

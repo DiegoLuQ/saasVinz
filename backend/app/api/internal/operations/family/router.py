@@ -1,4 +1,4 @@
-"""Avisos a la familia desde el panel y resumen de la encuesta de satisfacción.
+"""Avisos a la familia desde el panel (y resumen de la antigua encuesta de satisfacción, ya sin uso).
 
 Prefijo /api/internal/operations (mismo que el panel de trabajo). La lógica de
 envío vive en app/services/family_notices.py.
@@ -100,7 +100,7 @@ async def email_notice(
     current_user: models.User = Depends(get_current_user),
 ):
     """Envía (o reenvía) el correo a la familia: de la fase indicada o, si la orden
-    está entregada, el de agradecimiento con la encuesta."""
+    está entregada, el de agradecimiento con la invitación a la reseña de Google."""
     c = _order(db, cremation_id, tenant_id)
     if c.status in ("entregado", "completado") and not data.step_id:
         result = await fn.send_finish_email(db, c.id, current_user.id, force=True)
@@ -120,6 +120,13 @@ class NoticesConfig(BaseModel):
     on_finish: bool
 
 
+def _config_out(tenant) -> dict:
+    """Config + si el crematorio tiene enlace de reseña de Google (sin él, el correo final no lo invita)."""
+    sm = tenant.social_media if tenant is not None and isinstance(tenant.social_media, dict) else {}
+    return {**fn.notices_config(tenant), "enabled": fn.feature_on(tenant),
+            "google_review": bool((sm.get("google_review") or "").strip())}
+
+
 @router.get("/family-notices/config")
 def get_notices_config(
     db: Session = Depends(get_db),
@@ -127,7 +134,7 @@ def get_notices_config(
     current_user: models.User = Depends(get_current_user),
 ):
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
-    return {**fn.notices_config(tenant), "enabled": fn.feature_on(tenant)}
+    return _config_out(tenant)
 
 
 @router.put("/family-notices/config")
@@ -142,7 +149,7 @@ def update_notices_config(
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     tenant.family_notices = {**(tenant.family_notices or {}), "on_finish": data.on_finish}
     db.commit()
-    return {**fn.notices_config(tenant), "enabled": fn.feature_on(tenant)}
+    return _config_out(tenant)
 
 
 @router.get("/feedback/summary")

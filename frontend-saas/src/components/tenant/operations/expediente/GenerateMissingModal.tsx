@@ -87,6 +87,7 @@ export default function GenerateMissingModal({
             : !digitalConfig ? { ok: false, why: 'Sin plantilla de tarjeta configurada' } : { ok: true },
         social: !hasFeature('certificados:redes', true) ? { ok: false, why: 'No incluida en tu plan' }
             : socialOptions.length === 0 ? { ok: false, why: 'Sin plantillas de redes activas' }
+            : !photoUrl ? { ok: false, why: 'Sin foto de la mascota' }
             : socialJobActive ? { ok: false, why: 'Ya se está generando una' }
             : noCredit ? { ok: false, why: 'Sin créditos IA' } : { ok: true },
     };

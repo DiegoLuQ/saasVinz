@@ -234,6 +234,10 @@ def get_submission_detail(
     weight_charge = submission_weight_charge(db, tenant_id, submission.pet_data)
     if weight_charge:
         total += weight_charge["price"]
+    # Traslado por comuna congelado al enviar (services/transport.py)
+    from app.services import transport as _transport
+    transport_charge = (submission.owner_data or {}).get("transport") if isinstance(submission.owner_data, dict) else None
+    total += _transport.submission_charge(submission.owner_data)
 
     # Add resolved data to response
     data = json.loads(json.dumps(submission, default=str, sort_keys=True))
@@ -282,6 +286,7 @@ def get_submission_detail(
         "resolved_services": resolved_services,
         "total": total,
         "weight_charge": weight_charge,
+        "transport_charge": transport_charge if isinstance(transport_charge, dict) else None,
         "customer_id": submission.customer_id,
         "pet_id": submission.pet_id,
         "partner": partner_info,
@@ -662,6 +667,10 @@ def create_services_from_submission(
         weight_charge = submission_weight_charge(db, tenant_id, submission.pet_data)
         weight_price = weight_charge["price"] if weight_charge else 0.0
         total_price += weight_price
+        # Traslado congelado en la solicitud (retiro + entrega por zona de comuna)
+        from app.services import transport as _transport
+        transport_price = _transport.submission_charge(submission.owner_data)
+        total_price += transport_price
 
         # Create Cremation record with full details
         owner = submission.owner_data
@@ -713,6 +722,8 @@ def create_services_from_submission(
             total_cost=total_cost,
             discount=0.0,
             weight_price=weight_price,
+            transport_price=transport_price,
+            transport_detail=_transport.submission_detail(submission.owner_data),
             price_list_id=_submission_price_list_id(db, tenant_id, submission.pet_data),
         ))
         
@@ -737,8 +748,10 @@ def create_services_from_submission(
             tenant_id=tenant_id
         ))
         
-        # 1. Procesar Planes
-        # 1. Procesar Planes
+        # Productos sin stock: no detienen la orden, quedan «pendientes de stock»
+        # (se descuentan igual; el stock negativo = unidades por reponer).
+        backorder: list = []
+
         # 1. Procesar Planes
         for p in resolved_plans:
             db_plan_oc = models.PlanOC(
@@ -762,7 +775,7 @@ def create_services_from_submission(
                     if not sub_orig_id:
                         continue
                     qty_sub = int(sub_item.get("quantity") or 1)
-                    prod_db = stock_rules.take(db, tenant_id, int(sub_orig_id), qty_sub)
+                    prod_db = stock_rules.take(db, tenant_id, int(sub_orig_id), qty_sub, backorder=backorder)
                     if prod_db:
                         db.add(models.ProductoOC(
                             tenant_id=tenant_id,
@@ -797,7 +810,7 @@ def create_services_from_submission(
             p_cost = p["cost"] # Use snapshot cost by default
             
             if db_product:
-                stock_rules.take(db, tenant_id, db_product.id, p["qty"])
+                stock_rules.take(db, tenant_id, db_product.id, p["qty"], backorder=backorder)
                 
                 # If snapshot cost was 0, maybe try to fetch current? Or stick to 0?
                 # User said: "todos estos con el precio costo y venta... ya que se cobra por plan"
@@ -828,7 +841,7 @@ def create_services_from_submission(
         submission.processed_at = datetime.utcnow()
         db.commit()
         
-        return {"status": "created", "cremation_id": db_cremation.id}
+        return {"status": "created", "cremation_id": db_cremation.id, "stock_pending": backorder}
     except HTTPException:
         raise  # 404 / límite del plan: se responden tal cual, no como 500
     except Exception as e:

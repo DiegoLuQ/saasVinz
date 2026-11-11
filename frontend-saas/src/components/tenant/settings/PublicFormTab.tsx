@@ -33,7 +33,7 @@ import {
     Pencil,
     SlidersHorizontal,
     MessageSquare,
-    HeartHandshake
+    HeartHandshake,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
@@ -44,6 +44,7 @@ import WelcomeVideoField, { uploadPendingVideo } from './WelcomeVideoField';
 import PlanWeightPriceTable, { type PlanWeightRow } from './PlanWeightPriceTable';
 import PriceListsSection, { PRICE_LIST_STATUS, type PriceList } from './PriceListsSection';
 import TierIconField from './TierIconField';
+import TransportSection from './TransportSection';
 import {
     formatCLP,
     MAX_FIELD_LABEL,
@@ -171,7 +172,7 @@ type SectionId = 'fases' | 'pesos' | 'bienvenida' | 'enlaces';
 
 const SECTIONS: { id: SectionId; name: string; hint: string; icon: React.ElementType }[] = [
     { id: 'fases', name: 'Pasos y datos', hint: 'Fases y campos', icon: Layers },
-    { id: 'pesos', name: 'Pesos y precios', hint: 'Rangos, precios y servicios', icon: Scale },
+    { id: 'pesos', name: 'Pesos y precios', hint: 'Rangos, precios y traslados', icon: Scale },
     { id: 'bienvenida', name: 'Bienvenida y avisos', hint: 'Mensaje inicial y plazo', icon: HeartHandshake },
     { id: 'enlaces', name: 'Enlaces', hint: 'Principal y personalizados', icon: Share2 },
 ];
@@ -1293,10 +1294,10 @@ export function PublicFormTab() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold text-amber-400">
+                                    <span className="text-xs font-bold px-3 py-1.5 rounded-xl border bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-500/15 dark:text-amber-200 dark:border-amber-500/40">
                                         {tiersAccordionOpen ? 'Plegar' : 'Expandir y editar'}
                                     </span>
-                                    <div className={`p-2 rounded-xl bg-white/5 text-white/70 transition-transform duration-200 ${tiersAccordionOpen ? 'rotate-180' : ''}`}>
+                                    <div className={`p-2 rounded-xl bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-white/90 transition-transform duration-200 ${tiersAccordionOpen ? 'rotate-180' : ''}`}>
                                         <ChevronDown size={18} />
                                     </div>
                                 </div>
@@ -1449,6 +1450,8 @@ export function PublicFormTab() {
                                 </div>
                             )}
                         </div>
+
+                        <TransportSection />
 
                         <PriceListsSection
                             reloadKey={priceListsKey}

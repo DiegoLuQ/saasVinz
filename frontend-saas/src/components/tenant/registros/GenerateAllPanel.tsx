@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCanOpen } from '@/hooks/useCanOpen';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -26,6 +27,9 @@ const QUEUED_DETAIL = 'En segundo plano: aparecerá en la orden y la campana te 
 /** El modal de progreso se cierra solo a los 5 s si aún no termina (sigue en segundo plano). */
 const AUTO_CLOSE_MS = 5000;
 const BACKGROUND_MSG = 'Se está procesando en segundo plano. Te avisaremos cuando esté listo.';
+/** Cierre automático: al terminar lleva a Recepción y Pedidos con la orden abierta. */
+const REDIRECT_MSG = 'Procesando… al terminar te llevamos a Recepción y Pedidos.';
+const ordersHref = (cremationId: number) => `/dashboard/recepcion-pedidos?orden=${cremationId}`;
 interface StepStatus { state: StepState; detail?: string; href?: string; startedAt?: number; ms?: number }
 
 /** Los documentos parten desmarcados: el usuario marca los que quiere crear. */
@@ -69,6 +73,8 @@ interface Props {
     onAvailableChange?: (available: boolean) => void;
     /** Cada vez que cambia (> 0), abre el modal «Procesar registro». */
     processRequest?: number;
+    /** La mascota tiene al menos una foto. Sin foto la imagen para redes (IA) queda deshabilitada. */
+    hasPhoto?: boolean;
 }
 
 /**
@@ -78,9 +84,13 @@ interface Props {
  * imagen para redes (IA) se encola en el servidor (/auto-documents/jobs) y no hay que
  * esperarla.
  */
-export default function GenerateAllPanel({ submission, existing, canRun, tenant, processRegistro, onAvailableChange, processRequest }: Props) {
+export default function GenerateAllPanel({ submission, existing, canRun, tenant, processRegistro, onAvailableChange, processRequest, hasPhoto = true }: Props) {
     const { canOpen } = useCanOpen();
     const { showToast } = useToast();
+    const router = useRouter();
+    // Orden de la última ejecución y si hay que ir a Recepción y Pedidos al terminar (cierre automático).
+    const [doneOrderId, setDoneOrderId] = useState<number | null>(null);
+    const redirectWhenDone = useRef(false);
     const qc = useQueryClient();
     const { data: auto } = useQuery({ queryKey: ['tenant', 'auto-documents'], queryFn: getAutoDocuments });
     const { data: usage, refetch: refetchUsage } = useQuery({ queryKey: ['tenant', 'image-templates', 'ai-usage'], queryFn: getAiUsage });
@@ -154,7 +164,10 @@ export default function GenerateAllPanel({ submission, existing, canRun, tenant,
         if (!running || !progressOpen) return;
         const t = setTimeout(() => {
             setProgressOpen(false);
-            showToast(BACKGROUND_MSG, 'info');
+            // Sigue en esta página hasta terminar (la tarjeta se dibuja en el navegador; la imagen IA
+            // ya va al servidor) y luego lleva a Recepción y Pedidos.
+            redirectWhenDone.current = true;
+            showToast(REDIRECT_MSG, 'info');
         }, AUTO_CLOSE_MS);
         return () => clearTimeout(t);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -242,6 +255,8 @@ export default function GenerateAllPanel({ submission, existing, canRun, tenant,
     const run = async (kinds: AutoDocKind[], withProcess: boolean, socialSkippedNoCredits = false) => {
         setConfirm(null);
         setRunning(true);
+        setDoneOrderId(null);
+        redirectWhenDone.current = false;
         const initial: Partial<Record<StepKey, StepStatus>> = {};
         if (withProcess) (['cliente', 'mascota', 'orden'] as const).forEach(k => { initial[k] = { state: 'pending' }; });
         kinds.forEach(k => { initial[k] = { state: 'pending' }; });
@@ -264,6 +279,11 @@ export default function GenerateAllPanel({ submission, existing, canRun, tenant,
             const queued = stepsRef.current.social?.state === 'queued';
             setRunInfo(r => r && { ...r, finishedAt, creditUsed: queued && socialUsesAi && !openSession });
             setRunning(false);
+            setDoneOrderId(ids.cremation_id ?? null);
+            if (redirectWhenDone.current && ids.cremation_id) {
+                redirectWhenDone.current = false;
+                router.push(ordersHref(ids.cremation_id));
+            }
             // Medición: tiempos por paso (la imagen IA la mide su propia tarea en el servidor).
             apiRequest('/api/internal/auto-documents/runs', {
                 method: 'POST',
@@ -379,7 +399,9 @@ export default function GenerateAllPanel({ submission, existing, canRun, tenant,
     };
 
     // Modal de confirmación
-    const selectable = (k: AutoDocKind) => !(k === 'social' && noCreditsForSocial);
+    // Sin foto de la mascota la imagen para redes no se puede hacer (la IA parte de su foto).
+    const socialNoPhoto = !hasPhoto;
+    const selectable = (k: AutoDocKind) => !(k === 'social' && (noCreditsForSocial || socialNoPhoto));
     const chosen = confirm ? confirm.kinds.filter(k => include[k] && selectable(k)) : [];
     const toggle = (k: AutoDocKind) => {
         if (!selectable(k)) return;
@@ -387,6 +409,7 @@ export default function GenerateAllPanel({ submission, existing, canRun, tenant,
     };
     const kindNote = (k: AutoDocKind): React.ReactNode => {
         if (k === 'social') {
+            if (socialNoPhoto) return <span className="text-amber-600 dark:text-amber-400">Sin foto de la mascota</span>;
             if (noCreditsForSocial) return <span className="text-amber-600 dark:text-amber-400">Sin créditos IA: se omitirá</span>;
             return (
                 <span className="text-sky-700 dark:text-sky-300 flex items-center gap-1">
@@ -495,7 +518,7 @@ export default function GenerateAllPanel({ submission, existing, canRun, tenant,
                                         <span className="mt-0.5"><StepIcon s={st} /></span>
                                         <div className="min-w-0 flex-1">
                                             <p className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5"><Icon size={12} className="text-primary" /> {STEP_META[k].label}</p>
-                                            {st?.detail && <p className={`text-[11px] ${st.state === 'error' ? 'text-red-600 dark:text-red-400' : st.state === 'queued' ? 'text-sky-700 dark:text-sky-300' : 'text-slate-500'}`}>{st.detail}</p>}
+                                            {st?.detail && <p className={`text-[11px] ${st.state === 'error' ? 'text-red-600 dark:text-red-400' : st.state === 'queued' ? 'text-sky-700 dark:text-sky-300' : st.detail.startsWith('Pendiente de stock') ? 'font-semibold text-amber-700 dark:text-amber-300' : 'text-slate-500'}`}>{st.detail}</p>}
                                         </div>
                                         <span className="shrink-0 text-[11px] tabular-nums text-slate-500">{stepTime(st)}</span>
                                         {st?.state === 'done' && st.href && !running && <Link href={st.href} className="shrink-0 text-[11px] font-bold text-primary">Ver</Link>}
@@ -550,10 +573,17 @@ export default function GenerateAllPanel({ submission, existing, canRun, tenant,
                                         </div>
                                     </div>
                                 )}
-                                <button onClick={() => setProgressOpen(false)}
-                                    className="w-full py-3 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 text-sm font-black">
-                                    Cerrar
-                                </button>
+                                {doneOrderId ? (
+                                    <button onClick={() => { setProgressOpen(false); router.push(ordersHref(doneOrderId)); }}
+                                        className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-black">
+                                        Ir a Recepción y Pedidos
+                                    </button>
+                                ) : (
+                                    <button onClick={() => setProgressOpen(false)}
+                                        className="w-full py-3 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 text-sm font-black">
+                                        Cerrar
+                                    </button>
+                                )}
                             </>
                         )}
                     </div>
@@ -632,7 +662,12 @@ export default function GenerateAllPanel({ submission, existing, canRun, tenant,
                                     : <>La imagen para redes usará <b>1 crédito IA</b>: tienes {credits?.available ?? 0} y te quedarán {Math.max((credits?.available ?? 1) - 1, 0)}. No tienes que esperarla.</>}
                             </p>
                         )}
-                        {confirm.kinds.includes('social') && noCreditsForSocial && canOpen('/dashboard/configuracion?tab=creditos') && (
+                        {confirm.kinds.includes('social') && socialNoPhoto && (
+                            <p className="text-xs text-amber-700 dark:text-amber-300">
+                                La imagen para redes necesita una foto de la mascota. Agrégala en Mascotas y luego créala desde la orden («Generar lo que falta»).
+                            </p>
+                        )}
+                        {confirm.kinds.includes('social') && noCreditsForSocial && !socialNoPhoto && canOpen('/dashboard/configuracion?tab=creditos') && (
                             <p className="text-xs text-amber-700 dark:text-amber-300">
                                 Sin créditos IA la imagen para redes se omite. <Link href="/dashboard/configuracion?tab=creditos" className="underline font-bold">Comprar créditos</Link>
                             </p>
@@ -642,7 +677,7 @@ export default function GenerateAllPanel({ submission, existing, canRun, tenant,
                             <button onClick={() => setConfirm(null)} className="sm:flex-1 py-3 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 text-sm font-bold">Cancelar</button>
                             <button
                                 onClick={() => {
-                                    run(chosen, confirm.process, confirm.kinds.includes('social') && noCreditsForSocial && include.social);
+                                    run(chosen, confirm.process, confirm.kinds.includes('social') && noCreditsForSocial && !socialNoPhoto && include.social);
                                 }}
                                 disabled={!confirm.process && chosen.length === 0}
                                 className="sm:flex-[2] flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-black disabled:opacity-40">

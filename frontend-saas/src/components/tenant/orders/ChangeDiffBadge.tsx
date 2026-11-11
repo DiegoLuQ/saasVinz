@@ -42,7 +42,7 @@ export function getChangedFields(
     current: Partial<Cremation>
 ): string[] {
     const fields: (keyof Cremation)[] = [
-        'pet_id', 'status', 'scheduled_at', 'weight', 'weight_price',
+        'pet_id', 'status', 'scheduled_at', 'weight', 'weight_price', 'transport_price',
         'region', 'city', 'address', 'pickup_region', 'pickup_city', 'pickup_address', 'notes', 'discount',
     ];
 

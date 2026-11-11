@@ -283,6 +283,43 @@ def update_form_config(
     return {**form_config_with_meta(tenant.form_config), "video_allowed": form_video.tenant_can_use_form_video(tenant)}
 
 
+@router.get("/transport")
+def get_transport_config(
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    _: models.User = Depends(auth.get_current_user)  # La usan también los formularios de orden
+):
+    """Cobro de traslado por comuna (zonas). app/services/transport.py"""
+    from app.services import transport
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+    return {**transport.config_of(tenant), "default_message": transport.DEFAULT_MESSAGE,
+            "region": tenant.region, "country": tenant.country or "Chile"}
+
+
+@router.put("/transport")
+def update_transport_config(
+    payload: Dict[str, Any],
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    admin: models.User = Depends(check_permission("configuracion", "edit")),
+    _f: bool = Depends(FORM_FEATURE)
+):
+    """Guarda las zonas de traslado. Una comuna solo puede estar en una zona."""
+    from app.services import transport
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+    try:
+        cfg = transport.clean_config(payload)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    tenant.transport_config = cfg
+    db.commit()
+    return {**cfg, "default_message": transport.DEFAULT_MESSAGE}
+
+
 class FormVideoLink(BaseModel):
     url: str = Field(..., max_length=500)
 

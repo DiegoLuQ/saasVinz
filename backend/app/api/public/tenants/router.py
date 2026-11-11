@@ -31,6 +31,8 @@ class TenantPublicInfo(BaseModel):
     souvenir_store_url: str | None = None
     # Este es el formulario oficial: el navegador envía sus métricas (services/form_funnel.py)
     track_form: bool = False
+    # Cobro de traslado por comuna (services/transport.public_config); None = sin cobro
+    transport: dict | None = None
 
     class Config:
         from_attributes = True
@@ -57,6 +59,8 @@ def get_tenant_by_slug(slug: str, token: str | None = None, form: str | None = N
     from app.services.form_funnel import is_official
     info.track_form = is_official(tenant, form)
     info.form_config = form_config
+    from app.services import transport as _transport
+    info.transport = _transport.public_config(_transport.config_of(tenant))
     # Con la tabla por plan los tramos no llevan recargo (el precio va en cada plan).
     from app.services.price_lists import effective_for_request
     # Tabla del enlace del catálogo, o la elegida para este formulario en Configuración

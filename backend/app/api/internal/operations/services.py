@@ -232,6 +232,8 @@ class CremationService:
             total_cost=total_cost_in,
             discount=cremation_in.discount or 0.0,
             weight_price=cremation_in.weight_price or 0.0,
+            transport_price=cremation_in.transport_price or 0.0,
+            transport_detail=cremation_in.transport_detail,
             commission=calculated_commission
         ))
 
@@ -436,7 +438,7 @@ class CremationService:
         core_fields_keys = {"pet_id", "oc_number", "cremation_type", "status", "weight", "partner_link_id"}
         partition_fields = {
             "logistics": {"region", "city", "address", "pickup_region", "pickup_city", "pickup_address"},
-            "financial": {"total_price", "discount", "weight_price"},
+            "financial": {"total_price", "discount", "weight_price", "transport_price", "transport_detail"},
             "details": {"images", "notes", "additional_services"},
             "scheduling": {"scheduled_at", "completed_at"}
         }
@@ -568,7 +570,7 @@ class CremationService:
         def lines(model):
             return sum(float(r.precio_venta or 0) * float(r.cantidad or 1)
                        for r in self.db.query(model).filter(model.cremation_id == cid).all())
-        subtotal = lines(models.ServicioOC) + lines(models.PlanOC) + lines(models.ProductoOC) + float(fin.weight_price or 0)
+        subtotal = lines(models.ServicioOC) + lines(models.PlanOC) + lines(models.ProductoOC) + float(fin.weight_price or 0) + float(fin.transport_price or 0)
         after_agreement = subtotal - float(fin.agreement_discount or 0)
         fin.total_price = round(after_agreement * (1 - float(fin.discount or 0) / 100), 2)
         self.db.flush()

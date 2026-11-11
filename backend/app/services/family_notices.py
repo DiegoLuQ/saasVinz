@@ -1,10 +1,11 @@
-"""Avisos a la familia y encuesta de satisfacción.
+"""Avisos a la familia (etapas y agradecimiento final).
 
 - Al avanzar de fase el panel pregunta (modal, manual) si avisar a la familia:
   correo con la foto de la mascota, la etapa, la hora, la marca del crematorio, el
   link de seguimiento y su catálogo de productos (si tiene), o WhatsApp si no hay
   correo. Ya no se envía solo al avanzar. Al concluir, si el crematorio lo activó (`sys_tenants.family_notices
-  .on_finish`), un correo de agradecimiento con la encuesta.
+  .on_finish`), un correo de agradecimiento que invita a dejar una reseña en Google
+  (si el crematorio tiene el enlace; ya no hay encuesta).
 - El operador también puede avisar por WhatsApp desde la orden: se arma el
   mensaje con el link y se abre wa.me (sin API de Meta); queda registrado.
 - Cada aviso queda en ops_family_notices (no se repite el correo automático de

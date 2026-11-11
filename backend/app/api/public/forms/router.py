@@ -314,6 +314,11 @@ async def submit_public_form(
     # 2.1 Campos obligatorios configurados por el crematorio + tramo de peso
     apply_form_config_to_submission(db, tenant, owner_dict, pet_dict, form_preset_id=form_preset_id,
                                     photo_count=len(validated_files))
+    # 2.1b Traslado por comuna: el servidor calcula y congela el cobro (lo que el navegador
+    # mande en owner_data.transport se ignora).
+    from app.services import transport as _transport
+    owner_dict.pop("transport", None)
+    _transport.snapshot_into(_transport.config_of(tenant), owner_dict)
 
     # 2.2 Si el formulario personalizado tiene un servicio/plan asociado predeterminado, asegurarlo en la orden
     if form_preset_id and tenant.form_config:

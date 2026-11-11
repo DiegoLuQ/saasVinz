@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import FarewellPreview from '@/app/(tenant)/tenant/dashboard/documentos/disenos/components/FarewellPreview';
 import { formatAge } from '@/lib/petAge';
 import { formatPartialDate } from '@/lib/petDates';
+import { ownerCommunes, quoteTransport, transportPlaces, type PublicTransport } from '@/lib/transport';
 import { DEFAULT_FORM_CONFIG, fieldLabel, formatCLP, tierDisplay, tierForWeight, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
 
 interface OwnerData {
@@ -71,6 +72,8 @@ interface Props {
     farewellTemplate?: any;
     formConfig?: PublicFormConfig;
     weightTiers?: WeightTier[];
+    /** Cobro de traslado por comuna (null = no se cobra) */
+    transport?: PublicTransport | null;
 }
 
 const WEIGHT_LABELS: Record<string, string> = {
@@ -241,7 +244,7 @@ function PlanAccordionItem({ item, showPrice }: { item: ServiceItem; showPrice: 
     );
 }
 
-export default function SummaryStep({ ownerData, petData, selectedServices, services, images, onEditStep, farewellTemplate, formConfig = DEFAULT_FORM_CONFIG, weightTiers = [] }: Props) {
+export default function SummaryStep({ ownerData, petData, selectedServices, services, images, onEditStep, farewellTemplate, formConfig = DEFAULT_FORM_CONFIG, weightTiers = [], transport }: Props) {
     const f = formConfig.fields;
     const tier = weightTiers.find(t => String(t.id) === petData.weightTierId);
     const tierText = tier
@@ -266,8 +269,14 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
     const servicesTotal = selectedItems.reduce((sum, s) => sum + (s.price || 0), 0);
     const weightTierForPrice = tier ?? (petData.weightKg ? tierForWeight(weightTiers, parseFloat(petData.weightKg.replace(',', '.'))) : null);
     const weightSurcharge = showWeightPrices && f.weight.visible ? (weightTierForPrice?.price ?? 0) : 0;
-    const showTotal = (showServicePrices && servicesTotal > 0) || weightSurcharge > 0;
-    const estimatedTotal = (showServicePrices ? servicesTotal : 0) + weightSurcharge;
+    // Traslado por comuna (lib/transport.ts): suma solo si el crematorio muestra sus precios
+    const [pickupCommune, deliveryCommune] = ownerCommunes(ownerData);
+    const transportQuote = quoteTransport(transport, pickupCommune, deliveryCommune);
+    const transportHasLegs = !!transportQuote && !!(transportQuote.pickup || transportQuote.delivery);
+    const transportUncovered = !!transportQuote && transportQuote.uncovered.length > 0;
+    const transportTotal = transport?.show_prices && transportQuote ? transportQuote.total : 0;
+    const showTotal = (showServicePrices && servicesTotal > 0) || weightSurcharge > 0 || transportTotal > 0;
+    const estimatedTotal = (showServicePrices ? servicesTotal : 0) + weightSurcharge + transportTotal;
     const [showFarewellModal, setShowFarewellModal] = useState(false);
 
     const primaryImageBlobUrl = useMemo(() => {
@@ -449,11 +458,20 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
                                 <span className="shrink-0 font-bold text-slate-800 dark:text-slate-200">{formatCLP(weightSurcharge)}</span>
                             </div>
                         )}
+                        {/* Traslado: un solo cobro para retiro + entrega */}
+                        {transportQuote && transportHasLegs && (transportUncovered || transportTotal > 0) && (
+                            <div className="flex justify-between gap-3">
+                                <span className="min-w-0 truncate font-medium">Traslado · {transportPlaces(transportQuote)}</span>
+                                <span className={`shrink-0 font-bold ${transportUncovered ? 'text-amber-700 dark:text-amber-300' : 'text-slate-800 dark:text-slate-200'}`}>
+                                    {transportUncovered ? 'A cotizar' : formatCLP(transportTotal)}
+                                </span>
+                            </div>
+                        )}
                     </div>
                     <div className="mt-3.5 pt-3 border-t border-emerald-200/80 dark:border-emerald-900/40 flex items-baseline justify-between gap-3">
                         <div>
                             <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">Total estimado</span>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400">Plan base + recargo peso{selectedItems.some(s => (s.category || '').toLowerCase() !== 'plan') ? ' + adicionales' : ''}</p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">Plan base + recargo peso{selectedItems.some(s => (s.category || '').toLowerCase() !== 'plan') ? ' + adicionales' : ''}{transportTotal > 0 ? ' + traslado' : ''}</p>
                         </div>
                         <span className="text-2xl sm:text-3xl font-extrabold text-emerald-700 dark:text-emerald-400">{formatCLP(estimatedTotal)}</span>
                     </div>
@@ -462,6 +480,12 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
                     )}
                     {quoteItems.length > 0 && (
                         <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">No incluye {quoteItems.map(s => s.name).join(', ')}: el crematorio te informará su valor.</p>
+                    )}
+                    {transportHasLegs && !transportUncovered && !transport?.show_prices && (
+                        <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">El crematorio te confirmará el valor del traslado.</p>
+                    )}
+                    {transportQuote && transportQuote.uncovered.length > 0 && (
+                        <p className="mt-2 text-[11px] text-amber-700 dark:text-amber-300">{transport?.uncovered_message}</p>
                     )}
                 </motion.div>
             )}

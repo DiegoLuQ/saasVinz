@@ -76,7 +76,7 @@ export default function FamilyNoticesBox({ orderId, stepId, finished, compact = 
                         <li key={n.id} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                             <Check size={12} className="text-emerald-500 shrink-0" />
                             <span className="truncate">
-                                {n.channel === 'email' ? 'Correo' : 'WhatsApp'} · {n.kind === 'finish' ? 'Agradecimiento y encuesta' : (n.step_name || 'Avance')} · {formatChileDate(n.created_at)} {formatChileTime(n.created_at)}
+                                {n.channel === 'email' ? 'Correo' : 'WhatsApp'} · {n.kind === 'finish' ? 'Agradecimiento y reseña Google' : (n.step_name || 'Avance')} · {formatChileDate(n.created_at)} {formatChileTime(n.created_at)}
                             </span>
                         </li>
                     ))}

@@ -38,6 +38,7 @@ import type {
     SelectedPlan,
 } from '@/lib/tenant/orders/types';
 import { resolveTimeZone, nowZonedInputValue, zonedInputToUtcISO } from '@/lib/zonedTime';
+import { quoteTransport, type PublicTransport } from '@/lib/transport';
 import { computeAgreementDiscount, termsFromOption } from '@/lib/tenant/orders/agreements';
 import type { AgreementOption, AgreementTerms } from '@/lib/tenant/orders/agreements';
 import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
@@ -229,11 +230,12 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
                 selectedServices,
                 selectedPlans,
                 selectedProducts,
-                currentCremation.weight_price || 0,
+                // El traslado se trata igual que el recargo por peso (sin descuento de convenio)
+                (currentCremation.weight_price || 0) + (currentCremation.transport_price || 0),
                 currentCremation.discount || 0,
                 agreementBreakdown.total
             ),
-        [selectedServices, selectedPlans, selectedProducts, currentCremation.weight_price, currentCremation.discount, agreementBreakdown.total]
+        [selectedServices, selectedPlans, selectedProducts, currentCremation.weight_price, currentCremation.transport_price, currentCremation.discount, agreementBreakdown.total]
     );
 
     const grandTotalCost = useMemo(
@@ -1077,6 +1079,31 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
         });
     }, [weightPricingRules, currentCremation.weight, priceTable]);
 
+    // Traslado por comuna (Configuración → Formulario y Pesos → Traslados). En una orden
+    // NUEVA se propone según las comunas de retiro y entrega; si el usuario lo cambia a
+    // mano, se respeta. Las órdenes existentes conservan el valor guardado.
+    const [transportCfg, setTransportCfg] = useState<PublicTransport | null>(null);
+    const lastAutoTransport = useRef<number | null>(null);
+    useEffect(() => {
+        apiRequest('/api/internal/maintenance/transport')
+            .then((r: PublicTransport & { enabled?: boolean }) => setTransportCfg(r?.enabled ? r : null))
+            .catch(() => setTransportCfg(null));
+    }, []);
+    useEffect(() => {
+        if (editId || !transportCfg) return;
+        const q = quoteTransport(transportCfg, currentCremation.pickup_city, currentCremation.city);
+        setCurrentCremation(prev => {
+            const cur = prev.transport_price || 0;
+            const editedByHand = lastAutoTransport.current === null ? cur !== 0 : cur !== lastAutoTransport.current;
+            if (editedByHand) return prev;
+            const total = q?.total ?? 0;
+            const detail = q && (q.pickup || q.delivery) ? { pickup: q.pickup, delivery: q.delivery } : null;
+            lastAutoTransport.current = total;
+            if (total === cur && JSON.stringify(detail) === JSON.stringify(prev.transport_detail ?? null)) return prev;
+            return { ...prev, transport_price: total, transport_detail: detail };
+        });
+    }, [editId, transportCfg, currentCremation.pickup_city, currentCremation.city]);
+
     // ==========================================
     // Handler: Save
     // ==========================================
@@ -1143,6 +1170,8 @@ export function useOrderForm(options: UseOrderFormOptions = {}) {
                 images: currentCremation.images || [],
                 weight: currentCremation.weight || null,
                 weight_price: currentCremation.weight_price || 0,
+                transport_price: currentCremation.transport_price || 0,
+                transport_detail: currentCremation.transport_detail || null,
                 discount: currentCremation.discount || 0,
                 servicios: selectedServices.map(s => ({
                     service_id: s.service_id,

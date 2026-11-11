@@ -145,6 +145,8 @@ class Tenant(Base):
     family_notices = Column(JSON, nullable=True)
     # Enlaces oficiales: {"form", "plans_token_id", "products_token_id"} (services/official_links.py).
     official_links = Column(JSON, nullable=True)
+    # Cobro de traslado por comuna (zonas con precio). app/services/transport.py
+    transport_config = Column(JSON, nullable=True)
 
     # --- Polar.sh Integration ---
     polar_customer_id = Column(String, nullable=True)

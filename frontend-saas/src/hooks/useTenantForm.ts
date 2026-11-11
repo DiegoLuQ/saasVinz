@@ -1,4 +1,5 @@
 import { type AgeUnit } from '@/lib/petAge';
+import type { PublicTransport } from '@/lib/transport';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { apiRequest, API_BASE_URL } from '@/lib/api';
 import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
@@ -31,6 +32,8 @@ export interface Tenant {
     souvenir_store_url?: string | null;
     /** Es el formulario oficial: se envían sus métricas (lib/formEvents.ts) */
     track_form?: boolean;
+    /** Cobro de traslado por comuna (lib/transport.ts); null = no se cobra */
+    transport?: PublicTransport | null;
 }
 
 export interface OwnerData {

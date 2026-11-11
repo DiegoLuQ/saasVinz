@@ -5,6 +5,7 @@
 import { calculateGrandTotal } from './calculations';
 import { computeAgreementDiscount, type AgreementTerms } from './agreements';
 import { statusLabels } from './types';
+import { transportLabel } from '@/lib/transport';
 import type { Cremation, SelectedPlan, SelectedProduct, SelectedService } from './types';
 
 /** Acepta la forma actual de /partners/active-options (id, name) y la antigua (id_partner, nombre_clinica). */
@@ -30,6 +31,8 @@ export interface OrderSummary {
     weight: number | null;
     items: { key: string; label: string; amount: number }[];
     weightPrice: number;
+    transportPrice: number;
+    transportLabel: string;
     agreement: { name: string; amount: number } | null;
     discountPct: number;
     discountAmount: number;
@@ -63,8 +66,9 @@ export function buildOrderSummary(i: SummaryInput): OrderSummary {
     const c = i.cremation;
     const breakdown = computeAgreementDiscount(i.agreementTerms, i.services, i.plans, i.products);
     const weightPrice = c.weight_price || 0;
+    const transportPrice = c.transport_price || 0;
     const discountPct = c.discount || 0;
-    const total = calculateGrandTotal(i.services, i.plans, i.products, weightPrice, discountPct, breakdown.total);
+    const total = calculateGrandTotal(i.services, i.plans, i.products, weightPrice + transportPrice, discountPct, breakdown.total);
     const beforeManual = discountPct < 100 ? total / (1 - discountPct / 100) : 0;
 
     const partnerId = c.partner_link_id || c.partner_id;
@@ -98,6 +102,8 @@ export function buildOrderSummary(i: SummaryInput): OrderSummary {
             })),
         ],
         weightPrice,
+        transportPrice,
+        transportLabel: transportLabel(c.transport_detail),
         agreement: c.agreement_id
             ? { name: i.agreementName || c.agreement_name || 'Convenio', amount: breakdown.total }
             : null,
@@ -145,6 +151,7 @@ export function diffSummaries(before: OrderSummary, after: OrderSummary): Summar
     }
 
     add('Recargo por peso', fmtCLP(before.weightPrice), fmtCLP(after.weightPrice));
+    add('Traslado', fmtCLP(before.transportPrice), fmtCLP(after.transportPrice));
     add('Convenio empresa',
         before.agreement ? `${before.agreement.name} (−${fmtCLP(before.agreement.amount)})` : 'Sin convenio',
         after.agreement ? `${after.agreement.name} (−${fmtCLP(after.agreement.amount)})` : 'Sin convenio');

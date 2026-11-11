@@ -67,7 +67,7 @@ export const GUIDES: Guide[] = [
             },
             {
                 title: 'Procesa el registro',
-                desc: 'Abre la solicitud y usa «Procesar registro»: crea lo que falte del cliente, la mascota y la orden (si ya existen, los reutiliza) e incluye el recargo por peso elegido. Luego aparece «Ver orden».',
+                desc: 'Abre la solicitud y usa «Procesar registro»: crea lo que falte del cliente, la mascota y la orden (si ya existen, los reutiliza) e incluye el recargo por peso elegido. Al terminar te lleva a «Recepción y Pedidos» con la orden abierta.',
                 checkPath: '/dashboard/registros',
             },
             {
@@ -149,6 +149,12 @@ export const FAQS: Faq[] = [
     },
     {
         category: 'Formulario público',
+        q: '¿Cómo cobro el traslado según la comuna?',
+        a: 'En Formulario y Pesos → Pesos y precios → «Traslados por comuna» creas zonas con un precio de traslado (por ejemplo «Zona urbana» sin cargo y «Zona 2» a $8.000) y les asignas comunas; una comuna solo puede estar en una zona. Se cobra una sola vez por servicio (cubre retiro y entrega de cenizas): eliges si cuenta la comuna de retiro, la de entrega o ambas, y si caen en zonas distintas se cobra la más cara. En el formulario la familia ve el valor al elegir la comuna y se suma al total; si la comuna no está en ninguna zona ve un aviso y puede enviar igual (queda «a cotizar»). El valor llega al registro y a la orden, donde puedes editarlo. Los convenios no descuentan el traslado.',
+        href: '/dashboard/configuracion?tab=formulario', linkText: 'Pesos y precios', feature: 'configuracion:formulario',
+    },
+    {
+        category: 'Formulario público',
         q: '¿Puedo mostrar un mensaje o un video de bienvenida?',
         a: 'Sí, en «Bienvenida y avisos». El mensaje puede ser general o distinto en cada formulario específico. El botón «Ver video» (hasta 30 segundos, subido o desde Vimeo / Cloudflare Stream) está disponible en los planes PRO y ULTRA.',
         href: '/dashboard/configuracion?tab=formulario', linkText: 'Bienvenida y avisos', feature: 'configuracion:formulario',
@@ -158,7 +164,7 @@ export const FAQS: Faq[] = [
     {
         category: 'Registros y órdenes',
         q: 'Llegó una solicitud web, ¿qué hago?',
-        a: 'Ábrela desde el aviso de la campana o desde el Dashboard. Revisa los datos y usa «Procesar registro»: crea lo que falte del cliente, la mascota y la orden, reutilizando los que ya existan. Después aparece el botón «Ver orden».',
+        a: 'Ábrela desde el aviso de la campana o desde el Dashboard. Revisa los datos y usa «Procesar registro»: crea lo que falte del cliente, la mascota y la orden, reutilizando los que ya existan. Al terminar te lleva a «Recepción y Pedidos» con la orden abierta.',
         href: '/dashboard', linkText: 'Ir al Dashboard',
     },
     {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { formatRut, sanitizeEmailInput, autoFixEmailDomain } from '@/lib/formatters';
-import { ChevronDown, MessageCircle, Phone, Sparkles, MapPin } from 'lucide-react';
+import { ChevronDown, MessageCircle, Phone, Sparkles, MapPin, Truck } from 'lucide-react';
+import { ownerCommunes, quotePriceText, quoteTransport, transportPlaces, type PublicTransport } from '@/lib/transport';
 import { Country, State, City } from 'country-state-city';
 import { DEFAULT_FORM_CONFIG, fieldLabel, fieldSuffix, type PublicFormConfig } from '@/lib/publicFormConfig';
 
@@ -39,6 +40,8 @@ interface Props {
     tenantRegion?: string;
     /** Campos visibles/obligatorios configurados por el crematorio */
     formConfig?: PublicFormConfig;
+    /** Cobro de traslado por comuna (null = el crematorio no lo cobra) */
+    transport?: PublicTransport | null;
 }
 
 const COUNTRY_CODES = [
@@ -76,7 +79,7 @@ const CONTACT_OPTIONS = [
 // Cambiar a `true` para reactivarlo en el formulario público.
 const SHOW_SERVICE_CODE = false;
 
-export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hideServiceCode, tenantCountry, tenantRegion, formConfig = DEFAULT_FORM_CONFIG }: Props) {
+export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hideServiceCode, tenantCountry, tenantRegion, formConfig = DEFAULT_FORM_CONFIG, transport }: Props) {
     const f = formConfig.fields;
     const [countryCode, setCountryCode] = useState('+56');
     const [localPhone, setLocalPhone] = useState('');
@@ -527,6 +530,41 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                 </div>
                 )}
             </div>
+            )}
+
+            <TransportNotice transport={transport} data={data} />
+        </div>
+    );
+}
+
+/** Cuánto cuesta el traslado según las comunas elegidas (lib/transport.ts). Solo aviso: no bloquea. */
+function TransportNotice({ transport, data }: { transport?: PublicTransport | null; data: OwnerData }) {
+    const [pickup, delivery] = ownerCommunes(data);
+    const q = quoteTransport(transport, pickup, delivery);
+    if (!transport || !q || (!q.pickup && !q.delivery)) return null;
+    const show = transport.show_prices;
+    const price = quotePriceText(q, show);
+    const places = transportPlaces(q);
+    return (
+        <div className="form-card space-y-3">
+            <div className="flex items-center gap-2">
+                <div className="p-2 bg-sky-50 dark:bg-sky-950/30 rounded-lg">
+                    <Truck size={16} className="text-sky-600 dark:text-sky-400" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">Traslado</h3>
+            </div>
+            <div className="flex justify-between gap-3 text-sm">
+                <span className="min-w-0 text-slate-700 dark:text-slate-300">{places.charAt(0).toUpperCase() + places.slice(1)}</span>
+                {price && <span className={`shrink-0 font-bold ${q.uncovered.length ? 'text-amber-700 dark:text-amber-300' : 'text-slate-800 dark:text-slate-100'}`}>{price}</span>}
+            </div>
+            {q.pickup && q.delivery && !q.uncovered.length && (
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">Un solo valor cubre el retiro y la entrega de cenizas.</p>
+            )}
+            {!show && q.uncovered.length === 0 && (
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">El crematorio te confirmará el valor del traslado.</p>
+            )}
+            {q.uncovered.length > 0 && (
+                <p className="rounded-xl bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">{transport.uncovered_message}</p>
             )}
         </div>
     );
