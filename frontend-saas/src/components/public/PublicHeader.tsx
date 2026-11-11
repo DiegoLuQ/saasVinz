@@ -169,51 +169,55 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
 
     // Dynamic styling based on theme
     const textMainClass = effectiveIsDark ? 'text-white' : 'text-slate-900';
-    const textMutedClass = effectiveIsDark ? 'text-white/75' : 'text-slate-700'; // higher contrast on dark for legible nav links
+    const textMutedClass = effectiveIsDark ? 'text-slate-300' : 'text-slate-600';
+    const dividerClass = effectiveIsDark ? 'bg-white/10' : 'bg-stone-200';
     return (
         <header
-            className="fixed top-6 inset-x-0 z-50 flex justify-center px-4 bg-transparent transition-all duration-500"
+            className="fixed top-4 sm:top-5 inset-x-0 z-50 flex justify-center px-3 sm:px-6 bg-transparent transition-all duration-500"
             style={customBg && !transparent && !isMenuModalOpen ? { backgroundColor: customBg } : {}}
         >
-            {/* Header Outer Glow/Border effect */}
+            {/* Header Outer Pill */}
             <div className={`
-                w-auto md:w-full max-w-6xl xl:max-w-7xl relative
-                ${effectiveIsDark 
-                    ? 'bg-slate-950/70 border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.4)]' 
-                    : 'bg-white/80 border-slate-200/60 shadow-[0_8px_32px_0_rgba(31,38,135,0.08)]'}
-                backdrop-blur-xl border rounded-full px-5 sm:px-8 transition-all duration-500
-                ${isScrolled ? 'py-2 scale-98 border-[#c5a059]/20' : 'py-3'}
+                w-full max-w-7xl relative
+                ${effectiveIsDark
+                    ? 'bg-slate-950/80 border-white/10 shadow-[0_12px_36px_rgba(0,0,0,0.45)]'
+                    : 'bg-white/85 border-stone-200/80 shadow-[0_10px_35px_rgba(15,23,42,0.06)]'}
+                backdrop-blur-xl border rounded-full px-4 sm:px-6 lg:px-7 transition-all duration-500
+                ${isScrolled ? 'py-1.5 border-[#c5a059]/30 shadow-[0_12px_38px_rgba(15,23,42,0.09)]' : 'py-2.5'}
             `}>
-                {/* Subtle golden ambient top line on hover/scroll */}
+                {/* Subtle golden ambient top line on scroll */}
                 <div className={`absolute top-0 inset-x-12 h-px bg-gradient-to-r from-transparent via-[#c5a059]/50 to-transparent transition-opacity duration-500 ${isScrolled ? 'opacity-100' : 'opacity-0'}`} />
 
-                <div className="relative h-14 flex items-center justify-between gap-4">
+                <div className="relative h-12 flex items-center justify-between gap-4 lg:gap-6">
 
                     {/* LOGO - Lado Izquierdo */}
                     <Link
                         href="/"
                         onClick={() => setIsMobileMenuOpen(false)}
-                        className="flex shrink-0 items-center gap-3 group transition-all duration-300 active:scale-95"
+                        className="flex shrink-0 items-center gap-2.5 pr-1 group transition-all duration-300 active:scale-95"
                     >
                         <img
                             src="/logo-vinzer.webp"
                             alt="Vinzer"
-                            width={92}
-                            height={45}
-                            className="h-9 w-auto transition-transform duration-500 group-hover:scale-105"
+                            width={84}
+                            height={41}
+                            className="h-8 w-auto transition-transform duration-500 group-hover:scale-105"
                         />
-                        <div className="flex flex-col">
-                            <span className={`text-xl font-serif italic font-extrabold tracking-tight transition-all duration-300 ${effectiveIsDark ? 'text-white group-hover:text-[#c5a059]' : 'text-slate-900 group-hover:text-[#c5a059]'}`}>
+                        <div className="flex flex-col leading-none">
+                            <span className={`text-lg font-serif italic font-extrabold tracking-tight transition-colors duration-300 ${effectiveIsDark ? 'text-white group-hover:text-[#c5a059]' : 'text-slate-900 group-hover:text-[#a87f32]'}`}>
                                 Vinzer
                             </span>
-                            <span className="text-[7px] uppercase tracking-[0.3em] text-[#c5a059] font-bold opacity-80 group-hover:opacity-100 transition-opacity duration-300 -mt-1">
+                            <span className="text-[7px] uppercase tracking-[0.24em] text-[#b58938] dark:text-[#c5a059] font-bold mt-0.5">
                                 Memorial
                             </span>
                         </div>
                     </Link>
 
+                    {/* Separador visual */}
+                    <span className={`hidden xl:block h-5 w-px shrink-0 ${dividerClass}`} aria-hidden="true" />
+
                     {/* NAVEGACIÓN CENTRAL */}
-                    <nav className="hidden xl:flex flex-1 min-w-0 items-center justify-center gap-0.5">
+                    <nav className="hidden xl:flex flex-1 min-w-0 items-center justify-center gap-1 2xl:gap-2 px-1">
                         {navItems.map((item) => {
                             const active = isActive(item.id);
                             return (
@@ -221,41 +225,46 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                                     key={item.id}
                                     href={item.href}
                                     aria-current={active ? 'location' : undefined}
-                                    className={`group relative px-2.5 py-2.5 text-[10px] font-black uppercase tracking-[0.1em] whitespace-nowrap rounded-full transition-all duration-300 z-10
-                                        ${active ? 'text-[#c5a059]' : `${textMutedClass} hover:text-[#c5a059]`}`}
+                                    className={`group relative px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.07em] whitespace-nowrap rounded-full transition-colors duration-200 z-10
+                                        ${active
+                                            ? (effectiveIsDark ? 'text-amber-300' : 'text-amber-800')
+                                            : `${textMutedClass} ${effectiveIsDark ? 'hover:text-white hover:bg-white/5' : 'hover:text-slate-900 hover:bg-stone-100/80'}`}`}
                                 >
                                     {active && (
                                         <motion.span
                                             layoutId="activeNavBackground"
-                                            className="absolute inset-0 bg-[#c5a059]/10 border border-[#c5a059]/20 rounded-full z-0"
+                                            className={`absolute inset-0 rounded-full z-0 border ${
+                                                effectiveIsDark
+                                                    ? 'bg-amber-500/15 border-amber-400/25'
+                                                    : 'bg-amber-500/10 border-amber-600/20'
+                                            }`}
                                             transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                                         />
                                     )}
-                                    <span className="relative z-10 transition-transform duration-300 group-hover:scale-105 inline-block">{item.label}</span>
-                                    <span
-                                        className={`pointer-events-none absolute bottom-1.5 left-1/2 -translate-x-1/2 h-[2px] rounded-full bg-[#c5a059] transition-all duration-300 z-20
-                                            ${active ? 'w-4 opacity-100' : 'w-0 opacity-0 group-hover:w-4 group-hover:opacity-100'}`}
-                                    />
+                                    <span className="relative z-10">{item.label}</span>
                                 </Link>
                             );
                         })}
                     </nav>
 
+                    {/* Separador visual */}
+                    <span className={`hidden xl:block h-5 w-px shrink-0 ${dividerClass}`} aria-hidden="true" />
+
                     {/* Mobile Actions: Theme Toggle + Menu Button */}
-                    <div className="xl:hidden flex items-center gap-2">
+                    <div className="xl:hidden flex items-center gap-2 shrink-0">
                         {onToggleTheme && (
                             <button
                                 type="button"
                                 onClick={onToggleTheme}
                                 aria-label={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
                                 title={isDark ? 'Modo claro' : 'Modo oscuro'}
-                                className={`p-2.5 rounded-full transition-all duration-300 active:scale-90 border cursor-pointer ${
+                                className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 active:scale-90 border cursor-pointer ${
                                     effectiveIsDark
                                         ? 'border-white/10 bg-white/5 text-amber-300 hover:bg-white/10'
-                                        : 'border-slate-200 bg-slate-50 text-amber-700 hover:bg-slate-100'
+                                        : 'border-stone-200 bg-stone-50 text-amber-700 hover:bg-stone-100'
                                 }`}
                             >
-                                {isDark ? <Sun size={18} /> : <Moon size={18} />}
+                                {isDark ? <Sun size={16} /> : <Moon size={16} />}
                             </button>
                         )}
                         <button
@@ -263,67 +272,64 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                             aria-label="Abrir menú"
                             aria-expanded={isMobileMenuOpen}
                             aria-controls="mobile-menu"
-                            className={`p-3 rounded-full transition-all duration-300 ${textMainClass} hover:bg-white/10 active:scale-90 border ${effectiveIsDark ? 'border-white/5 bg-white/5' : 'border-slate-200/50 bg-slate-50/50'}`}
+                            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 ${textMainClass} active:scale-90 border cursor-pointer ${effectiveIsDark ? 'border-white/10 bg-white/5 hover:bg-white/10' : 'border-stone-200 bg-stone-50 hover:bg-stone-100'}`}
                         >
-                            <Menu size={20} className="text-[#c5a059]" />
+                            <Menu size={19} className="text-[#c5a059]" />
                         </button>
                     </div>
 
                     {/* ACCIONES - Lado Derecho */}
-                    <div className="hidden xl:flex shrink-0 items-center gap-2.5">
+                    <div className="hidden xl:flex shrink-0 items-center gap-2">
                         {onToggleTheme && (
                             <button
                                 type="button"
                                 onClick={onToggleTheme}
                                 aria-label={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
                                 title={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-                                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border transition-all duration-300 cursor-pointer
+                                className={`w-9 h-9 rounded-full flex items-center justify-center border transition-all duration-200 cursor-pointer
                                 ${effectiveIsDark
-                                    ? 'border-white/10 bg-white/5 text-amber-300 hover:bg-white/10 hover:border-[#c5a059]/40'
-                                    : 'border-slate-200 bg-slate-50/80 text-amber-700 hover:bg-slate-100 hover:border-[#c5a059]/40'}`}
+                                    ? 'border-white/10 bg-white/5 text-amber-300 hover:bg-white/10 hover:border-amber-400/40'
+                                    : 'border-stone-200 bg-stone-50/80 text-amber-700 hover:bg-stone-100 hover:border-amber-600/35'}`}
                             >
-                                {isDark ? <Sun size={14} /> : <Moon size={14} />}
-                                <span className="text-[9px] font-black uppercase tracking-widest">
-                                    {isDark ? (locale === 'en' ? 'Light' : 'Claro') : (locale === 'en' ? 'Dark' : 'Oscuro')}
-                                </span>
+                                {isDark ? <Sun size={15} /> : <Moon size={15} />}
                             </button>
                         )}
 
-                        {/* Language Toggle Premium */}
+                        {/* Language Toggle Compacto */}
                         <button
                             onClick={toggleLocale}
                             aria-label={locale === 'es' ? 'Cambiar idioma a inglés' : 'Switch language to Spanish'}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all duration-300
-                            ${effectiveIsDark 
-                                ? 'border-white/10 bg-white/5 hover:bg-white/10 hover:border-[#c5a059]/40' 
-                                : 'border-slate-200 bg-slate-50/50 hover:bg-slate-100 hover:border-[#c5a059]/40'}`}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all duration-200 cursor-pointer
+                            ${effectiveIsDark
+                                ? 'border-white/10 bg-white/5 hover:bg-white/10 hover:border-[#c5a059]/40'
+                                : 'border-stone-200 bg-stone-50/80 hover:bg-stone-100 hover:border-[#c5a059]/40'}`}
                         >
-                            <Globe size={13} className="text-[#c5a059] animate-pulse" />
-                            <span className="text-[9px] font-black uppercase tracking-widest">
-                                <span className={locale === 'es' ? 'text-[#c5a059]' : 'text-stone-500'}>ES</span>
-                                <span className="mx-1 opacity-20 text-stone-500">|</span>
-                                <span className={locale === 'en' ? 'text-[#c5a059]' : 'text-stone-500'}>EN</span>
+                            <Globe size={13} className="text-[#b58938] dark:text-[#c5a059]" />
+                            <span className="text-[10px] font-bold uppercase tracking-wider">
+                                <span className={locale === 'es' ? (effectiveIsDark ? 'text-amber-300' : 'text-amber-800') : 'text-slate-400'}>ES</span>
+                                <span className="mx-1 text-slate-300 dark:text-slate-600">/</span>
+                                <span className={locale === 'en' ? (effectiveIsDark ? 'text-amber-300' : 'text-amber-800') : 'text-slate-400'}>EN</span>
                             </span>
                         </button>
 
                         {/* Botón de Acceso */}
                         <Link
                             href={loginUrl}
-                            className={`px-5 py-2.5 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all duration-300
-                                ${effectiveIsDark 
-                                    ? 'border-white/10 text-white bg-white/5 hover:bg-[#c5a059]/10 hover:border-[#c5a059]' 
-                                    : 'border-slate-200 text-slate-800 bg-slate-50 hover:bg-[#c5a059]/10 hover:border-[#c5a059]'}`}
+                            className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-[0.12em] border transition-all duration-200 whitespace-nowrap
+                                ${effectiveIsDark
+                                    ? 'border-white/15 text-white bg-white/5 hover:bg-white/10 hover:border-[#c5a059]'
+                                    : 'border-stone-200 text-slate-700 bg-white hover:bg-stone-50 hover:text-slate-900 hover:border-[#c5a059]'}`}
                         >
                             {lc.nav_login}
                         </Link>
 
-                        {/* Botón CTA (Estilo Nomad Gear) */}
+                        {/* Botón CTA */}
                         <Link
                             href="/crear"
-                            className={`px-6 py-2.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all duration-300 shadow-md
+                            className={`px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.12em] transition-all duration-200 shadow-sm whitespace-nowrap
                             ${effectiveIsDark
-                                ? 'bg-white text-black hover:bg-[#c5a059] hover:text-white hover:shadow-[#c5a059]/25 hover:shadow-lg'
-                                : 'bg-slate-900 text-white hover:bg-[#c5a059] hover:shadow-[#c5a059]/25 hover:shadow-lg'}`}
+                                ? 'bg-amber-400 text-slate-950 hover:bg-amber-300 shadow-amber-500/20'
+                                : 'bg-slate-900 text-white hover:bg-[#b58938] hover:shadow-md'}`}
                         >
                             {lc.nav_cta}
                         </Link>
@@ -342,7 +348,7 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.3 }}
                         onClick={() => setIsMobileMenuOpen(false)}
-                        className="fixed inset-0 z-[60] bg-slate-950/60 backdrop-blur-sm"
+                        className="fixed inset-0 z-[60] bg-slate-950/50 backdrop-blur-sm"
                     />
 
                     {/* Sheet */}
@@ -359,14 +365,18 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                         dragConstraints={{ top: 0, bottom: 0 }}
                         dragElastic={{ top: 0, bottom: 0.5 }}
                         onDragEnd={(_, info) => { if (info.offset.y > 120) setIsMobileMenuOpen(false); }}
-                        className="fixed inset-x-0 bottom-0 z-[70] bg-slate-950/95 backdrop-blur-2xl border-t border-white/10 rounded-t-[2.5rem] px-6 pt-3 pb-10 shadow-[0_-8px_40px_rgba(0,0,0,0.5)]"
+                        className={`fixed inset-x-0 bottom-0 z-[70] backdrop-blur-2xl border-t rounded-t-[2.5rem] px-6 pt-3 pb-10 shadow-[0_-8px_40px_rgba(0,0,0,0.3)] ${
+                            isDark
+                                ? 'bg-slate-950/95 border-white/10'
+                                : 'bg-[#FAF8F4]/95 border-stone-200'
+                        }`}
                     >
                         {/* Ambient glow */}
                         <div className="absolute -top-px left-1/2 -translate-x-1/2 w-48 h-32 rounded-full bg-[#c5a059]/15 blur-[80px] pointer-events-none" />
 
                         {/* Drag handle */}
                         <div className="flex justify-center pt-1 pb-5 relative z-10 cursor-grab active:cursor-grabbing">
-                            <div className="w-12 h-1.5 rounded-full bg-white/20" />
+                            <div className={`w-12 h-1.5 rounded-full ${isDark ? 'bg-white/20' : 'bg-stone-300'}`} />
                         </div>
 
                         <div className="relative z-10 flex flex-col">
@@ -375,14 +385,18 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                                 <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3">
                                     <img src="/logo-vinzer.webp" alt="Vinzer" width={82} height={40} className="h-8 w-auto" />
                                     <div className="flex flex-col">
-                                        <span className="text-lg font-serif italic font-bold tracking-tight text-white">Vinzer</span>
-                                        <span className="text-[7px] uppercase tracking-[0.3em] text-[#c5a059] font-bold opacity-80 -mt-0.5">Memorial</span>
+                                        <span className={`text-lg font-serif italic font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>Vinzer</span>
+                                        <span className="text-[7px] uppercase tracking-[0.26em] text-[#b58938] dark:text-[#c5a059] font-bold -mt-0.5">Memorial</span>
                                     </div>
                                 </Link>
                                 <button
                                     onClick={() => setIsMobileMenuOpen(false)}
                                     aria-label="Cerrar menú"
-                                    className="p-2.5 rounded-full bg-white/5 text-white/70 hover:bg-white/10 hover:text-[#c5a059] transition-all border border-white/10"
+                                    className={`p-2.5 rounded-full transition-all border ${
+                                        isDark
+                                            ? 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-[#c5a059] border-white/10'
+                                            : 'bg-white text-slate-600 hover:bg-stone-100 hover:text-slate-900 border-stone-200'
+                                    }`}
                                 >
                                     <X size={18} />
                                 </button>
@@ -398,30 +412,55 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                                                 href={item.href}
                                                 onClick={() => setIsMobileMenuOpen(false)}
                                                 aria-current={active ? 'location' : undefined}
-                                                className={`group flex items-center justify-between py-4 border-b border-white/5 transition-colors ${active ? 'text-[#c5a059]' : 'text-white/90 hover:text-[#c5a059]'}`}
+                                                className={`group flex items-center justify-between py-4 border-b transition-colors ${
+                                                    isDark ? 'border-white/5' : 'border-stone-200/80'
+                                                } ${
+                                                    active
+                                                        ? (isDark ? 'text-[#c5a059]' : 'text-amber-700')
+                                                        : (isDark ? 'text-white/90 hover:text-[#c5a059]' : 'text-slate-800 hover:text-amber-700')
+                                                }`}
                                             >
                                                 <span className="flex items-baseline gap-3">
-                                                    <span className="text-[10px] font-mono text-[#c5a059]/50">0{index + 1}</span>
+                                                    <span className="text-[10px] font-mono text-[#c5a059]/70">0{index + 1}</span>
                                                     <span className="text-xl font-serif">{item.label}</span>
                                                 </span>
-                                                <ChevronRight size={18} className="text-white/30 group-hover:text-[#c5a059] group-hover:translate-x-1 transition-all" />
+                                                <ChevronRight size={18} className={`${isDark ? 'text-white/30' : 'text-slate-400'} group-hover:text-[#c5a059] group-hover:translate-x-1 transition-all`} />
                                             </Link>
                                         </motion.div>
                                     );
                                 })}
                             </nav>
 
-                            {/* Idioma */}
-                            <motion.div variants={itemVariants} className="flex items-center justify-center gap-4 py-6">
-                                <span className={`text-xs font-bold uppercase tracking-widest ${locale === 'es' ? 'text-[#c5a059]' : 'text-white/40'}`}>ES</span>
-                                <button
-                                    onClick={toggleLocale}
-                                    aria-label={locale === 'es' ? 'Cambiar idioma a inglés' : 'Switch language to Spanish'}
-                                    className="w-12 h-6 rounded-full bg-white/10 relative border border-white/10 transition-colors hover:border-[#c5a059]/40"
-                                >
-                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full shadow-sm transition-all ${locale === 'en' ? 'left-7 bg-white' : 'left-1 bg-[#c5a059]'}`} />
-                                </button>
-                                <span className={`text-xs font-bold uppercase tracking-widest ${locale === 'en' ? 'text-[#c5a059]' : 'text-white/40'}`}>EN</span>
+                            {/* Idioma y Tema */}
+                            <motion.div variants={itemVariants} className="flex items-center justify-center gap-6 py-6">
+                                <div className="flex items-center gap-3">
+                                    <span className={`text-xs font-bold uppercase tracking-widest ${locale === 'es' ? 'text-[#b58938] dark:text-[#c5a059]' : 'text-slate-400'}`}>ES</span>
+                                    <button
+                                        onClick={toggleLocale}
+                                        aria-label={locale === 'es' ? 'Cambiar idioma a inglés' : 'Switch language to Spanish'}
+                                        className={`w-12 h-6 rounded-full relative border transition-colors ${
+                                            isDark ? 'bg-white/10 border-white/10' : 'bg-stone-200 border-stone-300'
+                                        }`}
+                                    >
+                                        <div className={`absolute top-0.5 w-4 h-4 rounded-full shadow-sm transition-all ${locale === 'en' ? 'left-7 bg-white' : 'left-1 bg-[#c5a059]'}`} />
+                                    </button>
+                                    <span className={`text-xs font-bold uppercase tracking-widest ${locale === 'en' ? 'text-[#b58938] dark:text-[#c5a059]' : 'text-slate-400'}`}>EN</span>
+                                </div>
+
+                                {onToggleTheme && (
+                                    <button
+                                        type="button"
+                                        onClick={onToggleTheme}
+                                        className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-xs font-bold uppercase tracking-wider ${
+                                            isDark
+                                                ? 'border-white/15 bg-white/5 text-amber-300'
+                                                : 'border-stone-200 bg-white text-amber-800'
+                                        }`}
+                                    >
+                                        {isDark ? <Sun size={14} /> : <Moon size={14} />}
+                                        <span>{isDark ? 'Claro' : 'Oscuro'}</span>
+                                    </button>
+                                )}
                             </motion.div>
 
                             {/* Acciones */}
@@ -429,14 +468,22 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                                 <Link
                                     href={loginUrl}
                                     onClick={() => setIsMobileMenuOpen(false)}
-                                    className="px-8 py-3.5 border border-white/10 text-white rounded-full text-xs font-black uppercase tracking-widest bg-white/5 hover:bg-[#c5a059]/10 hover:border-[#c5a059] transition-all text-center"
+                                    className={`px-8 py-3.5 border rounded-full text-xs font-black uppercase tracking-widest transition-all text-center ${
+                                        isDark
+                                            ? 'border-white/10 text-white bg-white/5 hover:bg-[#c5a059]/10 hover:border-[#c5a059]'
+                                            : 'border-stone-300 text-slate-800 bg-white hover:border-[#c5a059]'
+                                    }`}
                                 >
                                     {lc.nav_login}
                                 </Link>
                                 <Link
                                     href="/crear"
                                     onClick={() => setIsMobileMenuOpen(false)}
-                                    className="px-8 py-3.5 bg-[#c5a059] text-white rounded-full text-xs font-black uppercase tracking-widest shadow-lg shadow-[#c5a059]/20 hover:bg-[#b38f4d] hover:shadow-xl transition-all text-center"
+                                    className={`px-8 py-3.5 rounded-full text-xs font-black uppercase tracking-widest shadow-lg transition-all text-center ${
+                                        isDark
+                                            ? 'bg-amber-400 text-slate-950 hover:bg-amber-300'
+                                            : 'bg-slate-900 text-white hover:bg-[#b58938]'
+                                    }`}
                                 >
                                     {lc.nav_cta}
                                 </Link>
