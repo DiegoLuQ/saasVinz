@@ -353,6 +353,15 @@ class TrackingTimelineEvent(BaseModel):
     completed_at: Optional[datetime] = None
     evidence: Optional[OrderEvidenceInDB] = None
 
+class PublicAiDesign(BaseModel):
+    id: int
+    kind: str  # "design" | "illustration"
+    title: str
+    url: Optional[str] = None
+    meta: Optional[dict] = None
+    template_definition: Optional[dict] = None
+    render_data: Optional[dict] = None
+
 class PublicTrackingResponse(BaseModel):
     # Zona horaria del crematorio: la página muestra las horas en ella (no en la del dispositivo)
     timezone: str = "America/Santiago"
@@ -374,6 +383,7 @@ class PublicTrackingResponse(BaseModel):
     tenant_social_media: Optional[dict] = None
     pet_dedication: Optional[str] = None
     farewell_template_config: Optional[dict] = None
+    ai_design: Optional[PublicAiDesign] = None
     is_ultra_plan: Optional[bool] = False
     tenant_plan: Optional[str] = None
     # Encuesta de satisfacción: se muestra al entregar si el crematorio la tiene activa.

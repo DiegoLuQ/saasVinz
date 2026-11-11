@@ -37,7 +37,7 @@ from app.api.internal.operations.schemas import (
     CremationInDB, CremationCreate, CremationUpdate,
     LogisticsTaskBase, LogisticsTaskCreate, LogisticsTaskUpdate, LogisticsTaskInDB,
     OrderEvidenceBase, OrderEvidenceCreate, OrderEvidenceInDB,
-    TrackingTimelineEvent, PublicTrackingResponse,
+    TrackingTimelineEvent, PublicAiDesign, PublicTrackingResponse,
     WorkflowStepBase, WorkflowStepCreate, WorkflowStepUpdate, WorkflowStepInDB,
     DashboardStatData, DashboardLimitItem, DashboardLimitsData, DashboardRecentActivity, DashboardSummarySchema,
     DocumentBase, DocumentCreate, DocumentInDB,

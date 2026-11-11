@@ -36,6 +36,7 @@ import FeedbackSurvey from '@/components/public/FeedbackSurvey';
 import { vinzerPromoUrl } from '@/lib/publicUrls';
 import html2canvas from 'html2canvas';
 import FarewellPreview from '@/app/(tenant)/tenant/dashboard/documentos/disenos/components/FarewellPreview';
+import PublicAiDesignCard from '@/components/public/PublicAiDesignCard';
 
 const getStepIcon = (index: number) => {
     switch (index) {
@@ -751,6 +752,16 @@ export default function TrackingPage() {
                             </div>
                         )}
 
+                        {/* 1b. Plantilla Conmemorativa con IA (si existe) */}
+                        {data.ai_design && (
+                            <PublicAiDesignCard
+                                design={data.ai_design}
+                                petName={data.pet_name}
+                                isDarkMode={isDarkMode}
+                                variant="central"
+                            />
+                        )}
+
                         {/* 2. Dedicatoria Familiar Destacada (si existe) */}
                         {data.pet_dedication && (
                             <div className={`p-6 sm:p-7 rounded-[2rem] border backdrop-blur-md relative overflow-hidden transition-all ${
@@ -946,7 +957,7 @@ export default function TrackingPage() {
                 ) : (
                     <>
                         {/* Selector de Pestañas en Móvil */}
-                        {farewellConfig && (
+                        {(farewellConfig || data.ai_design) && (
                             <div className="lg:hidden flex p-1 rounded-2xl bg-black/5 dark:bg-[#0f1a35]/80 border border-sky-500/20 backdrop-blur-md mb-6 shadow-sm sticky top-4 z-20">
                                 <button
                                     type="button"
@@ -1191,6 +1202,16 @@ export default function TrackingPage() {
                                             )}
                                         </button>
                                     </div>
+                                )}
+
+                                {/* Tarjeta 4b: Plantilla Conmemorativa con IA (si existe) */}
+                                {data.ai_design && (
+                                    <PublicAiDesignCard
+                                        design={data.ai_design}
+                                        petName={data.pet_name}
+                                        isDarkMode={isDarkMode}
+                                        variant="compact"
+                                    />
                                 )}
 
                                 {/* Tarjeta 5: Mensaje Emocional */}

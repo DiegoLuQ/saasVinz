@@ -300,6 +300,7 @@ def get_tracking_info(
         # Carta de despedida de la orden (oc_details.dedication; la mascota no tiene ese campo)
         pet_dedication=((cremation.details.dedication if cremation.details else None) or None),
         farewell_template_config=farewell_tpl.config if farewell_tpl else None,
+        ai_design=_resolve_pet_ai_design(db, tenant, pet),
         is_ultra_plan="ULTRA" in ((getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper()),
         tenant_plan=(getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper(),
         show_vinzer_brand=_show_brand(tenant),
@@ -307,6 +308,57 @@ def get_tracking_info(
         feedback={"rating": fb.rating, "comment": fb.comment} if fb else None,
         souvenir_store_url=_store_url(db, tenant, token),
     )
+
+
+def _resolve_pet_ai_design(db: Session, tenant: models.Tenant, pet: models.Pet) -> Optional[schemas.PublicAiDesign]:
+    """Busca la plantilla de diseño con IA (o ilustración IA como respaldo) generada para esta mascota."""
+    try:
+        from app.services import image_template_ai as ai
+        exports = (
+            db.query(models.TemplateExport)
+            .filter(
+                models.TemplateExport.tenant_id == tenant.id,
+                models.TemplateExport.pet_id == pet.id,
+                models.TemplateExport.kind.in_(["design", "illustration"]),
+            )
+            .order_by(models.TemplateExport.created_at.desc(), models.TemplateExport.id.desc())
+            .all()
+        )
+        if not exports:
+            return None
+
+        # Priorizar diseño con plantilla (incluye la ilustración IA + marco/texto)
+        design_exp = next((e for e in exports if e.kind == "design"), None)
+        if design_exp:
+            if design_exp.media_url:
+                return schemas.PublicAiDesign(
+                    id=design_exp.id, kind="design", title=design_exp.title, url=design_exp.media_url
+                )
+            if design_exp.meta and design_exp.template_id:
+                tpl = db.query(models.ImageTemplate).filter(models.ImageTemplate.id == design_exp.template_id).first()
+                if tpl and tpl.definition:
+                    bindings = ai.template_bindings(pet, pet.customer, tenant)
+                    # En track público omitimos teléfono/correo del tutor y RUT del crematorio si no son públicos
+                    bindings["owner_phone"] = ""
+                    bindings["owner_email"] = ""
+                    return schemas.PublicAiDesign(
+                        id=design_exp.id,
+                        kind="design",
+                        title=design_exp.title,
+                        meta=design_exp.meta,
+                        template_definition=tpl.definition,
+                        render_data=bindings,
+                    )
+
+        # Respaldo: ilustración IA directa si no hay plantilla compilada
+        ill_exp = next((e for e in exports if e.kind == "illustration" and e.media_url), None)
+        if ill_exp:
+            return schemas.PublicAiDesign(
+                id=ill_exp.id, kind="illustration", title=ill_exp.title, url=ill_exp.media_url
+            )
+    except Exception:
+        return None
+    return None
 
 
 def _store_url(db, tenant, ref=None):
