@@ -2,6 +2,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List, Any, Literal
 from datetime import datetime
 from app.models import PetStatus
+from app.utils.sanitize import sanitize_email, validate_email_strict
 
 # ==========================================
 # Business Schemas (CRM: Customers & Pets)
@@ -28,7 +29,17 @@ class CustomerBase(BaseModel):
         return v
 
 class CustomerCreate(CustomerBase):
-    pass
+    @field_validator('email', mode='before')
+    @classmethod
+    def clean_and_validate_email(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            cleaned = sanitize_email(v)
+            if cleaned:
+                err = validate_email_strict(cleaned)
+                if err:
+                    raise ValueError(err)
+            return cleaned
+        return v
 
 class CustomerUpdate(BaseModel):
     rut: Optional[str] = None
@@ -44,9 +55,12 @@ class CustomerUpdate(BaseModel):
     @classmethod
     def empty_str_to_none(cls, v: Any) -> Any:
         if isinstance(v, str):
-            v = v.strip()
-            if not v:
-                return None
+            cleaned = sanitize_email(v)
+            if cleaned:
+                err = validate_email_strict(cleaned)
+                if err:
+                    raise ValueError(err)
+            return cleaned
         return v
 
 class CustomerInDB(CustomerBase):

@@ -14,6 +14,7 @@ import shutil
 from pathlib import Path
 from pathlib import Path
 from app.utils.generators import generate_unique_code
+from app.utils.sanitize import sanitize_email
 from app.api.internal.common.media_service import MediaService
 
 from app.api.internal.admin.rbac.router import check_permission
@@ -411,7 +412,7 @@ def create_customer_from_submission(
         tenant_id=tenant_id,
         name=owner.get("fullName"),
         rut=rut,
-        email=(owner.get("email") or "").strip() or None,
+        email=sanitize_email(owner.get("email")),
         phone=owner.get("phone"),
         address=owner.get("address") or owner.get("Dirección"),
         region=region,

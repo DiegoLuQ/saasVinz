@@ -8,6 +8,7 @@ import { saveDraftImages, loadDraftImages, clearDraftImages } from '@/lib/formDr
 import { changedFields, formSessionId, resetFormSession, sendFormEvent, type FormEventKind } from '@/lib/formEvents';
 import { MAX_MEMORIAL_PHOTOS } from '@/components/public/ImageUploadStep';
 import { mergeWelcomeModal, planFitsWeight, planPriceForTier, resolveFormConfig, tierForWeight, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
+import { validateEmailStrict, validatePhoneStrict, autoFixEmailDomain } from '@/lib/formatters';
 
 export interface Tenant {
     id: number;
@@ -487,10 +488,18 @@ export function useTenantForm(
         const f = formConfig.fields;
         const blank = (v?: string) => !(v || '').trim();
         if (!ownerData.fullName) errors.fullName = 'Requerido';
-        if (!ownerData.phone) errors.phone = 'Requerido';
+        const phoneErr = validatePhoneStrict(ownerData.phone);
+        if (phoneErr) errors.phone = phoneErr;
         if (f.rut.required && blank(ownerData.rut)) errors.rut = 'Requerido';
         if (f.email.required && blank(ownerData.email)) errors.email = 'Requerido';
-        if (f.email.visible && ownerData.email && !/\S+@\S+\.\S+/.test(ownerData.email)) errors.email = 'Email inválido';
+        if (f.email.visible && ownerData.email) {
+            const fixedEmail = autoFixEmailDomain(ownerData.email);
+            if (fixedEmail !== ownerData.email) {
+                setOwnerData(prev => ({ ...prev, email: fixedEmail }));
+            }
+            const emailErr = validateEmailStrict(fixedEmail);
+            if (emailErr) errors.email = emailErr;
+        }
         if (f.contactPreference.required && !ownerData.contactPreference) errors.contactPreference = 'Selecciona una opción';
         if (f.address.required && blank(ownerData.address)) errors.address = 'Requerido';
         // Retiro y entrega son dos direcciones: el retiro puede ser obligatorio
@@ -498,7 +507,7 @@ export function useTenantForm(
         if (f.comments.required && blank(ownerData.comments)) errors.comments = 'Requerido';
 
         if (ownerData.fullName.length > 50) errors.fullName = 'Máx 50 caracteres';
-        if (ownerData.email && ownerData.email.length > 50) errors.email = 'Máx 50 caracteres';
+        if (ownerData.email && ownerData.email.length > 100) errors.email = 'Máx 100 caracteres';
         if ((ownerData.address || '').length > 70) errors.address = 'Máx 70 caracteres';
         if ((ownerData.rut || '').length > 13) errors.rut = 'RUT inválido';
 
@@ -735,6 +744,7 @@ export function useTenantForm(
             const owner = { ...ownerData };
             if (!f.rut.visible) owner.rut = '';
             if (!f.email.visible) owner.email = '';
+            else if (owner.email) owner.email = autoFixEmailDomain(owner.email);
             if (!f.contactPreference.visible) owner.contactPreference = '';
             if (!f.comments.visible) owner.comments = '';
             if (!f.pickup.visible) { owner.veterinary = ''; owner.pickupRegion = ''; owner.pickupCommune = ''; }

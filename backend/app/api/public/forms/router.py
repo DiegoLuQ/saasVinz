@@ -18,6 +18,7 @@ from app.services.recaptcha import verify_recaptcha
 from app.services.public_form_config import apply_form_config_to_submission, normalize_form_config
 from app.core.tenant_context import apply_tenant_rls, apply_bypass_rls
 from app.utils.upload_validation import read_and_validate_image, enforce_max_files, MAX_PUBLIC_FORM_PHOTOS
+from app.utils.sanitize import sanitize_email, validate_email_strict
 from app.api.internal.integrations.models import TenantApiKey
 from app.api.internal.integrations.services import tenant_can_use_form_embed
 
@@ -255,17 +256,31 @@ async def submit_public_form(
 
         # Security Validations for owner_data
         full_name = str(owner_dict.get("fullName") or "")
-        email = str(owner_dict.get("email") or "")
+        raw_email = str(owner_dict.get("email") or "")
         address = str(owner_dict.get("address") or "")
         rut = str(owner_dict.get("rut") or "")
+        phone = str(owner_dict.get("phone") or "").strip()
 
         if len(full_name) > 50:
             raise HTTPException(status_code=400, detail="Nombre completo no puede exceder 50 caracteres")
         
-        if len(email) > 50:
-            raise HTTPException(status_code=400, detail="Email no puede exceder 50 caracteres")
-        if email and not re.match(r"[^@]+@[^@]+\.[^@]+", email):
-            raise HTTPException(status_code=400, detail="Formato de email inválido")
+        if len(raw_email.strip()) > 100:
+            raise HTTPException(status_code=400, detail="Email no puede exceder 100 caracteres")
+        email = sanitize_email(raw_email)
+        if email:
+            email_err = validate_email_strict(email)
+            if email_err:
+                raise HTTPException(status_code=400, detail=email_err)
+            owner_dict["email"] = email
+
+        if phone:
+            digits = re.sub(r"\D", "", phone)
+            if phone.startswith("+56"):
+                local_digits = digits[2:] if digits.startswith("56") else digits
+                if len(local_digits) != 9 or local_digits.startswith("0"):
+                    raise HTTPException(status_code=400, detail="El número celular chileno debe tener 9 dígitos (ej: +56 9 1234 5678)")
+            elif len(digits) < 8 or len(digits) > 15:
+                raise HTTPException(status_code=400, detail="Teléfono inválido")
 
         if len(address) > 70:
             raise HTTPException(status_code=400, detail="Dirección no puede exceder 70 caracteres")

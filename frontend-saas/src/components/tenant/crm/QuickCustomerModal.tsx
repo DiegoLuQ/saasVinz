@@ -6,6 +6,7 @@ import Modal from '@/components/tenant/Modal';
 import { useSaveCustomer, Customer } from '@/hooks/useCustomers';
 import { regions } from '@/lib/tenant/chile-data';
 import SearchableSelect from '@/components/tenant/SearchableSelect';
+import { sanitizeEmailInput, autoFixEmailDomain } from '@/lib/formatters';
 
 const COUNTRY_CODES = [
     { code: '+56', country: 'Chile', flag: '🇨🇱' },
@@ -152,8 +153,14 @@ export default function QuickCustomerModal({
                         <input
                             type="email"
                             placeholder="ejemplo@correo.com"
+                            maxLength={100}
                             value={formData.email || ''}
-                            onChange={e => setFormData({ ...formData, email: e.target.value })}
+                            onChange={e => setFormData({ ...formData, email: sanitizeEmailInput(e.target.value) })}
+                            onBlur={() => {
+                                if (formData.email) {
+                                    setFormData({ ...formData, email: autoFixEmailDomain(formData.email) });
+                                }
+                            }}
                             className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition text-sm"
                         />
                     </div>

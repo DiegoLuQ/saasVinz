@@ -28,6 +28,7 @@ import { TableSkeleton } from '@/components/tenant/ui/Skeleton';
 import { usePermissions } from '@/app/(tenant)/tenant/context/PermissionContext';
 import { regions } from '@/lib/tenant/chile-data';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
+import { sanitizeEmailInput, autoFixEmailDomain } from '@/lib/formatters';
 import Modal from '@/components/tenant/Modal';
 import DeleteConfirmationModal from '@/components/tenant/DeleteConfirmationModal';
 import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
@@ -319,8 +320,14 @@ export default function CustomersPage() {
                             <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Correo Electrónico</label>
                             <input
                                 type="email"
+                                maxLength={100}
                                 value={currentCustomer?.email || ''}
-                                onChange={(e) => setCurrentCustomer({ ...currentCustomer, email: e.target.value })}
+                                onChange={(e) => setCurrentCustomer({ ...currentCustomer, email: sanitizeEmailInput(e.target.value) })}
+                                onBlur={() => {
+                                    if (currentCustomer?.email) {
+                                        setCurrentCustomer({ ...currentCustomer, email: autoFixEmailDomain(currentCustomer.email) });
+                                    }
+                                }}
                                 placeholder="ejemplo@correo.com"
                                 className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-primary/50 text-sm"
                             />
@@ -700,8 +707,14 @@ export default function CustomersPage() {
                             <label className="text-sm font-bold text-muted-foreground ml-1">Email</label>
                             <input
                                 type="email"
+                                maxLength={100}
                                 value={currentCustomer?.email || ''}
-                                onChange={(e) => setCurrentCustomer({ ...currentCustomer, email: e.target.value })}
+                                onChange={(e) => setCurrentCustomer({ ...currentCustomer, email: sanitizeEmailInput(e.target.value) })}
+                                onBlur={() => {
+                                    if (currentCustomer?.email) {
+                                        setCurrentCustomer({ ...currentCustomer, email: autoFixEmailDomain(currentCustomer.email) });
+                                    }
+                                }}
                                 className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-primary/50"
                             />
                         </div>

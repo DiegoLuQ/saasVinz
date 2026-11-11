@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { formatRut } from '@/lib/formatters';
+import { formatRut, sanitizeEmailInput, autoFixEmailDomain } from '@/lib/formatters';
 import { ChevronDown, MessageCircle, Phone, Sparkles, MapPin } from 'lucide-react';
 import { Country, State, City } from 'country-state-city';
 import { DEFAULT_FORM_CONFIG, fieldLabel, fieldSuffix, type PublicFormConfig } from '@/lib/publicFormConfig';
@@ -233,15 +233,21 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
     };
 
     const handleLocalPhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value.replace(/\D/g, '').slice(0, 9);
+        let digits = e.target.value.replace(/\D/g, '');
+        // Si pegaron +56912345678 o 56912345678 en el campo local de Chile, quitar el 56 inicial
+        if (countryCode === '+56' && digits.startsWith('56') && digits.length >= 11) {
+            digits = digits.slice(2);
+        }
+        const maxDigits = countryCode === '+56' ? 9 : 13;
+        const value = digits.slice(0, maxDigits);
         setLocalPhone(value);
-        updateData({ phone: `${countryCode} ${value}` });
+        updateData({ phone: value ? `${countryCode} ${value}` : '' });
     };
 
     const handleCountryCodeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const newCode = e.target.value;
         setCountryCode(newCode);
-        updateData({ phone: `${newCode} ${localPhone}` });
+        updateData({ phone: localPhone ? `${newCode} ${localPhone}` : '' });
     };
 
     return (
@@ -290,11 +296,19 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">{fieldLabel(f.email, 'Email')}{fieldSuffix(f.email)}</label>
                                 <input
                                     type="email"
+                                    inputMode="email"
+                                    autoComplete="email"
                                     value={data.email || ''}
-                                    onChange={(e) => updateData({ email: e.target.value.slice(0, 50) })}
+                                    onChange={(e) => updateData({ email: sanitizeEmailInput(e.target.value) })}
+                                    onBlur={() => {
+                                        if (data.email) {
+                                            const fixed = autoFixEmailDomain(data.email);
+                                            if (fixed !== data.email) updateData({ email: fixed });
+                                        }
+                                    }}
                                     className={`input-emotional ${errors.email ? 'border-red-500/50 focus:ring-red-500/10' : ''}`}
                                     placeholder="tu@email.com"
-                                    maxLength={50}
+                                    maxLength={100}
                                 />
                                 {errors.email && <p className="text-[10px] text-red-500 mt-2 font-bold uppercase tracking-tight ml-2">! {errors.email}</p>}
                             </div>
@@ -323,11 +337,13 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                         </div>
                         <input
                             type="tel"
+                            inputMode="numeric"
+                            autoComplete="tel-national"
                             value={localPhone}
                             onChange={handleLocalPhoneChange}
                             className={`flex-1 input-emotional ${errors.phone ? 'border-red-500/50 focus:ring-red-500/10' : ''}`}
-                            placeholder="9 1234 5678"
-                            maxLength={9}
+                            placeholder={countryCode === '+56' ? '9 1234 5678' : 'Número de teléfono'}
+                            maxLength={countryCode === '+56' ? 9 : 13}
                         />
                     </div>
                     {errors.phone && <p className="text-[10px] text-red-500 mt-2 font-bold uppercase tracking-tight ml-2">! {errors.phone}</p>}
