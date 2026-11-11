@@ -1,10 +1,9 @@
 "use client";
 
 import React, { useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
     Check,
-    ChevronLeft,
-    ChevronRight,
     Download,
     Heart,
     Loader2,
@@ -86,8 +85,6 @@ export default function PublicTributeCarousel({
                     ? 'bg-gradient-to-b from-white/95 via-amber-50/40 to-white/95 border-amber-200/90 shadow-[0_20px_50px_-15px_rgba(217,119,6,0.1)]'
                     : 'bg-gradient-to-br from-amber-50/70 to-white border-amber-200/80 shadow-md shadow-amber-500/5';
 
-    const toggleSlide = () => setSlide((prev) => (prev === 0 ? 1 : 0));
-
     return (
         <div
             className={`${
@@ -114,28 +111,15 @@ export default function PublicTributeCarousel({
             {/* Controles del carrusel cuando existen ambos recuerdos */}
             {hasBoth && (
                 <div
-                    className={`w-full flex items-center justify-between gap-2 pb-3 mb-4 border-b ${
+                    className={`w-full flex items-center justify-center pb-3 mb-4 border-b ${
                         isDarkMode ? 'border-white/10' : 'border-black/5'
                     }`}
                 >
-                    <button
-                        type="button"
-                        onClick={toggleSlide}
-                        aria-label="Recuerdo anterior"
-                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 border ${
-                            isDarkMode
-                                ? 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-300'
-                                : 'bg-white hover:bg-gray-50 border-gray-200 text-gray-600 shadow-2xs'
-                        }`}
-                    >
-                        <ChevronLeft size={16} />
-                    </button>
-
                     <div className="flex items-center gap-1 p-1 rounded-full bg-black/5 dark:bg-white/5">
                         <button
                             type="button"
                             onClick={() => setSlide(0)}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider transition-all cursor-pointer ${
+                            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider transition-all duration-200 cursor-pointer ${
                                 activeSlide === 0
                                     ? 'bg-amber-500 text-white shadow-sm'
                                     : isDarkMode
@@ -149,7 +133,7 @@ export default function PublicTributeCarousel({
                         <button
                             type="button"
                             onClick={() => setSlide(1)}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider transition-all cursor-pointer ${
+                            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider transition-all duration-200 cursor-pointer ${
                                 activeSlide === 1
                                     ? 'bg-violet-600 text-white shadow-sm'
                                     : isDarkMode
@@ -161,23 +145,19 @@ export default function PublicTributeCarousel({
                             <span>Recuerdo</span>
                         </button>
                     </div>
-
-                    <button
-                        type="button"
-                        onClick={toggleSlide}
-                        aria-label="Siguiente recuerdo"
-                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 border ${
-                            isDarkMode
-                                ? 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-300'
-                                : 'bg-white hover:bg-gray-50 border-gray-200 text-gray-600 shadow-2xs'
-                        }`}
-                    >
-                        <ChevronRight size={16} />
-                    </button>
                 </div>
             )}
 
-            {activeSlide === 0 ? (
+            <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                    key={activeSlide}
+                    initial={{ opacity: 0, x: activeSlide === 1 ? 14 : -14 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: activeSlide === 1 ? -14 : 14 }}
+                    transition={{ duration: 0.22, ease: 'easeOut' }}
+                    className="w-full"
+                >
+                    {activeSlide === 0 ? (
                 <div className="flex flex-col items-center text-center w-full">
                     <div
                         className={
@@ -310,6 +290,8 @@ export default function PublicTributeCarousel({
                     />
                 )
             )}
+                </motion.div>
+            </AnimatePresence>
 
             {/* Indicadores inferiores de carrusel */}
             {hasBoth && (
@@ -332,3 +314,4 @@ export default function PublicTributeCarousel({
         </div>
     );
 }
+
