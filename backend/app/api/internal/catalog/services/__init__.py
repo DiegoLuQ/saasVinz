@@ -373,6 +373,48 @@ class PlanService:
         self.db.refresh(db_plan)
         return db_plan
 
+    def copy(self, tenant_id: int, plan_id: int) -> models.Plan:
+        """Copia un plan (servicios, opcionales, productos, precios por peso y por tabla
+        de precios) como «<nombre> (copia)», INACTIVO y sin «Más solicitado», para
+        ajustarlo sin tocar el original ni las órdenes que lo usan."""
+        src = self.get_by_id(tenant_id, plan_id)
+
+        base = f"{src.name} (copia)"
+        name, n = base, 2
+        while self._duplicate(tenant_id, name, src.group_name):
+            name, n = f"{src.name} (copia {n})", n + 1
+
+        new = models.Plan(
+            tenant_id=tenant_id, name=name, description=src.description,
+            price=src.price, cost=src.cost, image_url=src.image_url,
+            is_active=False, is_featured=False,
+            price_label=src.price_label, important_note=src.important_note,
+            sort_order=src.sort_order,
+            weight_prices=dict(src.weight_prices) if isinstance(src.weight_prices, dict) else src.weight_prices,
+            group_name=src.group_name, max_weight=src.max_weight, is_priority=src.is_priority,
+        )
+        self.db.add(new)
+        self.db.flush()
+
+        links = sorted(src.plan_links, key=lambda l: (l.sort_order or 0, l.id))
+        for link in links:
+            self.db.add(models.PlanService(
+                tenant_id=tenant_id, plan_id=new.id, service_id=link.service_id,
+                sort_order=link.sort_order or 0, is_optional=bool(link.is_optional),
+            ))
+        for link in src.product_links:
+            self.db.add(models.PlanProduct(tenant_id=tenant_id, plan_id=new.id, product_id=link.product_id))
+
+        # Precios del plan en cada tabla de precios (promociones): {"<id plan>": {...}}
+        key = str(src.id)
+        for pl in self.db.query(models.PriceList).filter(models.PriceList.tenant_id == tenant_id).all():
+            prices = pl.plan_prices if isinstance(pl.plan_prices, dict) else None
+            if prices and isinstance(prices.get(key), dict):
+                pl.plan_prices = {**prices, str(new.id): dict(prices[key])}
+
+        self.db.commit()
+        return self.get_by_id(tenant_id, new.id)
+
     def update(self, tenant_id: int, plan_id: int, plan_update: schemas.PlanUpdate) -> models.Plan:
         db_plan = self.get_by_id(tenant_id, plan_id)
         

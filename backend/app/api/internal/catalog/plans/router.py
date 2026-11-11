@@ -119,6 +119,18 @@ def obtener_plan(
     """Obtiene los detalles de un plan específico."""
     return service.get_by_id(tenant_id, plan_id)
 
+@router.post("/{plan_id}/copy", response_model=schemas.PlanInDB)
+def copiar_plan(
+    plan_id: int,
+    tenant_id: int = Depends(get_tenant_id),
+    service: PlanService = Depends(get_plan_service),
+    _: bool = Depends(check_permission("servicios", "create")),
+    __: bool = Depends(check_resource_limit("plans"))
+):
+    """Copia un plan como «<nombre> (copia)», inactivo, para ajustarlo sin tocar el original."""
+    return service.copy(tenant_id, plan_id)
+
+
 @router.patch("/{plan_id}", response_model=schemas.PlanInDB)
 def actualizar_plan(
     plan_id: int,

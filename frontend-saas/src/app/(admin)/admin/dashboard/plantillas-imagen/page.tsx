@@ -339,7 +339,7 @@ function TemplateCard({
                         <span className="absolute inset-x-0 bottom-0 bg-black/70 text-white text-[8px] font-bold text-center">EJEMPLO</span>
                     </div>
                 )}
-                {template.is_locked && (
+                {template.usage_count > 0 && (
                     <div className="absolute top-3 right-3 bg-amber-500/90 text-black text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-full flex items-center gap-1">
                         <Lock size={10} /> En uso
                     </div>

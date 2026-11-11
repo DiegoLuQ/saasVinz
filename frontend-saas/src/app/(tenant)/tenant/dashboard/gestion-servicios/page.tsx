@@ -35,6 +35,7 @@ import {
     FileSpreadsheet,
     Folder,
     Pencil,
+    Copy,
     Zap
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
@@ -50,6 +51,7 @@ import {
     useSavePlan,
     useDeleteService,
     useDeletePlan,
+    useCopyPlan,
     type Service,
     type Plan
 } from '@/hooks/useCatalog';
@@ -117,6 +119,7 @@ export default function ServicesPage() {
     const savePlanMutation = useSavePlan();
     const deleteServiceMutation = useDeleteService();
     const deletePlanMutation = useDeletePlan();
+    const copyPlanMutation = useCopyPlan();
 
     const [isSaving, setIsSaving] = useState(false);
     const [togglingId, setTogglingId] = useState<number | null>(null);
@@ -461,6 +464,14 @@ export default function ServicesPage() {
         } catch (error) {
             console.error(error);
         }
+    };
+
+    // Copia inactiva del plan y abre su editor (las órdenes del original no cambian).
+    const handleCopyPlan = async (id: number) => {
+        try {
+            const copy = await copyPlanMutation.mutateAsync(id);
+            router.push(`/dashboard/gestion-servicios/plan/${copy.id}`);
+        } catch { /* el toast ya muestra el error */ }
     };
 
     const handleDelete = (type: 'service' | 'plan', id: number, name: string) => {
@@ -1167,6 +1178,16 @@ export default function ServicesPage() {
                                                             <Edit2 size={13} />
                                                         </button>
                                                     )}
+                                                    {canCreate('servicios') && (
+                                                        <button
+                                                            onClick={() => handleCopyPlan(plan.id)}
+                                                            disabled={copyPlanMutation.isPending}
+                                                            className="w-8 h-8 rounded-xl bg-slate-900/70 backdrop-blur-md border border-white/30 text-white hover:bg-primary hover:border-primary transition-all flex items-center justify-center shadow-sm disabled:opacity-50"
+                                                            title="Copiar plan"
+                                                        >
+                                                            <Copy size={13} />
+                                                        </button>
+                                                    )}
                                                     {canDelete('servicios') && (
                                                         <button
                                                             onClick={() => handleDelete('plan', plan.id, plan.name)}
@@ -1211,6 +1232,16 @@ export default function ServicesPage() {
                                                             title="Editar plan"
                                                         >
                                                             <Edit2 size={13} />
+                                                        </button>
+                                                    )}
+                                                    {canCreate('servicios') && (
+                                                        <button
+                                                            onClick={() => handleCopyPlan(plan.id)}
+                                                            disabled={copyPlanMutation.isPending}
+                                                            className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-primary transition-all disabled:opacity-50"
+                                                            title="Copiar plan"
+                                                        >
+                                                            <Copy size={13} />
                                                         </button>
                                                     )}
                                                     {canDelete('servicios') && (
@@ -1427,6 +1458,16 @@ export default function ServicesPage() {
                                                                 title="Editar"
                                                             >
                                                                 <Edit2 size={14} />
+                                                            </button>
+                                                        )}
+                                                        {canCreate('servicios') && (
+                                                            <button
+                                                                onClick={() => handleCopyPlan(plan.id)}
+                                                                disabled={copyPlanMutation.isPending}
+                                                                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-primary transition-colors disabled:opacity-50"
+                                                                title="Copiar plan"
+                                                            >
+                                                                <Copy size={14} />
                                                             </button>
                                                         )}
                                                         {canDelete('servicios') && (

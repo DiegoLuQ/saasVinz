@@ -163,6 +163,24 @@ export const useDeletePlan = () => {
         },
     });
 };
+/** Copia un plan como «<nombre> (copia)», inactivo (POST /plans/{id}/copy). */
+export const useCopyPlan = () => {
+    const queryClient = useQueryClient();
+    const { showToast } = useToast();
+
+    return useMutation({
+        mutationFn: (id: number) => apiRequest(`/api/internal/plans/${id}/copy`, { method: 'POST' }) as Promise<{ id: number; name: string }>,
+        onSuccess: (plan) => {
+            queryClient.invalidateQueries({ queryKey: ['catalog-plans'] });
+            queryClient.invalidateQueries({ queryKey: ['session-bootstrap'] });
+            showToast(`Copia creada: «${plan.name}» (inactiva)`, 'success');
+        },
+        onError: (err: any) => {
+            showToast(err.message || 'Error al copiar el plan', 'error');
+        },
+    });
+};
+
 export const useSaveProduct = () => {
     const queryClient = useQueryClient();
     const { showToast } = useToast();

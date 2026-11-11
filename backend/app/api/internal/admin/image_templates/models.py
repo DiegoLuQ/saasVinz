@@ -48,11 +48,10 @@ class ImageTemplate(Base):
 
     @property
     def is_locked(self) -> bool:
-        # Los collages no se bloquean: cada descarga guarda sus propios datos (quién,
-        # cuándo, periodo) y nunca se vuelve a dibujar con la plantilla.
-        if self.kind == "collage":
-            return False
-        return (self.usage_count or 0) > 0
+        # Ninguna plantilla se bloquea (decisión 2026-11-11): el SuperAdmin puede editar
+        # las que están en uso, aceptando que los diseños guardados como receta se
+        # redibujan con la versión actual. Eliminar sigue bloqueado por usage_count.
+        return False
 
 
 class AiGeneration(Base):
