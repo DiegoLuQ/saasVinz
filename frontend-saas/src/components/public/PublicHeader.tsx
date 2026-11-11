@@ -25,22 +25,6 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
     const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false);
-    const [loginUrl, setLoginUrl] = useState('http://app.localhost:3000');
-
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            const hostname = window.location.hostname;
-            const port = window.location.port;
-            const protocol = window.location.protocol;
-            if (hostname.includes('localhost') || hostname.includes('lvh.me')) {
-                const rootDomain = hostname.includes('lvh.me') ? 'lvh.me' : 'localhost';
-                setLoginUrl(`${protocol}//app.${rootDomain}${port ? `:${port}` : ''}/login`);
-            } else {
-                const rootDomainEnv = process.env.NEXT_PUBLIC_ROOT_DOMAIN || hostname;
-                setLoginUrl(`${protocol}//app.${rootDomainEnv}/login`);
-            }
-        }
-    }, []);
 
     const sheetVariants = {
         hidden: { y: '100%' },
@@ -312,17 +296,6 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                             </span>
                         </button>
 
-                        {/* Botón de Acceso */}
-                        <Link
-                            href={loginUrl}
-                            className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-[0.12em] border transition-all duration-200 whitespace-nowrap
-                                ${effectiveIsDark
-                                    ? 'border-white/15 text-white bg-white/5 hover:bg-white/10 hover:border-[#c5a059]'
-                                    : 'border-stone-200 text-slate-700 bg-white hover:bg-stone-50 hover:text-slate-900 hover:border-[#c5a059]'}`}
-                        >
-                            {lc.nav_login}
-                        </Link>
-
                         {/* Botón CTA */}
                         <Link
                             href="/crear"
@@ -465,17 +438,6 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
 
                             {/* Acciones */}
                             <motion.div variants={itemVariants} className="flex flex-col gap-3">
-                                <Link
-                                    href={loginUrl}
-                                    onClick={() => setIsMobileMenuOpen(false)}
-                                    className={`px-8 py-3.5 border rounded-full text-xs font-black uppercase tracking-widest transition-all text-center ${
-                                        isDark
-                                            ? 'border-white/10 text-white bg-white/5 hover:bg-[#c5a059]/10 hover:border-[#c5a059]'
-                                            : 'border-stone-300 text-slate-800 bg-white hover:border-[#c5a059]'
-                                    }`}
-                                >
-                                    {lc.nav_login}
-                                </Link>
                                 <Link
                                     href="/crear"
                                     onClick={() => setIsMobileMenuOpen(false)}
