@@ -1,4 +1,5 @@
 "use client";
+import { serverDate } from '@/lib/dates';
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { apiRequest } from '@/lib/veterinary/api';
@@ -173,7 +174,7 @@ export default function VetReferralsTable() {
                                     )}
                                 </td>
                                 <td className="py-3 text-right text-indigo-200/60 whitespace-nowrap">
-                                    {r.created_at ? new Date(r.created_at).toLocaleDateString('es-CL') : '—'}
+                                    {r.created_at ? serverDate(r.created_at).toLocaleDateString('es-CL') : '—'}
                                 </td>
                             </tr>
                         ))}

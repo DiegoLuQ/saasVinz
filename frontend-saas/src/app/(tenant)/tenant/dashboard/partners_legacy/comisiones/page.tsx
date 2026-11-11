@@ -1,4 +1,5 @@
 "use client";
+import { serverDate } from '@/lib/dates';
 
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '@/lib/tenant/api';
@@ -244,7 +245,7 @@ export default function ComisionesPage() {
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6 font-bold text-sm">{item.partner_name}</td>
-                                            <td className="px-8 py-6 text-xs text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</td>
+                                            <td className="px-8 py-6 text-xs text-muted-foreground">{serverDate(item.created_at).toLocaleDateString()}</td>
                                             <td className="px-8 py-6 font-bold text-emerald-400">{formatCurrency(item.amount)}</td>
                                             <td className="px-8 py-6 flex justify-center">
                                                 <StatusBadge status={item.status} />

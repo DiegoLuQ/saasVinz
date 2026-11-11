@@ -1,4 +1,5 @@
 'use client';
+import { serverDate } from '@/lib/dates';
 
 /**
  * Configuración → «Enlaces oficiales»: formulario, catálogo de planes y catálogo de
@@ -68,7 +69,7 @@ export function OfficialLinksTab() {
     }
 
     const linkLabel = (l: CatalogLink, type: 'plans' | 'products') =>
-        `${l.name || DEFAULT_NAME[type]}${l.created_at ? ` · creado el ${new Date(l.created_at).toLocaleDateString('es-CL')}` : ''}${!l.is_active ? ' (desactivado)' : l.is_expired ? ' (vencido: al elegirlo deja de vencer)' : ''}`;
+        `${l.name || DEFAULT_NAME[type]}${l.created_at ? ` · creado el ${serverDate(l.created_at).toLocaleDateString('es-CL')}` : ''}${!l.is_active ? ' (desactivado)' : l.is_expired ? ' (vencido: al elegirlo deja de vencer)' : ''}`;
 
     const row = (key: OfficialLinkKey, icon: React.ReactNode, control: React.ReactNode, url?: string | null) => {
         const ok = !status.missing.includes(key);

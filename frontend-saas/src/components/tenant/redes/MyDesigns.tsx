@@ -1,4 +1,5 @@
 "use client";
+import { serverDate } from '@/lib/dates';
 
 import React, { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -109,7 +110,7 @@ export default function MyDesigns({ canDelete }: { canDelete: boolean }) {
                             </button>
                             <div className="p-3">
                                 <p className="text-sm font-bold text-slate-900 dark:text-white truncate" title={d.title}>{d.title}</p>
-                                <p className="text-[11px] text-slate-500 dark:text-slate-400">{new Date(d.created_at).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400">{serverDate(d.created_at).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })}</p>
                                 {/* Sin mascota no aparece en ninguna orden: se puede asignar aquí */}
                                 {d.pet_id == null && (
                                     <button onClick={() => setAssigning(d)}

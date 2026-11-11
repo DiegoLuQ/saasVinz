@@ -1,4 +1,5 @@
 "use client";
+import { serverDate } from '@/lib/dates';
 
 import { Bell } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -182,7 +183,7 @@ export default function NotificationBell({ apiBaseUrl, className = "" }: Notific
                                                         {notif.message}
                                                     </p>
                                                     <p className="text-xs text-gray-500 mt-1">
-                                                        {new Date(notif.created_at).toLocaleDateString('es-ES', {
+                                                        {serverDate(notif.created_at).toLocaleDateString('es-ES', {
                                                             day: 'numeric',
                                                             month: 'short',
                                                             hour: '2-digit',

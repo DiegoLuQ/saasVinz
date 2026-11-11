@@ -1,4 +1,5 @@
 "use client";
+import { serverDate } from '@/lib/dates';
 
 import React from 'react';
 import { motion } from 'framer-motion';
@@ -75,7 +76,7 @@ export default function VeterinaryNotificationsPage() {
                                     </h3>
                                     <span className="text-[10px] uppercase font-bold text-[var(--muted-foreground)] flex items-center gap-1">
                                         <Clock size={10} />
-                                        {new Date(notif.created_at).toLocaleDateString()}
+                                        {serverDate(notif.created_at).toLocaleDateString()}
                                     </span>
                                 </div>
                                 <p className="text-sm text-[var(--muted-foreground)] leading-relaxed">

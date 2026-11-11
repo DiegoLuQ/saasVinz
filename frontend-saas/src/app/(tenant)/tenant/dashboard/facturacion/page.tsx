@@ -1,4 +1,5 @@
 "use client";
+import { serverDate } from '@/lib/dates';
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -280,7 +281,7 @@ export default function BillingPage() {
                             {transactions.map((tx) => (
                                 <tr key={tx.id} className="hover:bg-white/5 transition-colors group">
                                     <td className="px-8 py-6 text-sm font-medium text-white/60">
-                                        {new Date(tx.created_at).toLocaleDateString()}
+                                        {serverDate(tx.created_at).toLocaleDateString()}
                                     </td>
                                     <td className="px-8 py-6">
                                         <div className="font-bold text-sm">{tx.notes || 'Suscripción Mensual'}</div>

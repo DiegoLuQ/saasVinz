@@ -1,4 +1,5 @@
 "use client";
+import { serverDate } from '@/lib/dates';
 
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
@@ -421,7 +422,7 @@ export default function ComisionesPage() {
                                                                 <ArrowUpRight size={11} />
                                                             </Link>
                                                             <span className="text-[10px] text-slate-500 dark:text-muted-foreground/60 font-mono">
-                                                                {new Date(item.created_at).toLocaleDateString('es-CL')}
+                                                                {serverDate(item.created_at).toLocaleDateString('es-CL')}
                                                             </span>
                                                         </div>
                                                         <p className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[180px]">

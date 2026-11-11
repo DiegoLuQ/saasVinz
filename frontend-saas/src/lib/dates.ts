@@ -19,6 +19,12 @@ export function parseServerDate(iso: string | null | undefined): Date | null {
     return isNaN(d.getTime()) ? null : d;
 }
 
+/** Igual que `parseServerDate` pero siempre devuelve un Date (inválido si no hay fecha),
+ *  para reemplazar `new Date(iso)` directamente. */
+export function serverDate(iso: string | null | undefined): Date {
+    return parseServerDate(iso) ?? new Date(NaN);
+}
+
 export function formatChileDate(iso: string | null | undefined, opts: Intl.DateTimeFormatOptions = {}): string {
     const d = parseServerDate(iso);
     if (!d) return '';

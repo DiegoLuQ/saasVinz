@@ -1,4 +1,5 @@
 'use client';
+import { serverDate } from '@/lib/dates';
 
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -295,7 +296,7 @@ export function AiCreditsTab() {
                             <tbody>
                                 {data.purchases.map(p => (
                                     <tr key={p.id} className="border-t border-slate-200 dark:border-white/5 align-top">
-                                        <td className="py-2.5 pr-4 whitespace-nowrap">{new Date(p.created_at).toLocaleDateString('es-CL')}</td>
+                                        <td className="py-2.5 pr-4 whitespace-nowrap">{serverDate(p.created_at).toLocaleDateString('es-CL')}</td>
                                         <td className="py-2.5 pr-4 font-bold">{p.quantity}</td>
                                         <td className="py-2.5 pr-4">{p.total_clp ? clp(p.total_clp) : usd(p.total_usd)}</td>
                                         <td className="py-2.5 pr-4">{p.method === 'transfer' ? 'Transferencia' : 'Otro medio'}{p.reference ? ` · ${p.reference}` : ''}</td>
