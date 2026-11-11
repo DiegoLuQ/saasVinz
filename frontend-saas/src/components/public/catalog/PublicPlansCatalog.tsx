@@ -104,7 +104,7 @@ const THEME = {
 } as React.CSSProperties;
 
 const SEARCH_THRESHOLD = 6;
-const COLLAPSED_ITEMS = 5; // ítems visibles antes de "Ver más"
+const COLLAPSED_ITEMS = 6; // ítems visibles antes de "Ver más" (en grilla 2 columnas)
 
 // Tamaños de mascota para cotizar: el precio de cremación depende del peso.
 // Respaldo si el crematorio no definió sus tramos de peso en Configuración.
@@ -290,45 +290,142 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                 </div>
             </header>
 
-            {/* Presentación */}
-            <section className="px-4 sm:px-6 pt-12 pb-10 sm:pt-16 sm:pb-14 text-center">
-                <div className="max-w-2xl mx-auto">
-                    {logoUrl && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                            src={logoUrl}
-                            alt={`Logo de ${tenant.name}`}
-                            className="mx-auto mb-6 w-24 h-24 sm:w-28 sm:h-28 rounded-full object-contain bg-white border border-[var(--cat-line)] p-3 shadow-[0_12px_30px_-18px_rgba(43,39,36,0.45)]"
-                        />
-                    )}
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--cat-gold-deep)]">Nuestros planes</p>
-                    <h1 className="mt-3 [font-family:var(--cat-serif)] text-4xl sm:text-5xl font-semibold leading-tight">{tenant.name}</h1>
-                    {tenant.tagline && (
-                        <p className="mt-3 [font-family:var(--cat-serif)] italic text-xl sm:text-2xl text-[var(--cat-gold-deep)]">{tenant.tagline}</p>
-                    )}
-                    <div className="mx-auto mt-6 h-px w-16 bg-[var(--cat-gold)]/50" />
-                    <p className="mt-6 text-[15px] leading-relaxed text-[var(--cat-muted)] whitespace-pre-line">
-                        {tenant.intro || DEFAULT_CATALOG_INTRO}
-                    </p>
-                    {catalogVideo && (
-                        <div className="mt-8 flex justify-center">
-                            <button
-                                type="button"
-                                onClick={() => setVideoModalOpen(true)}
-                                className="inline-flex items-center gap-2.5 px-6 py-3 rounded-full bg-[var(--cat-gold-deep)] hover:bg-[var(--cat-gold)] text-white text-xs font-bold uppercase tracking-wider shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+            {/* Contenedor Superior: Hero + Calculador en 2 columnas (>= 960px) y 1 columna en móvil/tablet */}
+            <section className="w-full max-w-6xl mx-auto px-4 sm:px-6 pt-8 pb-8 sm:pt-12 sm:pb-12">
+                <div
+                    className={`grid grid-cols-1 ${
+                        plans.length > 0 ? 'min-[960px]:grid-cols-2' : ''
+                    } items-center gap-8 min-[960px]:gap-12`}
+                >
+                    {/* Columna Izquierda: Presentación alineada a la izquierda */}
+                    <div className="flex flex-col items-start text-left">
+                        {logoUrl && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                                src={logoUrl}
+                                alt={`Logo de ${tenant.name}`}
+                                className="mb-5 w-20 h-20 sm:w-24 sm:h-24 rounded-full object-contain bg-white border border-[var(--cat-line)] p-3 shadow-[0_12px_30px_-18px_rgba(43,39,36,0.45)]"
+                            />
+                        )}
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--cat-gold-deep)]">
+                            Nuestros planes
+                        </p>
+                        <h1 className="mt-2.5 [font-family:var(--cat-serif)] text-4xl sm:text-5xl font-semibold leading-tight text-[var(--cat-ink)]">
+                            {tenant.name}
+                        </h1>
+                        {tenant.tagline && (
+                            <p className="mt-2 [font-family:var(--cat-serif)] italic text-xl sm:text-2xl text-[var(--cat-gold-deep)]">
+                                {tenant.tagline}
+                            </p>
+                        )}
+                        <div className="mt-5 h-px w-14 bg-[var(--cat-gold)]/50" />
+                        <p className="mt-5 text-[15px] leading-relaxed text-[var(--cat-muted)] whitespace-pre-line max-w-xl">
+                            {tenant.intro || DEFAULT_CATALOG_INTRO}
+                        </p>
+                        {catalogVideo && (
+                            <div className="mt-7">
+                                <button
+                                    type="button"
+                                    onClick={() => setVideoModalOpen(true)}
+                                    className="inline-flex items-center gap-2.5 px-6 py-3 rounded-full bg-[var(--cat-gold-deep)] hover:bg-[var(--cat-gold)] text-white text-xs font-bold uppercase tracking-wider shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+                                >
+                                    <Play size={14} className="fill-current" />
+                                    <span>{catalogVideo.button_text || 'Ver video de bienvenida'}</span>
+                                    {catalogVideo.duration ? (
+                                        <span className="opacity-80 text-[11px] font-mono">({Math.round(catalogVideo.duration)}s)</span>
+                                    ) : null}
+                                </button>
+                            </div>
+                        )}
+                        <div className="mt-7 pt-5 border-t border-[var(--cat-line)] w-full max-w-md flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-medium text-[var(--cat-muted)]">
+                            <span className="inline-flex items-center gap-1.5">
+                                <Check size={14} className="text-[var(--cat-gold-deep)]" />
+                                Atención cercana
+                            </span>
+                            <span className="inline-flex items-center gap-1.5">
+                                <Check size={14} className="text-[var(--cat-gold-deep)]" />
+                                Certificación y trazabilidad
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Columna Derecha: Tarjeta del calculador/selector interactivo en grilla 2x2 */}
+                    {plans.length > 0 && (
+                        <div className="w-full rounded-3xl bg-white border border-[var(--cat-line)] shadow-[0_14px_36px_-22px_rgba(43,39,36,0.35)] p-5 sm:p-7 text-left">
+                            <h2 id="pet-size-title" className="[font-family:var(--cat-serif)] text-2xl sm:text-[26px] leading-snug font-semibold text-[var(--cat-ink)]">
+                                ¿Cuál es el tamaño aproximado de tu mascota?
+                            </h2>
+                            <p className="mt-1.5 text-xs sm:text-sm text-[var(--cat-muted)]">
+                                Selecciona un rango para calcular automáticamente el valor final estimado en cada plan.
+                            </p>
+                            <div
+                                role="radiogroup"
+                                aria-labelledby="pet-size-title"
+                                className="mt-5 grid grid-cols-2 gap-3 sm:gap-3.5"
                             >
-                                <Play size={14} className="fill-current" />
-                                <span>{catalogVideo.button_text || 'Ver video de bienvenida'}</span>
-                                {catalogVideo.duration ? (
-                                    <span className="opacity-80 text-[11px] font-mono">({Math.round(catalogVideo.duration)}s)</span>
-                                ) : null}
-                            </button>
+                                {sizes.map(size => {
+                                    const active = size.key === sizeKey;
+                                    const hasDistinctRange = size.range && size.range !== size.name;
+                                    return (
+                                        <button
+                                            key={size.key}
+                                            type="button"
+                                            role="radio"
+                                            aria-checked={active}
+                                            onClick={() => {
+                                                setSizeKey(size.key);
+                                                track('size_select', undefined, size.label);
+                                            }}
+                                            className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl px-3 py-4 text-center transition-all cursor-pointer ${
+                                                active
+                                                    ? 'bg-[var(--cat-bg)] border-2 border-[var(--cat-gold-deep)] shadow-[0_10px_24px_-16px_rgba(138,100,40,0.75)]'
+                                                    : 'bg-white border border-[var(--cat-line)] hover:border-[var(--cat-gold)]/60 hover:-translate-y-0.5'
+                                            }`}
+                                        >
+                                            <span className="flex h-9 w-9 items-center justify-center">
+                                                {size.icon ? (
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    <img src={size.icon} alt="" loading="lazy" className="h-9 w-9 object-contain" />
+                                                ) : (
+                                                    <PawPrint size={20} className={active ? 'text-[var(--cat-gold-deep)]' : 'text-[var(--cat-muted)]'} aria-hidden="true" />
+                                                )}
+                                            </span>
+                                            <span className="text-[14px] sm:text-[15px] font-bold leading-tight text-[var(--cat-ink)]">
+                                                {hasDistinctRange ? size.range : size.name}
+                                            </span>
+                                            {hasDistinctRange && (
+                                                <span className="text-[12px] font-medium text-[var(--cat-muted)]">
+                                                    {size.name}
+                                                </span>
+                                            )}
+                                            {size.price > 0 && (
+                                                <span className="mt-0.5 rounded-full bg-[var(--cat-sand)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--cat-gold-deep)]">
+                                                    + {formatCLP(size.price)}
+                                                </span>
+                                            )}
+                                            {size.examples && (
+                                                <span className="text-[11px] leading-snug text-[var(--cat-muted)] line-clamp-2">
+                                                    {size.examples}
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            {currentSize && (
+                                <p className="mt-5 pt-4 border-t border-dashed border-[var(--cat-line)] text-xs sm:text-sm text-[var(--cat-muted)] text-center">
+                                    Mostrando planes para: <span className="font-semibold text-[var(--cat-gold-deep)]">{currentSize.name}{currentSize.range !== currentSize.name ? ` (${currentSize.range})` : ''}</span>
+                                </p>
+                            )}
                         </div>
                     )}
                 </div>
+            </section>
 
+            {/* Contenedor Inferior: Resultados / Planes */}
+            <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 pb-16">
                 {plans.length > SEARCH_THRESHOLD && (
-                    <div className="relative max-w-md mx-auto mt-8">
+                    <div className="relative max-w-md mx-auto mb-8">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--cat-muted)]" size={17} />
                         <input
                             type="text"
@@ -344,78 +441,10 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                         )}
                     </div>
                 )}
-            </section>
 
-            {/* Planes */}
-            <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 pb-16">
-                {/* Selector de tamaño: ajusta el texto de cotización y el mensaje de WhatsApp de cada plan */}
-                {plans.length > 0 && (
-                    <div className="mb-10 mx-auto max-w-5xl rounded-3xl bg-white border border-[var(--cat-line)] shadow-[0_10px_30px_-24px_rgba(43,39,36,0.35)] px-4 py-6 sm:px-6 text-center">
-                        <h2 id="pet-size-title" className="[font-family:var(--cat-serif)] text-2xl sm:text-[28px] font-semibold">
-                            ¿Cuál es el tamaño aproximado de tu mascota?
-                        </h2>
-                        <p className="mt-1 text-xs sm:text-sm text-[var(--cat-muted)]">
-                            Selecciona un rango para calcular automáticamente el valor final estimado en cada plan.
-                        </p>
-                        {/* Celular: dos filas que se deslizan hacia el lado; escritorio: filas de hasta 6 tarjetas */}
-                        <div
-                            role="radiogroup"
-                            aria-labelledby="pet-size-title"
-                            className="mt-6 -mx-4 px-4 sm:mx-0 sm:px-0 grid grid-rows-2 grid-flow-col auto-cols-[38%] gap-2.5 overflow-x-auto snap-x snap-mandatory pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid-rows-none sm:grid-flow-row sm:auto-cols-auto sm:grid-cols-3 lg:grid-cols-6 sm:gap-3 sm:overflow-visible sm:pb-0"
-                        >
-                            {sizes.map(size => {
-                                const active = size.key === sizeKey;
-                                return (
-                                    <button
-                                        key={size.key}
-                                        type="button"
-                                        role="radio"
-                                        aria-checked={active}
-                                        onClick={() => {
-                                            setSizeKey(size.key);
-                                            track('size_select', undefined, size.label);
-                                        }}
-                                        className={`snap-start flex flex-col items-center gap-1.5 rounded-2xl px-2.5 pt-4 pb-3.5 text-center transition-all ${
-                                            active
-                                                ? 'bg-[var(--cat-bg)] border-2 border-[var(--cat-gold-deep)] shadow-[0_10px_24px_-16px_rgba(138,100,40,0.8)]'
-                                                : 'bg-white border border-[var(--cat-line)] hover:border-[var(--cat-gold)]/60 hover:-translate-y-0.5'
-                                        }`}
-                                    >
-                                        <span className="flex h-10 w-10 items-center justify-center">
-                                            {size.icon ? (
-                                                // eslint-disable-next-line @next/next/no-img-element
-                                                <img src={size.icon} alt="" loading="lazy" className="h-10 w-10 object-contain" />
-                                            ) : (
-                                                <PawPrint size={22} className="text-[var(--cat-gold)]" aria-hidden="true" />
-                                            )}
-                                        </span>
-                                        <span className="text-[14px] font-semibold leading-tight text-[var(--cat-ink)]">{size.name}</span>
-                                        {size.range !== size.name && (
-                                            <span className="rounded-full bg-[var(--cat-sand)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--cat-gold-deep)]">
-                                                {size.range}
-                                            </span>
-                                        )}
-                                        {size.price > 0 && (
-                                            <span className="text-[11px] font-semibold text-[var(--cat-gold-deep)]">+{formatCLP(size.price)}</span>
-                                        )}
-                                        {size.examples && (
-                                            <span className="text-[11px] leading-snug text-[var(--cat-muted)] line-clamp-2">{size.examples}</span>
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                        {currentSize && (
-                            <p className="mt-5 pt-4 border-t border-dashed border-[var(--cat-line)] text-xs sm:text-sm text-[var(--cat-muted)]">
-                                Mostrando planes para: <span className="font-semibold text-[var(--cat-gold-deep)]">{currentSize.name}{currentSize.range !== currentSize.name ? ` (${currentSize.range})` : ''}</span>
-                            </p>
-                        )}
-                    </div>
-                )}
-
-                {/* Mensaje del crematorio para este enlace: entre el tamaño y los planes */}
+                {/* Mensaje del crematorio para este enlace: entre el selector y los planes */}
                 {message?.trim() && (
-                    <div className="mb-10 mx-auto max-w-3xl rounded-2xl border border-[var(--cat-gold)]/30 bg-[var(--cat-gold)]/[0.06] px-5 py-4 sm:px-7 text-center">
+                    <div className="mb-8 mx-auto max-w-3xl rounded-2xl border border-[var(--cat-gold)]/30 bg-[var(--cat-gold)]/[0.06] px-5 py-4 sm:px-7 text-center">
                         <p className="text-[15px] sm:text-base font-bold leading-relaxed text-[var(--cat-ink)] whitespace-pre-line">
                             {message.trim()}
                         </p>
@@ -433,8 +462,7 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                         </p>
                     </div>
                 ) : (
-                    // flex-wrap centra la última fila incompleta; las tarjetas de una fila quedan de igual altura
-                    <div className="flex flex-wrap justify-center gap-6">
+                    <div className="flex flex-col gap-5">
                         {filtered.map(rawView => {
                             // Tabla «precio por plan y peso»: el precio del plan es el del tamaño elegido.
                             const tablePrice = rawView.plan.weight_prices?.[sizeKey];
@@ -594,114 +622,73 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
 
 function PlanCard({ view, cover, waUrl, formUrl, sizeLabel, tierPrice = 0, onRequest, onWhatsApp }: { view: PlanView; cover: string | null; waUrl: string | null; formUrl: string | null; sizeLabel: string; tierPrice?: number; onRequest?: () => void; onWhatsApp?: () => void }) {
     const { plan, included, optional } = view;
-    // Tarjeta corta por defecto: descripción recortada y primeros ítems; "Ver más" muestra todo.
+    // Tarjeta horizontal: muestra los primeros ítems en 2 columnas y "Ver más" despliega el resto.
     const [expanded, setExpanded] = useState(false);
     const price = priceText(plan);
     const basePrice = plan.price || 0;
     const isAmount = Boolean(price?.isAmount && basePrice > 0);
     const totalPrice = isAmount ? basePrice + tierPrice : 0;
     const featured = Boolean(plan.is_featured);
-    const longDesc = (plan.description || '').length > 120;
+    const longDesc = (plan.description || '').length > 160;
     const hiddenCount = Math.max(0, included.length - COLLAPSED_ITEMS) + optional.length;
     const canExpand = hiddenCount > 0 || longDesc;
     const visible = expanded ? included : included.slice(0, COLLAPSED_ITEMS);
 
     return (
         <article
-            className={`relative w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] max-w-md md:max-w-none flex flex-col rounded-3xl bg-[var(--cat-card)] overflow-hidden transition-shadow ${
+            className={`relative w-full flex flex-col min-[960px]:flex-row rounded-3xl bg-[var(--cat-card)] overflow-hidden transition-shadow ${
                 featured
                     ? 'border-2 border-[var(--cat-gold)] shadow-[0_18px_40px_-20px_rgba(166,124,55,0.45)]'
                     : 'border border-[var(--cat-line)] shadow-[0_10px_30px_-22px_rgba(43,39,36,0.35)] hover:shadow-[0_16px_36px_-22px_rgba(43,39,36,0.4)]'
             }`}
         >
-            {featured && (
-                <span className="absolute top-4 left-1/2 -translate-x-1/2 z-10 px-4 py-1.5 rounded-full bg-[var(--cat-gold-deep)] text-white text-xs font-semibold tracking-wide shadow-md whitespace-nowrap">
-                    Más solicitado
-                </span>
-            )}
-
-            {/* Portada 1:1, igual al recorte que exige el cargador de imágenes */}
-            <div className="relative aspect-square bg-[var(--cat-sand)]">
+            {/* Columna Izquierda: Portada compacta */}
+            <div className="relative w-full min-[960px]:w-60 xl:w-64 shrink-0 aspect-[16/10] sm:aspect-[2/1] min-[960px]:aspect-auto min-[960px]:min-h-[240px] bg-[var(--cat-sand)]">
+                {featured && (
+                    <span className="absolute top-3.5 left-3.5 z-10 px-3.5 py-1 rounded-full bg-[var(--cat-gold-deep)] text-white text-xs font-semibold tracking-wide shadow-md whitespace-nowrap">
+                        Más solicitado
+                    </span>
+                )}
                 {cover ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={cover} alt={plan.name} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
                 ) : (
                     <div className="absolute inset-0 flex items-center justify-center text-[var(--cat-gold)]/40">
-                        <Feather size={56} strokeWidth={1.25} />
+                        <Feather size={48} strokeWidth={1.25} />
                     </div>
                 )}
             </div>
 
-            <div className="flex-1 flex flex-col p-6 sm:p-7">
-                <h2 className="[font-family:var(--cat-serif)] text-[28px] leading-tight font-semibold">{plan.name}</h2>
-                {isAmount ? (
-                    <div className="mt-3 p-3.5 rounded-2xl bg-[var(--cat-sand)]/70 border border-[var(--cat-line)]">
-                        {tierPrice > 0 ? (
-                            <>
-                                <div className="flex items-baseline justify-between gap-2">
-                                    <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--cat-muted)]">
-                                        Total estimado:
-                                    </span>
-                                    <span className="text-2xl font-black tabular-nums text-[var(--cat-gold-deep)]">
-                                        {formatCLP(totalPrice)}
-                                    </span>
-                                </div>
-                                <div className="mt-1.5 pt-1.5 border-t border-[var(--cat-line)]/70 flex items-center justify-between text-[12px] text-[var(--cat-muted)]">
-                                    <span>Plan base: {formatCLP(basePrice)}</span>
-                                    <span className="font-semibold text-[var(--cat-gold-deep)]">
-                                        + {formatCLP(tierPrice)} ({sizeLabel})
-                                    </span>
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <div className="flex items-baseline justify-between gap-2">
-                                    <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--cat-muted)]">
-                                        Valor del plan:
-                                    </span>
-                                    <span className="text-2xl font-black tabular-nums text-[var(--cat-gold-deep)]">
-                                        {formatCLP(basePrice)}
-                                    </span>
-                                </div>
-                                <p className="mt-1 text-[12px] text-[var(--cat-muted)]">
-                                    Para tamaño: <span className="font-medium text-[var(--cat-ink)]">{sizeLabel}</span>
-                                </p>
-                            </>
-                        )}
-                    </div>
-                ) : price ? (
-                    <div className="mt-3 p-3 rounded-2xl bg-[var(--cat-sand)]/60 border border-[var(--cat-line)] flex items-center justify-between">
-                        <span className="text-sm font-semibold uppercase tracking-wider text-[var(--cat-gold-deep)]">
-                            {price.main}
-                        </span>
-                        <span className="text-xs text-[var(--cat-muted)]">
-                            {sizeLabel}
-                        </span>
-                    </div>
-                ) : (
-                    <p className="mt-2 text-sm font-semibold text-[var(--cat-gold-deep)]">Cotizar para: {sizeLabel}</p>
+            {/* Columna Central: Nombre, descripción y qué incluye (en 2 sub-columnas) */}
+            <div className="flex-1 flex flex-col p-6 sm:p-7 min-w-0">
+                <div className="flex flex-wrap items-center gap-2.5">
+                    <h2 className="[font-family:var(--cat-serif)] text-[26px] sm:text-[28px] leading-tight font-semibold text-[var(--cat-ink)]">
+                        {plan.name}
+                    </h2>
+                </div>
+
+                {plan.description && (
+                    <p className={`mt-2 text-[14px] leading-relaxed text-[var(--cat-muted)] ${longDesc && !expanded ? 'line-clamp-2' : ''}`}>
+                        {plan.description}
+                    </p>
                 )}
 
                 {plan.important_note && (
-                    <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-[var(--cat-gold)]/35 bg-[#fbf3e4] px-3.5 py-3 text-[13px] leading-snug text-[var(--cat-ink)]">
+                    <div className="mt-3.5 flex items-start gap-2.5 rounded-2xl border border-[var(--cat-gold)]/35 bg-[#fbf3e4] px-3.5 py-2.5 text-[13px] leading-snug text-[var(--cat-ink)]">
                         <Info size={16} className="mt-px shrink-0 text-[var(--cat-gold-deep)]" />
                         <p><span className="font-semibold">Importante:</span> {plan.important_note}</p>
                     </div>
                 )}
 
-                {plan.description && (
-                    <p className={`mt-3 text-[14px] leading-relaxed text-[var(--cat-muted)] ${longDesc && !expanded ? 'line-clamp-2' : ''}`}>
-                        {plan.description}
-                    </p>
-                )}
-
                 {included.length > 0 && (
-                    <div className="mt-5 pt-5 border-t border-[var(--cat-line)]">
-                        <p className="text-[13px] font-semibold text-[var(--cat-ink)] mb-3">Incluye</p>
-                        <ul className="space-y-2.5">
+                    <div className="mt-4 pt-4 border-t border-[var(--cat-line)]">
+                        <p className="text-[12px] font-bold uppercase tracking-wider text-[var(--cat-muted)] mb-2.5">
+                            Incluye
+                        </p>
+                        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-2">
                             {visible.map((item, i) => (
-                                <li key={`${item.name}-${i}`} className="flex items-start gap-2.5 text-[14px] leading-snug">
-                                    <Check size={16} strokeWidth={2.25} className="mt-0.5 shrink-0 text-[var(--cat-gold)]" />
+                                <li key={`${item.name}-${i}`} className="flex items-start gap-2 text-[13.5px] leading-snug text-[var(--cat-ink)]">
+                                    <Check size={15} strokeWidth={2.25} className="mt-0.5 shrink-0 text-[var(--cat-gold)]" />
                                     <span>{item.name}</span>
                                 </li>
                             ))}
@@ -710,12 +697,12 @@ function PlanCard({ view, cover, waUrl, formUrl, sizeLabel, tierPrice = 0, onReq
                 )}
 
                 {expanded && optional.length > 0 && (
-                    <div className="mt-5 rounded-2xl bg-[var(--cat-sand)]/60 px-4 py-3.5">
-                        <p className="text-[12px] font-semibold uppercase tracking-wider text-[var(--cat-muted)] mb-2">Opcionales</p>
-                        <ul className="space-y-2">
+                    <div className="mt-4 rounded-2xl bg-[var(--cat-sand)]/60 px-4 py-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--cat-muted)] mb-2">Opcionales</p>
+                        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-1.5">
                             {optional.map((item, i) => (
-                                <li key={`${item.name}-${i}`} className="flex items-start gap-2.5 text-[14px] leading-snug text-[var(--cat-muted)]">
-                                    <Plus size={15} className="mt-0.5 shrink-0 text-[var(--cat-gold)]" />
+                                <li key={`${item.name}-${i}`} className="flex items-start gap-2 text-[13px] leading-snug text-[var(--cat-muted)]">
+                                    <Plus size={14} className="mt-0.5 shrink-0 text-[var(--cat-gold)]" />
                                     <span>{item.name}</span>
                                 </li>
                             ))}
@@ -728,26 +715,83 @@ function PlanCard({ view, cover, waUrl, formUrl, sizeLabel, tierPrice = 0, onReq
                         type="button"
                         onClick={() => setExpanded(e => !e)}
                         aria-expanded={expanded}
-                        className="mt-4 self-start inline-flex items-center gap-1 text-[13px] font-semibold text-[var(--cat-gold-deep)] hover:underline"
+                        className="mt-3.5 self-start inline-flex items-center gap-1 text-[13px] font-semibold text-[var(--cat-gold-deep)] hover:underline cursor-pointer"
                     >
                         {expanded ? 'Ver menos' : hiddenCount > 0 ? `Ver más (+${hiddenCount})` : 'Ver más'}
                         <ChevronDown size={15} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
                     </button>
                 )}
+            </div>
 
-                <div className="mt-auto pt-6 flex flex-col gap-2.5">
+            {/* Columna Derecha: Precio estimado y Botones de acción */}
+            <div className="w-full min-[960px]:w-72 xl:w-80 shrink-0 flex flex-col justify-between gap-4 p-6 sm:p-7 border-t min-[960px]:border-t-0 min-[960px]:border-l border-[var(--cat-line)] bg-[var(--cat-bg)]/50">
+                <div>
+                    {isAmount ? (
+                        <div className="p-4 rounded-2xl bg-white border border-[var(--cat-line)] shadow-xs">
+                            {tierPrice > 0 ? (
+                                <>
+                                    <div className="flex items-baseline justify-between gap-2">
+                                        <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--cat-muted)]">
+                                            Total estimado:
+                                        </span>
+                                        <span className="text-2xl font-black tabular-nums text-[var(--cat-gold-deep)]">
+                                            {formatCLP(totalPrice)}
+                                        </span>
+                                    </div>
+                                    <div className="mt-2 pt-2 border-t border-[var(--cat-line)]/70 flex flex-col gap-0.5 text-[12px] text-[var(--cat-muted)]">
+                                        <div className="flex items-center justify-between">
+                                            <span>Plan base:</span>
+                                            <span className="font-medium text-[var(--cat-ink)]">{formatCLP(basePrice)}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-[var(--cat-gold-deep)] font-semibold">
+                                            <span className="truncate pr-2">Peso ({sizeLabel}):</span>
+                                            <span className="shrink-0">+ {formatCLP(tierPrice)}</span>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="flex items-baseline justify-between gap-2">
+                                        <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--cat-muted)]">
+                                            Valor del plan:
+                                        </span>
+                                        <span className="text-2xl font-black tabular-nums text-[var(--cat-gold-deep)]">
+                                            {formatCLP(basePrice)}
+                                        </span>
+                                    </div>
+                                    <p className="mt-1.5 text-[12px] text-[var(--cat-muted)]">
+                                        Para tamaño: <span className="font-medium text-[var(--cat-ink)]">{sizeLabel}</span>
+                                    </p>
+                                </>
+                            )}
+                        </div>
+                    ) : price ? (
+                        <div className="p-3.5 rounded-2xl bg-white border border-[var(--cat-line)] flex items-center justify-between gap-2">
+                            <span className="text-sm font-semibold uppercase tracking-wider text-[var(--cat-gold-deep)]">
+                                {price.main}
+                            </span>
+                            <span className="text-xs text-[var(--cat-muted)]">
+                                {sizeLabel}
+                            </span>
+                        </div>
+                    ) : (
+                        <p className="text-sm font-semibold text-[var(--cat-gold-deep)]">Cotizar para: {sizeLabel}</p>
+                    )}
+                </div>
+
+                <div className="flex flex-col gap-2.5">
                     {formUrl && (
                         <a
                             href={formUrl}
                             onClick={onRequest}
-                            className={`w-full rounded-full py-3.5 px-4 flex items-center justify-center gap-2 text-[15px] font-bold transition-all shadow-sm active:scale-[0.98] ${
+                            className={`w-full rounded-full py-3.5 px-4 flex items-center justify-center gap-2 text-[14px] font-bold transition-all shadow-sm active:scale-[0.98] ${
                                 featured
                                     ? 'bg-[var(--cat-gold-deep)] text-white hover:bg-[#735220] shadow-[0_4px_14px_-3px_rgba(138,100,40,0.4)]'
                                     : 'bg-[var(--cat-ink)] text-white hover:bg-black'
                             }`}
                         >
                             <span>Solicitar este plan</span>
-                            <ArrowRight size={17} />
+                            <ArrowRight size={16} />
                         </a>
                     )}
 
@@ -757,15 +801,15 @@ function PlanCard({ view, cover, waUrl, formUrl, sizeLabel, tierPrice = 0, onReq
                             onClick={onWhatsApp}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className={`w-full rounded-full py-2.5 px-4 flex items-center justify-center gap-2 text-[14px] font-medium transition-colors ${
+                            className={`w-full rounded-full py-2.5 px-4 flex items-center justify-center gap-2 text-[13.5px] font-medium transition-colors ${
                                 formUrl
-                                    ? 'bg-transparent text-[var(--cat-muted)] hover:text-[var(--cat-ink)] hover:bg-[var(--cat-sand)]/60'
+                                    ? 'bg-white border border-[var(--cat-line)] text-[var(--cat-muted)] hover:text-[var(--cat-ink)] hover:border-[var(--cat-gold)]/50'
                                     : featured
                                         ? 'bg-[var(--cat-gold-deep)] text-white hover:bg-[#735220]'
                                         : 'bg-white text-[var(--cat-gold-deep)] border border-[var(--cat-gold)]/60 hover:bg-[var(--cat-gold-deep)] hover:text-white'
                             }`}
                         >
-                            <MessageCircle size={16} />
+                            <MessageCircle size={15} />
                             Consultar por WhatsApp
                         </a>
                     )}
