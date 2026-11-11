@@ -715,13 +715,15 @@ export default function MemorialLandingClient() {
 
                         {/* Sello del Crematorio */}
                         <div className={`mt-2.5 pt-2 border-t flex items-center justify-center gap-1.5 min-w-0 ${isDark ? 'border-white/5' : 'border-stone-100'}`}>
-                          <span className="shrink-0 w-4 h-4 rounded-full bg-amber-500 text-[8px] font-black text-slate-950 flex items-center justify-center overflow-hidden">
-                            {m.tenant_logo_url ? (
-                              <img src={m.tenant_logo_url} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              initials(m.tenant_name)
-                            )}
-                          </span>
+                          {m.tenant_logo_url ? (
+                            <span className="shrink-0 w-5 h-5 flex items-center justify-center overflow-hidden bg-transparent">
+                              <img src={m.tenant_logo_url} alt={m.tenant_name} className="w-full h-full object-contain" />
+                            </span>
+                          ) : (
+                            <span className="shrink-0 w-4 h-4 rounded-full bg-amber-500 text-[8px] font-black text-slate-950 flex items-center justify-center">
+                              {initials(m.tenant_name)}
+                            </span>
+                          )}
                           <span className={`text-[10px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                             {m.tenant_name}
                           </span>
