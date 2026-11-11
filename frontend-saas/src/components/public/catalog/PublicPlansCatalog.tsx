@@ -297,8 +297,8 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                         plans.length > 0 ? 'min-[960px]:grid-cols-[1fr_1.15fr] xl:grid-cols-[1fr_1.2fr]' : ''
                     } items-center gap-8 min-[960px]:gap-12 xl:gap-16`}
                 >
-                    {/* Columna Izquierda: Presentación alineada a la izquierda */}
-                    <div className="flex flex-col items-start text-left">
+                    {/* Columna Izquierda: Centrada en móvil (< 960px), alineada a la izquierda en escritorio (>= 960px) */}
+                    <div className="flex flex-col items-center text-center min-[960px]:items-start min-[960px]:text-left">
                         {logoUrl && (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
@@ -318,12 +318,12 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                                 {tenant.tagline}
                             </p>
                         )}
-                        <div className="mt-5 h-px w-16 bg-[var(--cat-gold)]/50" />
+                        <div className="mt-5 h-px w-16 bg-[var(--cat-gold)]/50 mx-auto min-[960px]:mx-0" />
                         <p className="mt-5 text-[15px] sm:text-base leading-relaxed text-[var(--cat-muted)] whitespace-pre-line max-w-2xl">
                             {tenant.intro || DEFAULT_CATALOG_INTRO}
                         </p>
                         {catalogVideo && (
-                            <div className="mt-7">
+                            <div className="mt-7 flex justify-center min-[960px]:justify-start">
                                 <button
                                     type="button"
                                     onClick={() => setVideoModalOpen(true)}
@@ -337,7 +337,7 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                                 </button>
                             </div>
                         )}
-                        <div className="mt-7 pt-5 border-t border-[var(--cat-line)] w-full max-w-xl flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-medium text-[var(--cat-muted)]">
+                        <div className="mt-7 pt-5 border-t border-[var(--cat-line)] w-full max-w-xl flex flex-wrap items-center justify-center min-[960px]:justify-start gap-x-6 gap-y-2 text-xs font-medium text-[var(--cat-muted)]">
                             <span className="inline-flex items-center gap-1.5">
                                 <Check size={14} className="text-[var(--cat-gold-deep)]" />
                                 Atención cercana
@@ -351,7 +351,7 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
 
                     {/* Columna Derecha: Tarjeta del calculador/selector interactivo (3x2 si hay >=5 tamaños, 2x2 si <=4) */}
                     {plans.length > 0 && (
-                        <div className="w-full rounded-3xl bg-white border border-[var(--cat-line)] shadow-[0_14px_36px_-22px_rgba(43,39,36,0.35)] p-5 sm:p-8 text-left">
+                        <div className="w-full rounded-3xl bg-white border border-[var(--cat-line)] shadow-[0_14px_36px_-22px_rgba(43,39,36,0.35)] p-5 sm:p-8 text-center min-[960px]:text-left">
                             <h2 id="pet-size-title" className="[font-family:var(--cat-serif)] text-2xl sm:text-[28px] leading-snug font-semibold text-[var(--cat-ink)]">
                                 ¿Cuál es el tamaño aproximado de tu mascota?
                             </h2>
