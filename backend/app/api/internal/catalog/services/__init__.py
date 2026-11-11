@@ -567,28 +567,36 @@ class PlanService:
     def delete(self, tenant_id: int, plan_id: int) -> dict:
         db_plan = self.get_by_id(tenant_id, plan_id)
 
-        cremation_exists = self.db.query(models.PlanOC).filter(
-            models.PlanOC.plan_id == plan_id, 
-            models.PlanOC.tenant_id == tenant_id
-        ).first()
-
-        if cremation_exists:
+        # Solo se elimina si ninguna orden lo usa; si no, se desactiva (o se copia).
+        orders = self.db.query(models.PlanOC.cremation_id).filter(
+            models.PlanOC.plan_id == plan_id,
+            models.PlanOC.tenant_id == tenant_id,
+        ).distinct().count()
+        if orders:
             raise HTTPException(
-                status_code=409, 
-                detail="No se puede eliminar el plan porque ha sido utilizado en asignaciones de servicio (OC)."
+                status_code=409,
+                detail=(f"No se puede eliminar «{db_plan.name}»: lo usa{'n' if orders > 1 else ''} {orders} "
+                        f"orden{'es' if orders > 1 else ''}. Desactívalo para que no se ofrezca más."),
             )
-        
-        # La imagen se conserva en las imágenes del crematorio (puede usarla otro plan).
 
-        # self.db.query(models.PlanService).filter(...) is done by cascade usually, or manual
+        # La imagen se conserva en las imágenes del crematorio (puede usarla otro plan).
+        name = db_plan.name
+        # Las filas de srv_plan_services / srv_plan_products se borran a mano y se olvidan
+        # las colecciones ya cargadas del plan: si no, el ORM intenta borrarlas otra vez
+        # al eliminar el plan y falla (StaleDataError «expected to delete N rows; 0 matched»).
         self.db.query(models.PlanService).filter(
             models.PlanService.plan_id == plan_id,
-            models.PlanService.tenant_id == tenant_id
-        ).delete()
+            models.PlanService.tenant_id == tenant_id,
+        ).delete(synchronize_session=False)
+        self.db.query(models.PlanProduct).filter(
+            models.PlanProduct.plan_id == plan_id,
+            models.PlanProduct.tenant_id == tenant_id,
+        ).delete(synchronize_session=False)
+        self.db.expire(db_plan)
 
         self.db.delete(db_plan)
         self.db.commit()
-        return {"status": "deleted", "message": f"Plan {db_plan.name} eliminado correctamente"}
+        return {"status": "deleted", "message": f"Plan {name} eliminado correctamente"}
 
     async def upload_image(self, tenant_id: int, file: UploadFile, kind: str = "plan") -> str:
         """Sube la imagen de catálogo de un plan (WEBP 1:1 optimizado en R2).
