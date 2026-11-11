@@ -9,7 +9,7 @@ export interface Cremation {
     /** Solo en la lista: último certificado emitido (null = sin certificado). */
     certificate?: { id: number; number: string } | null;
     /** Planes de la orden (con su nombre) */
-    planes?: { plan_id: number; es_principal?: boolean; plan?: { name?: string | null; group_name?: string | null } | null }[];
+    planes?: { plan_id: number; es_principal?: boolean; plan?: { name?: string | null; group_name?: string | null; is_priority?: boolean } | null }[];
     pet_id: number;
     service_id?: number;
     plan_id?: number;

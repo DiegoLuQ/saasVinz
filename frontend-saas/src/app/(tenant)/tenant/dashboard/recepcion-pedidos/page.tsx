@@ -1,4 +1,5 @@
 "use client";
+import { serverDate } from '@/lib/dates';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -41,6 +42,7 @@ import OperationsStatsCards, { type OpsFilter } from '@/components/tenant/operat
 import OperationsToolbar, { type StatusPillFilter } from '@/components/tenant/operations/OperationsToolbar';
 import OperationRow from '@/components/tenant/operations/OperationRow';
 import OrderSlideOver from '@/components/tenant/operations/OrderSlideOver';
+import PriorityBadge from '@/components/tenant/operations/PriorityBadge';
 import { apiRequest, getImageUrl } from '@/lib/tenant/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { PlanLimitModal } from '@/components/tenant/PlanLimitModal';
@@ -136,7 +138,7 @@ export default function CremationsPage() {
         const currentMonth = now.getMonth();
         return cremations.filter(c => {
             if (!c.created_at) return false;
-            const d = new Date(c.created_at);
+            const d = serverDate(c.created_at);
             return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
         }).length;
     }, [cremations]);
@@ -311,6 +313,7 @@ export default function CremationsPage() {
     const KanbanCard = ({ item, nextStatus, nextLabel, icon: Icon, colorClass, glowColor, isSelected, onSelect, inProcess }: any) => {
         const isCompleted = ['delivered', 'completed', 'completado', 'entregado'].includes(normalizeStatus(item.status));
         const isCancelled = normalizeStatus(item.status) === 'cancelado';
+        const priorityPlan = item.planes?.find((p: { plan?: { is_priority?: boolean; name?: string | null } | null }) => p.plan?.is_priority)?.plan?.name || null;
         const partnerName = item.partner_name || item.partner_link?.veterinary?.name || item.partner?.veterinary?.name || item.partner?.nombre_clinica;
 
         const handleCopyCode = async (e: React.MouseEvent) => {
@@ -343,6 +346,8 @@ export default function CremationsPage() {
                     ? `border-primary bg-[#1e293b] shadow-primary/20 ring-4 ring-primary/10` 
                     : isCancelled
                     ? `bg-[#0f172a] border-red-500/20 hover:border-red-500/40 hover:shadow-2xl`
+                    : priorityPlan && !isCompleted
+                    ? `bg-[#0f172a] border-orange-500/75 ring-1 ring-orange-500/30 hover:border-orange-500 hover:shadow-2xl`
                     : `bg-[#0f172a] border-white/5 hover:border-white/20 hover:shadow-2xl`
                 }`}
             >
@@ -382,7 +387,7 @@ export default function CremationsPage() {
                         <p className="text-xs text-muted-foreground truncate">{item.pet?.customer?.name || 'Cliente no asignado'}</p>
                         {item.created_at && (
                             <p className="text-[10px] text-muted-foreground/60 mt-0.5 font-medium">
-                                {new Date(item.created_at).toLocaleDateString('es-CL')} {new Date(item.created_at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+                                {serverDate(item.created_at).toLocaleDateString('es-CL')} {serverDate(item.created_at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
                             </p>
                         )}
                     </div>
@@ -410,6 +415,7 @@ export default function CremationsPage() {
                                 <Copy size={10} />
                             </button>
                         )}
+                        <PriorityBadge plan={priorityPlan} />
                         {item.cremation_type && (
                             <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-md bg-white/5 text-muted-foreground border border-white/5">
                                 {item.cremation_type}

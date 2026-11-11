@@ -6,6 +6,7 @@ import { API_URL, apiRequest } from '@/lib/tenant/api';
 import { downloadHtmlAsPdf, pdfFileName } from '@/lib/certPdf';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import StatusPillMenu from './StatusPillMenu';
+import PriorityBadge from './PriorityBadge';
 import type { Cremation } from '@/hooks/useCremations';
 
 interface OperationRowProps {
@@ -82,6 +83,7 @@ export default function OperationRow({
     const planes = item.planes || [];
     const mainPlan = planes.find((p) => p.es_principal) || planes[0];
     const planName = mainPlan?.plan?.name || (mainPlan ? `Plan #${mainPlan.plan_id}` : null);
+    const priorityPlan = planes.find((p) => p.plan?.is_priority)?.plan?.name || null;
     const extraPlans = Math.max(planes.length - 1, 0);
 
     // Descargar el último certificado emitido (PDF, igual que en el detalle de la orden)
@@ -132,7 +134,10 @@ export default function OperationRow({
                     )}
                 </div>
                 <div className="min-w-0">
-                    <p className="text-sm font-black text-white truncate">{petName}</p>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                        <p className="text-sm font-black text-white truncate">{petName}</p>
+                        <PriorityBadge plan={priorityPlan} />
+                    </div>
                     <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider truncate">
                         {customerName}{item.city ? ` · ${item.city}` : ''}
                     </p>
