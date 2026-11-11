@@ -4,18 +4,20 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Globe, Menu, X, ChevronRight } from 'lucide-react';
+import { Globe, Menu, X, ChevronRight, Sun, Moon } from 'lucide-react';
 import type { Locale } from '@/lib/translations';
 import { getLandingContent, LANDING_SECTIONS } from '@/lib/memorialLanding';
 
 export interface PublicHeaderProps {
     isDark?: boolean;
+    onToggleTheme?: () => void;
     customBg?: string;
     transparent?: boolean;
 }
 
 export const PublicHeader: React.FC<PublicHeaderProps> = ({
     isDark = false,
+    onToggleTheme,
     customBg,
     transparent = false
 }) => {
@@ -239,19 +241,54 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                         })}
                     </nav>
 
-                    {/* Mobile Menu Button - Visible only on mobile */}
-                    <button
-                        onClick={() => setIsMobileMenuOpen(true)}
-                        aria-label="Abrir menú"
-                        aria-expanded={isMobileMenuOpen}
-                        aria-controls="mobile-menu"
-                        className={`xl:hidden p-3 rounded-full transition-all duration-300 ${textMainClass} hover:bg-white/10 active:scale-90 border ${effectiveIsDark ? 'border-white/5 bg-white/5' : 'border-slate-200/50 bg-slate-50/50'}`}
-                    >
-                        <Menu size={20} className="text-[#c5a059]" />
-                    </button>
+                    {/* Mobile Actions: Theme Toggle + Menu Button */}
+                    <div className="xl:hidden flex items-center gap-2">
+                        {onToggleTheme && (
+                            <button
+                                type="button"
+                                onClick={onToggleTheme}
+                                aria-label={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+                                title={isDark ? 'Modo claro' : 'Modo oscuro'}
+                                className={`p-2.5 rounded-full transition-all duration-300 active:scale-90 border cursor-pointer ${
+                                    effectiveIsDark
+                                        ? 'border-white/10 bg-white/5 text-amber-300 hover:bg-white/10'
+                                        : 'border-slate-200 bg-slate-50 text-amber-700 hover:bg-slate-100'
+                                }`}
+                            >
+                                {isDark ? <Sun size={18} /> : <Moon size={18} />}
+                            </button>
+                        )}
+                        <button
+                            onClick={() => setIsMobileMenuOpen(true)}
+                            aria-label="Abrir menú"
+                            aria-expanded={isMobileMenuOpen}
+                            aria-controls="mobile-menu"
+                            className={`p-3 rounded-full transition-all duration-300 ${textMainClass} hover:bg-white/10 active:scale-90 border ${effectiveIsDark ? 'border-white/5 bg-white/5' : 'border-slate-200/50 bg-slate-50/50'}`}
+                        >
+                            <Menu size={20} className="text-[#c5a059]" />
+                        </button>
+                    </div>
 
                     {/* ACCIONES - Lado Derecho */}
-                    <div className="hidden xl:flex shrink-0 items-center gap-3">
+                    <div className="hidden xl:flex shrink-0 items-center gap-2.5">
+                        {onToggleTheme && (
+                            <button
+                                type="button"
+                                onClick={onToggleTheme}
+                                aria-label={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+                                title={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+                                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border transition-all duration-300 cursor-pointer
+                                ${effectiveIsDark
+                                    ? 'border-white/10 bg-white/5 text-amber-300 hover:bg-white/10 hover:border-[#c5a059]/40'
+                                    : 'border-slate-200 bg-slate-50/80 text-amber-700 hover:bg-slate-100 hover:border-[#c5a059]/40'}`}
+                            >
+                                {isDark ? <Sun size={14} /> : <Moon size={14} />}
+                                <span className="text-[9px] font-black uppercase tracking-widest">
+                                    {isDark ? (locale === 'en' ? 'Light' : 'Claro') : (locale === 'en' ? 'Dark' : 'Oscuro')}
+                                </span>
+                            </button>
+                        )}
+
                         {/* Language Toggle Premium */}
                         <button
                             onClick={toggleLocale}
