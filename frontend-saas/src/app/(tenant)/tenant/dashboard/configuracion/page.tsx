@@ -14,7 +14,8 @@ import {
     ClipboardList,
     Coins,
     Wand2,
-    Link2
+    Link2,
+    Star
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -24,7 +25,7 @@ import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { useTheme } from '@/app/(tenant)/tenant/context/ThemeContext';
 import { usePolar } from '@/hooks/usePolar';
 import { useFeatures } from '@/hooks/useFeatures';
-import { CONFIG_TAB_FEATURES, CONFIG_TAB_MODULES } from '@/hooks/useCanOpen';
+import { CONFIG_TAB_FEATURES, CONFIG_TAB_MODULES, configTabDefault } from '@/hooks/useCanOpen';
 import { apiRequest } from '@/lib/tenant/api';
 import DeactivateTenantModal from '@/components/tenant/modals/DeactivateTenantModal';
 
@@ -37,6 +38,7 @@ import { CertificatesTab } from '@/components/tenant/settings/CertificatesTab';
 import { AiCreditsTab } from '@/components/tenant/settings/AiCreditsTab';
 import { AutoDocumentsTab } from '@/components/tenant/settings/AutoDocumentsTab';
 import { OfficialLinksTab } from '@/components/tenant/settings/OfficialLinksTab';
+import { GoogleReviewTab } from '@/components/tenant/settings/GoogleReviewTab';
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState('general');
@@ -81,7 +83,7 @@ export default function SettingsPage() {
     const { hasFeature } = useFeatures();
     const activeModules = (bootstrapData?.rbac.modules ?? []).filter(m => m.is_active).map(m => m.module_key);
     const tabAllowed = (id: string) =>
-        (!CONFIG_TAB_FEATURES[id] || hasFeature(CONFIG_TAB_FEATURES[id], true))
+        (!CONFIG_TAB_FEATURES[id] || hasFeature(CONFIG_TAB_FEATURES[id], configTabDefault(CONFIG_TAB_FEATURES[id])))
         && (!CONFIG_TAB_MODULES[id] || activeModules.includes(CONFIG_TAB_MODULES[id]));
     const currentTab = tabAllowed(activeTab) ? activeTab : 'general';
 
@@ -101,6 +103,7 @@ export default function SettingsPage() {
                 { id: 'flujo', name: 'Flujo Operativo', hint: 'Etapas del servicio', icon: Activity },
                 { id: 'formulario', name: 'Formulario y Pesos', hint: 'Formulario público y tramos', icon: ClipboardList },
                 { id: 'enlaces', name: 'Enlaces oficiales', hint: 'Formulario y catálogos oficiales', icon: Link2 },
+                { id: 'resenas', name: 'Reseñas en Google', hint: 'Invitación tras la entrega', icon: Star },
             ],
         },
         {
@@ -264,6 +267,7 @@ export default function SettingsPage() {
 
                         {currentTab === 'documentos-auto' && <AutoDocumentsTab />}
                         {currentTab === 'enlaces' && <OfficialLinksTab />}
+                        {currentTab === 'resenas' && <GoogleReviewTab />}
 
                         {currentTab === 'creditos' && <AiCreditsTab />}
                     </motion.div>

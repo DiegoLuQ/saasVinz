@@ -27,7 +27,7 @@ export function useCanOpen() {
         const tab = new URLSearchParams(href.split('?')[1] || '').get('tab');
         if (path === '/dashboard/configuracion' && tab) {
             const tabFeature = CONFIG_TAB_FEATURES[tab];
-            if (tabFeature && !hasFeature(tabFeature, true)) return false;
+            if (tabFeature && !hasFeature(tabFeature, configTabDefault(tabFeature))) return false;
             const tabModule = CONFIG_TAB_MODULES[tab];
             if (tabModule && !activeModules.includes(tabModule)) return false;
         }
@@ -43,7 +43,14 @@ export const CONFIG_TAB_FEATURES: Record<string, string> = {
     formulario: 'configuracion:formulario',
     'documentos-auto': 'certificados:generar_todo',
     creditos: 'configuracion:creditos_ia',
+    resenas: 'configuracion:resena_google',
 };
+
+/** Características de pestaña que, sin marcar en el plan, quedan APAGADAS (el resto: sin marcar = incluida). */
+export const CONFIG_TAB_FEATURE_OFF_BY_DEFAULT = new Set(['configuracion:resena_google']);
+
+/** Valor por defecto de la característica de una pestaña cuando el plan no la tiene guardada. */
+export const configTabDefault = (feature: string) => !CONFIG_TAB_FEATURE_OFF_BY_DEFAULT.has(feature);
 
 /** Pestañas de Configuración → módulo del plan que exigen (además de Configuración). */
 export const CONFIG_TAB_MODULES: Record<string, string> = {

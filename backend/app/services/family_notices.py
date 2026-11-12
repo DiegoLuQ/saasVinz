@@ -4,8 +4,8 @@
   correo con la foto de la mascota, la etapa, la hora, la marca del crematorio, el
   link de seguimiento y su catálogo de productos (si tiene), o WhatsApp si no hay
   correo. Ya no se envía solo al avanzar. Al concluir, si el crematorio lo activó (`sys_tenants.family_notices
-  .on_finish`), un correo de agradecimiento que invita a dejar una reseña en Google
-  (si el crematorio tiene el enlace; ya no hay encuesta).
+  .on_finish`), el aviso de fase final (estamos preparando la entrega). La invitación
+  a la reseña de Google sale aparte, 1 o 2 días después (services/google_review.py).
 - El operador también puede avisar por WhatsApp desde la orden: se arma el
   mensaje con el link y se abre wa.me (sin API de Meta); queda registrado.
 - Cada aviso queda en ops_family_notices (no se repite el correo automático de
@@ -200,7 +200,9 @@ async def send_step_email(db: Session, cremation_id: int, step_id: int, user_id:
 
 
 async def send_finish_email(db: Session, cremation_id: int, user_id: int | None = None, force: bool = False) -> dict:
-    """Correo de agradecimiento y entrega formal con enlace de seguimiento y reseña de Google."""
+    """Aviso de fase final: el servicio concluyó y estamos coordinando la entrega de las
+    cenizas, la urna y el certificado. Sin reseña de Google: esa invitación sale aparte,
+    1 o 2 días después (services/google_review.py)."""
     cremation = _load(db, cremation_id)
     if not cremation:
         return {"sent": False, "reason": "not_found"}
@@ -218,51 +220,37 @@ async def send_finish_email(db: Session, cremation_id: int, user_id: int | None 
     pet = cremation.pet.name if cremation.pet else "tu mascota"
     url = tracking_url(tenant, cremation)
 
-    sm = tenant.social_media if isinstance(tenant.social_media, dict) else {}
-    google_review_url = (sm.get("google_review") or "").strip()
-
-    review_card = None
-    if google_review_url:
-        city_phrase = f"de {tenant.city.strip()} " if getattr(tenant, "city", None) and tenant.city.strip() else ""
-        review_card = {
-            "title": "¿Te brindamos tranquilidad en este proceso?",
-            "text": (
-                f"Cuando tengas un momento de calma, compartir tu experiencia o una foto de sus recuerdos en Google "
-                f"ayudará a otras familias {city_phrase}a despedir a sus compañeros con confianza."
-            ),
-            "button_label": "💬 Compartir mi opinión en Google",
-            "url": google_review_url,
-            "stars": "⭐ ⭐ ⭐ ⭐ ⭐",
-        }
-
     first_name = _first_name(customer.name)
     greeting = f"Hola, {first_name}:" if first_name else "Hola:"
+    contact = (tenant.phone or "").strip()
 
     paragraphs = [
         greeting,
-        f"Te escribimos con profundo respeto y gratitud para contarte que hemos completado formalmente la entrega del ánfora y los recuerdos de {pet}.",
-        f"Agradecemos de corazón la confianza que depositaste en nosotros en un momento tan sensible. Cuidamos a {pet} con la máxima dedicación, cariño y transparencia en cada etapa del camino, y esperamos haber sido un verdadero apoyo y consuelo para tu familia.",
-        "Para que conserves su memoria intacta, en el siguiente enlace podrás descargar su Certificado Oficial de Cremación, su fotografía conmemorativa en alta resolución y volver a ver el registro completo de su homenaje cuando lo desees:",
+        f"Te escribimos con profundo respeto para contarte que el servicio de {pet} llegó a su fase final.",
+        f"Ahora estamos preparando la entrega de sus cenizas, su ánfora y sus recuerdos. "
+        + (f"Te contactaremos para coordinar el día y la hora; si lo prefieres, también puedes escribirnos al {contact}."
+           if contact else "Te contactaremos para coordinar el día y la hora de la entrega."),
+        f"Agradecemos de corazón la confianza que depositaste en nosotros. Cuidamos a {pet} con dedicación, cariño y transparencia en cada etapa.",
+        "En el siguiente enlace puedes revisar el registro completo de su servicio y, cuando esté disponible, descargar su certificado de cremación:",
     ]
 
-    button_label = f"🐾 Ver recuerdos y certificado de {pet}" if url else None
+    button_label = f"🐾 Ver el servicio de {pet}" if url else None
     footer = f"Con todo nuestro cariño y respeto,\nEl equipo de {tenant.name}."
 
     from app.services.email import send_action_email
     await send_action_email(
         to=customer.email.strip(),
-        subject=f"{pet} ya descansa en casa · {tenant.name}",
-        title=f"{pet} ya descansa en casa",
+        subject=f"El servicio de {pet} llegó a su fase final · {tenant.name}",
+        title=f"Estamos preparando la entrega de {pet}",
         paragraphs=paragraphs,
         button_label=button_label,
         button_url=url,
         footer=footer,
-        kicker=f"Servicio conmemorativo completado · {tenant.name}",
+        kicker=f"Fase final del servicio · {tenant.name}",
         brand=tenant_brand(tenant),
         reply_to=tenant.email or None,
         image_url=pet_photo(cremation),
-        preheader="Servicio conmemorativo completado con amor y respeto.",
-        review_card=review_card,
+        preheader=f"El servicio de {pet} concluyó: coordinaremos contigo la entrega.",
     )
     _record(db, cremation, "finish", "email", customer.email, None, user_id)
     return {"sent": True, "to": customer.email}
@@ -330,7 +318,7 @@ def whatsapp_message(db: Session, cremation_id: int, step_id: int | None, messag
     url = tracking_url(tenant, cremation)
     hello = f"Hola {_first_name(customer.name)}".strip() if customer else "Hola"
     if cremation.status in ("entregado", "completado"):
-        body = f"{hello}, te escribimos de {tenant.name}. Hemos concluido el servicio de {pet}. Gracias por confiar en nosotros."
+        body = f"{hello}, te escribimos de {tenant.name}. El servicio de {pet} llegó a su fase final y estamos preparando la entrega de sus cenizas: te contactaremos para coordinarla. Gracias por confiar en nosotros."
     elif step:
         body = f"{hello}, te escribimos de {tenant.name}. El servicio de {pet} avanzó a la etapa «{step.name}»."
     else:

@@ -142,6 +142,13 @@ async def _start_memorial_anniversary_scheduler():
     from app.services.memorial_notifications import memorial_anniversary_scheduler_loop
     asyncio.create_task(memorial_anniversary_scheduler_loop())
 
+# Invitación a reseña de Google 1-2 días después de entregar (ver services/google_review.py).
+@app.on_event("startup")
+async def _start_google_review_scheduler():
+    import asyncio
+    from app.services.google_review import google_review_scheduler_loop
+    asyncio.create_task(google_review_scheduler_loop())
+
 # Startup tasks removed. DDL migrations are handled by deployment scripts.
 
 # CORS Configuration - DEBE IR AL FINAL para que se ejecute PRIMERO en el request

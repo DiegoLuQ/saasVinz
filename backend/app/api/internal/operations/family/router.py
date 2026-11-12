@@ -14,6 +14,7 @@ from app import models
 from app.api.deps import get_current_user, get_tenant_id
 from app.database import get_db
 from app.services import family_notices as fn
+from app.services import google_review as gr
 
 router = APIRouter()
 
@@ -58,6 +59,8 @@ def list_family_notices(
         "next_step_id": nxt.id if nxt else None,
         "next_step_name": nxt.name if nxt else None,
         "next_message": fn.default_step_message(customer.name if customer else None, pet_name, nxt.name) if nxt else None,
+        # Invitación a reseña de Google programada (Configuración → Reseñas en Google)
+        "review": gr.order_status(db, c),
         "notices": [{
             "id": r.id, "kind": r.kind, "channel": r.channel, "sent_to": r.sent_to,
             "step_id": r.step_id, "step_name": steps.get(r.step_id), "created_at": r.created_at,
@@ -172,3 +175,63 @@ def feedback_summary(
         "recent": [{"rating": r.rating, "comment": r.comment, "pet_name": pet, "created_at": r.created_at,
                     "cremation_id": r.cremation_id} for r, pet in recent],
     }
+
+
+# --- Reseñas en Google (services/google_review.py) ----------------------------
+
+class ReviewConfig(BaseModel):
+    enabled: bool
+    delay_days: int = Field(gr.DEFAULT_DELAY, ge=1, le=2)
+
+
+def _review_config_out(tenant) -> dict:
+    return {**gr.config(tenant), "available": gr.feature_on(tenant), "has_link": bool(gr.review_link(tenant)),
+            "send_hour": gr.SEND_HOUR, "delays": list(gr.DELAYS)}
+
+
+@router.get("/review-config")
+def get_review_config(
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    current_user: models.User = Depends(get_current_user),
+):
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    return _review_config_out(tenant)
+
+
+@router.put("/review-config")
+def update_review_config(
+    data: ReviewConfig,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    current_user: models.User = Depends(get_current_user),
+):
+    if current_user.role not in (models.UserRole.admin, models.UserRole.creator):
+        raise HTTPException(status_code=403, detail="Solo el administrador puede cambiar esta configuración")
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not gr.feature_on(tenant):
+        raise HTTPException(status_code=403, detail="Las reseñas en Google no están incluidas en tu plan")
+    try:
+        gr.save_config(tenant, data.enabled, data.delay_days)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    db.commit()
+    return _review_config_out(tenant)
+
+
+@router.post("/ops/orders/{cremation_id}/family-notices/review")
+async def send_review_now(
+    cremation_id: int,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    current_user: models.User = Depends(get_current_user),
+):
+    """«Enviar ahora»: adelanta la invitación a la reseña de Google."""
+    c = _order(db, cremation_id, tenant_id)
+    result = await gr.send_review_email(db, c.id, current_user.id, force=True)
+    if not result.get("sent"):
+        reasons = {"no_email": "El cliente no tiene correo registrado",
+                   "no_link": "Falta el enlace de reseñas de Google en Perfil → Redes y reseñas",
+                   "plan": "Las reseñas en Google no están incluidas en tu plan"}
+        raise HTTPException(status_code=422, detail=reasons.get(result.get("reason"), "No se pudo enviar la invitación"))
+    return result

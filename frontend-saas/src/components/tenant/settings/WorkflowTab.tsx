@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Activity, Mail, Lock, Star } from 'lucide-react';
+import Link from 'next/link';
+import { Plus, Activity, Mail, Lock, Truck } from 'lucide-react';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { apiRequest } from '@/lib/tenant/api';
 import { FormInput } from './FormField';
@@ -102,15 +103,13 @@ export function WorkflowTab() {
                     {notices.enabled ? (
                         <label className="flex items-center justify-between gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 cursor-pointer">
                             <span className="flex items-start gap-3">
-                                <Star size={18} className="text-amber-500 mt-0.5 shrink-0" />
+                                <Truck size={18} className="text-sky-500 mt-0.5 shrink-0" />
                                 <span>
-                                    <span className="block text-sm font-bold">Al concluir: agradecimiento y reseña en Google</span>
-                                    <span className="block text-xs text-muted-foreground">Al finalizar la orden, la familia recibe un correo de agradecimiento con un botón para dejar su opinión en tu ficha de Google.</span>
-                                    {notices.google_review === false && (
-                                        <span className="block text-xs font-semibold text-amber-700 dark:text-amber-400 mt-1">
-                                            Aún no tienes el enlace de reseñas de Google: agrégalo en <a href="/dashboard/perfil" className="underline">Perfil → Redes y reseñas</a>. Sin él, el correo solo agradece.
-                                        </span>
-                                    )}
+                                    <span className="block text-sm font-bold">Al concluir: aviso de fase final</span>
+                                    <span className="block text-xs text-muted-foreground">
+                                        Al finalizar la orden, la familia recibe un correo: «llegamos a la fase final y estamos preparando la entrega de sus cenizas».
+                                        La invitación a opinar en Google sale aparte, días después: <Link href="/dashboard/configuracion?tab=resenas" className="text-primary font-semibold hover:underline">Reseñas en Google</Link>.
+                                    </span>
                                 </span>
                             </span>
                             <input type="checkbox" checked={notices.on_finish} onChange={toggleOnFinish} className="w-5 h-5 accent-sky-500 shrink-0" />

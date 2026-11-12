@@ -223,6 +223,13 @@ export const FEATURES_REGISTRY: Record<string, ModuleDef> = {
                     { key: 'configuracion:formulario', label: 'Formulario y Pesos', description: 'Formulario para la familia, rangos de peso, bienvenida y enlaces' },
                     { key: 'configuracion:flujo', label: 'Flujo Operativo', description: 'Crear y editar las etapas del servicio' },
                     { key: 'configuracion:creditos_ia', label: 'Compra de créditos IA', description: 'Pestaña «Compra de créditos» para pedir créditos extra' },
+                    {
+                        key: 'configuracion:resena_google',
+                        label: 'Reseñas en Google',
+                        description: 'Pestaña «Reseñas en Google»: invita a la familia a opinar en Google 1 o 2 días después de entregar (18:00)',
+                        // Sin marcar = no incluida: la decide el SuperAdmin (backend services/google_review.py).
+                        defaultFor: () => false,
+                    },
                 ],
             },
             {

@@ -739,7 +739,7 @@ export default function ProfilePage() {
                                         <Field
                                             label={<><Star size={12} /> Enlace de reseñas de Google</>}
                                             htmlFor="s-review"
-                                            hint={<>Lo encuentras en tu Perfil de Empresa de Google → &quot;Pedir reseñas&quot;. Se muestra a la familia al entregar las cenizas (seguimiento, WhatsApp y correo de agradecimiento). Déjalo vacío para no mostrarlo.</>}
+                                            hint={<>Lo encuentras en tu Perfil de Empresa de Google → &quot;Pedir reseñas&quot;. Se muestra a la familia al entregar las cenizas (seguimiento y WhatsApp) y en la invitación a reseñas de Configuración → Reseñas en Google. Déjalo vacío para no mostrarlo.</>}
                                         >
                                             <input
                                                 id="s-review"

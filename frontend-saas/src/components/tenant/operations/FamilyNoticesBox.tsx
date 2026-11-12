@@ -2,12 +2,47 @@
 
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Mail, MessageCircle, Check } from 'lucide-react';
+import { Loader2, Mail, MessageCircle, Check, CalendarClock } from 'lucide-react';
 import { apiRequest } from '@/lib/tenant/api';
 import { formatChileDate, formatChileTime } from '@/lib/dates';
 
-interface Notice { id: number; kind: 'step' | 'finish'; channel: 'email' | 'whatsapp'; sent_to?: string | null; step_name?: string | null; created_at: string }
-interface NoticesData { enabled: boolean; email?: string | null; phone?: string | null; notices: Notice[] }
+interface Notice { id: number; kind: 'step' | 'finish' | 'review'; channel: 'email' | 'whatsapp'; sent_to?: string | null; step_name?: string | null; created_at: string }
+/** Invitación a la reseña de Google (services/google_review.py). */
+interface ReviewStatus {
+    available: boolean;
+    sent_at?: string | null;
+    scheduled_for?: string | null;
+    reason?: 'no_link' | 'no_email' | 'off' | 'not_delivered' | 'before_enabled' | null;
+    can_send?: boolean;
+}
+interface NoticesData { enabled: boolean; email?: string | null; phone?: string | null; notices: Notice[]; review?: ReviewStatus }
+
+const REVIEW_REASON: Record<string, string> = {
+    no_link: 'Falta el enlace de Google (Perfil → Redes y reseñas)',
+    no_email: 'El cliente no tiene correo',
+    off: 'Desactivada en Configuración → Reseñas en Google',
+    not_delivered: 'Se programa al entregar la orden',
+    before_enabled: 'Entregada antes de activar las reseñas',
+};
+
+const NOTICE_LABEL = (n: Notice) =>
+    n.kind === 'review' ? 'Reseña en Google' : n.kind === 'finish' ? 'Aviso de fase final' : (n.step_name || 'Avance');
+
+/** Badge «Google ✓»: la invitación a la reseña ya se envió. */
+function GoogleSentBadge({ at }: { at: string }) {
+    return (
+        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300"
+            title={`Invitación a reseña enviada el ${formatChileDate(at)} ${formatChileTime(at)}`}>
+            <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
+                <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.2-2.1 3.5-5.1 3.5-8.7z" />
+                <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1A12 12 0 0 0 12 24z" />
+                <path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6H1.3a12 12 0 0 0 0 10.8l4-3.1z" />
+                <path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.3 6.6l4 3.1c.9-2.9 3.6-4.9 6.7-4.9z" />
+            </svg>
+            Google <Check size={12} />
+        </span>
+    );
+}
 
 /**
  * «Avisar a la familia» de una orden: WhatsApp (abre el chat con el mensaje y el
@@ -21,7 +56,7 @@ export default function FamilyNoticesBox({ orderId, stepId, finished, compact = 
     const qc = useQueryClient();
     const key = ['family-notices', orderId];
     const { data } = useQuery<NoticesData>({ queryKey: key, queryFn: () => apiRequest(`/api/internal/operations/ops/orders/${orderId}/family-notices`) });
-    const [busy, setBusy] = useState<'whatsapp' | 'email' | null>(null);
+    const [busy, setBusy] = useState<'whatsapp' | 'email' | 'review' | null>(null);
     const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
     if (!data?.enabled) return null;
@@ -52,6 +87,18 @@ export default function FamilyNoticesBox({ orderId, stepId, finished, compact = 
         } finally { setBusy(null); }
     };
 
+    const sendReview = async () => {
+        setBusy('review'); setMsg(null);
+        try {
+            const r = await apiRequest(`/api/internal/operations/ops/orders/${orderId}/family-notices/review`, { method: 'POST' });
+            setMsg({ ok: true, text: `Invitación a reseña enviada a ${r.to}` });
+            qc.invalidateQueries({ queryKey: key });
+        } catch (e: unknown) {
+            setMsg({ ok: false, text: e instanceof Error ? e.message : 'No se pudo enviar la invitación' });
+        } finally { setBusy(null); }
+    };
+    const review = data.review;
+
     const btn = 'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-colors disabled:opacity-40';
 
     return (
@@ -69,6 +116,23 @@ export default function FamilyNoticesBox({ orderId, stepId, finished, compact = 
                     {busy === 'email' ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />} Correo
                 </button>
             </div>
+            {review?.available && (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/60 dark:bg-white/[0.03] px-3 py-2">
+                    <div className="min-w-0 text-[11px] text-muted-foreground">
+                        <span className="font-bold text-foreground">Reseña en Google</span>
+                        {review.sent_at ? null : review.scheduled_for ? (
+                            <span className="ml-1.5 inline-flex items-center gap-1"><CalendarClock size={12} className="text-sky-500" />
+                                Programada: {formatChileDate(review.scheduled_for)} {formatChileTime(review.scheduled_for)}</span>
+                        ) : review.reason ? <span className="ml-1.5">· {REVIEW_REASON[review.reason] || ''}</span> : null}
+                    </div>
+                    {review.sent_at ? <GoogleSentBadge at={review.sent_at} /> : review.can_send && (
+                        <button type="button" onClick={sendReview} disabled={!!busy}
+                            className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold text-amber-800 dark:text-amber-200 hover:bg-amber-500/20 disabled:opacity-50">
+                            {busy === 'review' ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />} Enviar ahora
+                        </button>
+                    )}
+                </div>
+            )}
             {msg && <p className={`text-xs ${msg.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>{msg.text}</p>}
             {data.notices.length > 0 && (
                 <ul className="space-y-1">
@@ -76,7 +140,7 @@ export default function FamilyNoticesBox({ orderId, stepId, finished, compact = 
                         <li key={n.id} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                             <Check size={12} className="text-emerald-500 shrink-0" />
                             <span className="truncate">
-                                {n.channel === 'email' ? 'Correo' : 'WhatsApp'} · {n.kind === 'finish' ? 'Agradecimiento y reseña Google' : (n.step_name || 'Avance')} · {formatChileDate(n.created_at)} {formatChileTime(n.created_at)}
+                                {n.channel === 'email' ? 'Correo' : 'WhatsApp'} · {NOTICE_LABEL(n)} · {formatChileDate(n.created_at)} {formatChileTime(n.created_at)}
                             </span>
                         </li>
                     ))}
