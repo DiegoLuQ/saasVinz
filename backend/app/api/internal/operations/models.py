@@ -39,6 +39,10 @@ class FamilyNotice(Base):
     # 'sent' = el servidor de correo lo aceptó · 'failed' = lo rechazó (error = motivo)
     status = Column(String(20), nullable=False, default="sent", server_default="sent")
     error = Column(String(300), nullable=True)
+    # Reseña de Google: el botón pasa por /api/public/review/r/{slug}/{click_token} (registra el clic)
+    click_token = Column(String(40), nullable=True, unique=True)
+    clicked_at = Column(DateTime(timezone=True), nullable=True)
+    click_count = Column(Integer, nullable=False, default=0, server_default="0")
     created_by = Column(Integer, ForeignKey("sys_users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
 

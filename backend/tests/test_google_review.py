@@ -82,7 +82,7 @@ def test_programa_y_envia_a_las_18(client, db, setup, sent_emails):
     import asyncio
     n = len(sent_emails)
     assert asyncio.run(gr.send_review_email(db, oid))["sent"] is True
-    assert len(sent_emails) == n + 1 and "https://g.page/r/test-review" in sent_emails[-1].body
+    assert len(sent_emails) == n + 1 and "/api/public/review/r/" in sent_emails[-1].body  # pasa por el registro del clic
     assert asyncio.run(gr.send_review_email(db, oid))["reason"] == "already_sent"  # una sola vez
 
     info = client.get(f"/api/internal/operations/ops/orders/{oid}/family-notices", headers=h).json()["review"]
@@ -161,3 +161,55 @@ def test_lista_enviadas_y_errores_con_reintentos(client, db, setup, sent_emails,
     assert row["state"] == "sent" and row["sent_at"] and row["last_error"] is None
     notices = client.get(f"/api/internal/operations/ops/orders/{oid}/family-notices", headers=h).json()["notices"]
     assert {n["status"] for n in notices if n["kind"] == "review"} == {"sent", "failed"}
+
+
+def test_clic_en_google_se_registra_y_redirige_al_enlace_del_crematorio(client, db, setup, sent_emails, auth):
+    """El botón del correo pasa por /api/public/review/r/{slug}/{token}: cuenta el clic
+    (no HEAD, no robots, no en los primeros segundos) y redirige al enlace de ESE crematorio."""
+    import asyncio
+    import re
+
+    h, oid, tenant = setup["h"], setup["oid"], setup["tenant"]
+    client.put("/api/internal/operations/review-config", headers=h, json={"enabled": True, "delay_days": 1})
+    _deliver(client, h, db, oid)
+    db.expire_all()
+    assert asyncio.run(gr.send_review_email(db, oid, force=True))["sent"] is True
+    m = re.search(r"/api/public/review/r/([\w-]+)/([\w-]+)", sent_emails[-1].body)
+    assert m and m.group(1) == tenant.slug
+    path = m.group(0)
+    human = {"user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)"}
+
+    # Recién enviado (antivirus que revisa el enlace) = redirige pero no cuenta
+    r = client.get(path, headers=human, follow_redirects=False)
+    assert r.status_code == 302 and r.headers["location"] == "https://g.page/r/test-review"
+    notice = db.query(models.FamilyNotice).filter(models.FamilyNotice.cremation_id == oid,
+                                                  models.FamilyNotice.kind == "review").one()
+    assert notice.clicked_at is None
+
+    notice.created_at = tz.get_now() - timedelta(minutes=5)
+    db.commit()
+    assert client.head(path, headers=human, follow_redirects=False).status_code == 302          # HEAD no cuenta
+    client.get(path, headers={"user-agent": "Mimecast URL scanner"}, follow_redirects=False)  # robot no cuenta
+    client.get(path, headers=human, follow_redirects=False)
+    client.get(path, headers=human, follow_redirects=False)
+    db.expire_all()
+    notice = db.query(models.FamilyNotice).get(notice.id)
+    assert notice.clicked_at and notice.click_count == 2
+
+    # Token desconocido: igual llega a Google, sin error
+    r = client.get(f"/api/public/review/r/{tenant.slug}/token-que-no-existe", headers=human, follow_redirects=False)
+    assert r.status_code == 302 and r.headers["location"] == "https://g.page/r/test-review"
+
+    row = next(i for i in client.get("/api/internal/operations/review-emails?state=sent", headers=h).json()["items"]
+               if i["cremation_id"] == oid)
+    assert row["clicked_at"] and row["click_count"] == 2
+
+    # Admin: global (por crematorio) y detalle
+    ca = auth("creator")
+    rep = client.get(f"/api/internal/creator/catalog-funnel?tenant_id={tenant.id}", headers=ca).json()
+    assert rep["reviews"]["sent"] >= 1 and rep["reviews"]["clicked"] >= 1 and rep["reviews"]["click_rate"]
+    t_row = next(t for t in rep["by_tenant"] if t["tenant_id"] == tenant.id)
+    assert t_row["reviews_sent"] >= 1 and t_row["reviews_clicked"] >= 1
+    det = client.get(f"/api/internal/creator/catalog-funnel/tenant/{tenant.id}", headers=ca).json()
+    assert det["reviews"]["clicked"] >= 1
+    assert any(x["cremation_id"] == oid and x["click_count"] == 2 for x in det["reviews"]["recent"])

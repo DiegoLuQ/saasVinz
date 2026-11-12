@@ -369,6 +369,8 @@ app.include_router(catalog_links_router, prefix="/api/internal/catalog/links", t
 
 from app.api.public.tracking.router import router as tracking_router
 app.include_router(tracking_router, prefix="/api/public/tracking", tags=["Público - Seguimiento"])
+from app.api.public.review.router import router as public_review_router
+app.include_router(public_review_router, prefix="/api/public/review", tags=["Público - Reseña Google"])
 
 from app.api.public.catalog.router import router as public_catalog_router
 app.include_router(public_catalog_router, prefix="/api/public/catalog", tags=["Público - Catálogo"])

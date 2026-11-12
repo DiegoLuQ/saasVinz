@@ -18,12 +18,21 @@ crematorio. Configuración → «Reseñas en Google»; la guarda
   aceptó (equivale al «200»: no garantiza que no rebote después) o 'failed' + el
   motivo. La tarea reintenta hasta MAX_ATTEMPTS veces. `tenant_list()` alimenta
   la tabla «Programadas y enviadas» de Configuración → Reseñas en Google.
+- Clic: el botón del correo no va directo a Google sino a
+  /api/public/review/r/{slug}/{click_token} (`click_url`), que registra el clic
+  (`register_click`: primer clic en `clicked_at`, `click_count`) y redirige al
+  enlace de Google ACTUAL de ese crematorio. Se ignoran los HEAD, los robots
+  conocidos y los clics de los primeros segundos (antivirus que revisan enlaces).
+  Que la familia haya dejado la reseña no se puede saber (Google no lo informa).
+  `stats()` / `recent()` alimentan KPIs del catálogo (global y por crematorio).
 - La tarea revisa cada 10 min con advisory lock (una sola réplica envía).
 """
 from __future__ import annotations
 
 import asyncio
 import logging
+import re
+import secrets
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -43,6 +52,9 @@ DEFAULT_DELAY = 1
 MAX_AGE_DAYS = 7
 MAX_ATTEMPTS = 3
 LIST_DAYS = 30
+CLICK_MIN_SECONDS = 15  # clics antes de esto = antivirus/escáner que abre el enlace al recibirlo
+BOT_UA = re.compile(r"bot|crawl|spider|preview|scan|safelinks|proofpoint|mimecast|barracuda|"
+                    r"curl|wget|python|httpclient|headless|facebookexternalhit|slurp", re.I)
 CHECK_INTERVAL_SECONDS = 600
 FIRST_CHECK_DELAY_SECONDS = 90
 ADVISORY_LOCK_ID = 815004  # backups 815001, saldo IA 815002
@@ -162,6 +174,8 @@ def order_status(db: Session, cremation, notices: list | None = None, now: datet
         "state": "sent" if sent else "skipped",
         "sent_at": sent.created_at if sent else None,
         "sent_to": sent.sent_to if sent else None,
+        "clicked_at": sent.clicked_at if sent else None,
+        "click_count": int(sent.click_count or 0) if sent else 0,
         "scheduled_for": None,
         "reason": None,
         "attempts": len(failed) + (1 if sent else 0),
@@ -281,6 +295,7 @@ async def send_review_email(db: Session, cremation_id: int, user_id: int | None 
     ]
     from app.services import email as email_service
     to = customer.email.strip()
+    token = secrets.token_urlsafe(18)
     try:
         await email_service.send_action_email(
             to=to,
@@ -288,7 +303,7 @@ async def send_review_email(db: Session, cremation_id: int, user_id: int | None 
             title="¿Te acompañamos con tranquilidad?",
             paragraphs=paragraphs,
             button_label="⭐ Dejar mi opinión en Google",
-            button_url=url,
+            button_url=click_url(tenant, token),
             footer=f"Con cariño,\nEl equipo de {tenant.name}.",
             kicker=tenant.name,
             brand=fn.tenant_brand(tenant),
@@ -299,10 +314,107 @@ async def send_review_email(db: Session, cremation_id: int, user_id: int | None 
     except Exception as exc:  # noqa: BLE001 - el servidor de correo lo rechazó o no respondió
         error = _error_text(exc)
         logger.warning("Invitación a reseña rechazada (orden %s): %s", cremation.id, error)
-        fn._record(db, cremation, KIND, "email", to, None, user_id, status="failed", error=error)
+        fn._record(db, cremation, KIND, "email", to, None, user_id, status="failed", error=error, click_token=token)
         return {"sent": False, "reason": "smtp_error", "error": error}
-    fn._record(db, cremation, KIND, "email", to, None, user_id)
+    fn._record(db, cremation, KIND, "email", to, None, user_id, click_token=token)
     return {"sent": True, "to": to}
+
+
+# ---------------------------------------------------------------------------
+# Clic en «Dejar mi opinión en Google»
+# ---------------------------------------------------------------------------
+def click_url(tenant, token: str) -> str:
+    """Enlace del botón: pasa por nuestro servidor (mismo host que el seguimiento)."""
+    from app.services.family_notices import _tracking_base
+    return f"{_tracking_base()}/api/public/review/r/{tenant.slug}/{token}"
+
+
+def is_bot(user_agent: str | None) -> bool:
+    return not user_agent or bool(BOT_UA.search(user_agent))
+
+
+def register_click(db: Session, tenant, token: str, user_agent: str | None = None, method: str = "GET") -> bool:
+    """Registra el clic si parece de una persona. Devuelve True si se contó."""
+    notice = db.query(models.FamilyNotice).filter(
+        models.FamilyNotice.tenant_id == tenant.id,
+        models.FamilyNotice.click_token == token,
+        models.FamilyNotice.kind == KIND,
+    ).first()
+    if not notice or method.upper() != "GET" or is_bot(user_agent):
+        return False
+    now = tz.get_now()
+    sent_at = tz.to_santiago(notice.created_at) if notice.created_at else None
+    if sent_at and (tz.to_santiago(now) - sent_at).total_seconds() < CLICK_MIN_SECONDS:
+        return False
+    if not notice.clicked_at:
+        notice.clicked_at = now
+    notice.click_count = int(notice.click_count or 0) + 1
+    db.commit()
+    return True
+
+
+def _period_filters(date_from, date_to, tenant_id):
+    f = [models.FamilyNotice.kind == KIND]
+    if tenant_id:
+        f.append(models.FamilyNotice.tenant_id == tenant_id)
+    if date_from:
+        f.append(models.FamilyNotice.created_at >= date_from)
+    if date_to:
+        f.append(models.FamilyNotice.created_at < date_to)
+    return f
+
+
+def stats(db: Session, date_from=None, date_to=None, tenant_id: int | None = None) -> dict[int, dict]:
+    """Por crematorio, invitaciones del periodo (por fecha de envío): enviadas, con clic, con error."""
+    from sqlalchemy import case, func
+
+    N = models.FamilyNotice
+    rows = (
+        db.query(
+            N.tenant_id,
+            func.count(case((N.status == "sent", N.id))),
+            func.count(case(((N.status == "sent") & N.clicked_at.isnot(None), N.id))),
+            func.count(case((N.status == "failed", N.id))),
+            func.coalesce(func.sum(case((N.status == "sent", N.click_count), else_=0)), 0),
+        )
+        .filter(*_period_filters(date_from, date_to, tenant_id))
+        .group_by(N.tenant_id)
+        .all()
+    )
+    return {tid: {"sent": int(s or 0), "clicked": int(c or 0), "failed": int(f or 0), "clicks": int(k or 0)}
+            for tid, s, c, f, k in rows}
+
+
+def summary(per_tenant: dict[int, dict]) -> dict:
+    sent = sum(v["sent"] for v in per_tenant.values())
+    clicked = sum(v["clicked"] for v in per_tenant.values())
+    return {"sent": sent, "clicked": clicked, "failed": sum(v["failed"] for v in per_tenant.values()),
+            "clicks": sum(v["clicks"] for v in per_tenant.values()),
+            "click_rate": round(clicked * 100 / sent, 1) if sent else None}
+
+
+def recent(db: Session, tenant_id: int, date_from=None, date_to=None, limit: int = 15) -> list[dict]:
+    """Últimas invitaciones enviadas de un crematorio, con su clic."""
+    from sqlalchemy.orm import joinedload
+
+    N = models.FamilyNotice
+    rows = (
+        db.query(N)
+        .filter(*_period_filters(date_from, date_to, tenant_id), N.status == "sent")
+        .order_by(N.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    ids = [r.cremation_id for r in rows]
+    pets = {c.id: c for c in db.query(models.Cremation).options(joinedload(models.Cremation.pet))
+            .filter(models.Cremation.id.in_(ids or [0])).all()}
+    return [{
+        "cremation_id": r.cremation_id,
+        "pet_name": pets[r.cremation_id].pet.name if r.cremation_id in pets and pets[r.cremation_id].pet else None,
+        "sent_at": r.created_at,
+        "clicked_at": r.clicked_at,
+        "click_count": int(r.click_count or 0),
+    } for r in rows]
 
 
 def _error_text(exc: Exception) -> str:

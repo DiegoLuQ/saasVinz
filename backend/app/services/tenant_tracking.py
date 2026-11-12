@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app import models
 from app.api.internal.catalog.models import CatalogShareToken
 from app.api.internal.operations.models import FamilyNotice, ServiceFeedback
+from app.services import google_review
 from app.utils import tz
 
 TOP = 15
@@ -194,4 +195,9 @@ def detail(db: Session, tenant_id: int, date_from: datetime | None, date_to: dat
         "top_memorials": memorials,
         "notices": notices,
         "feedback": {"count": int(fb_n or 0), "avg": round(float(fb_avg), 1) if fb_avg else None},
+        # Invitaciones a reseña de Google enviadas en el periodo y clics en «Dejar mi opinión»
+        "reviews": {
+            **google_review.summary(google_review.stats(db, date_from, date_to, tenant.id)),
+            "recent": google_review.recent(db, tenant.id, date_from, date_to),
+        },
     }

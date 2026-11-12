@@ -11,6 +11,7 @@ interface Notice { id: number; kind: 'step' | 'finish' | 'review'; channel: 'ema
 interface ReviewStatus {
     available: boolean;
     sent_at?: string | null;
+    clicked_at?: string | null;
     scheduled_for?: string | null;
     state?: 'sent' | 'scheduled' | 'pending' | 'retrying' | 'failed' | 'skipped';
     reason?: 'no_link' | 'no_email' | 'off' | 'not_delivered' | 'before_enabled' | 'expired' | 'max_attempts' | null;
@@ -34,17 +35,17 @@ const NOTICE_LABEL = (n: Notice) =>
     n.kind === 'review' ? 'Reseña en Google' : n.kind === 'finish' ? 'Aviso de fase final' : (n.step_name || 'Avance');
 
 /** Badge «Google ✓»: la invitación a la reseña ya se envió. */
-function GoogleSentBadge({ at }: { at: string }) {
+function GoogleSentBadge({ at, clickedAt }: { at: string; clickedAt?: string | null }) {
     return (
         <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300"
-            title={`Invitación a reseña enviada el ${formatChileDate(at)} ${formatChileTime(at)}`}>
+            title={`Invitación a reseña enviada el ${formatChileDate(at)} ${formatChileTime(at)}${clickedAt ? ` · abrió Google el ${formatChileDate(clickedAt)} ${formatChileTime(clickedAt)}` : ' · aún no abre el enlace'}`}>
             <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
                 <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.2-2.1 3.5-5.1 3.5-8.7z" />
                 <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1A12 12 0 0 0 12 24z" />
                 <path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6H1.3a12 12 0 0 0 0 10.8l4-3.1z" />
                 <path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.3 6.6l4 3.1c.9-2.9 3.6-4.9 6.7-4.9z" />
             </svg>
-            Google <Check size={12} />
+            Google <Check size={12} />{clickedAt && <span className="font-semibold">· abrió</span>}
         </span>
     );
 }
@@ -133,7 +134,7 @@ export default function FamilyNoticesBox({ orderId, stepId, finished, compact = 
                                 Programada: {formatChileDate(review.scheduled_for)} {formatChileTime(review.scheduled_for)}</span>
                         ) : review.reason ? <span className="ml-1.5">· {REVIEW_REASON[review.reason] || ''}</span> : null}
                     </div>
-                    {review.sent_at ? <GoogleSentBadge at={review.sent_at} /> : review.can_send && (
+                    {review.sent_at ? <GoogleSentBadge at={review.sent_at} clickedAt={review.clicked_at} /> : review.can_send && (
                         <button type="button" onClick={sendReview} disabled={!!busy}
                             className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold text-amber-800 dark:text-amber-200 hover:bg-amber-500/20 disabled:opacity-50">
                             {busy === 'review' ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />} Enviar ahora

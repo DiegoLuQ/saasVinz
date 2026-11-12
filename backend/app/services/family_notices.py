@@ -117,11 +117,11 @@ def _already_sent(db: Session, cremation_id: int, kind: str, step_id: int | None
 
 
 def _record(db: Session, cremation, kind: str, channel: str, sent_to: str | None, step_id=None, user_id=None,
-            status: str = "sent", error: str | None = None) -> None:
+            status: str = "sent", error: str | None = None, click_token: str | None = None) -> None:
     db.add(models.FamilyNotice(
         tenant_id=cremation.tenant_id, cremation_id=cremation.id, step_id=step_id,
         kind=kind, channel=channel, sent_to=(sent_to or "")[:255] or None, created_by=user_id,
-        status=status, error=(error or "")[:300] or None,
+        status=status, error=(error or "")[:300] or None, click_token=click_token,
     ))
     db.commit()
 

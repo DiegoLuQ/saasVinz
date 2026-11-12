@@ -31,6 +31,11 @@ interface Detail {
     top_memorials: { id: number; uuid: string; short_code: string | null; pet_name: string | null; views: number; last_view: string | null }[];
     notices: { email: number; whatsapp: number; finish: number };
     feedback: { count: number; avg: number | null };
+    /** Invitaciones a reseña de Google del periodo y clics en «Dejar mi opinión en Google» (services/google_review.py). */
+    reviews?: {
+        sent: number; clicked: number; failed: number; clicks: number; click_rate: number | null;
+        recent: { cremation_id: number; pet_name: string | null; sent_at: string | null; clicked_at: string | null; click_count: number }[];
+    };
 }
 interface Funnel {
     visitors: number; size_select: number; plan_request: number; whatsapp: number;
@@ -265,7 +270,7 @@ export default function TenantTrackingDetailPage() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
                         <Tile icon={<Compass size={12} className="text-sky-400" />} label="Aperturas seguimiento" value={data.views.tracking}
                             sub={`${data.views.tracking_distinct} seguimientos distintos`} />
                         <Tile icon={<CheckCircle2 size={12} className="text-sky-400" />} label="Órdenes con seguimiento abierto"
@@ -276,7 +281,40 @@ export default function TenantTrackingDetailPage() {
                             sub={<><Mail size={11} className="inline" /> {data.notices.email} · <MessageCircle size={11} className="inline" /> {data.notices.whatsapp} · {data.notices.finish} de cierre</>} />
                         <Tile icon={<Star size={12} className="text-amber-400" />} label="Encuesta" value={data.feedback.avg != null ? `${data.feedback.avg} / 5` : '—'}
                             sub={`${data.feedback.count} respuestas`} />
+                        <Tile icon={<Star size={12} className="text-amber-400" />} label="Clic en Google"
+                            value={<>{data.reviews?.clicked ?? 0}<span className="text-sm text-white/40"> / {data.reviews?.sent ?? 0}</span></>}
+                            sub={<>{data.reviews?.click_rate != null ? `${data.reviews.click_rate} % de las invitaciones` : 'Sin invitaciones enviadas'}
+                                {(data.reviews?.failed ?? 0) > 0 && <span className="text-red-300"> · {data.reviews!.failed} con error</span>}</>} />
                     </div>
+
+                    {data.reviews && data.reviews.recent.length > 0 && (
+                        <div className={`${cardCls} p-5`}>
+                            <h2 className="text-white font-bold flex items-center gap-2"><Star size={15} className="text-amber-400" /> Invitaciones a reseña de Google</h2>
+                            <p className="text-[11px] text-white/40 mt-1">
+                                Últimas {data.reviews.recent.length} enviadas en el periodo. «Clic» = la familia abrió su enlace de Google desde el correo
+                                (no confirma que haya dejado la reseña).
+                            </p>
+                            <table className="w-full text-sm mt-3">
+                                <thead><tr className="text-left text-[10px] uppercase tracking-wider text-white/40">
+                                    <th className="py-2">Mascota</th><th className="py-2">Enviada</th><th className="py-2">Clic en Google</th><th className="py-2 text-right">Clics</th>
+                                </tr></thead>
+                                <tbody>
+                                    {data.reviews.recent.map((r) => (
+                                        <tr key={`${r.cremation_id}-${r.sent_at}`} className="border-t border-white/5 text-white/80">
+                                            <td className="py-2 font-bold text-white">{r.pet_name || `#${r.cremation_id}`}</td>
+                                            <td className="py-2 text-[11px] text-white/55">{fmtDate(r.sent_at)}</td>
+                                            <td className="py-2 text-[11px]">
+                                                {r.clicked_at
+                                                    ? <span className="inline-flex items-center gap-1 font-bold text-emerald-300"><CheckCircle2 size={12} /> {fmtDate(r.clicked_at)}</span>
+                                                    : <span className="text-white/35">Sin clic</span>}
+                                            </td>
+                                            <td className="py-2 text-right font-bold">{r.click_count || '—'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
 
                     <div className={`${cardCls} p-5`}>
                         <h2 className="text-white font-bold">Aperturas por día</h2>

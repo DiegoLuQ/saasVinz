@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
     Filter, Loader2, ArrowUpRight, Info, BookOpen,
     Globe2, Building2, PawPrint, X, Heart, Compass,
-    Share2, FileText, ChevronRight, FileDown
+    Share2, FileText, ChevronRight, FileDown, Star
 } from 'lucide-react';
 import { apiRequest } from '@/lib/admin/api';
 import { downloadGlobalCatalogPdf } from '@/components/admin/catalog/buildCatalogReportPdf';
@@ -30,7 +30,13 @@ interface TenantRow extends Funnel, AllForms {
     tracking_views?: number;
     tracking_views_total?: number;
     tracking_orders_viewed?: number;
+    /** Invitaciones a reseña de Google enviadas en el periodo y cuántas tuvieron clic (services/google_review.py). */
+    reviews_sent?: number;
+    reviews_clicked?: number;
+    reviews_failed?: number;
 }
+/** Resumen de invitaciones a reseña de Google del periodo. */
+interface ReviewsSummary { sent: number; clicked: number; failed: number; clicks: number; click_rate: number | null }
 interface SpeciesRow {
     species: string;
     catalog: number;
@@ -49,6 +55,7 @@ interface Report {
     tracking_views?: number;
     tracking_views_total?: number;
     tracking_orders_viewed?: number;
+    reviews?: ReviewsSummary;
     by_tenant: TenantRow[];
     top_plans: { plan_id: number; plan_name: string; tenant_name: string | null; price: number | null; plan_request: number; whatsapp: number; total: number }[];
     top_sizes: { weight_tier: string; count: number; tenant_id: number; tenant_name: string }[];
@@ -291,7 +298,7 @@ export default function CatalogFunnelPage() {
 
             {data && t && (
                 <>
-                    <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7 gap-3 sm:gap-4">
                         <Kpi label="Catálogos creados" value={String(data.links_period)} hint={`${data.links_total} en total`} />
                         <Kpi label="Visitas catálogo" value={String(t.visitors)} hint="Personas distintas" />
                         <Kpi label="Formularios enviados" value={String(t.form_submit)} hint={`${pct(t.form_submit, t.visitors)} de las visitas`} />
@@ -329,6 +336,22 @@ export default function CatalogFunnelPage() {
                             </p>
                             <p className="text-[11px] text-white/45 mt-1">
                                 {data.tracking_orders_viewed ?? 0} seguimientos consultados · {data.tracking_views_total ?? 0} hist.
+                            </p>
+                        </div>
+
+                        {/* Invitaciones a reseña de Google: clic en «Dejar mi opinión en Google» */}
+                        <div className={`${cardCls} p-5 border-amber-500/20 bg-amber-500/[0.03]`}
+                            title="Correos de invitación a reseña enviados en el periodo y cuántas familias hicieron clic en el botón de Google. Que dejen la reseña no se puede medir.">
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-amber-300/80 flex items-center gap-1.5">
+                                <Star size={12} className="text-amber-400" /> Clic en Google
+                            </p>
+                            <p className="text-2xl sm:text-3xl font-black mt-2 text-white">
+                                {data.reviews?.clicked ?? 0}
+                                <span className="text-sm font-bold text-white/40"> / {data.reviews?.sent ?? 0}</span>
+                            </p>
+                            <p className="text-[11px] text-white/45 mt-1">
+                                {data.reviews?.click_rate != null ? `${data.reviews.click_rate} % de las invitaciones` : 'Sin invitaciones enviadas'}
+                                {(data.reviews?.failed ?? 0) > 0 && <span className="text-red-300"> · {data.reviews!.failed} con error</span>}
                             </p>
                         </div>
                     </div>
@@ -459,7 +482,7 @@ export default function CatalogFunnelPage() {
                                                     <FileText size={11} /> Formularios y Órdenes
                                                 </span>
                                             </th>
-                                            <th colSpan={2} className="px-3 py-2 border-l border-white/10 text-center">
+                                            <th colSpan={3} className="px-3 py-2 border-l border-white/10 text-center">
                                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider bg-sky-500/15 text-sky-300 border border-sky-500/30">
                                                     <Compass size={11} /> Enlaces Públicos
                                                 </span>
@@ -480,6 +503,7 @@ export default function CatalogFunnelPage() {
 
                                             <th className="px-3 py-3 text-right border-l border-white/10" title="Aperturas del link de seguimiento y seguimientos consultados">Tracking</th>
                                             <th className="px-3 py-3 text-right" title="Aperturas del link de memoriales y memoriales creados">Memoriales</th>
+                                            <th className="px-3 py-3 text-right" title="Invitaciones a reseña de Google enviadas en el periodo y familias que hicieron clic en el botón">Reseñas</th>
                                             <th className="px-3 py-3 border-l border-white/10" />
                                         </tr>
                                     </thead>
@@ -585,6 +609,23 @@ export default function CatalogFunnelPage() {
                                                             <span className="text-[11px] text-white/30 italic">
                                                                 Sin módulo
                                                             </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3 py-3.5 text-right whitespace-nowrap">
+                                                        {(r.reviews_sent ?? 0) > 0 || (r.reviews_failed ?? 0) > 0 ? (
+                                                            <>
+                                                                <div className="flex items-center justify-end gap-1.5">
+                                                                    <Star size={13} className="text-amber-400" />
+                                                                    <span className="font-bold text-amber-300">{r.reviews_clicked ?? 0}</span>
+                                                                    <span className="text-white/40 text-xs">/ {r.reviews_sent ?? 0}</span>
+                                                                </div>
+                                                                <span className="text-[10px] text-white/40 block">
+                                                                    {pct(r.reviews_clicked ?? 0, r.reviews_sent ?? 0)} clic
+                                                                    {(r.reviews_failed ?? 0) > 0 && <span className="text-red-300"> · {r.reviews_failed} err.</span>}
+                                                                </span>
+                                                            </>
+                                                        ) : (
+                                                            <span className="text-[11px] text-white/30">—</span>
                                                         )}
                                                     </td>
 

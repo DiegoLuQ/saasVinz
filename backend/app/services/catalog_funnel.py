@@ -498,6 +498,10 @@ def report(db: Session, date_from: datetime | None, date_to: datetime | None, te
     sub_by_tenant = _submission_counts(db, sub_f, models.FormSubmission.tenant_id)
     all_by_tenant = _submission_counts(db, sub_f, models.FormSubmission.tenant_id, catalog_only=False)
 
+    # Invitaciones a reseña de Google: enviadas en el periodo y cuántas tuvieron clic
+    from app.services import google_review
+    reviews_by_tenant = google_review.stats(db, date_from, date_to, tenant_id)
+
     all_tids = (
         set(links_total)
         | set(ev_by_tenant)
@@ -505,6 +509,7 @@ def report(db: Session, date_from: datetime | None, date_to: datetime | None, te
         | set(all_by_tenant)
         | set(mem_total_by_tenant)
         | set(lv_period)
+        | set(reviews_by_tenant)
     )
     if tenant_id and tenant_id in tenants:
         all_tids.add(tenant_id)
@@ -536,6 +541,9 @@ def report(db: Session, date_from: datetime | None, date_to: datetime | None, te
             tracking_views_total=int(lv_t.get("tracking_views_total", 0)),
             tracking_orders_viewed=int(lv_p.get("tracking_resources", 0)),
         )
+        rv = reviews_by_tenant.get(tid, {})
+        row.update(reviews_sent=rv.get("sent", 0), reviews_clicked=rv.get("clicked", 0),
+                   reviews_failed=rv.get("failed", 0))
         by_tenant.append(row)
     by_tenant.sort(key=lambda r: (r["visitors"], r["forms_all"], r["links_total"]), reverse=True)
 
@@ -618,6 +626,7 @@ def report(db: Session, date_from: datetime | None, date_to: datetime | None, te
         "tracking_views": tracking_views_period,
         "tracking_views_total": tracking_views_total,
         "tracking_orders_viewed": tracking_orders_viewed,
+        "reviews": google_review.summary(reviews_by_tenant),
         "tracking_stage": tracking_stage if tracking_stage in ("in_progress", "delivered") else "all",
         "by_tenant": by_tenant,
         "top_plans": top_plans,
