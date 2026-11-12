@@ -437,7 +437,7 @@ export function TenantCatalogPDF({ detail, report, form, filters, logo }: {
 
                 <View style={[s.twoCols, { marginTop: 4 }]}>
                     <View style={[s.col, { marginRight: 10 }]}>
-                        <Text style={s.h2}>Seguimientos más abiertos</Text>
+                        <Text style={s.h2}>Últimos 15 seguimientos abiertos</Text>
                         {d.top_orders.length === 0 ? <Text style={s.empty}>Sin aperturas en el periodo.</Text> : (
                             <>
                                 <View style={s.tableHead}>

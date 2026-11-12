@@ -94,7 +94,17 @@ def detail(db: Session, tenant_id: int, date_from: datetime | None, date_to: dat
     """, dict(p)):
         totals[kind], distinct[kind] = int(n), int(d)
 
-    # --- Seguimientos más abiertos (huella del tracking_token de sus órdenes) ---
+    # --- Últimos 15 seguimientos abiertos, el más reciente primero (huella del tracking_token) ---
+    # Además del estado al abrir, la orden debe estar HOY en ese estado: con «En proceso»
+    # no aparecen órdenes ya entregadas (antes salían porque se abrieron mientras corrían).
+    from app.api.internal.operations.operations.board import CANCELED_STATUSES, FINAL_STATUSES
+    p_orders = dict(p)
+    cur = ""
+    if stage in ("in_progress", "delivered"):
+        p_orders["finals"] = tuple(x.lower() for x in FINAL_STATUSES)
+        p_orders["canceled"] = tuple(x.lower() for x in CANCELED_STATUSES)
+        cur = (" AND lower(coalesce(oc.status, '')) IN :finals" if stage == "delivered"
+               else " AND lower(coalesce(oc.status, '')) NOT IN :finals AND lower(coalesce(oc.status, '')) NOT IN :canceled")
     orders = []
     for oc_id, code, num, status, pet, views, last in _safe(db, f"""
         SELECT oc.id, oc.verification_code, oc.oc_number, oc.status, pe.name, count(v.id), max(v.created_at)
@@ -103,10 +113,10 @@ def detail(db: Session, tenant_id: int, date_from: datetime | None, date_to: dat
                AND encode(sha256(convert_to(d.tracking_token, 'UTF8')), 'hex') = v.resource_key
           JOIN oc_cremations oc ON oc.id = d.cremation_id
           LEFT JOIN crm_pets pe ON pe.id = oc.pet_id
-         WHERE v.tenant_id = :tid AND v.kind = 'tracking' {_period('v.created_at', date_from, date_to, p)}{st_v}
+         WHERE v.tenant_id = :tid AND v.kind = 'tracking' {_period('v.created_at', date_from, date_to, p_orders)}{st_v}{cur}
          GROUP BY oc.id, oc.verification_code, oc.oc_number, oc.status, pe.name
-         ORDER BY count(v.id) DESC, max(v.created_at) DESC LIMIT {TOP}
-    """, dict(p)):
+         ORDER BY max(v.created_at) DESC LIMIT {TOP}
+    """, p_orders):
         oc = db.get(models.CremationOC, oc_id)
         orders.append({"id": oc_id, "code": code, "oc_number": num, "status": status, "pet_name": pet,
                        "views": int(views), "last_view": last, "url": tracking_url(tenant, oc) if oc else None})

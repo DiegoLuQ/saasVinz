@@ -75,31 +75,86 @@ function Tile({ icon, label, value, sub }: { icon: React.ReactNode; label: strin
 }
 
 /** Aperturas por día: dos barras por día (seguimiento / memorial), con tooltip. */
-function DailyChart({ rows }: { rows: Detail['views']['daily'] }) {
+/** Todos los días entre from y to (YYYY-MM-DD), para que la gráfica no salte los días sin aperturas. */
+function fillDays(rows: Detail['views']['daily'], from?: string, to?: string): Detail['views']['daily'] {
+    const byDay = new Map(rows.map((r) => [r.date, r]));
+    const start = from || rows[0]?.date;
+    const end = to || rows[rows.length - 1]?.date;
+    if (!start || !end) return rows;
+    const out: Detail['views']['daily'] = [];
+    const d = new Date(`${start}T12:00:00`);
+    const last = new Date(`${end}T12:00:00`);
+    for (let n = 0; d <= last && n < 400; n++, d.setDate(d.getDate() + 1)) {
+        const key = isoDay(d);
+        out.push(byDay.get(key) || { date: key, tracking: 0, memorial: 0 });
+    }
+    return out;
+}
+
+/** Escala «bonita» para el eje Y (1, 2, 5 × 10^n). */
+function niceMax(v: number): number {
+    if (v <= 4) return 4;
+    const pow = 10 ** Math.floor(Math.log10(v));
+    const step = [1, 2, 2.5, 5, 10].find((m) => m * pow * 4 >= v) || 10;
+    return step * pow * 4;
+}
+
+// Colores validados (dataviz validate_palette, modo oscuro): pasan banda, CVD y contraste.
+const C_TRACK = '#0284c7';
+const C_MEMO = '#e11d48';
+
+function DailyChart({ rows, from, to }: { rows: Detail['views']['daily']; from?: string; to?: string }) {
+    const [hover, setHover] = useState<number | null>(null);
     if (!rows.length) return <p className="py-6 text-center text-sm text-white/40">Sin aperturas en el periodo.</p>;
-    const max = Math.max(1, ...rows.map((r) => Math.max(r.tracking, r.memorial)));
+    const days = fillDays(rows, from, to);
+    const top = niceMax(Math.max(1, ...days.map((r) => Math.max(r.tracking, r.memorial))));
+    const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(top * f));
+    const totT = days.reduce((a, r) => a + r.tracking, 0);
+    const totM = days.reduce((a, r) => a + r.memorial, 0);
+    const fmt = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+    const labelEvery = Math.max(1, Math.ceil(days.length / 8));
+    const h = hover !== null ? days[hover] : null;
     return (
         <div>
-            <div className="flex items-center gap-4 text-[11px] text-white/60 mb-2">
-                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-sky-400" /> Seguimiento</span>
-                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-rose-400" /> Memorial</span>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-white/70 mb-3">
+                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: C_TRACK }} /> Seguimiento <b className="text-white">{totT}</b></span>
+                <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: C_MEMO }} /> Memorial <b className="text-white">{totM}</b></span>
+                <span className="ml-auto text-white/60 min-h-[1rem]">
+                    {h ? <>{fmt(h.date)} · Seguimiento <b className="text-white">{h.tracking}</b> · Memorial <b className="text-white">{h.memorial}</b></> : 'Pasa el cursor por un día para ver el detalle'}
+                </span>
             </div>
-            <div className="flex items-end gap-1 h-40 overflow-x-auto pb-1">
-                {rows.map((r) => (
-                    <div key={r.date} className="group relative flex flex-col items-center justify-end h-full min-w-[18px] flex-1">
-                        <div className="flex items-end gap-[2px] h-full w-full justify-center">
-                            <div className="w-1/2 max-w-[10px] rounded-t bg-sky-400" style={{ height: `${(r.tracking / max) * 100}%`, minHeight: r.tracking ? 3 : 0 }} />
-                            <div className="w-1/2 max-w-[10px] rounded-t bg-rose-400" style={{ height: `${(r.memorial / max) * 100}%`, minHeight: r.memorial ? 3 : 0 }} />
-                        </div>
-                        <div className="pointer-events-none absolute bottom-full mb-1 hidden group-hover:block whitespace-nowrap rounded-lg bg-slate-900 border border-white/15 px-2 py-1 text-[11px] text-white z-10">
-                            {r.date.slice(8, 10)}/{r.date.slice(5, 7)} · Seguimiento {r.tracking} · Memorial {r.memorial}
-                        </div>
+            <div className="flex gap-2">
+                {/* Eje Y */}
+                <div className="relative h-52 w-7 shrink-0 text-[10px] text-white/45 tabular-nums">
+                    {ticks.map((t) => (
+                        <span key={t} className="absolute right-0 -translate-y-1/2" style={{ bottom: `calc(${(t / top) * 100}% - 0px)` }}>{t}</span>
+                    ))}
+                </div>
+                <div className="relative flex-1 min-w-0">
+                    {/* Líneas guía */}
+                    <div className="absolute inset-x-0 top-0 h-52 pointer-events-none">
+                        {ticks.map((t) => (
+                            <div key={t} className={`absolute inset-x-0 border-t ${t === 0 ? 'border-white/25' : 'border-white/[0.07]'}`} style={{ bottom: `${(t / top) * 100}%` }} />
+                        ))}
                     </div>
-                ))}
-            </div>
-            <div className="flex justify-between text-[10px] text-white/35 mt-1">
-                <span>{rows[0].date.slice(8, 10)}/{rows[0].date.slice(5, 7)}</span>
-                <span>{rows[rows.length - 1].date.slice(8, 10)}/{rows[rows.length - 1].date.slice(5, 7)}</span>
+                    <div className="relative flex h-52 items-end" onMouseLeave={() => setHover(null)}>
+                        {days.map((r, i) => (
+                            <div key={r.date} onMouseEnter={() => setHover(i)}
+                                className={`flex h-full flex-1 min-w-0 items-end justify-center gap-[2px] px-[1px] cursor-default ${hover === i ? 'bg-white/[0.06]' : ''}`}>
+                                <div className="w-full max-w-[12px] rounded-t-[4px]" style={{ background: C_TRACK, height: `${(r.tracking / top) * 100}%`, minHeight: r.tracking ? 3 : 0 }} />
+                                <div className="w-full max-w-[12px] rounded-t-[4px]" style={{ background: C_MEMO, height: `${(r.memorial / top) * 100}%`, minHeight: r.memorial ? 3 : 0 }} />
+                            </div>
+                        ))}
+                    </div>
+                    {/* Eje X: una fecha cada N días */}
+                    <div className="flex mt-1.5 text-[10px] text-white/45 tabular-nums">
+                        {days.map((r, i) => (
+                            <div key={r.date} className="flex-1 min-w-0 text-center overflow-visible whitespace-nowrap">
+                                {i % labelEvery === 0 ? fmt(r.date) : ''}
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -196,7 +251,7 @@ export default function TenantTrackingDetailPage() {
                             <label className="text-[11px] text-white/50 flex flex-col gap-1">Hasta
                                 <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} className={inputCls} />
                             </label>
-                            <label className="text-[11px] text-white/50 flex flex-col gap-1" title="Estado de la orden cuando la familia abrió su seguimiento">Tracking de órdenes
+                            <label className="text-[11px] text-white/50 flex flex-col gap-1" title="Gráfica: estado de la orden al abrir el seguimiento. Tabla: estado actual de la orden.">Estado de la orden
                                 <select value={stage} onChange={(e) => setStage(e.target.value as typeof stage)} className={inputCls}>
                                     <option value="in_progress">En proceso</option>
                                     <option value="delivered">Entregadas</option>
@@ -229,12 +284,15 @@ export default function TenantTrackingDetailPage() {
                             Cada vez que alguien abre el link de seguimiento o de un memorial de este crematorio (recargar también suma).
                             Seguimiento: {stage === 'in_progress' ? 'solo mientras la orden estaba en proceso' : stage === 'delivered' ? 'solo con la orden ya entregada' : 'todas las aperturas'}.
                         </p>
-                        <DailyChart rows={data.views.daily} />
+                        <DailyChart rows={data.views.daily} from={dateFrom} to={dateTo} />
                     </div>
 
                     <div className="grid gap-4 lg:grid-cols-2">
                         <div className={`${cardCls} p-5`}>
-                            <h2 className="text-white font-bold flex items-center gap-2"><Compass size={15} className="text-sky-400" /> Seguimientos más abiertos</h2>
+                            <h2 className="text-white font-bold flex items-center gap-2"><Compass size={15} className="text-sky-400" /> Últimos 15 seguimientos abiertos</h2>
+                            <p className="text-[11px] text-white/40 mt-1">
+                                {stage === 'in_progress' ? 'Solo órdenes que siguen en proceso.' : stage === 'delivered' ? 'Solo órdenes ya entregadas.' : 'Todas las órdenes.'} La más reciente primero.
+                            </p>
                             {data.top_orders.length === 0 ? <p className="py-3 text-sm text-white/40">Sin aperturas en el periodo.</p> : (
                                 <table className="w-full text-sm mt-3">
                                     <thead><tr className="text-left text-[10px] uppercase tracking-wider text-white/40">
