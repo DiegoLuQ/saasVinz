@@ -13,6 +13,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CalendarClock, CheckCircle2, Loader2, Mail, Save, Star, Truck } from 'lucide-react';
 import { apiRequest } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
+import { ReviewEmailsList } from './ReviewEmailsList';
 
 interface ReviewConfig {
     enabled: boolean;
@@ -142,7 +143,8 @@ export function GoogleReviewTab() {
                 <ul className="space-y-1.5 text-xs text-muted-foreground">
                     <li className="flex items-start gap-1.5"><CheckCircle2 size={13} className="text-emerald-500 shrink-0 mt-px" /> Se envía una sola vez por orden.</li>
                     <li className="flex items-start gap-1.5"><CheckCircle2 size={13} className="text-emerald-500 shrink-0 mt-px" /> Si la orden se cancela o se reabre antes, no se envía.</li>
-                    <li className="flex items-start gap-1.5"><Mail size={13} className="text-sky-500 shrink-0 mt-px" /> Desde la orden puedes adelantarla con «Enviar ahora».</li>
+                    <li className="flex items-start gap-1.5"><Mail size={13} className="text-sky-500 shrink-0 mt-px" /> Desde la orden o desde la lista de abajo puedes adelantarla con «Enviar ahora».</li>
+                    <li className="flex items-start gap-1.5"><AlertTriangle size={13} className="text-amber-500 shrink-0 mt-px" /> Si el servidor de correo la rechaza, se reintenta hasta 3 veces y verás el motivo abajo.</li>
                 </ul>
 
                 <div className="flex items-center justify-end gap-3">
@@ -154,6 +156,8 @@ export function GoogleReviewTab() {
                     </button>
                 </div>
             </div>
+
+            <ReviewEmailsList />
         </div>
     );
 }

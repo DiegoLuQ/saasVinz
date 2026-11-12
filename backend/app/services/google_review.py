@@ -13,7 +13,11 @@ crematorio. Configuración → «Reseñas en Google»; la guarda
 - No se envía si la orden ya no está entregada (cancelada o reabierta), ni para
   órdenes entregadas antes de activar la opción o hace más de MAX_AGE_DAYS.
 - Queda en ops_family_notices (kind 'review'); la orden muestra «Google ✓».
-  «Enviar ahora» (desde la orden) la adelanta.
+  «Enviar ahora» (desde la orden o desde la lista) la adelanta.
+- Cada intento queda registrado con su estado: 'sent' = el servidor de correo lo
+  aceptó (equivale al «200»: no garantiza que no rebote después) o 'failed' + el
+  motivo. La tarea reintenta hasta MAX_ATTEMPTS veces. `tenant_list()` alimenta
+  la tabla «Programadas y enviadas» de Configuración → Reseñas en Google.
 - La tarea revisa cada 10 min con advisory lock (una sola réplica envía).
 """
 from __future__ import annotations
@@ -37,6 +41,8 @@ SEND_HOUR = 18
 DELAYS = (1, 2)
 DEFAULT_DELAY = 1
 MAX_AGE_DAYS = 7
+MAX_ATTEMPTS = 3
+LIST_DAYS = 30
 CHECK_INTERVAL_SECONDS = 600
 FIRST_CHECK_DELAY_SECONDS = 90
 ADVISORY_LOCK_ID = 815004  # backups 815001, saldo IA 815002
@@ -104,11 +110,27 @@ def _completed_at(cremation) -> datetime | None:
     return cremation.scheduling.completed_at if cremation.scheduling else None
 
 
-def _sent(db: Session, cremation_id: int):
-    return db.query(models.FamilyNotice).filter(
-        models.FamilyNotice.cremation_id == cremation_id,
+def _notices(db: Session, cremation_ids: list[int]) -> dict[int, list]:
+    """Intentos de invitación por orden (más reciente primero)."""
+    out: dict[int, list] = {}
+    if not cremation_ids:
+        return out
+    rows = db.query(models.FamilyNotice).filter(
+        models.FamilyNotice.cremation_id.in_(cremation_ids),
         models.FamilyNotice.kind == KIND,
-    ).order_by(models.FamilyNotice.created_at.desc()).first()
+    ).order_by(models.FamilyNotice.created_at.desc(), models.FamilyNotice.id.desc()).all()
+    for r in rows:
+        out.setdefault(r.cremation_id, []).append(r)
+    return out
+
+
+def _sent(db: Session, cremation_id: int, notices: list | None = None):
+    rows = notices if notices is not None else _notices(db, [cremation_id]).get(cremation_id, [])
+    return next((r for r in rows if (r.status or "sent") == "sent"), None)
+
+
+def _failed(rows: list) -> list:
+    return [r for r in rows if r.status == "failed"]
 
 
 def _after_enabled(tenant, completed_at: datetime | None) -> bool:
@@ -121,18 +143,30 @@ def _after_enabled(tenant, completed_at: datetime | None) -> bool:
         return True
 
 
-def order_status(db: Session, cremation) -> dict:
-    """Para la orden: si se envió (y cuándo), cuándo saldrá o por qué no saldrá."""
+def order_status(db: Session, cremation, notices: list | None = None, now: datetime | None = None) -> dict:
+    """Para la orden: si se envió (y cuándo), cuándo saldrá o por qué no saldrá.
+
+    `state`: sent | scheduled (aún no llega la hora) | pending (ya toca: sale en la
+    próxima revisión, ≤ 10 min) | retrying (falló y se reintentará) | failed (agotó
+    los intentos) | skipped (no se enviará: ver `reason`).
+    """
     tenant = cremation.tenant
     if not feature_on(tenant):
         return {"available": False}
-    sent = _sent(db, cremation.id)
+    rows = notices if notices is not None else _notices(db, [cremation.id]).get(cremation.id, [])
+    sent = _sent(db, cremation.id, rows)
+    failed = _failed(rows)
     customer = cremation.pet.customer if cremation.pet and cremation.pet.customer else None
     out = {
         "available": True,
+        "state": "sent" if sent else "skipped",
         "sent_at": sent.created_at if sent else None,
+        "sent_to": sent.sent_to if sent else None,
         "scheduled_for": None,
         "reason": None,
+        "attempts": len(failed) + (1 if sent else 0),
+        "last_error": failed[0].error if failed and not sent else None,
+        "last_attempt_at": rows[0].created_at if rows else None,
         "can_send": bool(review_link(tenant)) and bool(customer and (customer.email or "").strip()),
     }
     if sent:
@@ -148,8 +182,61 @@ def order_status(db: Session, cremation) -> dict:
     elif not _after_enabled(tenant, _completed_at(cremation)):
         out["reason"] = "before_enabled"
     else:
-        out["scheduled_for"] = due_at(tenant, _completed_at(cremation))
+        due = due_at(tenant, _completed_at(cremation))
+        out["scheduled_for"] = due
+        now = now or tz.get_now()
+        if len(failed) >= MAX_ATTEMPTS:
+            out["state"], out["reason"] = "failed", "max_attempts"
+        elif due and now - due > timedelta(days=MAX_AGE_DAYS):
+            out["reason"] = "expired"
+        elif failed:
+            out["state"] = "retrying"
+        else:
+            out["state"] = "pending" if due and due <= now else "scheduled"
     return out
+
+
+def tenant_list(db: Session, tenant, state: str | None = None, days: int = LIST_DAYS, limit: int = 300) -> dict:
+    """Órdenes con entrega en los últimos `days` días y el estado de su invitación.
+
+    `state` filtra: sent | scheduled (incluye pending y retrying) | failed | skipped.
+    """
+    from sqlalchemy.orm import joinedload
+
+    now = tz.get_now()
+    rows = (
+        db.query(models.Cremation)
+        .join(models.CremationScheduling, models.CremationScheduling.cremation_id == models.Cremation.id)
+        .options(joinedload(models.Cremation.pet).joinedload(models.Pet.customer))
+        .filter(models.Cremation.tenant_id == tenant.id,
+                models.CremationScheduling.completed_at >= now - timedelta(days=days))
+        .order_by(models.CremationScheduling.completed_at.desc())
+        .limit(limit)
+        .all()
+    )
+    notices = _notices(db, [c.id for c in rows])
+    groups = {"pending": "scheduled", "retrying": "scheduled"}
+    items, counts = [], {"sent": 0, "scheduled": 0, "failed": 0, "skipped": 0}
+    for c in rows:
+        st = order_status(db, c, notices.get(c.id, []), now)
+        if not st.get("available"):
+            break
+        group = groups.get(st["state"], st["state"])
+        counts[group] = counts.get(group, 0) + 1
+        if state and group != state:
+            continue
+        customer = c.pet.customer if c.pet and c.pet.customer else None
+        items.append({
+            "cremation_id": c.id,
+            "verification_code": c.verification_code,
+            "pet_name": c.pet.name if c.pet else None,
+            "owner_name": customer.name if customer else None,
+            "email": (customer.email or None) if customer else None,
+            "delivered_at": _completed_at(c),
+            **{k: v for k, v in st.items() if k != "available"},
+        })
+    return {"items": items, "counts": counts, "days": days, "max_attempts": MAX_ATTEMPTS,
+            "send_hour": SEND_HOUR}
 
 
 # ---------------------------------------------------------------------------
@@ -176,8 +263,11 @@ async def send_review_email(db: Session, cremation_id: int, user_id: int | None 
             return {"sent": False, "reason": "off"}
         if (cremation.status or "").lower() not in FINAL_STATUSES:
             return {"sent": False, "reason": "not_delivered"}
-        if _sent(db, cremation.id):
+        rows = _notices(db, [cremation.id]).get(cremation.id, [])
+        if _sent(db, cremation.id, rows):
             return {"sent": False, "reason": "already_sent"}
+        if len(_failed(rows)) >= MAX_ATTEMPTS:
+            return {"sent": False, "reason": "max_attempts"}
 
     pet = cremation.pet.name if cremation.pet else "tu mascota"
     first = fn._first_name(customer.name)
@@ -189,23 +279,35 @@ async def send_review_email(db: Session, cremation_id: int, user_id: int | None 
         f"ayuda a otras familias{f' de {city}' if city else ''} a despedir a sus compañeros con confianza.",
         "Solo toma un minuto y significa mucho para nuestro equipo.",
     ]
-    from app.services.email import send_action_email
-    await send_action_email(
-        to=customer.email.strip(),
-        subject=f"¿Nos cuentas cómo te acompañamos con {pet}? · {tenant.name}",
-        title="¿Te acompañamos con tranquilidad?",
-        paragraphs=paragraphs,
-        button_label="⭐ Dejar mi opinión en Google",
-        button_url=url,
-        footer=f"Con cariño,\nEl equipo de {tenant.name}.",
-        kicker=tenant.name,
-        brand=fn.tenant_brand(tenant),
-        reply_to=tenant.email or None,
-        image_url=fn.pet_photo(cremation),
-        preheader=f"Tu opinión ayuda a otras familias que despiden a su compañero.",
-    )
-    fn._record(db, cremation, KIND, "email", customer.email, None, user_id)
-    return {"sent": True, "to": customer.email}
+    from app.services import email as email_service
+    to = customer.email.strip()
+    try:
+        await email_service.send_action_email(
+            to=to,
+            subject=f"¿Nos cuentas cómo te acompañamos con {pet}? · {tenant.name}",
+            title="¿Te acompañamos con tranquilidad?",
+            paragraphs=paragraphs,
+            button_label="⭐ Dejar mi opinión en Google",
+            button_url=url,
+            footer=f"Con cariño,\nEl equipo de {tenant.name}.",
+            kicker=tenant.name,
+            brand=fn.tenant_brand(tenant),
+            reply_to=tenant.email or None,
+            image_url=fn.pet_photo(cremation),
+            preheader="Tu opinión ayuda a otras familias que despiden a su compañero.",
+        )
+    except Exception as exc:  # noqa: BLE001 - el servidor de correo lo rechazó o no respondió
+        error = _error_text(exc)
+        logger.warning("Invitación a reseña rechazada (orden %s): %s", cremation.id, error)
+        fn._record(db, cremation, KIND, "email", to, None, user_id, status="failed", error=error)
+        return {"sent": False, "reason": "smtp_error", "error": error}
+    fn._record(db, cremation, KIND, "email", to, None, user_id)
+    return {"sent": True, "to": to}
+
+
+def _error_text(exc: Exception) -> str:
+    msg = " ".join(str(exc).split()) or exc.__class__.__name__
+    return f"{exc.__class__.__name__}: {msg}"[:300]
 
 
 def due_orders(db: Session, now: datetime | None = None) -> list[int]:
@@ -226,7 +328,10 @@ def due_orders(db: Session, now: datetime | None = None) -> list[int]:
         if not _after_enabled(c.tenant, done):
             continue
         due = due_at(c.tenant, done)
-        if due and due <= now and (now - due) <= timedelta(days=MAX_AGE_DAYS) and not _sent(db, c.id):
+        if not (due and due <= now and (now - due) <= timedelta(days=MAX_AGE_DAYS)):
+            continue
+        rows = _notices(db, [c.id]).get(c.id, [])
+        if not _sent(db, c.id, rows) and len(_failed(rows)) < MAX_ATTEMPTS:
             out.append(c.id)
     return out
 

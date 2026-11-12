@@ -188,7 +188,7 @@ def test_detalle_de_tracking_por_crematorio(client, db, world, auth):
     url = f"/api/internal/creator/catalog-funnel/tenant/{tid}"
     assert client.get(url, headers=auth("a")).status_code in (401, 403)
     assert client.get("/api/internal/creator/catalog-funnel/tenant/999999", headers=auth("creator")).status_code == 404
-    r = client.get(url, headers=auth("creator"))
+    r = client.get(f"{url}?tracking_stage=all", headers=auth("creator"))  # la orden puede estar ya entregada
     assert r.status_code == 200, r.text
     d = r.json()
     assert d["tenant"]["id"] == tid and d["views"]["tracking"] >= 1

@@ -153,7 +153,8 @@ def detail(db: Session, tenant_id: int, date_from: datetime | None, date_to: dat
     orders_opened = int(opened[0][0]) if opened else 0
 
     # --- Avisos a la familia y encuesta ---
-    nq = db.query(FamilyNotice.channel, FamilyNotice.kind, func.count(FamilyNotice.id)).filter(FamilyNotice.tenant_id == tenant_id)
+    nq = db.query(FamilyNotice.channel, FamilyNotice.kind, func.count(FamilyNotice.id)).filter(
+        FamilyNotice.tenant_id == tenant_id, FamilyNotice.status == "sent")
     fq = db.query(func.count(ServiceFeedback.id), func.avg(ServiceFeedback.rating)).filter(ServiceFeedback.tenant_id == tenant_id)
     if date_from:
         nq = nq.filter(FamilyNotice.created_at >= date_from)

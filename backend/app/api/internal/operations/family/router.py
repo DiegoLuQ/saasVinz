@@ -63,6 +63,7 @@ def list_family_notices(
         "review": gr.order_status(db, c),
         "notices": [{
             "id": r.id, "kind": r.kind, "channel": r.channel, "sent_to": r.sent_to,
+            "status": r.status or "sent", "error": r.error,
             "step_id": r.step_id, "step_name": steps.get(r.step_id), "created_at": r.created_at,
         } for r in rows],
     }
@@ -233,5 +234,25 @@ async def send_review_now(
         reasons = {"no_email": "El cliente no tiene correo registrado",
                    "no_link": "Falta el enlace de reseñas de Google en Perfil → Redes y reseñas",
                    "plan": "Las reseñas en Google no están incluidas en tu plan"}
+        if result.get("reason") == "smtp_error":
+            raise HTTPException(status_code=502, detail=f"El servidor de correo rechazó el envío: {result.get('error')}")
         raise HTTPException(status_code=422, detail=reasons.get(result.get("reason"), "No se pudo enviar la invitación"))
     return result
+
+
+@router.get("/review-emails")
+def list_review_emails(
+    state: Optional[str] = None,
+    days: int = 30,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Invitaciones a reseña de las órdenes entregadas en los últimos `days` días:
+    programadas, enviadas ✓ (el servidor de correo las aceptó), con error o que no saldrán."""
+    if state not in (None, "", "sent", "scheduled", "failed", "skipped"):
+        raise HTTPException(status_code=400, detail="Estado inválido")
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not gr.feature_on(tenant):
+        raise HTTPException(status_code=403, detail="Las reseñas en Google no están incluidas en tu plan")
+    return gr.tenant_list(db, tenant, state or None, days=max(1, min(days, 90)))

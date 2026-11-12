@@ -36,6 +36,9 @@ class FamilyNotice(Base):
     kind = Column(String(20), nullable=False)      # 'step' | 'finish'
     channel = Column(String(20), nullable=False)   # 'email' | 'whatsapp'
     sent_to = Column(String(255), nullable=True)
+    # 'sent' = el servidor de correo lo aceptó · 'failed' = lo rechazó (error = motivo)
+    status = Column(String(20), nullable=False, default="sent", server_default="sent")
+    error = Column(String(300), nullable=True)
     created_by = Column(Integer, ForeignKey("sys_users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
 

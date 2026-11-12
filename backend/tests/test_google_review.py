@@ -112,3 +112,52 @@ def test_ordenes_entregadas_antes_de_activar_no_se_invitan(client, db, setup):
     assert oid not in gr.due_orders(db)
     info = client.get(f"/api/internal/operations/ops/orders/{oid}/family-notices", headers=h).json()["review"]
     assert info["reason"] == "before_enabled"
+
+
+def test_lista_enviadas_y_errores_con_reintentos(client, db, setup, sent_emails, monkeypatch):
+    """Configuración → Reseñas en Google: lista programadas / enviadas ✓ / con error.
+    Un rechazo del servidor de correo queda registrado y se reintenta hasta MAX_ATTEMPTS."""
+    import asyncio
+    from fastapi_mail import FastMail
+
+    h, oid = setup["h"], setup["oid"]
+    client.put("/api/internal/operations/review-config", headers=h, json={"enabled": True, "delay_days": 1})
+    _deliver(client, h, db, oid, tz.get_now() + timedelta(minutes=1))
+
+    lst = client.get("/api/internal/operations/review-emails", headers=h).json()
+    row = next(i for i in lst["items"] if i["cremation_id"] == oid)
+    assert row["state"] == "scheduled" and row["email"] and row["pet_name"]
+
+    async def boom(self, message, *a, **k):
+        raise ConnectionError("550 mailbox unavailable")
+    monkeypatch.setattr(FastMail, "send_message", boom)
+    db.expire_all()
+    r = asyncio.run(gr.send_review_email(db, oid))
+    assert r["sent"] is False and r["reason"] == "smtp_error" and "550" in r["error"]
+
+    row = next(i for i in client.get("/api/internal/operations/review-emails", headers=h).json()["items"]
+               if i["cremation_id"] == oid)
+    assert row["state"] == "retrying" and row["attempts"] == 1 and "550" in row["last_error"]
+    # «Enviar ahora» con el servidor caído = 502 con el motivo
+    rr = client.post(f"/api/internal/operations/ops/orders/{oid}/family-notices/review", headers=h)
+    assert rr.status_code == 502 and "550" in rr.json()["detail"]
+    asyncio.run(gr.send_review_email(db, oid))
+    due = datetime.fromisoformat(row["scheduled_for"])
+    db.expire_all()
+    assert oid not in gr.due_orders(db, now=due + timedelta(minutes=1))  # agotó los 3 intentos
+    failed = client.get("/api/internal/operations/review-emails?state=failed", headers=h).json()["items"]
+    assert any(i["cremation_id"] == oid and i["state"] == "failed" for i in failed)
+
+    # Vuelve el servidor: «Enviar ahora» lo envía y queda ✓
+    monkeypatch.undo()
+    from fastapi_mail import FastMail as FM
+
+    async def ok(self, message, *a, **k):
+        sent_emails.append(message)
+    monkeypatch.setattr(FM, "send_message", ok)
+    assert client.post(f"/api/internal/operations/ops/orders/{oid}/family-notices/review", headers=h).status_code == 200
+    sent = client.get("/api/internal/operations/review-emails?state=sent", headers=h).json()
+    row = next(i for i in sent["items"] if i["cremation_id"] == oid)
+    assert row["state"] == "sent" and row["sent_at"] and row["last_error"] is None
+    notices = client.get(f"/api/internal/operations/ops/orders/{oid}/family-notices", headers=h).json()["notices"]
+    assert {n["status"] for n in notices if n["kind"] == "review"} == {"sent", "failed"}

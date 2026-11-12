@@ -2,17 +2,20 @@
 
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Mail, MessageCircle, Check, CalendarClock } from 'lucide-react';
+import { Loader2, Mail, MessageCircle, Check, CalendarClock, AlertTriangle } from 'lucide-react';
 import { apiRequest } from '@/lib/tenant/api';
 import { formatChileDate, formatChileTime } from '@/lib/dates';
 
-interface Notice { id: number; kind: 'step' | 'finish' | 'review'; channel: 'email' | 'whatsapp'; sent_to?: string | null; step_name?: string | null; created_at: string }
+interface Notice { id: number; kind: 'step' | 'finish' | 'review'; channel: 'email' | 'whatsapp'; sent_to?: string | null; step_name?: string | null; created_at: string; status?: 'sent' | 'failed'; error?: string | null }
 /** Invitación a la reseña de Google (services/google_review.py). */
 interface ReviewStatus {
     available: boolean;
     sent_at?: string | null;
     scheduled_for?: string | null;
-    reason?: 'no_link' | 'no_email' | 'off' | 'not_delivered' | 'before_enabled' | null;
+    state?: 'sent' | 'scheduled' | 'pending' | 'retrying' | 'failed' | 'skipped';
+    reason?: 'no_link' | 'no_email' | 'off' | 'not_delivered' | 'before_enabled' | 'expired' | 'max_attempts' | null;
+    attempts?: number;
+    last_error?: string | null;
     can_send?: boolean;
 }
 interface NoticesData { enabled: boolean; email?: string | null; phone?: string | null; notices: Notice[]; review?: ReviewStatus }
@@ -23,6 +26,8 @@ const REVIEW_REASON: Record<string, string> = {
     off: 'Desactivada en Configuración → Reseñas en Google',
     not_delivered: 'Se programa al entregar la orden',
     before_enabled: 'Entregada antes de activar las reseñas',
+    expired: 'Pasó la fecha y no se envió',
+    max_attempts: 'El servidor de correo la rechazó 3 veces',
 };
 
 const NOTICE_LABEL = (n: Notice) =>
@@ -120,7 +125,10 @@ export default function FamilyNoticesBox({ orderId, stepId, finished, compact = 
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/60 dark:bg-white/[0.03] px-3 py-2">
                     <div className="min-w-0 text-[11px] text-muted-foreground">
                         <span className="font-bold text-foreground">Reseña en Google</span>
-                        {review.sent_at ? null : review.scheduled_for ? (
+                        {review.sent_at ? null : review.last_error ? (
+                            <span className="ml-1.5 inline-flex items-center gap-1 text-red-600 dark:text-red-400" title={review.last_error}>
+                                <AlertTriangle size={12} /> {review.state === 'failed' ? 'No se pudo enviar' : `Falló (intento ${review.attempts}), se reintentará`}</span>
+                        ) : review.scheduled_for && review.reason !== 'expired' ? (
                             <span className="ml-1.5 inline-flex items-center gap-1"><CalendarClock size={12} className="text-sky-500" />
                                 Programada: {formatChileDate(review.scheduled_for)} {formatChileTime(review.scheduled_for)}</span>
                         ) : review.reason ? <span className="ml-1.5">· {REVIEW_REASON[review.reason] || ''}</span> : null}
@@ -137,10 +145,14 @@ export default function FamilyNoticesBox({ orderId, stepId, finished, compact = 
             {data.notices.length > 0 && (
                 <ul className="space-y-1">
                     {data.notices.slice(0, compact ? 3 : 6).map((n) => (
-                        <li key={n.id} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                            <Check size={12} className="text-emerald-500 shrink-0" />
+                        <li key={n.id} className={`flex items-center gap-1.5 text-[11px] ${n.status === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}
+                            title={n.error || undefined}>
+                            {n.status === 'failed'
+                                ? <AlertTriangle size={12} className="shrink-0" />
+                                : <Check size={12} className="text-emerald-500 shrink-0" />}
                             <span className="truncate">
                                 {n.channel === 'email' ? 'Correo' : 'WhatsApp'} · {NOTICE_LABEL(n)} · {formatChileDate(n.created_at)} {formatChileTime(n.created_at)}
+                                {n.status === 'failed' && ' · rechazado'}
                             </span>
                         </li>
                     ))}
