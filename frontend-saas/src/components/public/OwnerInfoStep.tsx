@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { formatRut, sanitizeEmailInput, autoFixEmailDomain } from '@/lib/formatters';
+import { formatRut, sanitizeEmailInput, autoFixEmailDomain, emailHasInvalidChars } from '@/lib/formatters';
 import { ChevronDown, MessageCircle, Phone, Sparkles, MapPin, Truck } from 'lucide-react';
 import { ownerCommunes, quotePriceText, quoteTransport, transportPlaces, type PublicTransport } from '@/lib/transport';
 import { Country, State, City } from 'country-state-city';
@@ -83,6 +83,8 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
     const f = formConfig.fields;
     const [countryCode, setCountryCode] = useState('+56');
     const [localPhone, setLocalPhone] = useState('');
+    // Se escribió una ñ, tilde u otro carácter que el correo no admite (se reemplazó).
+    const [emailFixed, setEmailFixed] = useState(false);
     const [partners, setPartners] = useState<{ id: number; name: string; slug: string }[]>([]);
 
     const countryIso = useMemo(() => {
@@ -298,11 +300,20 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                             <div>
                                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 ml-1 mb-2">{fieldLabel(f.email, 'Email')}{fieldSuffix(f.email)}</label>
                                 <input
-                                    type="email"
+                                    // type="text" + inputMode="email": con type="email" el navegador
+                                    // altera los caracteres no ASCII (ñ, tildes) antes de que los limpiemos.
+                                    type="text"
                                     inputMode="email"
                                     autoComplete="email"
+                                    autoCapitalize="none"
+                                    autoCorrect="off"
+                                    spellCheck={false}
                                     value={data.email || ''}
-                                    onChange={(e) => updateData({ email: sanitizeEmailInput(e.target.value) })}
+                                    onChange={(e) => {
+                                        const raw = e.target.value;
+                                        setEmailFixed(emailHasInvalidChars(raw));
+                                        updateData({ email: sanitizeEmailInput(raw) });
+                                    }}
                                     onBlur={() => {
                                         if (data.email) {
                                             const fixed = autoFixEmailDomain(data.email);
@@ -314,6 +325,11 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                                     maxLength={100}
                                 />
                                 {errors.email && <p className="text-[10px] text-red-500 mt-2 font-bold uppercase tracking-tight ml-2">! {errors.email}</p>}
+                                {!errors.email && emailFixed && (
+                                    <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-2 ml-2">
+                                        Los correos no admiten «ñ», tildes ni espacios: los cambiamos (ñ → n, á → a). Revisa que quede bien.
+                                    </p>
+                                )}
                             </div>
                         )}
                     </div>

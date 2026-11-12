@@ -23,14 +23,22 @@ export const formatPrice = (price: number): string => {
 /**
  * Sanitiza el correo en tiempo real mientras se escribe:
  * - Elimina espacios
+ * - Cambia «ñ» por «n» y quita tildes (no se admiten en correos)
  * - Solo permite letras, números, ".", "-", "_" y "@"
  * - Evita más de un "@" y puntos consecutivos ".."
  * - Máximo 100 caracteres
  */
+/** «ñ» → «n», tildes y diéresis fuera (á → a, ü → u, ç → c): los correos no las admiten. */
+export const transliterateEmail = (raw: string): string =>
+    (raw || '').replace(/ñ/g, 'n').replace(/Ñ/g, 'N').normalize('NFKD').replace(/\p{M}/gu, '');
+
+/** true si el texto trae caracteres que el correo no admite (ñ, tildes, símbolos, espacios). */
+export const emailHasInvalidChars = (raw: string): boolean => /[^a-zA-Z0-9._@-]/.test(raw || '');
+
 export const sanitizeEmailInput = (raw: string): string => {
     if (!raw) return '';
-    // Quitar espacios y caracteres no permitidos
-    let clean = raw.replace(/\s+/g, '').replace(/[^a-zA-Z0-9._@-]/g, '');
+    // ñ → n y sin tildes; luego quitar espacios y caracteres no permitidos
+    let clean = transliterateEmail(raw).replace(/\s+/g, '').replace(/[^a-zA-Z0-9._@-]/g, '');
     // Permitir solo un '@'
     const atIndex = clean.indexOf('@');
     if (atIndex !== -1) {

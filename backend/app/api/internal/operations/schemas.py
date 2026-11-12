@@ -479,7 +479,7 @@ class DashboardRecentActivity(BaseModel):
     pet_species: Optional[str] = None
     pet_image: Optional[str] = None
     client: str
-    service_name: str
+    service_name: Optional[str] = None  # plan principal de la orden (+N si hay más)
     amount: float
     status: str
     step_name: Optional[str] = None

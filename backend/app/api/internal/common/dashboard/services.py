@@ -139,11 +139,12 @@ def _format_orders(
         customer = pet.customer if pet else None
         tech = c.technical
 
-        main_service_name = "Servicio"
-        if c.servicios:
-            main_service_name = c.servicios[0].service.name if c.servicios[0].service else "Servicio"
-        elif c.planes:
-            main_service_name = c.planes[0].plan.name if c.planes[0].plan else "Plan de Cremación"
+        # Solo el plan (el principal, si no el primero); sin plan no se muestra nada.
+        main_service_name = None
+        plans = [p for p in (c.planes or []) if p.plan]
+        if plans:
+            main = next((p for p in plans if p.es_principal), plans[0])
+            main_service_name = main.plan.name + (f" +{len(plans) - 1}" if len(plans) > 1 else "")
 
         scheduled_at = c.scheduling.scheduled_at if c.scheduling else None
         is_overdue = bool(

@@ -78,9 +78,18 @@ def sanitize_email(raw: str | None) -> str | None:
     """Limpia espacios, caracteres prohibidos y auto-corrige typos conocidos de dominio."""
     if not isinstance(raw, str):
         return None
-    cleaned = re.sub(r"\s+", "", raw).strip().lower()
+    # «ñ» → «n» y sin tildes (á → a); luego fuera todo lo que un correo no admite,
+    # para que una ñ o un símbolo pegado no impida enviar el formulario.
+    import unicodedata
+    cleaned = raw.replace("ñ", "n").replace("Ñ", "N")
+    cleaned = "".join(c for c in unicodedata.normalize("NFKD", cleaned) if not unicodedata.combining(c))
+    cleaned = re.sub(r"[^a-z0-9._@-]", "", re.sub(r"\s+", "", cleaned).strip().lower())
     if not cleaned:
         return None
+    # Un solo «@»
+    if cleaned.count("@") > 1:
+        i = cleaned.index("@")
+        cleaned = cleaned[: i + 1] + cleaned[i + 1:].replace("@", "")
     # Quitar puntos consecutivos
     cleaned = re.sub(r"\.{2,}", ".", cleaned)
     if "@" in cleaned:
