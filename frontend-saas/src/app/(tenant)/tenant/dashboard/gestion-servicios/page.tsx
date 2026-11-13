@@ -67,6 +67,7 @@ import ImportServicesModal from '@/components/tenant/catalog/ImportServicesModal
 import { apiRequest } from '@/lib/tenant/api';
 import PlanImageUploader from '@/components/tenant/catalog/PlanImageUploader';
 import { useQueryClient } from '@tanstack/react-query';
+import { useFeatures } from '@/hooks/useFeatures';
 
 const NO_GROUP = '__none__';
 
@@ -159,13 +160,14 @@ export default function ServicesPage() {
         return tenantData.logo_url.startsWith('http') ? tenantData.logo_url : `${API_URL}${tenantData.logo_url}`;
     };
 
+    const { hasFeature } = useFeatures();
     const maxServices = tenantData?.subscription_plan?.max_services || 0;
     const isServiceLimitReached = maxServices > 0 && maxServices < 999999 && services.length >= maxServices;
 
     const maxPlans = tenantData?.subscription_plan?.max_plans || 0;
     const isPlanLimitReached = maxPlans > 0 && maxPlans < 999999 && plans.length >= maxPlans;
 
-    const isPlanesEnabled = maxServices === 0 || maxServices === null || maxServices > 2;
+    const isPlanesEnabled = hasFeature('servicios:planes:gestionar', true) && (maxServices === 0 || maxServices === null || maxServices > 2);
 
     useEffect(() => {
         if (!isPlanesEnabled && activeTab === 'planes') {
@@ -510,22 +512,26 @@ export default function ServicesPage() {
                     {/* Botones contextuales de Planes */}
                     {activeTab === 'planes' && (
                         <>
-                            <button
-                                onClick={() => setShowSharePlansModal(true)}
-                                className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-all"
-                                title="Generar enlace público del catálogo"
-                            >
-                                <Share2 size={15} className="text-primary" />
-                                <span>Compartir</span>
-                            </button>
-                            <button
-                                onClick={() => setShowPlansCatalogModal(true)}
-                                className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-all"
-                                title="Previsualizar catálogo y descargar PDF"
-                            >
-                                <BookOpen size={15} className="text-primary" />
-                                <span>Ver Catálogo PDF</span>
-                            </button>
+                            {hasFeature('servicios:planes:catalogo', true) && (
+                                <button
+                                    onClick={() => setShowSharePlansModal(true)}
+                                    className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-all"
+                                    title="Generar enlace público del catálogo"
+                                >
+                                    <Share2 size={15} className="text-primary" />
+                                    <span>Compartir</span>
+                                </button>
+                            )}
+                            {hasFeature('servicios:planes:descargar_pdf', true) && (
+                                <button
+                                    onClick={() => setShowPlansCatalogModal(true)}
+                                    className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-all"
+                                    title="Previsualizar catálogo y descargar PDF"
+                                >
+                                    <BookOpen size={15} className="text-primary" />
+                                    <span>Ver Catálogo PDF</span>
+                                </button>
+                            )}
                         </>
                     )}
 

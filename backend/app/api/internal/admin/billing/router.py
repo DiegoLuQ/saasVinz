@@ -24,9 +24,15 @@ def get_available_plans(
 ):
     """
     List all active subscription plans available for upgrade/downgrade.
-    Accessible to Tenant Admins.
+    Accessible to Tenant Admins. Un plan desactivado no se ofrece, pero quien ya lo
+    tiene lo sigue viendo como su plan actual.
     """
-    return db.query(models.SubscriptionPlan).filter(models.SubscriptionPlan.is_active == True).all()
+    from sqlalchemy import or_
+    current_id = getattr(getattr(current_user, "tenant", None), "subscription_plan_id", None)
+    cond = models.SubscriptionPlan.is_active == True  # noqa: E712
+    if current_id:
+        cond = or_(cond, models.SubscriptionPlan.id == current_id)
+    return db.query(models.SubscriptionPlan).filter(cond).all()
 
 
 @router.get("/pricing")
@@ -68,6 +74,8 @@ def request_plan_change(
     plan = db.query(models.SubscriptionPlan).filter(models.SubscriptionPlan.id == request.plan_id).first()
     if not plan:
         raise HTTPException(status_code=404, detail="Plan not found")
+    if not plan.is_active and plan.id != tenant.subscription_plan_id:
+        raise HTTPException(status_code=400, detail="Este plan ya no está disponible.")
 
     # 2. Check for existing pending request of same type
     existing = db.query(BillingTransaction).filter(

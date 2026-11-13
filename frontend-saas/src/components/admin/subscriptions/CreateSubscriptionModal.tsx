@@ -24,7 +24,9 @@ const CYCLE_OPTIONS: { value: Cycle; label: string; months: number }[] = [
 
 export default function CreateSubscriptionModal({ isOpen, onClose, onCreated, showToast }: Props) {
     const tenants = useAdminTenants();
-    const plans = useAdminPlans();
+    const allPlans = useAdminPlans();
+    // Los planes desactivados (Admin → Planes) no se ofrecen al asignar uno nuevo.
+    const plans = useMemo(() => allPlans.filter((p: any) => p.is_active !== false), [allPlans]);
 
     const [tenantId, setTenantId] = useState<number | ''>('');
     const [planId, setPlanId] = useState<number | ''>('');

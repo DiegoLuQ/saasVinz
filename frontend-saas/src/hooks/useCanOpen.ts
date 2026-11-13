@@ -41,6 +41,7 @@ export function useCanOpen() {
 export const CONFIG_TAB_FEATURES: Record<string, string> = {
     flujo: 'configuracion:flujo',
     formulario: 'configuracion:formulario',
+    enlaces: 'configuracion:enlaces_oficiales',
     'documentos-auto': 'certificados:generar_todo',
     creditos: 'configuracion:creditos_ia',
     resenas: 'configuracion:resena_google',

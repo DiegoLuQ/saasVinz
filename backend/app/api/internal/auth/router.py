@@ -365,12 +365,13 @@ def get_bootstrap(
         
         # --- Lógica de Auto-recuperación (Self-healing) ---
         if not tenant_configs:
-            # 1. Identificar módulos permitidos por plan
+            # 1. Identificar módulos permitidos por plan (respetando tiempos de vida)
+            from app.services.plan_features import effective_allowed_modules
             base_modules = ["dashboard", "perfil", "configuracion"]
             allowed_modules = list(base_modules)
             _eff_plan = user.tenant.effective_plan
             if _eff_plan and _eff_plan.allowed_modules:
-                allowed_modules.extend(_eff_plan.allowed_modules)
+                allowed_modules.extend(effective_allowed_modules(_eff_plan, tenant=user.tenant))
             
             # 2. Crear configuración por defecto para el tenant (solo si es Admin, los otros roles vendrán después o se heredarán)
             all_modules = db.query(models.Module).all()
@@ -520,9 +521,13 @@ def get_bootstrap(
     ).order_by(models.WorkflowStep.order_index).all()
 
     # --- Dynamic Plan-to-Permission Sync (capa de plan + capa de rol/blueprint) ---
-    # 1. Universo de módulos del plan efectivo (techo del tenant)
-    allowed_plan_modules = user.tenant.effective_plan.allowed_modules if user.tenant.effective_plan else []
-    from app.services.plan_features import PLAN_EXEMPT_MODULES
+    # 1. Universo de módulos del plan efectivo (techo del tenant, respetando trials)
+    from app.services.plan_features import (
+        PLAN_EXEMPT_MODULES,
+        effective_allowed_modules,
+        build_tenant_effective_features,
+    )
+    allowed_plan_modules = effective_allowed_modules(user.tenant.effective_plan, tenant=user.tenant) if user.tenant.effective_plan else []
     base_required = list(PLAN_EXEMPT_MODULES)
     master_keys = list(set(allowed_plan_modules + base_required))
 
@@ -638,6 +643,13 @@ def get_bootstrap(
         tenant_resp.demo_active = True
         tenant_resp.demo_plan_name = user.tenant.demo_plan.name
         tenant_resp.demo_expires_at = user.tenant.demo_expires_at
+
+    # Aplicar tiempos de vida (trials) efectivos al plan serializado para el tenant
+    if tenant_resp.subscription_plan and user.tenant.effective_plan:
+        tenant_resp.subscription_plan.allowed_modules = allowed_plan_modules
+        tenant_resp.subscription_plan.features = build_tenant_effective_features(
+            user.tenant.effective_plan, user.tenant
+        )
         
     # Fallback: Check most recent active subscription if Tenant dates are missing
     if not tenant_resp.next_billing_date:

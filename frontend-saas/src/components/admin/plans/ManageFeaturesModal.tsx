@@ -87,10 +87,33 @@ export const FEATURES_REGISTRY: Record<string, ModuleDef> = {
         label: 'Gestionar Servicios',
         sections: [
             {
-                label: 'General',
+                label: 'Servicios Base',
                 features: [
                     { key: 'servicios:crear', label: 'Crear Servicios' },
                     { key: 'servicios:editar', label: 'Editar Servicios' },
+                ],
+            },
+            {
+                label: 'Planes y Catálogo de Servicios',
+                features: [
+                    {
+                        key: 'servicios:planes:gestionar',
+                        label: 'Planes de Cremación',
+                        description: 'Crear, editar y configurar paquetes de servicios (Planes)',
+                        defaultFor: (code) => code.trim().toUpperCase() !== 'FREE',
+                    },
+                    {
+                        key: 'servicios:planes:catalogo',
+                        label: 'Catálogo Digital de Planes',
+                        description: 'Compartir enlace web interactivo del catálogo de planes para las familias',
+                        defaultFor: (code) => code.trim().toUpperCase() !== 'FREE',
+                    },
+                    {
+                        key: 'servicios:planes:descargar_pdf',
+                        label: 'Descargar Catálogo PDF',
+                        description: 'Generar y exportar catálogo de planes como documento PDF',
+                        defaultFor: (code) => code.trim().toUpperCase() !== 'FREE',
+                    },
                 ],
             },
         ],
@@ -229,6 +252,12 @@ export const FEATURES_REGISTRY: Record<string, ModuleDef> = {
                         description: 'Pestaña «Reseñas en Google»: invita a la familia a opinar en Google 1 o 2 días después de entregar (18:00)',
                         // Sin marcar = no incluida: la decide el SuperAdmin (backend services/google_review.py).
                         defaultFor: () => false,
+                    },
+                    {
+                        key: 'configuracion:enlaces_oficiales',
+                        label: 'Enlaces Oficiales y Tiendita',
+                        description: 'Pestaña «Enlaces oficiales»: fijar catálogo oficial de planes y productos para la tiendita de recuerdos en seguimiento y confirmaciones',
+                        defaultFor: (code) => code.trim().toUpperCase() !== 'FREE',
                     },
                 ],
             },

@@ -391,11 +391,24 @@ def check_permission(module_key: str, action: str):
                     },
                 )
 
-        # 0.6 Característica del plan para esta acción (crear/editar/eliminar).
+        # 0.6 Característica del plan para esta acción (crear/editar/eliminar) y vigencia del módulo.
+        _tenant = db.query(models.Tenant).filter(models.Tenant.id == current_user.tenant_id).first()
+        _plan = _tenant.effective_plan if _tenant else None
+        if _plan and _tenant:
+            from app.services.plan_features import is_module_trial_expired, get_key_trial_status
+            if is_module_trial_expired(_plan, module_key, tenant=_tenant):
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "error": "Tiempo de vida del módulo finalizado",
+                        "code": "trial_expired",
+                        "module": module_key,
+                        "message": f"El período de acceso al módulo {module_key} en tu plan ha finalizado. Mejora tu plan en Configuración → Facturación.",
+                    },
+                )
+
         feature_key = PLAN_ACTION_FEATURES.get((module_key, action))
         if feature_key:
-            _tenant = db.query(models.Tenant).filter(models.Tenant.id == current_user.tenant_id).first()
-            _plan = _tenant.effective_plan if _tenant else None
             _features = _plan.features if _plan and isinstance(_plan.features, dict) else {}
             if _features.get(feature_key, True) is False:
                 raise HTTPException(
@@ -406,6 +419,19 @@ def check_permission(module_key: str, action: str):
                         "message": "Tu plan actual no incluye esta acción. Revisa los planes en Configuración → Facturación.",
                     },
                 )
+            if _plan and _tenant:
+                from app.services.plan_features import get_key_trial_status
+                _trial_st = get_key_trial_status(_plan, feature_key, tenant=_tenant)
+                if _trial_st and _trial_st.get("expired"):
+                    raise HTTPException(
+                        status_code=403,
+                        detail={
+                            "error": "Tiempo de prueba finalizado",
+                            "code": "trial_expired",
+                            "feature": feature_key,
+                            "message": "El período de vigencia de esta acción en tu plan ha finalizado. Revisa los planes en Configuración → Facturación.",
+                        },
+                    )
 
         # 0.7 Techo de ROL (blueprint global). Si el rol tiene blueprint definido,
         #     es autoritativo: un módulo fuera de él queda SIN acceso para ese rol,

@@ -43,6 +43,8 @@ def update_official_links(payload: OfficialLinksIn, db: Session = Depends(get_db
     role = getattr(current_user.role, "value", current_user.role)
     if role not in ("admin", "creator"):
         raise HTTPException(status_code=403, detail="Solo el administrador del crematorio puede cambiar los enlaces oficiales.")
+    from app.api.deps_features import check_feature
+    check_feature("configuracion:enlaces_oficiales", default=True)(current_user=current_user)
     tenant = _tenant(db, tenant_id)
     st = official_links.save(db, tenant, payload.model_dump())
     return {**st, "form_options": official_links.form_options(tenant)}

@@ -46,6 +46,20 @@ def check_feature(feature_key: str, default: bool = False):
         if not isinstance(enabled, bool):
             enabled = default
 
+        if enabled and plan and tenant:
+            from app.services.plan_features import get_key_trial_status
+            trial_st = get_key_trial_status(plan, feature_key, tenant=tenant)
+            if trial_st and trial_st.get("expired"):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "error": "Tiempo de prueba finalizado",
+                        "code": "trial_expired",
+                        "feature": feature_key,
+                        "message": "El período de vigencia de esta funcionalidad en tu plan ha finalizado. Mejora tu plan en Configuración → Facturación para seguir usándola.",
+                    },
+                )
+
         if not enabled:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

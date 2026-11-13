@@ -184,6 +184,9 @@ class SubscriptionPlanCreate(BaseModel):
     features: Any = None
     # Orden en que se muestran los planes (menor = primero). None = no se cambia.
     display_order: int | None = Field(None, ge=0, le=999)
+    # Desactivado = deja de ofrecerse (web, facturación, cambio de plan); quien ya lo
+    # tiene lo conserva. None = no se cambia.
+    is_active: bool | None = None
 
 class SubscriptionPlanResponse(SubscriptionPlanCreate):
     id: int
@@ -463,7 +466,8 @@ async def get_creator_bootstrap(
         ).count()
 
         # 5. Subscription Plans
-        plans = db.query(models.SubscriptionPlan).filter(models.SubscriptionPlan.is_active == True).order_by(models.SubscriptionPlan.display_order).all()
+        # Todos (también los desactivados: Admin → Planes los muestra para reactivarlos).
+        plans = db.query(models.SubscriptionPlan).order_by(models.SubscriptionPlan.display_order, models.SubscriptionPlan.id).all()
 
         # 6. Global Announcements
         announcements = db.query(models.TenantAnnouncement).filter(
@@ -1463,6 +1467,8 @@ async def create_plan(
     from app.services.plan_features import make_plan_code
     data = plan_data.dict()
     data["name"] = _check_plan_name(db, data["name"])
+    if data.get("is_active") is None:
+        data["is_active"] = True
     if data.get("display_order") is None:
         top = db.query(func.max(models.SubscriptionPlan.display_order)).scalar()
         data["display_order"] = (top or 0) + 1
@@ -1493,8 +1499,9 @@ async def update_plan(
     # sobrescribirlo con null cuando el cliente no lo envía (ej. el botón
     # "Guardar Cambios" de la card vs. el modal "Configurar Características").
     features_val = new_data.pop('features', None)
-    if new_data.get('display_order') is None:
-        new_data.pop('display_order', None)
+    for opt in ('display_order', 'is_active'):
+        if new_data.get(opt) is None:
+            new_data.pop(opt, None)
     new_data['name'] = _check_plan_name(db, new_data.get('name'), plan_id)
     renamed = new_data['name'] != plan.name
     if not plan.code:  # filas antiguas: fija el código con el nombre que tenía
@@ -1506,6 +1513,9 @@ async def update_plan(
         setattr(plan, key, value)
 
     if features_val is not None:
+        if isinstance(features_val, dict) and isinstance(plan.features, dict):
+            if "__trials__" in plan.features and "__trials__" not in features_val:
+                features_val = {**features_val, "__trials__": plan.features["__trials__"]}
         plan.features = features_val
 
     # El anual sigue al mensual con el descuento global (no cambia lo ya contratado).

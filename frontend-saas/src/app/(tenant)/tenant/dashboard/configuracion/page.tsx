@@ -82,9 +82,14 @@ export default function SettingsPage() {
     // o de un módulo del plan (Certificados). Ver hooks/useCanOpen.ts.
     const { hasFeature } = useFeatures();
     const activeModules = (bootstrapData?.rbac.modules ?? []).filter(m => m.is_active).map(m => m.module_key);
-    const tabAllowed = (id: string) =>
-        (!CONFIG_TAB_FEATURES[id] || hasFeature(CONFIG_TAB_FEATURES[id], configTabDefault(CONFIG_TAB_FEATURES[id])))
-        && (!CONFIG_TAB_MODULES[id] || activeModules.includes(CONFIG_TAB_MODULES[id]));
+    const tabAllowed = (id: string) => {
+        if (id === 'enlaces') {
+            const hasCatalogCapability = activeModules.includes('servicios') || activeModules.includes('inventario');
+            if (!hasCatalogCapability) return false;
+        }
+        return (!CONFIG_TAB_FEATURES[id] || hasFeature(CONFIG_TAB_FEATURES[id], configTabDefault(CONFIG_TAB_FEATURES[id])))
+            && (!CONFIG_TAB_MODULES[id] || activeModules.includes(CONFIG_TAB_MODULES[id]));
+    };
     const currentTab = tabAllowed(activeTab) ? activeTab : 'general';
 
     // Agrupadas por tema: menú lateral en pantallas grandes, chips en móvil.

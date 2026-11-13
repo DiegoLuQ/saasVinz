@@ -117,7 +117,9 @@ def create_catalog_share_link(
 ):
     """Genera un nuevo token de catálogo para compartir con clientes."""
     _authorize(db, current_user, tenant_id, data.catalog_type, "create")
-    if data.catalog_type != "plans":
+    if data.catalog_type == "plans":
+        check_feature("servicios:planes:catalogo", default=True)(current_user=current_user)
+    else:
         # Catálogo público de productos: función del plan (antes solo se ocultaba en el frontend)
         check_feature("inventario:productos:catalogo", default=True)(current_user=current_user)
 

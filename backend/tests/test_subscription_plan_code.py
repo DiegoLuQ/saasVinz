@@ -73,3 +73,31 @@ def test_make_plan_code_unico():
     assert make_plan_code("Pro", {"PRO"}) == "PRO_2"
     assert make_plan_code("  ", set()) == "PLAN"
     assert len(make_plan_code("x" * 50, set())) <= 20
+
+
+def test_desactivar_plan_deja_de_ofrecerse(client, auth, db, world):
+    """Admin → Planes «Desactivar»: sale de la web y del cambio de plan; quien ya lo
+    tiene lo sigue viendo como su plan actual."""
+    h = auth("creator")
+    pro = db.get(models.SubscriptionPlan, world["pro_plan_id"])
+    try:
+        r = client.put(f"/api/internal/creator/plans/{pro.id}", headers=h, json=_body(pro, is_active=False))
+        assert r.status_code == 200 and r.json()["is_active"] is False
+        assert all(p["code"] != "PRO" for p in client.get("/api/public/plans").json())
+        # El admin lo sigue viendo para reactivarlo
+        assert any(p["id"] == pro.id for p in client.get("/api/internal/creator/plans", headers=h).json())
+        # Un crematorio en PRO lo sigue viendo; uno en FREE no puede pedirlo
+        ids_a = [p["id"] for p in client.get("/api/internal/billing/plans", headers=auth("a")).json()]
+        assert pro.id in ids_a
+        ids_free = [p["id"] for p in client.get("/api/internal/billing/plans", headers=auth("free")).json()]
+        assert pro.id not in ids_free
+        # Guardar sin is_active no lo reactiva
+        db.expire_all()
+        pro = db.get(models.SubscriptionPlan, world["pro_plan_id"])
+        body = _body(pro); body.pop("display_order")
+        r = client.put(f"/api/internal/creator/plans/{pro.id}", headers=h, json=body)
+        assert r.json()["is_active"] is False
+    finally:
+        db.expire_all()
+        pro = db.get(models.SubscriptionPlan, world["pro_plan_id"])
+        client.put(f"/api/internal/creator/plans/{pro.id}", headers=h, json=_body(pro, is_active=True))
