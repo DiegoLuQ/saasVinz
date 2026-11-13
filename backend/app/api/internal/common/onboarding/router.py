@@ -56,7 +56,7 @@ def create_free_account(
         raise HTTPException(status_code=400, detail="El correo electrónico ya está registrado.")
 
     # 3. Buscar el Plan FREE
-    free_plan = db.query(models.SubscriptionPlan).filter(models.SubscriptionPlan.name == "FREE").first()
+    free_plan = db.query(models.SubscriptionPlan).filter(models.SubscriptionPlan.code == "FREE").first()         or db.query(models.SubscriptionPlan).filter(models.SubscriptionPlan.name == "FREE").first()
     if not free_plan:
         raise HTTPException(status_code=500, detail="Error de configuración: Plan FREE no encontrado en el sistema.")
 

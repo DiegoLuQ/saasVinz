@@ -66,7 +66,8 @@ def _orders_query(status_filter: str | None) -> tuple[str, str]:
 
 def _rank(rows: list[dict], limit: int = LIMIT) -> list[dict]:
     out = [{"label": r["label"], "count": int(r["count"] or 0), "revenue": float(r.get("revenue") or 0),
-            **({"extra": float(r["extra"] or 0)} if "extra" in r else {})} for r in rows]
+            **({"extra": float(r["extra"] or 0)} if "extra" in r else {}),
+            **({"pending": int(r["pending"] or 0)} if "pending" in r else {})} for r in rows]
     out.sort(key=lambda r: (-r["count"], -r["revenue"], r["label"]))
     return out[:limit]
 
@@ -87,22 +88,38 @@ def compute(db: Session, tenant_id: int, year: int, month: int | None, status: s
         FROM o LEFT JOIN oc_financial f ON f.cremation_id = o.id
     """)[0]
 
+    # Planes y servicios agrupados por ID (el nombre puede cambiar). Nombre / grupo / «especial»
+    # salen de la copia guardada en la orden (services/order_snapshot.py): editar el catálogo
+    # no reescribe lo vendido. El ingreso de un plan es su precio: los servicios que INCLUYE
+    # no suman aparte (oc_services solo tiene los servicios agregados como línea propia).
     by_plan = q(f"""
         WITH o AS ({orders_sql})
-        SELECT coalesce(sp.name, 'Plan eliminado') AS label, count(DISTINCT o.id) AS count,
+        SELECT pl.plan_id,
+               coalesce(max(sp.name), max(pl.plan_name), 'Plan eliminado')
+                 || coalesce(' · ' || coalesce(max(sp.group_name), max(pl.plan_group)), '') AS label,
+               count(DISTINCT o.id) AS count,
                coalesce(sum(pl.precio_venta * coalesce(pl.cantidad, 1)), 0) AS revenue
         FROM o JOIN oc_plans pl ON pl.cremation_id = o.id
         LEFT JOIN srv_plans sp ON sp.id = pl.plan_id
-        GROUP BY 1
+        GROUP BY pl.plan_id
     """)
-    by_service = q(f"""
+    services = q(f"""
         WITH o AS ({orders_sql})
-        SELECT coalesce(ss.name, 'Servicio eliminado') AS label, count(DISTINCT o.id) AS count,
-               coalesce(sum(sv.precio_venta * coalesce(sv.cantidad, 1)), 0) AS revenue
+        SELECT sv.service_id,
+               coalesce(sv.is_special, ss.is_special, false) AS special,
+               coalesce(max(ss.name), max(sv.service_name), 'Servicio eliminado')
+                 || coalesce(' · ' || max(ss.group_name), '') AS label,
+               count(DISTINCT o.id) AS count,
+               coalesce(sum(sv.precio_venta * coalesce(sv.cantidad, 1)), 0) AS revenue,
+               count(DISTINCT o.id) FILTER (
+                   WHERE coalesce(sv.price_on_request, ss.price_on_request, false)
+                     AND coalesce(sv.precio_venta, 0) = 0) AS pending
         FROM o JOIN oc_services sv ON sv.cremation_id = o.id
         LEFT JOIN srv_services ss ON ss.id = sv.service_id
-        GROUP BY 1
+        GROUP BY sv.service_id, 2
     """)
+    by_special = [r for r in services if r["special"]]
+    by_extra = [{k: v for k, v in r.items() if k != "pending"} for r in services if not r["special"]]
     by_product = q(f"""
         WITH o AS ({orders_sql})
         SELECT coalesce(ip.name, 'Producto eliminado') AS label, ip.id AS pid,
@@ -267,7 +284,10 @@ def compute(db: Session, tenant_id: int, year: int, month: int | None, status: s
             "external_product_units": external_units, "external_product_revenue": external_revenue,
         },
         "by_plan": _rank(by_plan),
-        "by_service": _rank(by_service, FULL_LIMIT),
+        # Servicios especiales (adicionales: no vienen en el plan) y, aparte, los servicios
+        # normales vendidos sueltos. `pending` = órdenes con el servicio «a cotizar» aún en $0.
+        "by_special_service": _rank(by_special, FULL_LIMIT),
+        "by_extra_service": _rank(by_extra, FULL_LIMIT),
         "by_product": _rank(list(prod_map.values()), FULL_LIMIT),
         "by_city": _rank(by_city),
         "by_species": _rank(by_species),

@@ -17,6 +17,7 @@ from app.api.internal.partners.models import PartnerLinkV2 as PartnerLink, Partn
 from app.api.internal.agreements.models import Agreement
 from app.services import agreements as agreement_rules
 from app.services import stock as stock_rules
+from app.services import order_snapshot
 
 class CremationService:
     def __init__(self, db: Session):
@@ -360,10 +361,14 @@ class CremationService:
                         if not any(s.get("service_id") == s_id for s in servicios_in):
                             srv = self.db.query(models.Service).filter(models.Service.id == s_id).first()
                             servicios_in.append({"service_id": s_id, "cantidad": 1, "precio_venta": srv.price if srv else 0.0, "precio_costo": srv.cost if srv else 0.0, "es_principal": True})
+                # Los servicios que siguen en la orden conservan su copia (services/order_snapshot.py)
+                kept = order_snapshot.keep_services(
+                    self.db.query(models.ServicioOC).filter(models.ServicioOC.cremation_id == cremation_id).all())
                 self.db.query(models.ServicioOC).filter(models.ServicioOC.cremation_id == cremation_id).delete()
                 for s_item in servicios_in:
                     s_dict = s_item if isinstance(s_item, dict) else s_item.model_dump()
-                    self.db.add(models.ServicioOC(tenant_id=tenant_id, cremation_id=cremation_id, **s_dict))
+                    self.db.add(models.ServicioOC(tenant_id=tenant_id, cremation_id=cremation_id,
+                                                  **{**kept.get(s_dict.get("service_id"), {}), **s_dict}))
 
             # Planes
             if planes_in is not None or patch_plan_id is not None:
@@ -372,10 +377,14 @@ class CremationService:
                     if not any(p.get("plan_id") == patch_plan_id for p in planes_in):
                         pln = self.db.query(models.Plan).filter(models.Plan.id == patch_plan_id).first()
                         planes_in.append({"plan_id": patch_plan_id, "cantidad": 1, "precio_venta": pln.price if pln else 0.0, "precio_costo": 0.0, "es_principal": True})
+                # Mismo plan = se conserva lo contratado; plan nuevo = copia del plan actual
+                kept = order_snapshot.keep_plans(
+                    self.db.query(models.PlanOC).filter(models.PlanOC.cremation_id == cremation_id).all())
                 self.db.query(models.PlanOC).filter(models.PlanOC.cremation_id == cremation_id).delete()
                 for p_item in planes_in:
                     p_dict = p_item if isinstance(p_item, dict) else p_item.model_dump()
-                    self.db.add(models.PlanOC(tenant_id=tenant_id, cremation_id=cremation_id, **p_dict))
+                    self.db.add(models.PlanOC(tenant_id=tenant_id, cremation_id=cremation_id,
+                                              **{**kept.get(p_dict.get("plan_id"), {}), **p_dict}))
 
             # Productos (Stock management)
             if productos_in is not None:

@@ -182,9 +182,14 @@ class SubscriptionPlanCreate(BaseModel):
     # Dict de flags por característica granular (módulo:feature -> bool). Lo edita
     # el modal "Configurar Características". Opcional para no romper otros callers.
     features: Any = None
+    # Orden en que se muestran los planes (menor = primero). None = no se cambia.
+    display_order: int | None = Field(None, ge=0, le=999)
 
 class SubscriptionPlanResponse(SubscriptionPlanCreate):
     id: int
+    # Código interno fijo (FREE, TRACK, NORMAL, PRO, ULTRA…): la lógica usa el código,
+    # así el nombre se puede cambiar sin romper nada.
+    code: str | None = None
     class Config:
         from_attributes = True
 
@@ -363,7 +368,8 @@ async def get_creator_bootstrap(
 
         due_soon_tenants = []
         for t in due_soon_entities:
-            plan_name = t.subscription_plan.name if t.subscription_plan else (t.plan or "FREE")
+            from app.services.plan_features import plan_code
+            plan_name = plan_code(t.subscription_plan) if t.subscription_plan else (t.plan or "FREE").upper()
             if plan_name == "FREE":
                 continue  # FREE no factura; si arrastra una fecha vieja, no es accionable
             due_soon_tenants.append(schemas.DueSoonTenant(
@@ -1378,7 +1384,21 @@ async def get_plans(
     current_creator: User = Depends(get_current_creator),
     db: Session = Depends(get_db)
 ):
-    return db.query(models.SubscriptionPlan).all()
+    return (db.query(models.SubscriptionPlan)
+            .order_by(models.SubscriptionPlan.display_order, models.SubscriptionPlan.price,
+                      models.SubscriptionPlan.id).all())
+
+
+def _check_plan_name(db: Session, name: str, plan_id: int | None = None) -> str:
+    name = (name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="El plan necesita un nombre.")
+    q = db.query(models.SubscriptionPlan).filter(func.lower(models.SubscriptionPlan.name) == name.lower())
+    if plan_id:
+        q = q.filter(models.SubscriptionPlan.id != plan_id)
+    if q.first():
+        raise HTTPException(status_code=400, detail=f"Ya existe un plan llamado «{name}».")
+    return name
 
 class AnnualDiscount(BaseModel):
     pct: int = Field(..., ge=0, le=MAX_ANNUAL_DISCOUNT)
@@ -1440,7 +1460,14 @@ async def create_plan(
     current_creator: User = Depends(get_current_creator),
     db: Session = Depends(get_db)
 ):
-    new_plan = models.SubscriptionPlan(**plan_data.dict())
+    from app.services.plan_features import make_plan_code
+    data = plan_data.dict()
+    data["name"] = _check_plan_name(db, data["name"])
+    if data.get("display_order") is None:
+        top = db.query(func.max(models.SubscriptionPlan.display_order)).scalar()
+        data["display_order"] = (top or 0) + 1
+    taken = {c for (c,) in db.query(models.SubscriptionPlan.code).all() if c}
+    new_plan = models.SubscriptionPlan(**data, code=make_plan_code(data["name"], taken))
     apply_annual_price(db, new_plan)
     db.add(new_plan)
     db.commit()
@@ -1466,6 +1493,13 @@ async def update_plan(
     # sobrescribirlo con null cuando el cliente no lo envía (ej. el botón
     # "Guardar Cambios" de la card vs. el modal "Configurar Características").
     features_val = new_data.pop('features', None)
+    if new_data.get('display_order') is None:
+        new_data.pop('display_order', None)
+    new_data['name'] = _check_plan_name(db, new_data.get('name'), plan_id)
+    renamed = new_data['name'] != plan.name
+    if not plan.code:  # filas antiguas: fija el código con el nombre que tenía
+        from app.services.plan_features import plan_code
+        plan.code = plan_code(plan)[:20]
 
     # Update plan fields
     for key, value in new_data.items():
@@ -1476,6 +1510,10 @@ async def update_plan(
 
     # El anual sigue al mensual con el descuento global (no cambia lo ya contratado).
     apply_annual_price(db, plan)
+
+    if renamed:
+        # Copia antigua del nombre en sys_tenants.plan (pantallas/reportes que la leen).
+        db.query(models.Tenant).filter(models.Tenant.subscription_plan_id == plan_id)             .update({models.Tenant.plan: plan.name}, synchronize_session=False)
 
     db.commit()
     db.refresh(plan)

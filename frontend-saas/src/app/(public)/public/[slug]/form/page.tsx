@@ -104,6 +104,8 @@ export default function TenantFormPage() {
         if (!cardExportRef.current) return;
         setIsDownloadingCard(true);
         try {
+            // Fuentes de la plantilla cargadas: si no, el PNG sale con otra métrica de texto
+            if (document.fonts?.ready) await document.fonts.ready;
             const canvas = await html2canvas(cardExportRef.current, {
                 useCORS: true,
                 scale: 2,

@@ -34,6 +34,12 @@ export interface PlanData {
     features: Record<string, boolean>;
     is_active: boolean;
     display_order: number;
+    /** Código fijo (FREE, TRACK, NORMAL, PRO, ULTRA…). No cambia al renombrar el plan. */
+    code?: string | null;
+    can_export?: boolean;
+    can_delete?: boolean;
+    annual_price?: number | null;
+    ai_monthly_credits?: number;
 }
 
 interface PlanCardProps {
@@ -65,7 +71,7 @@ function PlanCard({ plan, allModules, saving, onSave, onSaveFeatures, onDelete }
         setDraft(plan);
     }, [plan]);
 
-    const theme = useMemo(() => getPlanTheme(plan.display_order, plan.name), [plan.display_order, plan.name]);
+    const theme = useMemo(() => getPlanTheme(plan.display_order, plan.code || plan.name), [plan.display_order, plan.code, plan.name]);
 
     const isDirty = useMemo(() => {
         return JSON.stringify(draft) !== JSON.stringify(plan);
@@ -111,8 +117,31 @@ function PlanCard({ plan, allModules, saving, onSave, onSaveFeatures, onDelete }
                         type="text"
                         value={draft.name}
                         onChange={(e) => updateField('name', e.target.value)}
+                        maxLength={40}
+                        title="Nombre que se muestra en todo el sistema (web, facturación, panel)"
                         className="text-xl font-black text-white bg-transparent outline-none border-b border-white/0 focus:border-white/20 transition-all w-full"
                     />
+                    <div className="flex flex-wrap items-center gap-2">
+                        {plan.code && (
+                            <span
+                                className="text-[10px] font-mono font-bold uppercase tracking-wider text-white/50 bg-white/5 border border-white/10 rounded-md px-1.5 py-0.5"
+                                title="Código interno fijo: el sistema usa este código, así puedes cambiar el nombre sin romper nada"
+                            >
+                                {plan.code}
+                            </span>
+                        )}
+                        <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-white/40" title="Posición del plan en la web, la comparación y la facturación (menor = primero)">
+                            Orden
+                            <input
+                                type="number"
+                                min={0}
+                                max={999}
+                                value={draft.display_order ?? 0}
+                                onChange={(e) => updateField('display_order', Math.max(0, Math.min(999, parseInt(e.target.value) || 0)))}
+                                className="w-14 text-xs font-bold text-white bg-white/5 border border-white/10 rounded-md px-1.5 py-0.5 outline-none focus:border-white/30"
+                            />
+                        </label>
+                    </div>
                     <div className="flex items-center gap-2">
                         <span className={`${theme.text} font-bold text-sm`}>$</span>
                         <input
@@ -212,6 +241,7 @@ function PlanCard({ plan, allModules, saving, onSave, onSaveFeatures, onDelete }
                 isOpen={featuresModalOpen}
                 onClose={() => setFeaturesModalOpen(false)}
                 planName={plan.name}
+                planCode={plan.code}
                 initialFeatures={draft.features || {}}
                 allowedModules={draft.allowed_modules || []}
                 saving={savingFeatures}

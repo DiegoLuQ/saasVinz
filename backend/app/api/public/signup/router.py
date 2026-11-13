@@ -218,7 +218,7 @@ def confirm_signup(
         # Segundo clic en el mismo enlace: la cuenta ya existe.
         raise HTTPException(status_code=409, detail="Tu cuenta ya está activa. Inicia sesión con tu correo y contraseña.")
 
-    plan = db.query(models.SubscriptionPlan).filter(func.upper(models.SubscriptionPlan.name) == "FREE").first()
+    plan = db.query(models.SubscriptionPlan).filter(models.SubscriptionPlan.code == "FREE").first()         or db.query(models.SubscriptionPlan).filter(func.upper(models.SubscriptionPlan.name) == "FREE").first()
     if not plan:
         logger.error("Registro autoservicio: no existe el plan FREE")
         raise HTTPException(status_code=500, detail="No pudimos crear tu cuenta. Escríbenos y te ayudamos.")

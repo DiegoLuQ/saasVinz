@@ -59,9 +59,13 @@ export default function CreatorDashboard() {
     const planBreakdown = useMemo(() => {
         const counts: Record<string, number> = {};
         tenants.forEach(t => { counts[t.plan] = (counts[t.plan] ?? 0) + 1; });
-        const order = ['FREE', 'Track', 'NORMAL', 'PRO', 'ULTRA'];
-        return order.filter(p => counts[p]).map(p => ({ plan: p, count: counts[p] }));
-    }, [tenants]);
+        // Orden = «Orden» de Admin → Planes; nombres que ya no existen (renombrados) al final.
+        const order = [...(bootstrapPlans || [])]
+            .sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0))
+            .map((p: any) => p.name as string);
+        const rest = Object.keys(counts).filter(n => !order.includes(n));
+        return [...order, ...rest].filter(p => counts[p]).map(p => ({ plan: p, count: counts[p] }));
+    }, [tenants, bootstrapPlans]);
     const pendingTransactions = useMemo(
         () => allTransactions.filter(t => t.payment_status === 'pending'),
         [allTransactions]

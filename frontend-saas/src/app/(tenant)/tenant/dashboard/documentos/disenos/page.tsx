@@ -414,6 +414,8 @@ export default function FarewellPickerPage() {
                 showToast('Imagen generada correctamente', 'success');
             } else {
                 if (!exportRef.current || !previewConfig) return;
+                // Fuentes de la plantilla cargadas: si no, el PNG sale con otra métrica de texto
+                if (document.fonts?.ready) await document.fonts.ready;
                 const canvas = await html2canvas(exportRef.current, {
                     useCORS: true,
                     scale: 2,

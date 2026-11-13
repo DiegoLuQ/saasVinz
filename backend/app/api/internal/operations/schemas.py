@@ -43,6 +43,10 @@ class ServicioOCCreate(ServicioOCBase):
 class ServicioOCInDB(ServicioOCBase):
     id: int
     service: Optional[ServiceInDB] = None
+    # Copia al venderse (services/order_snapshot.py)
+    service_name: Optional[str] = None
+    is_special: Optional[bool] = None
+    price_on_request: Optional[bool] = None
     model_config = {"from_attributes": True}
 
 class PlanOCBase(BaseModel):
@@ -59,6 +63,11 @@ class PlanOCCreate(PlanOCBase):
 class PlanOCInDB(PlanOCBase):
     id: int
     plan: Optional[PlanInDB] = None
+    # Lo contratado (services/order_snapshot.py): no cambia si después se edita el plan
+    plan_name: Optional[str] = None
+    plan_group: Optional[str] = None
+    included_services: Optional[list] = None
+    snapshot_source: Optional[str] = None
     model_config = {"from_attributes": True}
 
 class CremationTechnicalBase(BaseModel):

@@ -14,6 +14,7 @@ de Polar/Stripe ni nada que no sea público por naturaleza.
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from app.services.plan_features import plan_code
 from pydantic import BaseModel
 
 from app.database import get_db
@@ -41,6 +42,9 @@ from app.services.landing_features import get_landing_features, plan_offers
 
 class PublicPlan(BaseModel):
     name: str
+    # Código fijo (FREE, TRACK, NORMAL, PRO, ULTRA…): la web decide botones y textos
+    # por el código, no por el nombre (que el SuperAdmin puede cambiar).
+    code: str = ""
     description: Optional[str] = None
     display_order: int
 
@@ -107,6 +111,7 @@ def _serialize(plan: SubscriptionPlan, highlight_keys: List[str] | None = None, 
     return PublicPlan(
         name=plan.name,
         description=plan.description,
+        code=plan_code(plan),
         display_order=plan.display_order or 0,
         price=plan.price or 0.0,
         annual_price=annual,

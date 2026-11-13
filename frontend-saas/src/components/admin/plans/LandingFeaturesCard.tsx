@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, ExternalLink, Globe, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ExternalLink, Globe, Plus, Save, Trash2 } from 'lucide-react';
 import { apiRequest } from '@/lib/admin/api';
+import { planCode } from '@/lib/api/plans';
 import { FEATURES_REGISTRY } from './ManageFeaturesModal';
 import type { PlanData } from './PlanCard';
 
@@ -26,14 +27,14 @@ const VIRTUAL: { key: string; label: string }[] = [
 function planOffers(plan: PlanData, key: string): boolean {
     if (key.startsWith('core:')) return true;
     if (key === 'plan:can_export') return !!(plan as PlanData & { can_export?: boolean }).can_export;
-    if (key === 'plan:web_institucional') return plan.name.trim().toUpperCase() === 'ULTRA';
+    if (key === 'plan:web_institucional') return planCode(plan) === 'ULTRA';
     const modules = plan.allowed_modules || [];
     if (key.startsWith('mod:')) return modules.includes(key.slice(4));
     const features = (plan.features || {}) as Record<string, unknown>;
     if (key.startsWith('integraciones:')) {
         const v = features[key];
         if (typeof v === 'boolean') return v;
-        const name = plan.name.trim().toUpperCase();
+        const name = planCode(plan);
         return key === 'integraciones:formulario_incrustable' ? name === 'ULTRA' : ['PRO', 'ULTRA'].includes(name);
     }
     return modules.includes(key.split(':')[0]) && features[key] !== false;
@@ -46,6 +47,8 @@ function planOffers(plan: PlanData, key: string): boolean {
  */
 export default function LandingFeaturesCard({ plans, onSaved, onToast }: Props) {
     const [items, setItems] = useState<Item[]>([]);
+    // Acordeón: cerrado por defecto.
+    const [open, setOpen] = useState(false);
     const [groups, setGroups] = useState<string[]>([]);
     const [savedJson, setSavedJson] = useState('');
     const [saving, setSaving] = useState(false);
@@ -114,24 +117,28 @@ export default function LandingFeaturesCard({ plans, onSaved, onToast }: Props) 
         }
     };
 
-    const sortedPlans = [...plans].sort((a, b) => (a.price || 0) - (b.price || 0));
+    const sortedPlans = [...plans].sort((a, b) => ((a.display_order || 0) - (b.display_order || 0)) || ((a.price || 0) - (b.price || 0)));
 
     return (
         <section className="bg-[#0a192f] border border-sky-500/20 rounded-3xl p-6 space-y-5">
             <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-5">
-                <div className="flex items-start gap-3">
+                <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className="flex items-start gap-3 text-left flex-1 min-w-0">
                     <span className="p-2.5 rounded-2xl bg-sky-500/15 text-sky-400 shrink-0">
                         <Globe size={22} />
                     </span>
                     <div>
-                        <h3 className="text-lg font-black text-white">Funciones en la web</h3>
+                        <h3 className="text-lg font-black text-white">
+                            Funciones en la web
+                            {!open && items.length > 0 && <span className="ml-2 text-sm font-bold text-sky-400">{items.length} funciones</span>}
+                        </h3>
                         <p className="text-sm text-white/50 max-w-2xl">
                             Lo que la página pública muestra al comparar planes (tarjetas de la landing y «Comparar planes»), con el nombre
                             que verá el cliente. Qué plan tiene cada función sale solo de sus módulos y características.
                         </p>
                     </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
+                    <ChevronDown size={20} className={`ml-auto mt-1 shrink-0 text-white/40 transition-transform ${open ? 'rotate-180' : ''}`} />
+                </button>
+                {open && <div className="flex flex-wrap items-center gap-2">
                     <a href="/comparar-planes" target="_blank" rel="noopener" className="flex items-center gap-1.5 px-4 py-3 rounded-2xl bg-white/5 hover:bg-white/10 text-white/80 text-sm font-bold border border-white/10">
                         <ExternalLink size={15} /> Ver comparación
                     </a>
@@ -143,9 +150,10 @@ export default function LandingFeaturesCard({ plans, onSaved, onToast }: Props) 
                     >
                         <Save size={16} /> {saving ? 'Guardando…' : 'Guardar'}
                     </button>
-                </div>
+                </div>}
             </div>
 
+            {open && <>
             <div className="overflow-x-auto rounded-2xl border border-white/10">
                 <table className="w-full min-w-[900px] text-sm">
                     <thead>
@@ -226,6 +234,7 @@ export default function LandingFeaturesCard({ plans, onSaved, onToast }: Props) 
                 («Todos los planes incluyen…»). La tabla de «Comparar planes» muestra todo, agrupado. ✓ = el plan lo incluye según sus módulos y
                 características (una característica sin valor guardado cuenta como incluida).
             </p>
+            </>}
         </section>
     );
 }

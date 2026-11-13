@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { FileDown, Plus } from 'lucide-react';
 import { apiRequest } from '@/lib/admin/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { useAdminPlans, useAdminBootstrap } from '@/hooks/useAdminBootstrap';
@@ -11,6 +11,7 @@ import CreatePlanModal from '@/components/admin/plans/CreatePlanModal';
 import AnnualDiscountCard from '@/components/admin/plans/AnnualDiscountCard';
 import LandingFeaturesCard from '@/components/admin/plans/LandingFeaturesCard';
 import type { PlanModuleDef } from '@/components/admin/plans/PlanModuleToggle';
+import { downloadPlansPdf } from '@/components/admin/plans/buildPlansPdf';
 
 const ALL_MODULES: PlanModuleDef[] = [
     { key: 'dashboard', name: 'Dashboard' },
@@ -43,18 +44,16 @@ export default function PlansPage() {
     const [savingId, setSavingId] = useState<number | null>(null);
     const [createModalOpen, setCreateModalOpen] = useState(false);
     const [creating, setCreating] = useState(false);
+    const [pdfBusy, setPdfBusy] = useState(false);
     const [deleteModal, setDeleteModal] = useState<{ open: boolean; plan: PlanData | null }>({
         open: false,
         plan: null
     });
 
     const plans: PlanData[] = useMemo(() => {
-        return [...(bootstrapPlans || [])].sort((a, b) => {
-            const priceDiff = (a.price || 0) - (b.price || 0);
-            if (priceDiff !== 0) return priceDiff;
-            // Empate por precio: respetar display_order como secundario
-            return (a.display_order || 0) - (b.display_order || 0);
-        });
+        // Mismo orden que la web y la facturación: «Orden» de cada plan (display_order).
+        return [...(bootstrapPlans || [])].sort((a, b) =>
+            ((a.display_order || 0) - (b.display_order || 0)) || ((a.price || 0) - (b.price || 0)));
     }, [bootstrapPlans]);
 
     const handleSavePlan = async (plan: PlanData) => {
@@ -128,8 +127,8 @@ export default function PlansPage() {
                     max_users: 3,
                     max_partners: 5,
                     allowed_modules: ['dashboard', 'clientes', 'mascotas'],
-                    is_active: true,
-                    display_order: plans.length
+                    is_active: true
+                    // display_order: el backend lo pone al final.
                 }
             });
             showToast(`Plan ${name} creado`, 'success');
@@ -142,6 +141,18 @@ export default function PlansPage() {
         }
     };
 
+    const handlePdf = async () => {
+        setPdfBusy(true);
+        try {
+            const disc = await apiRequest('/api/internal/creator/pricing/annual-discount').catch(() => null) as { pct?: number } | null;
+            await downloadPlansPdf(plans, disc?.pct ?? null);
+        } catch (err: any) {
+            showToast(err?.message || 'No se pudo generar el PDF', 'error');
+        } finally {
+            setPdfBusy(false);
+        }
+    };
+
     return (
         <div className="p-8 max-w-7xl mx-auto space-y-8 min-h-screen">
             <header className="flex items-center justify-between sticky top-0 bg-[#061121]/50 backdrop-blur-md z-10 py-4 mb-4">
@@ -149,6 +160,16 @@ export default function PlansPage() {
                     <h2 className="text-3xl font-black text-white">Configuración de Planes</h2>
                     <p className="text-white/40 text-sm">Gestiona límites y módulos para cada tier de suscripción</p>
                 </div>
+                <div className="flex flex-wrap items-center gap-3">
+                <button
+                    onClick={handlePdf}
+                    disabled={pdfBusy || plans.length === 0}
+                    className="flex items-center gap-2 px-5 py-3 bg-white/5 hover:bg-white/10 border border-white/10 disabled:opacity-50 text-white font-bold rounded-2xl transition-all"
+                    title="Planes con precios, límites, módulos y características"
+                >
+                    <FileDown size={18} />
+                    <span>{pdfBusy ? 'Generando…' : 'Descargar PDF'}</span>
+                </button>
                 <button
                     onClick={() => setCreateModalOpen(true)}
                     disabled={plans.length >= MAX_PLANS}
@@ -158,6 +179,7 @@ export default function PlansPage() {
                     <span>Crear Nuevo Plan</span>
                     <span className="ml-2 text-[10px] opacity-60">({plans.length}/{MAX_PLANS})</span>
                 </button>
+                </div>
             </header>
 
             <AnnualDiscountCard plans={plans} onSaved={afterChange} onToast={showToast} />

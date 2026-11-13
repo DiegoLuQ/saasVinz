@@ -1,7 +1,7 @@
 /**
  * Diagnóstico 360°. Admin: /api/internal/creator/diagnostics; landing pública
  * vinzer.cl/diagnostico: /api/public/diagnostic (backend services/diagnostics.py;
- * especificación DIAGNOSTICO_360.md). Tipos compartidos por el admin, la landing y el PDF.
+ * especificación docs/DIAGNOSTICO_360.md). Tipos compartidos por el admin, la landing y el PDF.
  */
 export const DIAG_API = '/api/internal/creator/diagnostics';
 export const PUBLIC_DIAG_API = '/api/public/diagnostic';

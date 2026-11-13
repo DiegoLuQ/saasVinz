@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, Check, Minus, Star } from 'lucide-react';
 import { VinzerLogo } from '@/components/vinzer/VinzerLogo';
-import { fetchPlanHighlights, fetchPublicPlans, type PlanHighlight, type PublicPlan } from '@/lib/api/plans';
+import { fetchPlanHighlights, fetchPublicPlans, planCode, type PlanHighlight, type PublicPlan } from '@/lib/api/plans';
 import { planCta, VINZER_WHATSAPP, type PlanCtaKind } from '@/lib/vinzer/planCta';
 import { ComparePlansScroller } from '@/components/vinzer/ComparePlansScroller';
 
@@ -26,7 +26,6 @@ const CTA_CLASS: Record<PlanCtaKind, string> = {
 };
 
 /** Mismo orden que las tarjetas de la landing; FREE va primero en la tabla. */
-const PLAN_ORDER = ['FREE', 'TRACK', 'NORMAL', 'PRO', 'ULTRA'];
 
 const formatCLP = (value: number) => new Intl.NumberFormat('es-CL').format(Math.round(value));
 
@@ -51,14 +50,8 @@ async function fetchAnnualDiscount(): Promise<{ pct: number; launch: boolean } |
  */
 export default async function CompararPlanesPage() {
     const [rawPlans, highlights, discount] = await Promise.all([fetchPublicPlans(), fetchPlanHighlights(), fetchAnnualDiscount()]);
-    const plans: PublicPlan[] = [...(rawPlans ?? [])].sort((a, b) => {
-        const ia = PLAN_ORDER.indexOf(a.name.toUpperCase());
-        const ib = PLAN_ORDER.indexOf(b.name.toUpperCase());
-        if (ia === -1 && ib === -1) return a.price - b.price;
-        if (ia === -1) return 1;
-        if (ib === -1) return -1;
-        return ia - ib;
-    });
+    // Orden = «Orden» de cada plan en Admin → Planes (display_order).
+    const plans: PublicPlan[] = [...(rawPlans ?? [])].sort((a, b) => (a.display_order - b.display_order) || (a.price - b.price));
     const pct = discount?.pct ?? 0;
 
     // Créditos IA: precio del crédito adicional por plan (CLP con el tipo de cambio fijo).
@@ -117,7 +110,7 @@ export default async function CompararPlanesPage() {
         })),
     ];
 
-    const highlightCol = plans.findIndex((p) => p.name.toUpperCase() === 'PRO');
+    const highlightCol = plans.findIndex((p) => planCode(p) === 'PRO');
 
     return (
         <div className="min-h-screen bg-[#020210] text-[#FFFFFF] font-sans antialiased overflow-x-hidden relative selection:bg-[#19B5FE]/30 selection:text-[#FFFFFF] pb-20">
@@ -192,7 +185,7 @@ export default async function CompararPlanesPage() {
                                                             {p.price > 0 ? `$${formatCLP(p.price)} CLP / mes` : '$0 CLP / mes'}
                                                         </p>
                                                         {(() => {
-                                                            const cta = planCta(p.name, p.price);
+                                                            const cta = planCta(p.name, p.price, p.code);
                                                             return (
                                                                 <a
                                                                     href={cta.href}

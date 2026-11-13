@@ -80,6 +80,7 @@ class SubscriptionPlanCreate(SubscriptionPlanBase):
 
 class SubscriptionPlanInDB(SubscriptionPlanBase):
     id: int
+    code: Optional[str] = None
     created_at: datetime
     model_config = {"from_attributes": True}
 

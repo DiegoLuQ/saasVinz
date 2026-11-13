@@ -9,6 +9,8 @@
 
 export interface PublicPlan {
     name: string;
+    /** Código fijo (FREE, TRACK, NORMAL, PRO, ULTRA…). La lógica usa el código; el nombre se puede cambiar. */
+    code?: string;
     description: string | null;
     display_order: number;
 
@@ -90,3 +92,7 @@ export async function fetchPublicPlans(): Promise<PublicPlan[] | null> {
         return null;
     }
 }
+
+/** Código del plan (FREE, TRACK…): el `code` fijo, o el nombre en mayúsculas en planes antiguos. */
+export const planCode = (p: { code?: string | null; name?: string | null }) =>
+    (p.code || p.name || '').trim().toUpperCase();

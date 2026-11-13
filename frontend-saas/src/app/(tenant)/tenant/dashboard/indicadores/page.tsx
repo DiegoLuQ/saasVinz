@@ -10,12 +10,13 @@ import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
     BarChart3, Building2, ClipboardList, Dog, Flame, Heart, Loader2, MapPin, Package, Receipt, Stethoscope, Wallet, Wrench, Layers,
-    Search, ArrowDown, Scale,
+    Search, ArrowDown, Scale, Sparkles,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/tenant/api';
 import { useCurrentUser } from '@/hooks/useSessionBootstrap';
 
-interface RankRow { label: string; count: number; revenue: number; extra?: number }
+/** `pending` (servicios especiales): órdenes con el servicio «a cotizar» aún en $0. */
+interface RankRow { label: string; count: number; revenue: number; extra?: number; pending?: number }
 interface MonthRow { month: number; orders: number; revenue: number; forms: number; memorials: number }
 interface KpiData {
     year: number;
@@ -26,7 +27,7 @@ interface KpiData {
         orders: number; revenue: number; avg_ticket: number; forms: number; forms_processed: number;
         form_conversion: number | null; memorials: number; external_product_units: number; external_product_revenue: number;
     };
-    by_plan: RankRow[]; by_service: RankRow[]; by_product: RankRow[]; by_city: RankRow[];
+    by_plan: RankRow[]; by_special_service: RankRow[]; by_extra_service: RankRow[]; by_product: RankRow[]; by_city: RankRow[];
     by_species: RankRow[]; by_weight?: RankRow[]; by_agreement: RankRow[]; by_veterinary: RankRow[];
     monthly: MonthRow[];
 }
@@ -145,6 +146,7 @@ function RankCard({ title, icon: Icon, rows, countLabel, extraLabel, revenueLabe
             count: rest.reduce((s, r) => s + r.count, 0),
             revenue: rest.reduce((s, r) => s + r.revenue, 0),
             extra: rest.reduce((s, r) => s + (r.extra || 0), 0),
+            pending: rest.reduce((s, r) => s + (r.pending || 0), 0),
         }];
     }, [rows, metric]);
     const max = Math.max(1, ...shown.map(r => r[metric]));
@@ -185,6 +187,7 @@ function RankCard({ title, icon: Icon, rows, countLabel, extraLabel, revenueLabe
                                 <div className="absolute right-0 top-full mt-1 z-10 rounded-lg bg-slate-900 dark:bg-white px-2.5 py-1.5 text-xs font-semibold text-white dark:text-slate-900 shadow-lg whitespace-nowrap">
                                     {countLabel}: {num(r.count)} · {revenueLabel}: {clp(r.revenue)}
                                     {extraLabel && r.extra !== undefined && <> · {extraLabel}: {clp(r.extra)}</>}
+                                    {!!r.pending && <> · {num(r.pending)} por cotizar</>}
                                 </div>
                             )}
                         </li>
@@ -256,7 +259,15 @@ function RankTable({ title, icon: Icon, rows, countLabel, empty }: {
                             {filtered.slice(0, shown).map((r, i) => (
                                 <tr key={r.label} className="border-b border-slate-100 dark:border-white/5 last:border-0">
                                     <td className="py-2 pr-2 text-xs text-slate-400 tabular-nums">{i + 1}</td>
-                                    <td className="py-2 pr-3 font-semibold text-slate-700 dark:text-slate-200 max-w-[260px] truncate" title={r.label}>{r.label}</td>
+                                    <td className="py-2 pr-3 font-semibold text-slate-700 dark:text-slate-200 max-w-[260px] truncate" title={r.label}>
+                                        {r.label}
+                                        {!!r.pending && (
+                                            <span className="ml-2 inline-block rounded-full bg-amber-100 dark:bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-300"
+                                                title="Órdenes con este servicio «a cotizar» que aún tienen precio $0">
+                                                {num(r.pending)} por cotizar
+                                            </span>
+                                        )}
+                                    </td>
                                     <td className="py-2 pr-3 text-right font-bold tabular-nums text-slate-900 dark:text-white">{num(r.count)}</td>
                                     <td className="py-2 pr-3 text-right font-bold tabular-nums text-slate-900 dark:text-white">{clp(r.revenue)}</td>
                                     <td className="py-2 hidden sm:table-cell">
@@ -364,9 +375,10 @@ export default function IndicadoresPage() {
             {data && t && section === 'catalogo' && (
                 <div className="space-y-4">
                     <RankTable title="Productos" icon={Package} rows={data.by_product} countLabel="Unidades" empty="Sin productos en el periodo" />
-                    <RankTable title="Servicios" icon={Wrench} rows={data.by_service} countLabel="Órdenes" empty="Sin servicios en el periodo" />
+                    <RankTable title="Servicios especiales" icon={Sparkles} rows={data.by_special_service} countLabel="Órdenes" empty="Sin servicios especiales en el periodo" />
+                    <RankTable title="Servicios normales vendidos sueltos" icon={Wrench} rows={data.by_extra_service} countLabel="Órdenes" empty="Ningún servicio vendido fuera de un plan en el periodo" />
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Ingresos = precio de lista de cada línea, antes de descuentos.
+                        Ingresos = precio de lista de cada línea, antes de descuentos. Los servicios incluidos en un plan no suman aparte: su ingreso está en el plan.
                         {t.external_product_units > 0 && <> «Productos» incluye {num(t.external_product_units)} unidad(es) vendidas a clientes externos desde el catálogo ({clp(t.external_product_revenue)}).</>}
                     </p>
                 </div>
@@ -387,6 +399,7 @@ export default function IndicadoresPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                         <RankCard title="Por plan" icon={Layers} rows={data.by_plan} countLabel="Órdenes" empty="Sin planes en el periodo" />
+                        <RankCard title="Servicios especiales" icon={Sparkles} rows={data.by_special_service || []} countLabel="Órdenes" empty="Sin servicios especiales en el periodo" />
                         <RankCard title="Por peso / tamaño" icon={Scale} rows={data.by_weight || []} countLabel="Órdenes" empty="Sin órdenes con peso en el periodo" />
                         <RankCard title="Por especie" icon={Dog} rows={data.by_species} countLabel="Órdenes" empty="Sin órdenes en el periodo" />
                         <RankCard title="Por ciudad" icon={MapPin} rows={data.by_city} countLabel="Órdenes" empty="Sin órdenes en el periodo" />

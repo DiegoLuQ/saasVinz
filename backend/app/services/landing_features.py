@@ -97,7 +97,8 @@ def plan_offers(plan, key: str) -> bool:
     if key == "plan:can_export":
         return bool(plan.can_export)
     if key == "plan:web_institucional":
-        return (plan.name or "").strip().upper() == "ULTRA"
+        from app.services.plan_features import plan_code
+        return plan_code(plan) == "ULTRA"
     modules = set(plan.allowed_modules or [])
     if key.startswith("mod:"):
         return key[4:] in modules

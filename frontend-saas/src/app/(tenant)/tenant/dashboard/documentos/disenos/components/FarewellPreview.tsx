@@ -358,6 +358,23 @@ const FarewellPreview = forwardRef<HTMLDivElement, FarewellPreviewProps>(({ conf
                 height: dims.height,
                 backgroundColor: config.styles?.background || '#fff',
                 color: config.styles?.color || '#000',
+                // Tipografía propia, igual a la del editor (admin → Despedidas): sin esto la
+                // tarjeta heredaba alto de línea / espaciado / alineación de la página donde se
+                // muestra (seguimiento, panel), y como el nombre y los textos se centran en
+                // vertical según su propia altura, se movían unos píxeles respecto del editor.
+                fontSize: '16px',
+                lineHeight: 1.5,
+                letterSpacing: 'normal',
+                wordSpacing: 'normal',
+                textAlign: 'left',
+                textTransform: 'none',
+                fontWeight: 400,
+                fontStyle: 'normal',
+                whiteSpace: 'normal',
+                fontFeatureSettings: 'normal',
+                fontVariationSettings: 'normal',
+                WebkitFontSmoothing: 'antialiased',
+                MozOsxFontSmoothing: 'grayscale',
             }}
         >
             {/* Background image */}
@@ -465,9 +482,12 @@ const FarewellPreview = forwardRef<HTMLDivElement, FarewellPreviewProps>(({ conf
                     zIndex: config.styles?.zIndex?.petName || 20,
                 }}
             >
-                <h1
-                    className="font-bold tracking-tight"
+                {/* div (no h1): el CSS del panel fuerza `main h1` a azul marino con !important */}
+                <div
+                    role="heading"
+                    aria-level={1}
                     style={{
+                        margin: 0,
                         fontFamily: config.petNameFormatting?.fontFamily || fontFamily,
                         fontSize: `${px(config.petNameFormatting?.fontSize, 36)}px`,
                         fontWeight: config.petNameFormatting?.bold ?? true ? 'bold' : 'normal',
@@ -476,7 +496,7 @@ const FarewellPreview = forwardRef<HTMLDivElement, FarewellPreviewProps>(({ conf
                     }}
                 >
                     {config.elements?.petName}
-                </h1>
+                </div>
             </div>
 
             {/* Subtitle — slogan/fecha. Centrado horizontalmente desde el centro vertical. */}

@@ -96,7 +96,8 @@ def _tenant_has_memorials(tenant: models.Tenant | None, memorials_total: int = 0
     if not tenant:
         return False
     plan = getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None)
-    plan_name = ((plan.name if plan else None) or getattr(tenant, "plan", None) or "FREE").upper()
+    from app.services.plan_features import plan_code
+    plan_name = (plan_code(plan) if plan else None) or (getattr(tenant, "plan", None) or "FREE").upper()
     features = plan.features if plan and isinstance(plan.features, dict) else {}
     if "mascotas:memorial" in features and not features.get("mascotas:memorial"):
         return False

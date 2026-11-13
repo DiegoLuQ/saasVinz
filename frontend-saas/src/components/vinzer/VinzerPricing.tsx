@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Star, ShieldCheck, Check, Gift, Sparkles } from 'lucide-react';
 import Link from 'next/link';
-import type { PlanHighlight, PublicPlan } from '@/lib/api/plans';
+import { planCode, type PlanHighlight, type PublicPlan } from '@/lib/api/plans';
 import { planCta, VINZER_WHATSAPP } from '@/lib/vinzer/planCta';
 
 
@@ -41,12 +41,6 @@ const PLAN_COPY: Record<string, {
     },
 };
 
-/**
- * Orden de las tarjetas de pago. Se fija aquí y no por `display_order` porque
- * en la BD ese campo tiene a Track empatado con ULTRA, lo que lo empuja al
- * final. FREE queda fuera de la grilla: tiene su propio bloque.
- */
-const PAID_PLAN_ORDER = ['TRACK', 'NORMAL', 'PRO', 'ULTRA'];
 
 const formatCLP = (value: number) => new Intl.NumberFormat('es-CL').format(Math.round(value));
 
@@ -100,15 +94,8 @@ export function VinzerPricing({ theme = 'dark', initialPlans = null, initialHigh
     const freePlan = plans.find((p) => p.price === 0) ?? null;
     const paidPlans = plans
         .filter((p) => p.price > 0)
-        .sort((a, b) => {
-            const ia = PAID_PLAN_ORDER.indexOf(a.name.toUpperCase());
-            const ib = PAID_PLAN_ORDER.indexOf(b.name.toUpperCase());
-            // Un plan no listado va al final, ordenado por precio.
-            if (ia === -1 && ib === -1) return a.price - b.price;
-            if (ia === -1) return 1;
-            if (ib === -1) return -1;
-            return ia - ib;
-        });
+        // Orden = «Orden» de cada plan en Admin → Planes (display_order). FREE tiene su propio bloque.
+        .sort((a, b) => (a.display_order - b.display_order) || (a.price - b.price));
 
     const hasAnnualOffer = paidPlans.some((p) => p.annual_price != null && p.annual_price > 0);
     const pct = hasAnnualOffer && discount && discount.pct > 0 ? discount.pct : 0;
@@ -275,14 +262,14 @@ export function VinzerPricing({ theme = 'dark', initialPlans = null, initialHigh
 function PlanCard({ plan, prev, highlights, isAnnual, isLight, pct }: {
     plan: PublicPlan; prev: PublicPlan | null; highlights: PlanHighlight[]; isAnnual: boolean; isLight: boolean; pct: number;
 }) {
-    const copy = PLAN_COPY[plan.name.toUpperCase()] ?? {
+    const copy = PLAN_COPY[planCode(plan)] ?? {
         category: 'Plan',
         tagline: plan.description ?? '',
     };
 
     const isRecommended = copy.highlight === 'recommended';
     const isTop = copy.highlight === 'top';
-    const cta = planCta(plan.name, plan.price);
+    const cta = planCta(plan.name, plan.price, plan.code);
 
     // El anual solo se muestra si la BD tiene annual_price. Hoy Track no lo tiene:
     // esa tarjeta se queda en mensual en vez de inventar un precio.
@@ -407,7 +394,7 @@ function PlanCard({ plan, prev, highlights, isAnnual, isLight, pct }: {
  */
 function FreePlanBlock({ plan, isLight }: { plan: PublicPlan; isLight: boolean }) {
     const copy = PLAN_COPY.FREE;
-    const freeCta = planCta(plan.name, 0);
+    const freeCta = planCta(plan.name, 0, plan.code);
 
     const highlights = [
         `${plan.max_orders} órdenes al mes`,

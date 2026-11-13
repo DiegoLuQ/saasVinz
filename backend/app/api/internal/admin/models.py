@@ -19,6 +19,9 @@ class SubscriptionPlan(Base):
     __tablename__ = "sys_subscription_plans"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True) # FREE, NORMAL, PRO, PRO+
+    # Código interno fijo (FREE, TRACK, NORMAL, PRO, ULTRA): la lógica usa el código, no el
+    # nombre, para poder renombrar el plan (migración e7b9d1f3a250, plan_features.plan_code)
+    code = Column(String(20), unique=True, nullable=True)
     max_pets = Column(Integer, default=10)
     max_services = Column(Integer, default=10)
     max_plans = Column(Integer, default=4)

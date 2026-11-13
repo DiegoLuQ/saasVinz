@@ -23,6 +23,26 @@ NAME_FALLBACK: dict[str, set[str]] = {
 }
 
 
+def plan_code(plan) -> str:
+    """Código interno fijo del plan (FREE, TRACK, NORMAL, PRO, ULTRA…). La lógica compara
+    el código, nunca el nombre: el SuperAdmin puede renombrar el plan sin romper nada.
+    Sin código (filas antiguas) = el nombre en mayúsculas, como antes."""
+    if not plan:
+        return ""
+    return ((getattr(plan, "code", None) or getattr(plan, "name", None) or "").strip().upper())
+
+
+def make_plan_code(name: str, taken: set[str]) -> str:
+    """Código para un plan nuevo a partir de su nombre (único, ≤ 20, A-Z 0-9 _)."""
+    import re
+    base = re.sub(r"[^A-Z0-9_]+", "_", (name or "").strip().upper()).strip("_")[:20] or "PLAN"
+    code, n = base, 2
+    while code in taken:
+        code = f"{base[:20 - len(str(n)) - 1]}_{n}"
+        n += 1
+    return code
+
+
 def plan_has(plan, key: str) -> bool:
     """¿El plan incluye la característica? (usa effective_plan del tenant al llamarla)."""
     if not plan:
@@ -31,7 +51,7 @@ def plan_has(plan, key: str) -> bool:
     value = features.get(key)
     if isinstance(value, bool):
         return value
-    return (plan.name or "").strip().upper() in NAME_FALLBACK.get(key, set())
+    return plan_code(plan) in NAME_FALLBACK.get(key, set())
 
 
 def tenant_has(tenant, key: str) -> bool:

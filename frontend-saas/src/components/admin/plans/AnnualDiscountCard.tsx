@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { BadgePercent, Lock, Save } from 'lucide-react';
+import { BadgePercent, ChevronDown, Lock, Save } from 'lucide-react';
 import { apiRequest } from '@/lib/admin/api';
 import type { PlanData } from './PlanCard';
 
@@ -24,6 +24,8 @@ export default function AnnualDiscountCard({ plans, onSaved, onToast }: Props) {
     const [pct, setPct] = useState('25');
     const [launch, setLaunch] = useState(true);
     const [saving, setSaving] = useState(false);
+    // Acordeón: cerrado por defecto para que las tarjetas de los planes queden a la vista.
+    const [open, setOpen] = useState(false);
 
     useEffect(() => {
         apiRequest('/api/internal/creator/pricing/annual-discount')
@@ -56,19 +58,23 @@ export default function AnnualDiscountCard({ plans, onSaved, onToast }: Props) {
     return (
         <section className="bg-[#0a192f] border border-emerald-500/20 rounded-3xl p-6 space-y-5">
             <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-5">
-                <div className="flex items-start gap-3">
+                <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className="flex items-start gap-3 text-left flex-1 min-w-0">
                     <span className="p-2.5 rounded-2xl bg-emerald-500/15 text-emerald-400 shrink-0">
                         <BadgePercent size={22} />
                     </span>
                     <div>
-                        <h3 className="text-lg font-black text-white">Descuento por pago anual</h3>
+                        <h3 className="text-lg font-black text-white">
+                            Descuento por pago anual
+                            {!open && saved && <span className="ml-2 text-sm font-bold text-emerald-400">{saved.pct}%{saved.launch ? ' · lanzamiento' : ''}</span>}
+                        </h3>
                         <p className="text-sm text-white/50 max-w-xl">
                             Un mismo porcentaje para todos los planes. El precio anual se calcula solo: mensual × 12 menos el descuento.
                         </p>
                     </div>
-                </div>
+                    <ChevronDown size={20} className={`ml-auto mt-1 shrink-0 text-white/40 transition-transform ${open ? 'rotate-180' : ''}`} />
+                </button>
 
-                <div className="flex flex-wrap items-center gap-3">
+                {open && <div className="flex flex-wrap items-center gap-3">
                     <label className="flex items-center gap-2 rounded-2xl bg-white/5 border border-white/10 px-4 py-2.5">
                         <input
                             type="number"
@@ -89,9 +95,10 @@ export default function AnnualDiscountCard({ plans, onSaved, onToast }: Props) {
                     >
                         <Save size={16} /> {saving ? 'Guardando…' : 'Guardar'}
                     </button>
-                </div>
+                </div>}
             </div>
 
+            {open && <>
             <label className="flex items-start gap-3 cursor-pointer select-none">
                 <input
                     type="checkbox"
@@ -139,6 +146,7 @@ export default function AnnualDiscountCard({ plans, onSaved, onToast }: Props) {
                     y no cambia. Si cobras por Polar, ajusta también el precio del producto anual allá.
                 </span>
             </p>
+            </>}
         </section>
     );
 }

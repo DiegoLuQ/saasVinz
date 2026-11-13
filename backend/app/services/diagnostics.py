@@ -1,5 +1,5 @@
 """Diagnóstico 360° para crematorios prospecto (Admin → Comercial → «Diagnóstico 360°»).
-Especificación: DIAGNOSTICO_360.md.
+Especificación: docs/DIAGNOSTICO_360.md.
 
 - Cada alternativa vale un % de cumplimiento; «No aplica» no cuenta.
 - % de categoría = promedio de sus preguntas respondidas.

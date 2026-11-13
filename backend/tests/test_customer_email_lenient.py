@@ -48,8 +48,9 @@ def test_customer_create_sanitizes_and_validates():
     c = CustomerCreate(name="Gabriela", email="gabriela. cisternas.15.gc@gmail.con")
     assert c.email == "gabriela.cisternas.15.gc@gmail.com"
 
-    with pytest.raises(ValueError):
-        CustomerCreate(name="Bad", email="user!#$@gmail.com")
+    # Los caracteres que un correo no admite se quitan (ñ → n, sin tildes; app/utils/sanitize.py)
+    assert CustomerCreate(name="Bad", email="user!#$@gmail.com").email == "user@gmail.com"
+    assert CustomerCreate(name="Ñandú", email="nandú.peña@gmail.com").email == "nandu.pena@gmail.com"
 
     with pytest.raises(ValueError):
         CustomerCreate(name="BadGmail", email="user@gmail.net")

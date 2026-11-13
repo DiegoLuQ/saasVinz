@@ -7,6 +7,9 @@ import { cn } from "@/lib/utils";
 export interface Plan {
     id: number;
     name: string;
+    /** Código fijo (FREE, TRACK, NORMAL, PRO, ULTRA…); la lógica lo usa en vez del nombre. */
+    code?: string | null;
+    display_order?: number;
     description?: string;
     monthly_price: number;
     annual_price: number; // puede venir null (plan sin pago anual, ej. Track)
@@ -40,15 +43,15 @@ const NAME_FALLBACK: Record<string, string[]> = {
     'integraciones:formulario_incrustable': ['ULTRA'],
     'integraciones:video_bienvenida': ['PRO', 'ULTRA'],
 };
-const planHas = (p: { name: string; features?: unknown }, key: string) => {
+const planHas = (p: { name: string; code?: string | null; features?: unknown }, key: string) => {
     const v = (p.features as Record<string, unknown> | undefined)?.[key];
-    return typeof v === 'boolean' ? v : (NAME_FALLBACK[key] ?? []).includes(p.name.trim().toUpperCase());
+    return typeof v === 'boolean' ? v : (NAME_FALLBACK[key] ?? []).includes((p.code || p.name).trim().toUpperCase());
 };
 
 const formatPrice = (amount: number) =>
     new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(amount);
 
-const planKey = (p: Plan) => p.name.trim().toUpperCase();
+const planKey = (p: Plan) => (p.code || p.name).trim().toUpperCase();
 const isFreePlan = (p: Plan) => planKey(p) === 'FREE' || p.monthly_price <= 0;
 const hasAnnual = (p: Plan) => !!p.annual_price && p.annual_price > 0 && p.monthly_price > 0;
 /** Ahorro del pago anual frente a 12 meses (redondeado), o 0. */
@@ -106,7 +109,7 @@ export function PlanComparison({ plans, currentPlanId, onSelectPlan, launchPromo
     // FREE solo se muestra a quien todavía está en FREE.
     const sortedPlans = plans
         .filter(p => onFree || !isFreePlan(p) || p.id === currentPlanId)
-        .sort((a, b) => a.monthly_price - b.monthly_price);
+        .sort((a, b) => ((a.display_order ?? 0) - (b.display_order ?? 0)) || (a.monthly_price - b.monthly_price));
     const savings = sortedPlans.filter(hasAnnual).map(annualSaving);
     const maxSaving = Math.max(0, ...savings);
     // Mismo descuento en todos los planes = precio de lanzamiento (no "hasta").

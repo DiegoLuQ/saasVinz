@@ -20,8 +20,9 @@ export interface PlanCta {
 
 const wa = (text: string) => `${VINZER_WHATSAPP}${encodeURIComponent(text)}`;
 
-export function planCta(planName: string, price: number): PlanCta {
-    const name = planName.trim().toUpperCase();
+/** `code` = código fijo del plan (FREE, PRO, ULTRA…); sin él se usa el nombre. */
+export function planCta(planName: string, price: number, code?: string | null): PlanCta {
+    const name = (code || planName).trim().toUpperCase();
     const signup = (process.env.NEXT_PUBLIC_SIGNUP_URL || '').trim();
     const selfServe = (label: string, kind: PlanCtaKind, message: string): PlanCta => signup
         ? { label, kind, external: false, href: `${signup}${signup.includes('?') ? '&' : '?'}plan=${encodeURIComponent(name.toLowerCase())}` }

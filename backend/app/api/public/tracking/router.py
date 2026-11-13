@@ -12,6 +12,13 @@ from app.api.public.tenants.router import resolve_farewell_template
 
 router = APIRouter()
 
+
+def _is_ultra(tenant) -> bool:
+    from app.services.plan_features import plan_code
+    plan = getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None)
+    return "ULTRA" in (plan_code(plan) if plan else (getattr(tenant, "plan", "") or "").upper())
+
+
 # Mensaje único para cualquier fallo de resolución: no revelar si el código
 # existe, si el formato es válido, ni a qué tenant pertenece.
 _RESOLVE_NOT_FOUND = "No encontramos un seguimiento con ese código"
@@ -190,7 +197,7 @@ def get_tracking_info(
             tenant_social_media=tenant.social_media if isinstance(tenant.social_media, dict) else None,
             pet_dedication=pet_data.get("dedication"),
             farewell_template_config=farewell_tpl.config if farewell_tpl else None,
-            is_ultra_plan="ULTRA" in ((getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper()),
+            is_ultra_plan=_is_ultra(tenant),
             tenant_plan=(getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper(),
             show_vinzer_brand=_show_brand(tenant),
             souvenir_store_url=_store_url(db, tenant, token),
@@ -301,7 +308,7 @@ def get_tracking_info(
         pet_dedication=((cremation.details.dedication if cremation.details else None) or None),
         farewell_template_config=farewell_tpl.config if farewell_tpl else None,
         ai_design=_resolve_pet_ai_design(db, tenant, pet),
-        is_ultra_plan="ULTRA" in ((getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper()),
+        is_ultra_plan=_is_ultra(tenant),
         tenant_plan=(getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper(),
         show_vinzer_brand=_show_brand(tenant),
         feedback_enabled=delivered and feature_on(tenant),

@@ -81,6 +81,10 @@ class ServicioOC(Base):
     precio_costo = Column(Float, default=0.0)
     precio_venta = Column(Float, default=0.0)
     es_principal = Column(Boolean, nullable=False, server_default='false', default=False)
+    # Copia al venderse (services/order_snapshot.py): no cambia si después se edita el servicio
+    service_name = Column(String(150), nullable=True)
+    is_special = Column(Boolean, nullable=True)
+    price_on_request = Column(Boolean, nullable=True)
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
 
     service = relationship("Service")
@@ -95,6 +99,11 @@ class PlanOC(Base):
     precio_costo = Column(Float, default=0.0)
     precio_venta = Column(Float, default=0.0)
     es_principal = Column(Boolean, nullable=False, server_default='false', default=False)
+    # Copia de lo contratado (services/order_snapshot.py): editar el plan no altera la orden
+    plan_name = Column(String(150), nullable=True)
+    plan_group = Column(String(60), nullable=True)
+    included_services = Column(JSON, nullable=True)  # [{service_id, name, optional, position}]
+    snapshot_source = Column(String(20), nullable=True)  # 'order' | 'backfill'
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
 
     plan = relationship("Plan")

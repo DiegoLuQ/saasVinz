@@ -56,6 +56,8 @@ export function OffscreenFarewell({ config, onDone, onError }: {
                 await waitImages(ref.current);
                 await waitCanvasPhotos(ref.current);
                 await document.fonts?.ready;
+                // Fuentes de la plantilla cargadas: si no, el PNG sale con otra métrica de texto
+                if (document.fonts?.ready) await document.fonts.ready;
                 const canvas = await html2canvas(ref.current, { useCORS: true, scale: 2, backgroundColor: null, logging: false });
                 const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'));
                 if (cancelled) return;

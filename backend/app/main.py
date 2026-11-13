@@ -49,6 +49,8 @@ init_sentry()
 from app.services import tenant_events, limit_alerts  # noqa: E402
 tenant_events.register()
 limit_alerts.register()
+from app.services import order_snapshot  # noqa: E402  copia de planes/servicios en cada orden
+order_snapshot.register()
 
 app = FastAPI(
     title="SaaS Crematorio API",

@@ -172,16 +172,20 @@ def obtener_expediente(
 
     # Servicios, planes y productos de la orden.
     items = []
+    from app.services.order_snapshot import plan_included
     for s_ in (oc.servicios or []):
-        items.append({"tipo": "servicio", "nombre": getattr(s_.service, "name", "Servicio"), "cantidad": s_.cantidad or 1, "precio": s_.precio_venta or 0})
+        items.append({"tipo": "servicio", "nombre": s_.service_name or getattr(s_.service, "name", "Servicio"),
+                      "cantidad": s_.cantidad or 1, "precio": s_.precio_venta or 0, "especial": bool(s_.is_special)})
     for p_ in (oc.planes or []):
-        # Lo que trae el plan (servicios y productos incluidos, sin precio aparte)
-        incluye = []
-        if p_.plan:
-            incluye = [s.name for s in (p_.plan.services or []) if s and s.name] + \
-                      [pr.name for pr in (p_.plan.products or []) if pr and pr.name]
-        items.append({"tipo": "plan", "nombre": getattr(p_.plan, "name", "Plan"), "cantidad": getattr(p_, "cantidad", 1) or 1,
-                      "precio": p_.precio_venta or 0, "incluye": incluye})
+        # Lo contratado (copia en la orden: editar el plan después no lo cambia) + las
+        # ánforas/insumos del plan, que ya son líneas de la orden (oc_products.plan_id).
+        plan_products = [pr.product.name for pr in (oc.productos or [])
+                         if pr.plan_id == p_.plan_id and pr.product and pr.product.name]
+        if not plan_products and p_.plan:  # órdenes antiguas, anteriores a las líneas por plan
+            plan_products = [pr.name for pr in (p_.plan.products or []) if pr and pr.name]
+        items.append({"tipo": "plan", "nombre": p_.plan_name or getattr(p_.plan, "name", "Plan"),
+                      "cantidad": getattr(p_, "cantidad", 1) or 1, "precio": p_.precio_venta or 0,
+                      "incluye": plan_included(p_) + plan_products})
     for pr in (oc.productos or []):
         items.append({"tipo": "producto", "nombre": getattr(pr.product, "name", "Producto"), "cantidad": pr.cantidad or 1, "precio": pr.precio_venta or 0})
 

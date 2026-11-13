@@ -32,6 +32,8 @@ export default function FarewellCardSection({ templateConfig, petName, dedicatio
         if (!exportRef.current) return;
         setDownloading(true);
         try {
+            // Fuentes de la plantilla cargadas: si no, el PNG sale con otra métrica de texto
+            if (document.fonts?.ready) await document.fonts.ready;
             const canvas = await html2canvas(exportRef.current, { useCORS: true, scale: 2, backgroundColor: null, logging: false });
             const a = document.createElement('a');
             a.href = canvas.toDataURL('image/png');
