@@ -198,6 +198,9 @@ def detail(db: Session, tenant_id: int, date_from: datetime | None, date_to: dat
         # Invitaciones a reseña de Google enviadas en el periodo y clics en «Dejar mi opinión»
         "reviews": {
             **google_review.summary(google_review.stats(db, date_from, date_to, tenant.id)),
+            # Últimas 10 de cada filtro (todas / con clic / sin clic) para el selector del detalle
             "recent": google_review.recent(db, tenant.id, date_from, date_to),
+            "recent_clicked": google_review.recent(db, tenant.id, date_from, date_to, clicked=True),
+            "recent_unclicked": google_review.recent(db, tenant.id, date_from, date_to, clicked=False),
         },
     }

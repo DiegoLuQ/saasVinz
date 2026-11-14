@@ -213,3 +213,6 @@ def test_clic_en_google_se_registra_y_redirige_al_enlace_del_crematorio(client, 
     det = client.get(f"/api/internal/creator/catalog-funnel/tenant/{tenant.id}", headers=ca).json()
     assert det["reviews"]["clicked"] >= 1
     assert any(x["cremation_id"] == oid and x["click_count"] == 2 for x in det["reviews"]["recent"])
+    assert any(x["cremation_id"] == oid for x in det["reviews"]["recent_clicked"])
+    assert all(x["clicked_at"] is None for x in det["reviews"]["recent_unclicked"])
+    assert all(len(det["reviews"][k]) <= 10 for k in ("recent", "recent_clicked", "recent_unclicked"))

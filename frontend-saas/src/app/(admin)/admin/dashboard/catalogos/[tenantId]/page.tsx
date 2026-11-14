@@ -34,9 +34,75 @@ interface Detail {
     /** Invitaciones a reseña de Google del periodo y clics en «Dejar mi opinión en Google» (services/google_review.py). */
     reviews?: {
         sent: number; clicked: number; failed: number; clicks: number; click_rate: number | null;
-        recent: { cremation_id: number; pet_name: string | null; sent_at: string | null; clicked_at: string | null; click_count: number }[];
+        recent: ReviewRow[];
+        recent_clicked?: ReviewRow[];
+        recent_unclicked?: ReviewRow[];
     };
 }
+interface ReviewRow { cremation_id: number; pet_name: string | null; sent_at: string | null; clicked_at: string | null; click_count: number }
+type ReviewFilter = 'all' | 'clicked' | 'unclicked';
+const REVIEW_FILTERS: { key: ReviewFilter; label: string }[] = [
+    { key: 'all', label: 'Todas' }, { key: 'clicked', label: 'Con clic' }, { key: 'unclicked', label: 'Sin clic' },
+];
+
+/** Invitaciones a reseña de Google: últimas 10, filtro con clic / sin clic. */
+function ReviewInvites({ reviews }: { reviews: NonNullable<Detail['reviews']> }) {
+    const [filter, setFilter] = useState<ReviewFilter>('all');
+    const lists: Record<ReviewFilter, ReviewRow[]> = {
+        all: reviews.recent,
+        clicked: reviews.recent_clicked ?? reviews.recent.filter((r) => r.clicked_at),
+        unclicked: reviews.recent_unclicked ?? reviews.recent.filter((r) => !r.clicked_at),
+    };
+    const counts: Record<ReviewFilter, number> = {
+        all: reviews.sent, clicked: reviews.clicked, unclicked: Math.max(0, reviews.sent - reviews.clicked),
+    };
+    const rows = lists[filter].slice(0, 10);
+    return (
+        <div className={`${cardCls} p-5`}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h2 className="text-white font-bold flex items-center gap-2"><Star size={15} className="text-amber-400" /> Invitaciones a reseña de Google</h2>
+                    <p className="text-[11px] text-white/40 mt-1">
+                        Últimas 10 enviadas en el periodo. «Clic» = la familia abrió su enlace de Google desde el correo
+                        (no confirma que haya dejado la reseña).
+                    </p>
+                </div>
+                <div className="flex gap-1 rounded-xl bg-white/5 border border-white/10 p-1" role="tablist" aria-label="Filtrar invitaciones">
+                    {REVIEW_FILTERS.map((f) => (
+                        <button key={f.key} type="button" role="tab" aria-selected={filter === f.key} onClick={() => setFilter(f.key)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${filter === f.key ? 'bg-white/15 text-white' : 'text-white/50 hover:text-white/80'}`}>
+                            {f.label} <span className="opacity-60">{counts[f.key]}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+            {rows.length === 0 ? (
+                <p className="text-sm text-white/40 mt-4">{filter === 'clicked' ? 'Ninguna familia abrió Google en el periodo.' : 'Sin invitaciones en este filtro.'}</p>
+            ) : (
+                <table className="w-full text-sm mt-3">
+                    <thead><tr className="text-left text-[10px] uppercase tracking-wider text-white/40">
+                        <th className="py-2">Mascota</th><th className="py-2">Enviada</th><th className="py-2">Clic en Google</th><th className="py-2 text-right">Clics</th>
+                    </tr></thead>
+                    <tbody>
+                        {rows.map((r) => (
+                            <tr key={`${r.cremation_id}-${r.sent_at}`} className="border-t border-white/5 text-white/80">
+                                <td className="py-2 font-bold text-white">{r.pet_name || `#${r.cremation_id}`}</td>
+                                <td className="py-2 text-[11px] text-white/55">{fmtDate(r.sent_at)}</td>
+                                <td className="py-2 text-[11px]">
+                                    {r.clicked_at
+                                        ? <span className="inline-flex items-center gap-1 font-bold text-emerald-300"><CheckCircle2 size={12} /> {fmtDate(r.clicked_at)}</span>
+                                        : <span className="text-white/35">Sin clic</span>}
+                                </td>
+                                <td className="py-2 text-right font-bold">{r.click_count || '—'}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
+        </div>
+    );
+}
+
 interface Funnel {
     visitors: number; size_select: number; plan_request: number; whatsapp: number;
     form_open: number; form_submit: number; order: number; delivered: number;
@@ -287,34 +353,7 @@ export default function TenantTrackingDetailPage() {
                                 {(data.reviews?.failed ?? 0) > 0 && <span className="text-red-300"> · {data.reviews!.failed} con error</span>}</>} />
                     </div>
 
-                    {data.reviews && data.reviews.recent.length > 0 && (
-                        <div className={`${cardCls} p-5`}>
-                            <h2 className="text-white font-bold flex items-center gap-2"><Star size={15} className="text-amber-400" /> Invitaciones a reseña de Google</h2>
-                            <p className="text-[11px] text-white/40 mt-1">
-                                Últimas {data.reviews.recent.length} enviadas en el periodo. «Clic» = la familia abrió su enlace de Google desde el correo
-                                (no confirma que haya dejado la reseña).
-                            </p>
-                            <table className="w-full text-sm mt-3">
-                                <thead><tr className="text-left text-[10px] uppercase tracking-wider text-white/40">
-                                    <th className="py-2">Mascota</th><th className="py-2">Enviada</th><th className="py-2">Clic en Google</th><th className="py-2 text-right">Clics</th>
-                                </tr></thead>
-                                <tbody>
-                                    {data.reviews.recent.map((r) => (
-                                        <tr key={`${r.cremation_id}-${r.sent_at}`} className="border-t border-white/5 text-white/80">
-                                            <td className="py-2 font-bold text-white">{r.pet_name || `#${r.cremation_id}`}</td>
-                                            <td className="py-2 text-[11px] text-white/55">{fmtDate(r.sent_at)}</td>
-                                            <td className="py-2 text-[11px]">
-                                                {r.clicked_at
-                                                    ? <span className="inline-flex items-center gap-1 font-bold text-emerald-300"><CheckCircle2 size={12} /> {fmtDate(r.clicked_at)}</span>
-                                                    : <span className="text-white/35">Sin clic</span>}
-                                            </td>
-                                            <td className="py-2 text-right font-bold">{r.click_count || '—'}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+                    {data.reviews && data.reviews.sent > 0 && <ReviewInvites reviews={data.reviews} />}
 
                     <div className={`${cardCls} p-5`}>
                         <h2 className="text-white font-bold">Aperturas por día</h2>

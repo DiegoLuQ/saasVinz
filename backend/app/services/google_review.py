@@ -393,14 +393,17 @@ def summary(per_tenant: dict[int, dict]) -> dict:
             "click_rate": round(clicked * 100 / sent, 1) if sent else None}
 
 
-def recent(db: Session, tenant_id: int, date_from=None, date_to=None, limit: int = 15) -> list[dict]:
-    """Últimas invitaciones enviadas de un crematorio, con su clic."""
+def recent(db: Session, tenant_id: int, date_from=None, date_to=None, limit: int = 10,
+           clicked: bool | None = None) -> list[dict]:
+    """Últimas invitaciones enviadas de un crematorio, con su clic.
+    `clicked` True = solo las que abrieron Google; False = solo las sin clic."""
     from sqlalchemy.orm import joinedload
 
     N = models.FamilyNotice
+    extra = [] if clicked is None else [N.clicked_at.isnot(None) if clicked else N.clicked_at.is_(None)]
     rows = (
         db.query(N)
-        .filter(*_period_filters(date_from, date_to, tenant_id), N.status == "sent")
+        .filter(*_period_filters(date_from, date_to, tenant_id), N.status == "sent", *extra)
         .order_by(N.created_at.desc())
         .limit(limit)
         .all()
