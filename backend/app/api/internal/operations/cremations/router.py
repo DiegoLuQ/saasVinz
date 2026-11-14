@@ -466,6 +466,54 @@ def actualizar_descuentos(
     }
 
 
+class WeightUpdate(BaseModel):
+    tier_id: Optional[int] = None
+    weight: Optional[float] = None
+    # Fase 2: cambiar el plan (reemplaza la línea `replace_line_id`, o la principal)
+    plan_id: Optional[int] = None
+    replace_line_id: Optional[int] = None
+    dry_run: bool = False
+
+
+def _check_editable_amounts(current, current_user):
+    status = (current.status or "").lower()
+    if status in ("cancelado", "canceled", "cancelled"):
+        raise HTTPException(status_code=400, detail="La orden está cancelada")
+    if status in ("entregado", "delivered", "completado", "completed") and not board.is_owner(current_user):
+        raise HTTPException(status_code=403, detail="Solo el administrador puede cambiar montos de una orden entregada")
+
+
+@router.get("/{cremation_id}/weight")
+def opciones_peso(
+    cremation_id: int,
+    tenant_id: int = Depends(get_tenant_id),
+    service: CremationService = Depends(get_cremation_service),
+    _: bool = Depends(check_permission("ordenes", "view"))
+):
+    """Rangos de peso de la orden (los de su tabla de precios o la General) y el actual."""
+    from app.services import order_weight
+    return order_weight.options(service.db, tenant_id, service.get_by_id(tenant_id, cremation_id))
+
+
+@router.patch("/{cremation_id}/weight")
+def corregir_peso(
+    cremation_id: int,
+    payload: WeightUpdate,
+    tenant_id: int = Depends(get_tenant_id),
+    service: CremationService = Depends(get_cremation_service),
+    current_user=Depends(get_current_user),
+    _: bool = Depends(check_permission("ordenes", "edit"))
+):
+    """Corrige el rango de peso (o los kg) y recalcula el precio, el total y la
+    comisión. `dry_run` = vista previa sin guardar."""
+    from app.services import order_weight
+    current = service.get_by_id(tenant_id, cremation_id)
+    _check_editable_amounts(current, current_user)
+    return order_weight.apply(service, tenant_id, current,
+                              tier_id=payload.tier_id, weight=payload.weight, dry_run=payload.dry_run,
+                              plan_id=payload.plan_id, replace_line_id=payload.replace_line_id)
+
+
 @router.delete("/{cremation_id}")
 def eliminar_cremacion(
     cremation_id: int,

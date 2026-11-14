@@ -573,8 +573,17 @@ class CremationService:
         if discount is not None:
             fin.discount = max(0.0, min(100.0, float(discount)))
         self.db.flush()
-        self._recompute_agreement_discount(db_obj)
+        self.recompute_totals(db_obj)
+        self.db.commit()
+        self.db.refresh(db_obj)
+        return db_obj
 
+    def recompute_totals(self, db_obj) -> None:
+        """Convenio, total y comisión desde las líneas guardadas (sin commit). Lo usan
+        los descuentos y la corrección de peso (services/order_weight.py)."""
+        self.db.flush()
+        fin = db_obj.financial
+        self._recompute_agreement_discount(db_obj)
         cid = db_obj.id
         def lines(model):
             return sum(float(r.precio_venta or 0) * float(r.cantidad or 1)
@@ -584,9 +593,7 @@ class CremationService:
         fin.total_price = round(after_agreement * (1 - float(fin.discount or 0) / 100), 2)
         self.db.flush()
         self._sync_commission(db_obj)
-        self.db.commit()
-        self.db.refresh(db_obj)
-        return db_obj
+        self.db.flush()
 
     # --- Convenios con empresas (app/services/agreements.py) ---
     def _set_agreement(self, tenant_id: int, db_obj, agreement_id: Optional[int]) -> None:

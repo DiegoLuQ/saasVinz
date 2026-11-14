@@ -23,6 +23,7 @@ import GeneratedImagesSection from './expediente/GeneratedImagesSection';
 import MemorialOrderSection from './expediente/MemorialOrderSection';
 import DedicationSection from './expediente/DedicationSection';
 import OrderDiscountsBox from './expediente/OrderDiscountsBox';
+import OrderWeightBox from './expediente/OrderWeightBox';
 import FamilyNoticesBox from './FamilyNoticesBox';
 import AdvanceNoticeModal from './AdvanceNoticeModal';
 import StageTimeline, { type Stage } from './expediente/StageTimeline';
@@ -888,6 +889,20 @@ export default function OrderSlideOver({ isOpen, onClose, cremation, onUpdateSta
                                             <span className="text-slate-900 dark:text-white tabular-nums">{clp.format(exp.financial.total || 0)}</span>
                                         </div>
                                     </div>
+                                </Section>
+
+                                {/* Peso: corregir el rango elegido por la familia (el servidor recalcula precio y total) */}
+                                <Section title="Peso y plan" icon={<Scale size={14} />}>
+                                    <OrderWeightBox
+                                        orderId={exp.order.id}
+                                        canEdit={!!(canEditOrder && exp.order.status_group !== 'cancelado' && (exp.order.status_group !== 'entregado' || isOwner))}
+                                        lockedReason={exp.order.status_group === 'cancelado'
+                                            ? 'La orden está cancelada.'
+                                            : exp.order.status_group === 'entregado' && !isOwner
+                                                ? 'La orden ya fue entregada: solo el administrador puede cambiar el peso.'
+                                                : undefined}
+                                        onSaved={refresh}
+                                    />
                                 </Section>
 
                                 {/* Descuentos: convenio empresa + % manual (el servidor recalcula total y comisión) */}
