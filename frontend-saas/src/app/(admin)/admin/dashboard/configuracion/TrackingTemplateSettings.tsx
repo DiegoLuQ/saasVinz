@@ -608,10 +608,10 @@ export default function TrackingTemplateSettings() {
 
             {/* MODAL / DRAWER: CONSTRUCTOR Y EDITOR DE PLANTILLAS */}
             {modalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-                    <div className="relative w-full max-w-4xl bg-[#12141a] border border-white/15 rounded-3xl shadow-2xl overflow-hidden my-8">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md overflow-hidden">
+                    <div className="relative w-full max-w-4xl max-h-[90vh] bg-[#12141a] border border-white/15 rounded-3xl shadow-2xl flex flex-col overflow-hidden my-auto">
                         {/* Modal Header */}
-                        <div className="p-6 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
+                        <div className="shrink-0 p-5 sm:p-6 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
                             <div>
                                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
                                     <Sparkles className="text-amber-400" size={20} />
@@ -630,14 +630,15 @@ export default function TrackingTemplateSettings() {
                             </button>
                         </div>
 
-                        {/* Modal Body: Two Columns (Form + Live Preview) */}
-                        <form onSubmit={handleSaveTemplate} className="p-6 space-y-6">
-                            {formError && (
-                                <div className="p-3.5 rounded-xl border bg-red-500/10 border-red-500/30 text-red-300 text-xs font-semibold flex items-center gap-2">
-                                    <AlertCircle size={16} />
-                                    {formError}
-                                </div>
-                            )}
+                        {/* Modal Body: Two Columns (Form + Live Preview) with Scrollable Content & Sticky Footer */}
+                        <form onSubmit={handleSaveTemplate} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+                                {formError && (
+                                    <div className="p-3.5 rounded-xl border bg-red-500/10 border-red-500/30 text-red-300 text-xs font-semibold flex items-center gap-2">
+                                        <AlertCircle size={16} />
+                                        {formError}
+                                    </div>
+                                )}
 
                             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                                 {/* Left Column: Form Controls (7 cols) */}
@@ -893,7 +894,7 @@ export default function TrackingTemplateSettings() {
 
                                     {/* Mockup Frame (Mobile aspect ratio preview) */}
                                     <div
-                                        className={`w-full h-[520px] rounded-2xl border border-white/20 overflow-hidden relative shadow-2xl flex flex-col justify-between p-4 transition-colors duration-500 ${
+                                        className={`w-full h-[470px] rounded-2xl border border-white/20 overflow-hidden relative shadow-2xl flex flex-col justify-between p-4 transition-colors duration-500 ${
                                             previewDarkMode ? 'bg-[#120d09]' : 'bg-[#FFFDF7]'
                                         }`}
                                     >
@@ -1004,10 +1005,16 @@ export default function TrackingTemplateSettings() {
                                         <div className="relative z-10 bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-xl p-3 border border-amber-300/40 shadow-md">
                                             <div className="flex items-center justify-between text-xs">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="w-3 h-3 rounded-full bg-amber-500 animate-pulse" />
+                                                    <span
+                                                        className="w-3 h-3 rounded-full animate-pulse"
+                                                        style={{ backgroundColor: formAccentColor }}
+                                                    />
                                                     <span className="font-bold text-gray-800 dark:text-gray-100">En proceso de cremación</span>
                                                 </div>
-                                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500 text-white">
+                                                <span
+                                                    className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full text-white"
+                                                    style={{ backgroundColor: formAccentColor }}
+                                                >
                                                     En curso
                                                 </span>
                                             </div>
@@ -1015,9 +1022,10 @@ export default function TrackingTemplateSettings() {
                                     </div>
                                 </div>
                             </div>
+                        </div>
 
-                            {/* Modal Footer */}
-                            <div className="pt-4 border-t border-white/10 flex items-center justify-between">
+                        {/* Modal Footer (Fijo al fondo) */}
+                            <div className="shrink-0 p-4 sm:px-6 border-t border-white/10 bg-[#12141a] flex items-center justify-between">
                                 <button
                                     type="button"
                                     onClick={() => setModalOpen(false)}

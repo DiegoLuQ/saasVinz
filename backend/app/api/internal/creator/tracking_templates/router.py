@@ -220,22 +220,70 @@ async def upload_tracking_asset(
     db: Session = Depends(get_db),
     current_creator: models.User = Depends(auth.get_current_creator),
 ):
-    """Sube un recurso (fondo o elemento decorativo en webp/png) para plantillas de tracking."""
+    """Sube un recurso (fondo o elemento decorativo en webp/png) para plantillas de tracking,
+
+    optimizándolo automáticamente y convirtiéndolo a WebP antes de enviarlo a R2/almacenamiento.
+    """
     apply_bypass_rls(db)
     from app.api.internal.common.media_service import MediaService
+    from PIL import Image, ImageOps
 
     temp_dir = "temp_uploads"
     os.makedirs(temp_dir, exist_ok=True)
-    ext = os.path.splitext(file.filename or "")[1] or ".webp"
-    temp_path = os.path.join(temp_dir, f"track_tpl_{asset_type}_{uuid.uuid4().hex}{ext}")
+    raw_ext = os.path.splitext(file.filename or "")[1] or ".tmp"
+    raw_path = os.path.join(temp_dir, f"raw_track_tpl_{asset_type}_{uuid.uuid4().hex}{raw_ext}")
+    optimized_path = os.path.join(temp_dir, f"track_tpl_{asset_type}_{uuid.uuid4().hex}.webp")
 
-    with open(temp_path, "wb") as buffer:
+    with open(raw_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
     try:
+        # Abrir imagen y corregir rotación EXIF móvil
+        try:
+            with Image.open(raw_path) as img:
+                try:
+                    img = ImageOps.exif_transpose(img)
+                except Exception:
+                    pass
+
+                # Procesamiento según tipo de asset
+                if asset_type == "element":
+                    # Preservar transparencia (RGBA)
+                    if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
+                        img = img.convert("RGBA")
+                    else:
+                        img = img.convert("RGBA")
+                    # Escala máxima para elemento central: 1600x1600 sin distorsión
+                    img.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+                    img.save(optimized_path, "WEBP", quality=85, method=6)
+                elif asset_type == "mobile_bg":
+                    # Fondo vertical móvil: max 1080x1920
+                    if img.mode not in ("RGB", "RGBA"):
+                        img = img.convert("RGB")
+                    img.thumbnail((1080, 1920), Image.Resampling.LANCZOS)
+                    img.save(optimized_path, "WEBP", quality=82, method=6)
+                elif asset_type == "desktop_bg":
+                    # Fondo panorámico desktop: max 1920x1080
+                    if img.mode not in ("RGB", "RGBA"):
+                        img = img.convert("RGB")
+                    img.thumbnail((1920, 1080), Image.Resampling.LANCZOS)
+                    img.save(optimized_path, "WEBP", quality=82, method=6)
+                else:
+                    # Otros / previews: max 1200x1200
+                    if img.mode not in ("RGB", "RGBA"):
+                        img = img.convert("RGB")
+                    img.thumbnail((1200, 1200), Image.Resampling.LANCZOS)
+                    img.save(optimized_path, "WEBP", quality=82, method=6)
+        except Exception as img_err:
+            raise HTTPException(
+                status_code=400,
+                detail=f"El archivo subido no es una imagen válida o compatible: {str(img_err)}"
+            )
+
+        # Subir a Cloudflare R2 vía MediaService
         media_item = MediaService.upload_media(
             db=db,
-            local_path=temp_path,
+            local_path=optimized_path,
             media_type="image",
             category="tracking_assets",
             ratio="original",
@@ -245,8 +293,14 @@ async def upload_tracking_asset(
             custom_prefix=f"tpl_{asset_type}",
         )
         return {"url": media_item.url, "asset_type": asset_type}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al subir el archivo: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al procesar o subir el archivo: {str(e)}")
     finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        for p in (raw_path, optimized_path):
+            if os.path.exists(p):
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass

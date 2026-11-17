@@ -245,6 +245,15 @@ export default function TrackingPage() {
     const dynamicMobileBg = (data as any)?.tracking_template_config?.background_mobile_url || '/tracking/fondos/movil/fondo_cielo_flores_1_9_16.webp';
     const dynamicDesktopBg = (data as any)?.tracking_template_config?.background_desktop_url || '/tracking/fondos/desktop/fondo_cielo_flores_1_16_9.webp';
 
+    const visualColors = React.useMemo(() => {
+        const cfg = (data as any)?.tracking_template_config?.theme_config || {};
+        return {
+            accent: cfg.accent_color || '#D97706',
+            title: isDarkMode ? (cfg.title_color_dark || '#FDF6E2') : (cfg.title_color_light || '#3E2723'),
+            subtitle: isDarkMode ? (cfg.subtitle_color_dark || '#FDE68A') : (cfg.subtitle_color_light || '#78350F'),
+        };
+    }, [data, isDarkMode]);
+
     const theme = React.useMemo(() => {
         if (isVisualTemplate) {
             return {
@@ -600,21 +609,21 @@ export default function TrackingPage() {
 
                 {/* Celestial / Visual Dynamic WebP Backgrounds */}
                 {isVisualTemplate ? (
-                    <div className="absolute inset-0">
+                    <div className="absolute inset-0 overflow-hidden">
                         {/* Mobile Background 9:16 */}
                         <img
                             src={dynamicMobileBg}
                             alt="Fondo Conmemorativo Móvil"
-                            className="block md:hidden w-full h-full object-cover object-top fixed inset-0"
+                            className="block md:hidden w-full h-full object-cover object-top fixed inset-0 scale-[1.02] transform-gpu pointer-events-none select-none z-0"
                         />
                         {/* Desktop Background 16:9 */}
                         <img
                             src={dynamicDesktopBg}
                             alt="Fondo Conmemorativo Desktop"
-                            className="hidden md:block w-full h-full object-cover object-center fixed inset-0"
+                            className="hidden md:block w-full h-full object-cover object-center fixed inset-0 scale-[1.01] transform-gpu pointer-events-none select-none z-0"
                         />
                         {/* Dark mode overlay */}
-                        <div className={`fixed inset-0 transition-opacity duration-500 pointer-events-none ${
+                        <div className={`fixed inset-0 transition-opacity duration-500 pointer-events-none z-0 ${
                             isDarkMode ? 'bg-[#0e0a07]/80 backdrop-brightness-75' : 'bg-transparent'
                         }`} />
                     </div>
@@ -901,21 +910,33 @@ export default function TrackingPage() {
 
                         {/* Pet Identity & Heading */}
                         <div className="space-y-1.5 mt-2">
-                            <p className={`font-outfit font-bold text-[11px] sm:text-xs tracking-[0.24em] uppercase flex items-center justify-center gap-1.5 transition-colors duration-300 ${
-                                isDarkMode ? 'text-amber-300 drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]' : 'text-amber-900/90'
-                            }`}>
-                                <span className={isDarkMode ? 'text-amber-400' : 'text-amber-700'}>♥</span>
+                            <p
+                                className="font-outfit font-bold text-[11px] sm:text-xs tracking-[0.24em] uppercase flex items-center justify-center gap-1.5 transition-colors duration-300"
+                                style={{
+                                    color: visualColors.subtitle,
+                                    textShadow: isDarkMode ? '0 1px 4px rgba(0,0,0,0.8)' : undefined,
+                                }}
+                            >
+                                <span style={{ color: visualColors.accent }}>♥</span>
                                 <span>ACOMPAÑANDO EL PROCESO</span>
-                                <span className={isDarkMode ? 'text-amber-400' : 'text-amber-700'}>♥</span>
+                                <span style={{ color: visualColors.accent }}>♥</span>
                             </p>
-                            <h1 className={`font-dancing sm:font-alex text-5xl sm:text-6xl font-bold tracking-wide my-0.5 transition-colors duration-300 ${
-                                isDarkMode ? 'text-amber-100 drop-shadow-[0_2px_12px_rgba(251,191,36,0.35)]' : 'text-amber-950'
-                            }`}>
+                            <h1
+                                className="font-dancing sm:font-alex text-5xl sm:text-6xl font-bold tracking-wide my-0.5 transition-colors duration-300"
+                                style={{
+                                    color: visualColors.title,
+                                    textShadow: isDarkMode ? '0 2px 12px rgba(251,191,36,0.28)' : undefined,
+                                }}
+                            >
                                 {data.pet_name}
                             </h1>
-                            <div className={`flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold transition-colors duration-300 ${
-                                isDarkMode ? 'text-amber-200/90 drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]' : 'text-amber-900/80'
-                            }`}>
+                            <div
+                                className="flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold transition-colors duration-300 opacity-90"
+                                style={{
+                                    color: visualColors.subtitle,
+                                    textShadow: isDarkMode ? '0 1px 4px rgba(0,0,0,0.8)' : undefined,
+                                }}
+                            >
                                 <span>{data.pet_species === 'Felino' || data.pet_species === 'Gato' ? '♀ Felino' : '🐾 ' + (data.pet_species || 'Mascota')}</span>
                                 {data.customer_name && (
                                     <>
@@ -1109,35 +1130,57 @@ export default function TrackingPage() {
 
                 {isVisualTemplate ? (
                     <div className="w-full max-w-md lg:max-w-2xl xl:max-w-3xl mx-auto space-y-4">
-                        {/* Selector de Pestañas Homenaje / Recuerdo (Móvil y Desktop - Posicionado ARRIBA del Seguimiento) */}
+                        {/* Selector de Pestañas Seguimiento / Homenaje (Móvil y Desktop - Posicionado ARRIBA del Seguimiento) */}
                         <div className="flex items-center justify-center gap-3 pt-1 pb-2">
                             <button
                                 type="button"
                                 onClick={() => setMobileTab('tracking')}
                                 className={`px-6 sm:px-8 py-2.5 sm:py-3 rounded-full font-bold text-xs sm:text-sm uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer shadow-md ${
                                     mobileTab === 'tracking'
-                                        ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-amber-500/30 scale-[1.03] ring-2 ring-amber-300/40'
+                                        ? 'text-white scale-[1.03] ring-2 ring-white/30'
                                         : isDarkMode
-                                            ? 'bg-[#1e1610]/90 text-amber-200 border border-amber-500/40 hover:bg-[#2a1f17]'
-                                            : 'bg-white/85 text-amber-900 border border-amber-300/80 hover:bg-white'
+                                            ? 'bg-[#1e1610]/90 border hover:bg-[#2a1f17]'
+                                            : 'bg-white/85 border hover:bg-white'
                                 }`}
+                                style={
+                                    mobileTab === 'tracking'
+                                        ? {
+                                              backgroundColor: visualColors.accent,
+                                              boxShadow: `0 8px 20px -4px ${visualColors.accent}66`,
+                                          }
+                                        : {
+                                              color: isDarkMode ? visualColors.subtitle : visualColors.title,
+                                              borderColor: `${visualColors.accent}55`,
+                                          }
+                                }
                             >
                                 <PawPrint size={15} />
-                                <span>HOMENAJE</span>
+                                <span>SEGUIMIENTO</span>
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setMobileTab('tribute')}
                                 className={`px-6 sm:px-8 py-2.5 sm:py-3 rounded-full font-bold text-xs sm:text-sm uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer shadow-md ${
                                     mobileTab === 'tribute'
-                                        ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-amber-500/30 scale-[1.03] ring-2 ring-amber-300/40'
+                                        ? 'text-white scale-[1.03] ring-2 ring-white/30'
                                         : isDarkMode
-                                            ? 'bg-[#1e1610]/90 text-amber-200 border border-amber-500/40 hover:bg-[#2a1f17]'
-                                            : 'bg-white/85 text-amber-900 border border-amber-300/80 hover:bg-white'
+                                            ? 'bg-[#1e1610]/90 border hover:bg-[#2a1f17]'
+                                            : 'bg-white/85 border hover:bg-white'
                                 }`}
+                                style={
+                                    mobileTab === 'tribute'
+                                        ? {
+                                              backgroundColor: visualColors.accent,
+                                              boxShadow: `0 8px 20px -4px ${visualColors.accent}66`,
+                                          }
+                                        : {
+                                              color: isDarkMode ? visualColors.subtitle : visualColors.title,
+                                              borderColor: `${visualColors.accent}55`,
+                                          }
+                                }
                             >
                                 <Heart size={15} />
-                                <span>RECUERDO</span>
+                                <span>HOMENAJE</span>
                             </button>
                         </div>
 
@@ -1171,42 +1214,60 @@ export default function TrackingPage() {
                                             return (
                                                 <div key={idx} className="relative">
                                                     {/* Golden Node on the line */}
-                                                    <div className={`absolute -left-6 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                                                        isCompleted
-                                                            ? 'border-amber-500 bg-amber-400 text-white shadow-xs'
-                                                            : isCurrent
-                                                                ? 'border-amber-500 bg-white ring-4 ring-amber-400/30 animate-pulse'
-                                                                : isDarkMode
-                                                                    ? 'border-amber-700 bg-[#140e0a]'
-                                                                    : 'border-amber-200 bg-white'
-                                                    }`}>
-                                                        <div className={`w-2 h-2 rounded-full ${
-                                                            isCompleted ? 'bg-white' : isCurrent ? 'bg-amber-500' : 'bg-transparent'
-                                                        }`} />
+                                                    <div
+                                                        className={`absolute -left-6 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                                                            isCompleted
+                                                                ? 'text-white shadow-xs'
+                                                                : isCurrent
+                                                                    ? 'bg-white ring-4 ring-amber-400/25 animate-pulse'
+                                                                    : isDarkMode
+                                                                        ? 'border-amber-700 bg-[#140e0a]'
+                                                                        : 'border-amber-200 bg-white'
+                                                        }`}
+                                                        style={
+                                                            isCompleted
+                                                                ? { borderColor: visualColors.accent, backgroundColor: visualColors.accent }
+                                                                : isCurrent
+                                                                    ? { borderColor: visualColors.accent }
+                                                                    : undefined
+                                                        }
+                                                    >
+                                                        <div
+                                                            className={`w-2 h-2 rounded-full ${
+                                                                isCompleted ? 'bg-white' : isCurrent ? '' : 'bg-transparent'
+                                                            }`}
+                                                            style={isCurrent ? { backgroundColor: visualColors.accent } : undefined}
+                                                        />
                                                     </div>
 
                                                     {/* Pill Step Card */}
-                                                    <div className={`rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-3 transition-all ${
-                                                        isCurrent
-                                                            ? isDarkMode
-                                                                ? 'bg-[#261a12] border-2 border-amber-400 shadow-lg ring-2 ring-amber-400/20'
-                                                                : 'bg-white border-2 border-amber-400/90 shadow-md ring-2 ring-amber-400/15'
-                                                            : isDarkMode
-                                                                ? 'bg-[#1b120c]/90 border border-amber-900/50 shadow-xs'
-                                                                : 'bg-white/95 border border-amber-100/90 shadow-xs'
-                                                    }`}>
-                                                        {/* Icon */}
-                                                        <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 ${
-                                                            isCompleted
+                                                    <div
+                                                        className={`rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-3 transition-all ${
+                                                            isCurrent
                                                                 ? isDarkMode
-                                                                    ? 'bg-amber-950/70 text-amber-300 border border-amber-800/40'
-                                                                    : 'bg-amber-100/80 text-amber-700'
-                                                                : isCurrent
-                                                                    ? 'bg-amber-500 text-white shadow-xs'
-                                                                    : isDarkMode
-                                                                        ? 'bg-amber-950/40 text-amber-400/70'
-                                                                        : 'bg-amber-50/70 text-amber-600/70'
-                                                        }`}>
+                                                                    ? 'bg-[#261a12] border-2 shadow-lg ring-2 ring-amber-400/20'
+                                                                    : 'bg-white border-2 shadow-md ring-2 ring-amber-400/15'
+                                                                : isDarkMode
+                                                                    ? 'bg-[#1b120c]/90 border border-amber-900/50 shadow-xs'
+                                                                    : 'bg-white/95 border border-amber-100/90 shadow-xs'
+                                                        }`}
+                                                        style={isCurrent ? { borderColor: visualColors.accent } : undefined}
+                                                    >
+                                                        {/* Icon */}
+                                                        <div
+                                                            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 ${
+                                                                isCompleted
+                                                                    ? isDarkMode
+                                                                        ? 'bg-amber-950/70 text-amber-300 border border-amber-800/40'
+                                                                        : 'bg-amber-100/80 text-amber-700'
+                                                                    : isCurrent
+                                                                        ? 'text-white shadow-xs'
+                                                                        : isDarkMode
+                                                                            ? 'bg-amber-950/40 text-amber-400/70'
+                                                                            : 'bg-amber-50/70 text-amber-600/70'
+                                                            }`}
+                                                            style={isCurrent ? { backgroundColor: visualColors.accent } : undefined}
+                                                        >
                                                             {getCelestialStepIcon(idx)}
                                                         </div>
 
@@ -1253,15 +1314,18 @@ export default function TrackingPage() {
                                                                     <span>{hasPhoto && hasComments ? 'Ver evidencia' : hasPhoto ? 'Ver fotos' : 'Ver nota'}</span>
                                                                 </motion.button>
                                                             )}
-                                                            <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-full ${
-                                                                isCompleted
-                                                                    ? 'bg-teal-600 text-white shadow-xs'
-                                                                    : isCurrent
-                                                                        ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-xs animate-pulse'
-                                                                        : isDarkMode
-                                                                            ? 'bg-amber-950/70 text-amber-300 border border-amber-800/50'
-                                                                            : 'bg-amber-100/80 text-amber-800 border border-amber-200/60'
-                                                            }`}>
+                                                            <span
+                                                                className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-full ${
+                                                                    isCompleted
+                                                                        ? 'bg-teal-600 text-white shadow-xs'
+                                                                        : isCurrent
+                                                                            ? 'text-white shadow-xs animate-pulse'
+                                                                            : isDarkMode
+                                                                                ? 'bg-amber-950/70 text-amber-300 border border-amber-800/50'
+                                                                                : 'bg-amber-100/80 text-amber-800 border border-amber-200/60'
+                                                                }`}
+                                                                style={isCurrent ? { backgroundColor: visualColors.accent } : undefined}
+                                                            >
                                                                 {isCompleted ? 'Completado' : isCurrent ? 'En proceso' : 'Pendiente'}
                                                             </span>
                                                         </div>
@@ -1278,24 +1342,30 @@ export default function TrackingPage() {
                                             : 'bg-amber-50/70 border-amber-200/50'
                                     }`}>
                                         <div className="flex items-center gap-2.5 min-w-0">
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                                                isDarkMode ? 'bg-sky-950/90 text-sky-300 border border-sky-800/40' : 'bg-sky-100 text-sky-600'
-                                            }`}>
+                                            <div
+                                                className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border"
+                                                style={{
+                                                    backgroundColor: isDarkMode ? `${visualColors.accent}26` : `${visualColors.accent}18`,
+                                                    color: visualColors.accent,
+                                                    borderColor: `${visualColors.accent}40`,
+                                                }}
+                                            >
                                                 <PawPrint size={15} />
                                             </div>
                                             <div className="min-w-0">
                                                 <p className={`text-[9px] font-black uppercase tracking-wider ${
-                                                    isDarkMode ? 'text-amber-300/70' : 'text-slate-400'
+                                                    isDarkMode ? 'text-amber-300/70' : 'text-amber-900/60'
                                                 }`}>
                                                     ESTADO ACTUAL
                                                 </p>
-                                                <p className={`text-xs font-black truncate ${
-                                                    isDarkMode ? 'text-sky-300' : 'text-sky-700'
-                                                }`}>
+                                                <p
+                                                    className="text-xs font-black truncate"
+                                                    style={{ color: isDarkMode ? visualColors.subtitle : visualColors.accent }}
+                                                >
                                                     {currentStepName}
                                                 </p>
                                                 <p className={`text-[10px] ${
-                                                    isDarkMode ? 'text-amber-200/70' : 'text-slate-500'
+                                                    isDarkMode ? 'text-amber-200/70' : 'text-amber-900/70'
                                                 }`}>
                                                     El proceso se encuentra en marcha.
                                                 </p>
@@ -1309,26 +1379,26 @@ export default function TrackingPage() {
                                         <div className="text-right shrink-0">
                                             <div className="flex items-center justify-end gap-1.5 mb-1">
                                                 <span className={`text-[9px] font-black uppercase tracking-wider ${
-                                                    isDarkMode ? 'text-amber-300/70' : 'text-slate-400'
+                                                    isDarkMode ? 'text-amber-300/70' : 'text-amber-900/60'
                                                 }`}>
                                                     PROGRESO
                                                 </span>
                                                 <span className={`text-xs font-black ${
-                                                    isDarkMode ? 'text-amber-100' : 'text-slate-800'
+                                                    isDarkMode ? 'text-amber-100' : 'text-amber-950'
                                                 }`}>
                                                     {progressPercentage}%
                                                 </span>
                                             </div>
                                             <div className={`h-1.5 w-24 rounded-full overflow-hidden ${
-                                                isDarkMode ? 'bg-neutral-800' : 'bg-slate-200'
+                                                isDarkMode ? 'bg-neutral-800' : 'bg-amber-200/60'
                                             }`}>
                                                 <div
-                                                    className="h-full bg-gradient-to-r from-amber-400 to-amber-500 transition-all duration-700"
-                                                    style={{ width: `${progressPercentage}%` }}
+                                                    className="h-full transition-all duration-700"
+                                                    style={{ width: `${progressPercentage}%`, backgroundColor: visualColors.accent }}
                                                 />
                                             </div>
                                             <p className={`text-[10px] mt-0.5 ${
-                                                isDarkMode ? 'text-amber-200/70' : 'text-slate-500'
+                                                isDarkMode ? 'text-amber-200/70' : 'text-amber-900/70'
                                             }`}>
                                                 {completedCount} de {totalSteps} etapas
                                             </p>
