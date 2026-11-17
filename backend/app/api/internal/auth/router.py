@@ -663,6 +663,10 @@ def get_bootstrap(
             if not tenant_resp.billing_cycle:
                 tenant_resp.billing_cycle = latest_sub.billing_cycle
 
+    # Telemetría de módulos (sidebar tracking on/off)
+    saas_cfg = db.query(models.SaaSConfig.module_tracking_enabled).first()
+    tracking_enabled = bool(saas_cfg[0]) if saas_cfg else False
+
     # Build response
     return schemas.BootstrapResponse(
         user=schemas.BootstrapUserData.model_validate(user),
@@ -687,8 +691,23 @@ def get_bootstrap(
             unread_notifications=unread_count,
             pending_submissions=len([s for s in formatted_submissions if s.status == "pending"]),
             pending_product_requests=_pending_product_requests(db, current_user),
+            ops_in_progress=_ops_in_progress(db, current_user),
+            module_tracking_enabled=tracking_enabled,
         )
     )
+
+def _ops_in_progress(db, user) -> int:
+    """Órdenes en proceso (badge «Panel de Trabajo»); solo para roles que ven el panel."""
+    if not getattr(user, "tenant_id", None):
+        return 0
+    try:
+        from app.api.internal.operations.operations import board
+        if user.role not in board.OPS_ROLES:
+            return 0
+        return board.in_progress_count(db, user.tenant_id)
+    except Exception:  # noqa: BLE001 - el bootstrap nunca debe fallar por el contador
+        return 0
+
 
 def _pending_product_requests(db, user) -> int:
     """Solicitudes de productos pendientes del crematorio (badge celeste del Sidebar)."""

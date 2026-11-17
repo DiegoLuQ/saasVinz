@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Float, Enum, JSON, Text, Numeric
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Float, Enum, JSON, Text, Numeric, Date, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.database import Base
 from datetime import datetime
@@ -150,6 +150,9 @@ class Tenant(Base):
     official_links = Column(JSON, nullable=True)
     # Cobro de traslado por comuna (zonas con precio). app/services/transport.py
     transport_config = Column(JSON, nullable=True)
+    # Plantilla visual de la página pública de seguimiento (classic | warm | modern).
+    # NULL = hereda sys_saas_config.default_tracking_template.
+    tracking_template = Column(String(50), nullable=True)
 
     # --- Polar.sh Integration ---
     polar_customer_id = Column(String, nullable=True)
@@ -291,6 +294,10 @@ class SaaSConfig(Base):
     dashboard_slides = Column(JSON, nullable=True)
     # Página pública /tour: {"video_url", "modules": [...]}; NULL = contenido original (services/tour_content.py)
     tour_content = Column(JSON, nullable=True)
+    # Plantilla por defecto para el seguimiento público (classic | warm | modern)
+    default_tracking_template = Column(String(50), nullable=False, default="classic")
+    # Telemetría ligera y anónima de uso de módulos en el sidebar (False por defecto)
+    module_tracking_enabled = Column(Boolean, nullable=False, default=False)
     redes_sociales = Column(JSON, default=list) # [{"name": "Facebook", "link": "..."}]
     imagenes = Column(JSON, default=list) # ["url1", "url2"]
     
@@ -333,3 +340,52 @@ class SaaSConfig(Base):
     diagnostic_config = Column(JSON, nullable=True)
 
     updated_at = Column(DateTime(timezone=True), default=tz.get_now, onupdate=tz.get_now)
+
+
+class ModuleClickDaily(Base):
+    """
+    Telemetría agregada de uso de módulos por crematorio/tenant.
+    Almacena contadores diarios consolidados (1 fila por módulo al día).
+    No contiene datos personales ni registros individuales de usuario/IP.
+    """
+    __tablename__ = "sys_module_clicks_daily"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("sys_tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    module_key = Column(String(50), nullable=False, index=True)
+    date = Column(Date, nullable=False, index=True)
+    click_count = Column(Integer, nullable=False, default=1)
+    updated_at = Column(DateTime(timezone=True), default=tz.get_now, onupdate=tz.get_now)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "module_key", "date", name="uq_module_clicks_tenant_module_date"),
+    )
+
+
+class TrackingCustomTemplate(Base):
+    """
+    Plantillas visuales configurables para el seguimiento público (Tracking).
+    Permite a los administradores subir fondos (9:16 y 16:9), elemento central
+    (.webp transparente como alas, corona floral, laureles), configurar colores
+    y habilitar/deshabilitar la plantilla para planes específicos.
+    """
+    __tablename__ = "sys_tracking_custom_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    slug = Column(String(80), unique=True, index=True, nullable=False)
+    name = Column(String(120), nullable=False)
+    description = Column(String(255), nullable=True)
+    is_active = Column(Boolean, default=True, index=True, nullable=False)
+    # Lista de nombres/códigos de planes que pueden usarla, ej: ["Track", "NORMAL", "PRO", "ULTRA"]
+    allowed_plans = Column(JSON, default=["PRO", "ULTRA"], nullable=False)
+    # Recursos visuales
+    background_mobile_url = Column(String(500), nullable=True)
+    background_desktop_url = Column(String(500), nullable=True)
+    element_url = Column(String(500), nullable=True)
+    preview_image_url = Column(String(500), nullable=True)
+    # Configuración de estilos y colores
+    theme_config = Column(JSON, default=dict, nullable=False)
+
+    created_at = Column(DateTime(timezone=True), default=tz.get_now)
+    updated_at = Column(DateTime(timezone=True), default=tz.get_now, onupdate=tz.get_now)
+

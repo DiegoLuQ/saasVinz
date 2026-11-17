@@ -121,7 +121,7 @@ export default function PublicTributeCarousel({
                             onClick={() => setSlide(0)}
                             className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider transition-all duration-200 cursor-pointer ${
                                 activeSlide === 0
-                                    ? 'bg-amber-500 text-white shadow-sm'
+                                    ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-md shadow-orange-500/25'
                                     : isDarkMode
                                         ? 'text-slate-400 hover:text-white'
                                         : 'text-gray-600 hover:text-gray-900'
@@ -162,16 +162,16 @@ export default function PublicTributeCarousel({
                     <div
                         className={
                             isCentral
-                                ? 'inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 mb-5'
+                                ? 'inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/25 text-orange-600 dark:text-orange-300 mb-5'
                                 : 'flex items-center gap-2 mb-3'
                         }
                     >
-                        <Sparkles size={isCentral ? 14 : 16} className="text-amber-500" />
+                        <Sparkles size={isCentral ? 14 : 16} className="text-orange-400" />
                         <span
                             className={`text-[11px] uppercase tracking-wider ${
                                 isCentral
                                     ? 'font-black'
-                                    : 'font-bold text-amber-700 dark:text-amber-300'
+                                    : 'font-extrabold text-orange-700 dark:text-orange-300'
                             }`}
                         >
                             Homenaje Conmemorativo

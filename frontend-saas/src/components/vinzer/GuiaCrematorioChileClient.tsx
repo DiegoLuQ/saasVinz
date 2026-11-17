@@ -1,10 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import {
     Heart,
-    ArrowRight,
     CheckCircle2,
     ChevronRight,
     Clock,
@@ -19,16 +18,20 @@ import {
     Scale,
     Flower2,
     HelpCircle,
-    Building2,
     ExternalLink,
+    Check,
+    ArrowRight,
+    Award,
+    Camera,
+    FileText,
+    BookOpen,
 } from 'lucide-react';
 
 import { VinzerNavbar } from './VinzerNavbar';
 import { VinzerFooter } from './VinzerFooter';
 import { VinzerGuideTOC, TOCItem } from './VinzerGuideTOC';
 import { VinzerGuideAccordion } from './VinzerGuideAccordion';
-import { VinzerMemorialBanner } from './VinzerMemorialBanner';
-import { useVinzerTheme, formatFecha, SectionTitle } from './guide-shared';
+import { formatFecha } from './guide-shared';
 import { GUIA_CREMATORIO_CHILE_FAQ, GUIA_CREMATORIO_CHILE_SEO } from '@/lib/vinzer/guia-crematorio-chile';
 
 const TRAZABILIDAD_HREF = '/guias/software-trazabilidad-cadena-custodia-crematorios-mascotas';
@@ -40,23 +43,23 @@ const CODIGO_SANITARIO_URL = 'https://www.leychile.cl/navegar?idNorma=5595';
 const TOC_ITEMS: TOCItem[] = [
     { id: 'resumen', label: 'Resumen rápido' },
     { id: 'que-es', label: '1. Qué es un crematorio de mascotas' },
-    { id: 'tipos', label: '2. Tipos de cremación' },
-    { id: 'como-funciona', label: '3. Cómo funciona la cremación' },
-    { id: 'precio', label: '4. Cuánto cuesta' },
-    { id: 'como-elegir', label: '5. Cómo elegir un crematorio confiable' },
-    { id: 'donde', label: '6. Dónde encontrar crematorios' },
-    { id: 'que-hacer', label: '7. Qué hacer cuando fallece una mascota' },
-    { id: 'normativa', label: '8. Qué dice la normativa chilena' },
-    { id: 'recuerdo', label: '9. Conservar un recuerdo' },
-    { id: 'faqs', label: '10. Preguntas frecuentes' },
-    { id: 'para-crematorios', label: '¿Tienes un crematorio?' },
+    { id: 'tipos', label: '2. Cremación individual vs. colectiva' },
+    { id: 'como-funciona', label: '3. Cómo funciona el proceso' },
+    { id: 'precio', label: '4. Cuánto cuesta en Chile' },
+    { id: 'como-elegir', label: '5. Checklist: crematorio confiable' },
+    { id: 'trazabilidad', label: '6. La importancia de la trazabilidad' },
+    { id: 'donde', label: '7. Dónde encontrar crematorios' },
+    { id: 'que-hacer', label: '8. Qué hacer cuando fallece tu mascota' },
+    { id: 'normativa', label: '9. Normativa chilena' },
+    { id: 'recuerdo', label: '10. Cómo conservar el recuerdo' },
+    { id: 'faqs', label: '11. Preguntas frecuentes' },
 ];
 
 const RESUMEN = [
     'La cremación individual suele incluir la devolución de las cenizas; la colectiva normalmente no.',
     'El precio depende de la ciudad, el peso, la modalidad, el retiro y los recuerdos que elijas.',
     'Pide siempre por escrito qué incluye el servicio, los plazos y cómo se identifica a tu mascota.',
-    'Un buen crematorio puede explicarte cada etapa y mostrarte su trazabilidad.',
+    'Un buen crematorio puede explicarte cada etapa y mostrarte su trazabilidad con respeto.',
 ];
 
 const ANIMALES = [
@@ -64,24 +67,6 @@ const ANIMALES = [
     'Gatos.',
     'Conejos y otros pequeños animales de compañía.',
     'Otras especies, previa consulta al establecimiento.',
-];
-
-const TIPOS = [
-    {
-        titulo: 'Cremación individual',
-        texto: 'El servicio se contrata para una mascota de manera individual, con procedimientos destinados a mantener su identificación durante el proceso. Generalmente contempla la entrega de las cenizas a la familia, según las condiciones contratadas.',
-        tip: 'Pregunta cómo se identifica a tu mascota, qué controles se usan y qué documento se entrega al finalizar.',
-    },
-    {
-        titulo: 'Cremación colectiva',
-        texto: 'Contempla el tratamiento conjunto de varias mascotas, de acuerdo con el procedimiento del proveedor. Habitualmente no incluye la devolución individualizada de las cenizas.',
-        tip: 'Puede ser una alternativa para quienes no desean conservar las cenizas. Confirma las condiciones antes de contratar.',
-    },
-    {
-        titulo: 'Con entrega de cenizas y recuerdos',
-        texto: 'Algunos proveedores suman ánforas de distintos materiales, placas con el nombre, certificados de cremación, fotografías conmemorativas, recuerdos personalizados y entrega a domicilio.',
-        tip: 'Pueden venir en un plan o contratarse por separado. Revisa siempre qué incluye el precio final.',
-    },
 ];
 
 const PASOS = [
@@ -94,21 +79,39 @@ const PASOS = [
 ];
 
 const FACTORES_PRECIO = [
-    { t: 'Peso de la mascota', d: 'algunos proveedores establecen categorías según el tamaño.' },
-    { t: 'Tipo de cremación', d: 'individual o colectiva.' },
-    { t: 'Retiro y traslado', d: 'domicilio, clínica veterinaria y distancia recorrida.' },
-    { t: 'Ánfora y recuerdos', d: 'materiales, diseños y personalización.' },
-    { t: 'Documentación', d: 'certificados y comprobantes incluidos.' },
-    { t: 'Entrega', d: 'retiro en el establecimiento o despacho a domicilio, cuando esté disponible.' },
+    { factor: 'Peso o tamaño de la mascota', impacto: 'Principal determinante', detalle: 'Muchos proveedores establecen tramos por peso (ej. pequeño, mediano, grande, gigante).' },
+    { factor: 'Modalidad de cremación', impacto: 'Alto', detalle: 'Individual (con devolución de cenizas) suele tener mayor valor que colectiva.' },
+    { factor: 'Retiro y traslado', impacto: 'Variable', detalle: 'Depende de si se retira en domicilio, clínica veterinaria y la distancia entre comunas.' },
+    { factor: 'Ánfora o urna', impacto: 'Opcional / Incluido', detalle: 'Madera, cerámica, metal o diseños personalizados según el plan elegido.' },
+    { factor: 'Recuerdos y certificados', impacto: 'Opcional / Incluido', detalle: 'Placas grabadas, huellas, fotografías o memorial digital.' },
+    { factor: 'Ubicación geográfica', impacto: 'Regional', detalle: 'La oferta y costos logísticos varían entre Santiago, norte, centro y sur del país.' },
 ];
 
-const CONDICIONES_ESCRITO = [
-    'Modalidad de cremación contratada.',
-    'Precio y servicios incluidos.',
-    'Retiro y entrega.',
-    'Plazo estimado.',
-    'Documentación que recibirás.',
-    'Procedimiento para resolver consultas o reclamos.',
+const CHECKLIST_CONFIABLE = [
+    { id: 'id', q: '¿Identifican correctamente a la mascota desde el retiro o recepción?' },
+    { id: 'proc', q: '¿Explican con claridad el procedimiento individual o colectivo?' },
+    { id: 'traz', q: '¿Informan sobre la trazabilidad o registro de etapas del servicio?' },
+    { id: 'doc', q: '¿Entregan documentación o certificado al finalizar?' },
+    { id: 'plazos', q: '¿Explican los plazos estimados de entrega de las cenizas?' },
+    { id: 'cond', q: '¿Permiten conocer por escrito las condiciones y el precio final sin cobros ocultos?' },
+];
+
+const TRAZABILIDAD_ETAPAS = [
+    'Recepción',
+    'Identificación',
+    'Registro',
+    'Proceso',
+    'Finalización',
+    'Entrega',
+];
+
+const RECUERDOS_OPCIONES = [
+    { icon: Flower2, titulo: 'Urnas conmemorativas', texto: 'De madera, cerámica o materiales biodegradables pensadas para el hogar.' },
+    { icon: Award, titulo: 'Placas personalizadas', texto: 'Con su nombre, fechas significativas o una frase de despedida.' },
+    { icon: Camera, titulo: 'Fotografías y retratos', texto: 'Imágenes físicas o digitales que preserven sus mejores momentos.' },
+    { icon: Sparkles, titulo: 'Recuerdos digitales', texto: 'Santuarios en línea donde familiares y amigos dejan dedicatorias.' },
+    { icon: Heart, titulo: 'Huellas conmemorativas', texto: 'Moldes en yeso o impresiones de su patita como recuerdo tangible.' },
+    { icon: FileText, titulo: 'Certificado de cremación', texto: 'Documento formal que acredita la realización y modalidad del servicio.' },
 ];
 
 const REGIONES = [
@@ -128,466 +131,487 @@ const REGIONES = [
 
 const PASOS_FALLECIMIENTO = [
     'Contacta a tu veterinario si tienes dudas sobre el fallecimiento o necesitas orientación.',
-    'Consulta las alternativas de cremación y las condiciones de cada servicio.',
+    'Consulta las alternativas de cremación y las condiciones de cada servicio sin apuros innecesarios.',
     'Confirma si el proveedor realiza retiro o requiere recepción en sus instalaciones.',
     'Pregunta por la modalidad de cremación, los plazos y la documentación.',
     'Sigue las instrucciones del veterinario o del proveedor para mantener el cuerpo en condiciones adecuadas hasta el traslado.',
 ];
 
-const SOFTWARE_BENEFICIOS = [
-    'Código único y evidencia fotográfica en cada etapa del servicio.',
-    'Enlace de seguimiento en línea para que la familia vea el avance.',
-    'Formulario online, certificados y memoriales digitales.',
-];
+function WarmSectionTitle({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+    return (
+        <div className="flex items-center gap-3.5">
+            <span className="p-2.5 rounded-xl bg-[#F0EAE0] border border-[#C6A56A]/35 text-[#5B493D] shrink-0">
+                {icon}
+            </span>
+            <h2 className="text-xl sm:text-2xl font-serif font-bold tracking-tight text-[#292522]">
+                {children}
+            </h2>
+        </div>
+    );
+}
 
 export function GuiaCrematorioChileClient() {
-    const { theme, isLight, toggleTheme } = useVinzerTheme();
+    const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
 
-    const strong = isLight ? 'text-slate-900' : 'text-white';
-    const muted = isLight ? 'text-slate-600' : 'text-slate-300';
-    const card = isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#071120] border-white/10';
-    const sectionBorder = isLight ? 'border-slate-200' : 'border-white/10';
-    const accent = isLight ? 'text-rose-700' : 'text-rose-400';
-    const linkCls = `font-bold underline underline-offset-4 transition-colors ${
-        isLight ? 'text-[#0284C7] decoration-[#0284C7]/40 hover:text-slate-900' : 'text-[#19B5FE] decoration-[#19B5FE]/40 hover:text-white'
-    }`;
-    const primaryBtn = isLight
-        ? 'bg-[#0284C7] hover:bg-[#0369A1] text-white shadow-sky-600/25'
-        : 'bg-[#19B5FE] hover:bg-[#0e9ce0] text-[#020210] shadow-[#19B5FE]/25';
-    const numberBadge = (color: 'rose' | 'emerald') =>
-        color === 'rose'
-            ? isLight ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-            : isLight ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+    const toggleCheck = (id: string) => {
+        setCheckedItems((prev) => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    const checkedCount = Object.values(checkedItems).filter(Boolean).length;
 
     return (
-        <div
-            className={`min-h-screen transition-colors duration-500 font-sans relative overflow-hidden ${
-                isLight
-                    ? 'bg-slate-50 text-slate-900 selection:bg-[#0284C7]/20 selection:text-slate-900'
-                    : 'bg-[#020210] text-white selection:bg-[#19B5FE]/30 selection:text-white'
-            }`}
-        >
-            <VinzerNavbar theme={theme} toggleTheme={toggleTheme} />
+        <div className="min-h-screen bg-[#FAF8F3] text-[#292522] selection:bg-[#C6A56A]/25 selection:text-[#292522] font-sans relative overflow-hidden">
+            {/* Navbar en modo claro para integrarse con la estética cálida */}
+            <VinzerNavbar theme="light" />
 
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[600px] pointer-events-none z-0 overflow-hidden">
-                <div className={`absolute top-[5%] left-[10%] w-[500px] h-[500px] blur-[170px] rounded-full ${isLight ? 'bg-rose-300/15 opacity-60' : 'bg-rose-500/10'}`} />
-                <div className={`absolute top-[15%] right-[5%] w-[450px] h-[450px] blur-[180px] rounded-full ${isLight ? 'bg-sky-400/15 opacity-60' : 'bg-[#19B5FE]/10'}`} />
+            {/* Halo cálido sumamente sutil */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-6xl h-[420px] pointer-events-none z-0 overflow-hidden">
+                <div className="absolute top-[6%] left-[12%] w-[420px] h-[420px] blur-[150px] rounded-full bg-[#C6A56A]/15 opacity-70" />
+                <div className="absolute top-[12%] right-[8%] w-[360px] h-[360px] blur-[150px] rounded-full bg-[#F0EAE0] opacity-90" />
             </div>
 
-            <header className="relative pt-32 sm:pt-36 pb-12 sm:pb-16 px-4 sm:px-6 z-10 max-w-6xl mx-auto">
-                <nav aria-label="Ruta de navegación" className="flex items-center gap-2 text-xs font-semibold mb-6 flex-wrap">
-                    <Link href="/" className={`transition-colors ${isLight ? 'text-slate-500 hover:text-[#0284C7]' : 'text-slate-400 hover:text-[#19B5FE]'}`}>Inicio</Link>
-                    <ChevronRight size={13} className={isLight ? 'text-slate-300' : 'text-slate-600'} />
-                    <Link href="/guias" className={`transition-colors ${isLight ? 'text-slate-500 hover:text-[#0284C7]' : 'text-slate-400 hover:text-[#19B5FE]'}`}>Guías</Link>
-                    <ChevronRight size={13} className={isLight ? 'text-slate-300' : 'text-slate-600'} />
-                    <span className={`font-bold ${accent}`}>Crematorio de mascotas en Chile</span>
+            <header className="relative pt-32 sm:pt-36 pb-10 sm:pb-14 px-4 sm:px-6 z-10 max-w-6xl mx-auto">
+                <nav aria-label="Ruta de navegación" className="flex items-center gap-2 text-xs font-medium mb-6 flex-wrap text-[#77716A]">
+                    <Link href="/" className="hover:text-[#5B493D] transition-colors">Inicio</Link>
+                    <ChevronRight size={13} className="text-[#C6A56A]" />
+                    <Link href="/guias" className="hover:text-[#5B493D] transition-colors">Guías</Link>
+                    <ChevronRight size={13} className="text-[#C6A56A]" />
+                    <span className="font-semibold text-[#5B493D]">Crematorio de mascotas en Chile</span>
                 </nav>
 
-                <div
-                    className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border mb-5 ${
-                        isLight ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-rose-500/10 border-rose-500/25 text-rose-400'
-                    }`}
-                >
-                    <Heart size={14} /> Guía para familias
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide border border-[#C6A56A]/40 bg-[#F0EAE0] text-[#5B493D] mb-5">
+                    <Heart size={13} className="text-[#C6A56A]" /> Guía informativa para familias
                 </div>
 
-                <h1 className={`text-3xl sm:text-4xl md:text-5xl font-black tracking-tight leading-[1.15] max-w-4xl ${strong}`}>
+                <h1 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold tracking-tight leading-[1.15] max-w-4xl text-[#292522]">
                     {GUIA_CREMATORIO_CHILE_SEO.headline}
                 </h1>
 
-                <p className={`mt-6 text-base sm:text-lg max-w-3xl leading-relaxed ${muted}`}>
+                <p className="mt-6 text-base sm:text-lg max-w-3xl leading-relaxed text-[#5B493D]">
                     Perder a una mascota significa despedirse de un compañero que formó parte de nuestra vida, nuestras
-                    rutinas y nuestra familia. Un <strong className={strong}>crematorio de mascotas en Chile</strong> puede
-                    ofrecer una alternativa respetuosa para despedir a perros, gatos y otros animales de compañía. En esta
-                    guía te explicamos cómo funciona la cremación, qué diferencias hay entre los servicios y qué consultar
-                    antes de contratar.
+                    rutinas y nuestra familia. Conocer las opciones de cremación, los factores de precio y cómo elegir un
+                    servicio respetuoso puede darte calma para tomar una decisión informada.
                 </p>
 
-                <p className={`mt-4 text-xs font-semibold flex items-center gap-2 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                    <Clock size={13} />
+                <p className="mt-4 text-xs font-medium flex items-center gap-2 text-[#77716A]">
+                    <Clock size={13} className="text-[#C6A56A]" />
                     <span>
-                        Actualizado el <time dateTime={GUIA_CREMATORIO_CHILE_SEO.dateModified}>{formatFecha(GUIA_CREMATORIO_CHILE_SEO.dateModified)}</time> · Equipo Vinzer
+                        Actualizado el <time dateTime={GUIA_CREMATORIO_CHILE_SEO.dateModified}>{formatFecha(GUIA_CREMATORIO_CHILE_SEO.dateModified)}</time> · Guía editorial Vinzer
                     </span>
                 </p>
-
-                {/* Aviso B2B: quien llega buscando ayuda para su crematorio ve de inmediato que Vinzer es software. */}
-                <a
-                    href="#para-crematorios"
-                    className={`mt-8 flex items-start sm:items-center gap-3 max-w-3xl p-4 rounded-2xl border text-sm transition-colors ${
-                        isLight ? 'bg-sky-50 border-sky-200 text-slate-700 hover:border-sky-300' : 'bg-[#19B5FE]/5 border-[#19B5FE]/20 text-slate-300 hover:border-[#19B5FE]/40'
-                    }`}
-                >
-                    <Building2 size={18} className={`shrink-0 mt-0.5 sm:mt-0 ${isLight ? 'text-[#0284C7]' : 'text-[#19B5FE]'}`} />
-                    <span>
-                        <strong className={strong}>¿Tienes un crematorio de mascotas?</strong> Vinzer es el software de
-                        gestión para crematorios: trazabilidad, seguimiento en línea para las familias, certificados y más.
-                    </span>
-                    <ArrowRight size={16} className={`shrink-0 hidden sm:block ${isLight ? 'text-[#0284C7]' : 'text-[#19B5FE]'}`} />
-                </a>
             </header>
 
-            <main className="relative max-w-6xl mx-auto px-4 sm:px-6 pb-20 z-10">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                    <article className={`lg:col-span-8 space-y-14 leading-relaxed text-sm sm:text-base ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
-                        <section id="resumen" className={`p-6 rounded-2xl border scroll-mt-28 ${card}`}>
-                            <h2 className={`text-base font-black uppercase tracking-wider mb-4 flex items-center gap-2 ${strong}`}>
-                                <Sparkles size={16} className="text-amber-500" /> Resumen rápido
+            <main className="relative max-w-6xl mx-auto px-4 sm:px-6 pb-24 z-10">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12">
+                    <article className="lg:col-span-8 space-y-14 leading-relaxed text-sm sm:text-base text-[#292522]/90">
+                        {/* Resumen rápido */}
+                        <section id="resumen" className="p-6 sm:p-7 rounded-2xl border border-[#C6A56A]/35 bg-[#F0EAE0]/65 scroll-mt-28">
+                            <h2 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2 text-[#5B493D]">
+                                <Sparkles size={16} className="text-[#C6A56A]" /> En pocas palabras
                             </h2>
                             <ul className="space-y-2.5">
                                 {RESUMEN.map((r) => (
-                                    <li key={r} className="flex items-start gap-2.5 text-sm">
-                                        <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
+                                    <li key={r} className="flex items-start gap-2.5 text-sm text-[#292522]">
+                                        <CheckCircle2 size={16} className="text-[#C6A56A] shrink-0 mt-0.5" />
                                         <span>{r}</span>
                                     </li>
                                 ))}
                             </ul>
                         </section>
 
-                        {/* 1 */}
+                        {/* 1. Qué es */}
                         <section id="que-es" className="space-y-5 scroll-mt-28">
-                            <SectionTitle isLight={isLight} icon={<Flame size={20} />} color="bg-rose-500/10 border-rose-500/20 text-rose-500">
+                            <WarmSectionTitle icon={<Flame size={20} />}>
                                 1. ¿Qué es un crematorio de mascotas?
-                            </SectionTitle>
+                            </WarmSectionTitle>
                             <p>
                                 Un crematorio de mascotas es un establecimiento o servicio especializado en la cremación de animales
-                                de compañía fallecidos. Su finalidad es ofrecer una alternativa para el tratamiento de sus restos y,
-                                en determinados servicios, permitir que sus familias conserven las cenizas como recuerdo.
+                                de compañía fallecidos. Su finalidad es ofrecer una alternativa digna para el tratamiento de sus
+                                restos y, en determinados servicios, permitir que sus familias conserven las cenizas como recuerdo.
                             </p>
                             <p>
                                 Dependiendo del proveedor, el servicio puede incluir el retiro de la mascota desde el domicilio o una
                                 clínica veterinaria, su traslado, la cremación, la entrega de cenizas y un certificado del servicio.
-                                No todos los crematorios ofrecen las mismas prestaciones: antes de contratar, pregunta qué incluye cada
-                                alternativa y cómo se realiza el proceso.
+                                No todos los crematorios ofrecen las mismas prestaciones: antes de contratar, tómate un momento para
+                                preguntar qué incluye cada alternativa.
                             </p>
 
-                            <h3 className={`text-lg font-bold pt-2 ${strong}`}>¿Qué animales pueden ser cremados?</h3>
-                            <p>La disponibilidad depende de cada proveedor y de sus instalaciones. Algunos servicios reciben:</p>
-                            <ul className={`p-6 rounded-2xl border space-y-3 ${card}`}>
+                            <h3 className="text-lg font-serif font-bold pt-2 text-[#292522]">¿Qué animales pueden ser cremados?</h3>
+                            <p className="text-[#5B493D]">La disponibilidad depende de cada proveedor y de sus instalaciones. Habitualmente reciben:</p>
+                            <ul className="p-6 rounded-2xl border border-[#E6DFD5] bg-white space-y-3">
                                 {ANIMALES.map((t) => (
                                     <li key={t} className="flex items-start gap-2.5 text-sm">
-                                        <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
+                                        <CheckCircle2 size={16} className="text-[#C6A56A] shrink-0 mt-0.5" />
                                         <span>{t}</span>
                                     </li>
                                 ))}
                             </ul>
-                            <p className="text-sm">Al solicitar información, indica la especie, el peso aproximado y la ciudad donde necesitas el servicio.</p>
-
-                            <h3 className={`text-lg font-bold pt-2 ${strong}`}>¿Por qué elegir un servicio de cremación?</h3>
-                            <p>
-                                La cremación puede ser una alternativa para las familias que desean conservar las cenizas de su
-                                mascota, elegir un ánfora o contar con un recuerdo conmemorativo. También puede facilitar el traslado
-                                cuando el servicio incluye coordinación con clínicas veterinarias y retiro a domicilio. La decisión
-                                depende de las preferencias de cada familia y de las opciones disponibles en su localidad.
+                            <p className="text-sm text-[#77716A]">
+                                Al solicitar información, indica la especie, el peso aproximado y la ciudad donde necesitas el servicio.
                             </p>
                         </section>
 
-                        {/* 2 */}
-                        <section id="tipos" className={`space-y-6 scroll-mt-28 border-t pt-10 ${sectionBorder}`}>
-                            <SectionTitle isLight={isLight} icon={<Layers size={20} />} color="bg-violet-500/10 border-violet-500/20 text-violet-500">
+                        {/* 2. Tipos de cremación (Comparativa lado a lado) */}
+                        <section id="tipos" className="space-y-6 scroll-mt-28 border-t border-[#E6DFD5] pt-10">
+                            <WarmSectionTitle icon={<Layers size={20} />}>
                                 2. Tipos de cremación de mascotas en Chile
-                            </SectionTitle>
+                            </WarmSectionTitle>
                             <p>
                                 Los nombres comerciales pueden variar entre proveedores, por lo que conviene confirmar por escrito qué
-                                ofrece cada uno. Estas son las modalidades más habituales:
+                                ofrece cada uno. Estas son las dos modalidades principales:
                             </p>
-                            <div className="space-y-4">
-                                {TIPOS.map((tipo, i) => (
-                                    <div key={tipo.titulo} className={`p-5 sm:p-6 rounded-2xl border ${card}`}>
-                                        <h3 className={`text-lg font-bold ${strong}`}>{i + 1}. {tipo.titulo}</h3>
-                                        <p className="text-sm mt-2">{tipo.texto}</p>
-                                        <p className={`text-sm mt-3 pl-3 border-l-2 ${isLight ? 'border-rose-300 text-slate-600' : 'border-rose-500/40 text-slate-400'}`}>
-                                            {tipo.tip}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div className="p-6 rounded-2xl border border-[#C6A56A]/45 bg-white shadow-sm flex flex-col justify-between">
+                                    <div>
+                                        <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-[#F0EAE0] text-[#5B493D] mb-3">
+                                            Con devolución
+                                        </span>
+                                        <h3 className="text-xl font-serif font-bold text-[#292522]">Cremación individual</h3>
+                                        <p className="text-sm text-[#5B493D] mt-2 leading-relaxed">
+                                            El servicio se contrata para una sola mascota, con procedimientos destinados a mantener su
+                                            identificación durante todo el proceso.
                                         </p>
+                                        <ul className="mt-4 space-y-2 text-sm text-[#292522]">
+                                            <li className="flex items-start gap-2">
+                                                <CheckCircle2 size={15} className="text-[#C6A56A] shrink-0 mt-0.5" />
+                                                <span>Recuperación de las cenizas de tu mascota.</span>
+                                            </li>
+                                            <li className="flex items-start gap-2">
+                                                <CheckCircle2 size={15} className="text-[#C6A56A] shrink-0 mt-0.5" />
+                                                <span>Alternativas de urnas, ánforas y recuerdos.</span>
+                                            </li>
+                                            <li className="flex items-start gap-2">
+                                                <CheckCircle2 size={15} className="text-[#C6A56A] shrink-0 mt-0.5" />
+                                                <span>Suele incluir certificado de cremación.</span>
+                                            </li>
+                                        </ul>
                                     </div>
-                                ))}
+                                    <p className="text-xs mt-5 pt-3 border-t border-[#F0EAE0] text-[#77716A]">
+                                        Consulta siempre cómo se identifica a tu mascota y qué documento se entrega al finalizar.
+                                    </p>
+                                </div>
+
+                                <div className="p-6 rounded-2xl border border-[#E6DFD5] bg-white/80 flex flex-col justify-between">
+                                    <div>
+                                        <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-[#FAF8F3] border border-[#E6DFD5] text-[#77716A] mb-3">
+                                            Sin devolución individual
+                                        </span>
+                                        <h3 className="text-xl font-serif font-bold text-[#292522]">Cremación colectiva</h3>
+                                        <p className="text-sm text-[#5B493D] mt-2 leading-relaxed">
+                                            Contempla el tratamiento conjunto de varias mascotas, de acuerdo con el procedimiento
+                                            sanitario del proveedor.
+                                        </p>
+                                        <ul className="mt-4 space-y-2 text-sm text-[#292522]">
+                                            <li className="flex items-start gap-2">
+                                                <CheckCircle2 size={15} className="text-[#77716A] shrink-0 mt-0.5" />
+                                                <span>Generalmente no contempla devolución de cenizas.</span>
+                                            </li>
+                                            <li className="flex items-start gap-2">
+                                                <CheckCircle2 size={15} className="text-[#77716A] shrink-0 mt-0.5" />
+                                                <span>Alternativa respetuosa para quienes no buscan conservarlas.</span>
+                                            </li>
+                                            <li className="flex items-start gap-2">
+                                                <CheckCircle2 size={15} className="text-[#77716A] shrink-0 mt-0.5" />
+                                                <span>Costo habitualmente menor al servicio individual.</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                    <p className="text-xs mt-5 pt-3 border-t border-[#F0EAE0] text-[#77716A]">
+                                        Confirma las condiciones específicas de disposición final antes de contratar.
+                                    </p>
+                                </div>
                             </div>
                         </section>
 
-                        {/* 3 */}
-                        <section id="como-funciona" className={`space-y-5 scroll-mt-28 border-t pt-10 ${sectionBorder}`}>
-                            <SectionTitle isLight={isLight} icon={<ListOrdered size={20} />} color="bg-emerald-500/10 border-emerald-500/20 text-emerald-500">
+                        {/* 3. Cómo funciona */}
+                        <section id="como-funciona" className="space-y-5 scroll-mt-28 border-t border-[#E6DFD5] pt-10">
+                            <WarmSectionTitle icon={<ListOrdered size={20} />}>
                                 3. ¿Cómo funciona la cremación de una mascota?
-                            </SectionTitle>
+                            </WarmSectionTitle>
                             <p>El procedimiento varía entre establecimientos, pero normalmente se organiza en estas etapas:</p>
-                            <ol className="space-y-4">
+                            <ol className="space-y-3.5">
                                 {PASOS.map((item, i) => (
-                                    <li key={item.t} className={`flex gap-4 p-5 rounded-2xl border ${card}`}>
-                                        <span className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-sm font-black ${numberBadge('emerald')}`}>
+                                    <li key={item.t} className="flex gap-4 p-5 rounded-2xl border border-[#E6DFD5] bg-white">
+                                        <span className="w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-sm font-bold bg-[#F0EAE0] text-[#5B493D] border border-[#C6A56A]/40">
                                             {i + 1}
                                         </span>
                                         <div>
-                                            <h3 className={`font-bold ${strong}`}>{item.t}</h3>
-                                            <p className="text-sm mt-1">{item.d}</p>
+                                            <h3 className="font-bold text-[#292522]">{item.t}</h3>
+                                            <p className="text-sm text-[#5B493D] mt-1">{item.d}</p>
                                         </div>
                                     </li>
                                 ))}
                             </ol>
                         </section>
 
-                        {/* 4 */}
-                        <section id="precio" className={`space-y-5 scroll-mt-28 border-t pt-10 ${sectionBorder}`}>
-                            <SectionTitle isLight={isLight} icon={<Wallet size={20} />} color="bg-amber-500/10 border-amber-500/20 text-amber-500">
+                        {/* 4. Precios en Chile */}
+                        <section id="precio" className="space-y-5 scroll-mt-28 border-t border-[#E6DFD5] pt-10">
+                            <WarmSectionTitle icon={<Wallet size={20} />}>
                                 4. ¿Cuánto cuesta la cremación de una mascota en Chile?
-                            </SectionTitle>
+                            </WarmSectionTitle>
                             <p>
-                                El precio puede variar según la ciudad, el peso del animal, la modalidad de cremación y los servicios
-                                adicionales contratados. Estos son los factores que más influyen:
+                                No existe una tarifa única nacional: el precio cambia según la región, el peso de la mascota y lo
+                                que incluya el servicio. Esta tabla resume los factores que explican las diferencias de presupuesto:
                             </p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {FACTORES_PRECIO.map((f) => (
-                                    <div key={f.t} className={`p-5 rounded-2xl border ${card}`}>
-                                        <h3 className={`font-bold ${strong}`}>{f.t}</h3>
-                                        <p className="text-sm mt-1 first-letter:uppercase">{f.d}</p>
-                                    </div>
-                                ))}
+                            <div className="overflow-x-auto rounded-2xl border border-[#E6DFD5] bg-white">
+                                <table className="w-full text-left text-xs sm:text-sm">
+                                    <thead className="bg-[#F0EAE0]/70 text-[#5B493D] text-[11px] uppercase tracking-wider border-b border-[#E6DFD5]">
+                                        <tr>
+                                            <th scope="col" className="p-3.5 sm:p-4 font-bold">Factor</th>
+                                            <th scope="col" className="p-3.5 sm:p-4 font-bold">Impacto</th>
+                                            <th scope="col" className="p-3.5 sm:p-4 font-bold">Qué considerar al cotizar</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-[#F0EAE0]">
+                                        {FACTORES_PRECIO.map((f) => (
+                                            <tr key={f.factor}>
+                                                <th scope="row" className="p-3.5 sm:p-4 font-semibold text-[#292522]">{f.factor}</th>
+                                                <td className="p-3.5 sm:p-4">
+                                                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#FAF8F3] border border-[#E6DFD5] text-[#5B493D]">
+                                                        {f.impacto}
+                                                    </span>
+                                                </td>
+                                                <td className="p-3.5 sm:p-4 text-[#5B493D]">{f.detalle}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
-                            <h3 className={`text-lg font-bold pt-2 ${strong}`}>¿Cómo comparar presupuestos?</h3>
+                            <div className="p-5 rounded-2xl border border-[#C6A56A]/35 bg-[#F0EAE0]/45 text-sm text-[#5B493D]">
+                                <strong className="text-[#292522]">Consejo al comparar presupuestos:</strong> solicita al menos dos
+                                cotizaciones y verifica si el valor informado es el precio final (si incluye retiro, entrega a
+                                domicilio, urna básica y certificado).
+                            </div>
+                        </section>
+
+                        {/* 5. Checklist interactivo: cómo elegir un crematorio confiable */}
+                        <section id="como-elegir" className="space-y-5 scroll-mt-28 border-t border-[#E6DFD5] pt-10">
+                            <WarmSectionTitle icon={<ShieldCheck size={20} />}>
+                                5. ¿Cómo elegir un crematorio confiable?
+                            </WarmSectionTitle>
                             <p>
-                                Solicita al menos dos cotizaciones y comprueba que ambas incluyan los mismos servicios. Pregunta si el
-                                valor publicado corresponde al precio final, si existen cobros por retiro, si la entrega de cenizas
-                                está incluida y cuánto demora el proceso.
+                                En un momento de duelo, tener una lista clara te ayuda a preguntar lo esencial con tranquilidad.
+                                Puedes usar este checklist al conversar con cada proveedor:
                             </p>
-                            <p>
-                                No elijas únicamente por el precio. La claridad de las condiciones, la identificación de la mascota y
-                                la confianza que transmite el proveedor también son factores importantes.
+
+                            <div className="rounded-2xl border border-[#C6A56A]/40 bg-white p-5 sm:p-6 space-y-3 shadow-sm">
+                                <div className="flex items-center justify-between gap-3 pb-3 border-b border-[#F0EAE0]">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-[#5B493D]">
+                                        Checklist de verificación ({checkedCount}/{CHECKLIST_CONFIABLE.length})
+                                    </span>
+                                    {checkedCount > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setCheckedItems({})}
+                                            className="text-xs text-[#77716A] hover:text-[#292522] underline"
+                                        >
+                                            Reiniciar
+                                        </button>
+                                    )}
+                                </div>
+                                <ul className="space-y-2.5">
+                                    {CHECKLIST_CONFIABLE.map((item) => {
+                                        const isChecked = !!checkedItems[item.id];
+                                        return (
+                                            <li key={item.id}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleCheck(item.id)}
+                                                    aria-pressed={isChecked}
+                                                    className={`w-full text-left flex items-start gap-3 p-3 rounded-xl border transition-colors ${
+                                                        isChecked
+                                                            ? 'bg-[#F0EAE0]/65 border-[#C6A56A]/60 text-[#292522]'
+                                                            : 'bg-[#FAF8F3]/60 border-[#E6DFD5] hover:border-[#C6A56A]/50 text-[#292522]'
+                                                    }`}
+                                                >
+                                                    <span
+                                                        className={`w-5 h-5 mt-0.5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
+                                                            isChecked
+                                                                ? 'bg-[#5B493D] border-[#5B493D] text-white'
+                                                                : 'bg-white border-[#C6A56A]/60'
+                                                        }`}
+                                                    >
+                                                        {isChecked && <Check size={13} strokeWidth={3} />}
+                                                    </span>
+                                                    <span className={`text-sm ${isChecked ? 'font-medium' : ''}`}>{item.q}</span>
+                                                </button>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            </div>
+
+                            <p className="text-sm text-[#5B493D]">
+                                Revisa además opiniones de otras familias en Google y pide siempre por escrito la modalidad contratada,
+                                el plazo de entrega y los mecanismos de identificación.
                             </p>
                         </section>
 
-                        {/* 5 */}
-                        <section id="como-elegir" className={`space-y-5 scroll-mt-28 border-t pt-10 ${sectionBorder}`}>
-                            <SectionTitle isLight={isLight} icon={<ShieldCheck size={20} />} color="bg-[#19B5FE]/10 border-[#19B5FE]/20 text-[#19B5FE]">
-                                5. ¿Cómo elegir un crematorio de mascotas confiable?
-                            </SectionTitle>
-
-                            <h3 className={`text-lg font-bold ${strong}`}>Verifica sus antecedentes y condiciones de funcionamiento</h3>
+                        {/* 6. La importancia de la trazabilidad */}
+                        <section id="trazabilidad" className="space-y-5 scroll-mt-28 border-t border-[#E6DFD5] pt-10">
+                            <WarmSectionTitle icon={<BookOpen size={20} />}>
+                                6. La importancia de la trazabilidad
+                            </WarmSectionTitle>
                             <p>
-                                Pregunta por la identificación de la empresa, sus instalaciones, los permisos o autorizaciones que
-                                correspondan a su actividad y la documentación disponible. En Chile, la normativa aplicable debe
-                                revisarse según el tipo de instalación y servicio (ver la <a href="#normativa" className={linkCls}>sección de normativa</a>).
+                                La trazabilidad consiste en mantener identificada a tu mascota y registrar cada etapa importante del
+                                servicio, especialmente cuando contratas una cremación individual. Esto aporta certeza y tranquilidad
+                                a la familia.
                             </p>
 
-                            <h3 className={`text-lg font-bold pt-2 ${strong}`}>Consulta cómo funciona la trazabilidad</h3>
-                            <p>
-                                La trazabilidad permite registrar y seguir las etapas relevantes del servicio. Antes de contratar una
-                                cremación individual, pregunta cómo identifican a la mascota al recibirla, cómo registran los cambios
-                                de etapa y qué información pueden entregar a la familia.
-                            </p>
-                            <p>
-                                Un proveedor puede utilizar registros internos, comprobantes, fotografías u otros mecanismos. Algunos
-                                crematorios ofrecen incluso un{' '}
-                                <Link href={SEGUIMIENTO_HREF} className={linkCls}>seguimiento en línea</Link> donde la familia ve cada
-                                etapa con fotos y fechas. Si quieres saber qué es una buena{' '}
-                                <Link href={TRAZABILIDAD_HREF} className={linkCls}>cadena de custodia</Link>, revisa nuestra guía.
-                            </p>
-
-                            <h3 className={`text-lg font-bold pt-2 ${strong}`}>Revisa las opiniones de otros clientes</h3>
-                            <p>
-                                Las reseñas ayudan a conocer experiencias sobre la atención, la puntualidad y la comunicación. Busca
-                                comentarios de distintas fechas y fíjate en cómo la empresa responde dudas y resuelve inconvenientes.
-                            </p>
-
-                            <h3 className={`text-lg font-bold pt-2 ${strong}`}>Solicita las condiciones por escrito</h3>
-                            <p>Antes de confirmar, procura tener claridad sobre:</p>
-                            <ul className={`p-6 rounded-2xl border space-y-3 ${card}`}>
-                                {CONDICIONES_ESCRITO.map((t) => (
-                                    <li key={t} className="flex items-start gap-2.5 text-sm">
-                                        <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
-                                        <span>{t}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                            <p className="text-sm">
-                                La transparencia es especialmente importante cuando la familia atraviesa un momento emocionalmente difícil.
-                            </p>
+                            <div className="p-5 sm:p-6 rounded-2xl border border-[#E6DFD5] bg-white">
+                                <p className="text-xs font-bold uppercase tracking-wider text-[#77716A] mb-4">
+                                    Ejemplo referencial de etapas de seguimiento
+                                </p>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
+                                    {TRAZABILIDAD_ETAPAS.map((etapa, idx) => (
+                                        <div
+                                            key={etapa}
+                                            className="p-3 rounded-xl bg-[#FAF8F3] border border-[#E6DFD5] text-center flex flex-col items-center justify-center gap-1"
+                                        >
+                                            <span className="text-[10px] font-bold text-[#C6A56A]">0{idx + 1}</span>
+                                            <span className="text-xs font-semibold text-[#292522]">{etapa}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className="text-xs text-[#77716A] mt-4">
+                                    * Cada crematorio define sus propios protocolos internos y etapas de atención. Algunos proveedores
+                                    ofrecen comprobantes fotográficos o un{' '}
+                                    <Link href={SEGUIMIENTO_HREF} className="underline text-[#5B493D] font-semibold hover:text-[#292522]">
+                                        enlace de seguimiento en línea
+                                    </Link>{' '}
+                                    (puedes leer más sobre{' '}
+                                    <Link href={TRAZABILIDAD_HREF} className="underline text-[#5B493D] font-semibold hover:text-[#292522]">
+                                        cadena de custodia
+                                    </Link>
+                                    ).
+                                </p>
+                            </div>
                         </section>
 
-                        {/* 6 */}
-                        <section id="donde" className={`space-y-5 scroll-mt-28 border-t pt-10 ${sectionBorder}`}>
-                            <SectionTitle isLight={isLight} icon={<MapPin size={20} />} color="bg-rose-500/10 border-rose-500/20 text-rose-500">
-                                6. ¿Dónde encontrar crematorios de mascotas en Chile?
-                            </SectionTitle>
+                        {/* 7. Dónde encontrar crematorios */}
+                        <section id="donde" className="space-y-5 scroll-mt-28 border-t border-[#E6DFD5] pt-10">
+                            <WarmSectionTitle icon={<MapPin size={20} />}>
+                                7. ¿Dónde encontrar crematorios de mascotas en Chile?
+                            </WarmSectionTitle>
                             <p>
                                 La disponibilidad depende de cada región y comuna. Busca proveedores en tu ciudad y confirma
-                                directamente su cobertura, sus horarios y las condiciones de atención.
+                                directamente su cobertura, horarios y condiciones de traslado.
                             </p>
-                            <div className="space-y-4">
+                            <div className="space-y-3.5">
                                 {REGIONES.map((r) => (
-                                    <div key={r.titulo} className={`p-5 rounded-2xl border ${card}`}>
-                                        <h3 className={`font-bold ${strong}`}>{r.titulo}</h3>
-                                        <p className="text-sm mt-1">{r.texto}</p>
+                                    <div key={r.titulo} className="p-5 rounded-2xl border border-[#E6DFD5] bg-white">
+                                        <h3 className="font-bold text-[#292522]">{r.titulo}</h3>
+                                        <p className="text-sm text-[#5B493D] mt-1">{r.texto}</p>
                                     </div>
                                 ))}
                             </div>
-                            <p className="text-sm">
-                                No des por hecho que el retiro a domicilio está disponible en todo el territorio.{' '}
-                                <strong className={strong}>Consejo:</strong> busca términos como “crematorio de mascotas en [tu ciudad]”,
-                                “cremación individual de mascotas en [tu comuna]” o “retiro de mascotas fallecidas en [tu región]”.
-                            </p>
                         </section>
 
-                        {/* 7 */}
-                        <section id="que-hacer" className={`space-y-5 scroll-mt-28 border-t pt-10 ${sectionBorder}`}>
-                            <SectionTitle isLight={isLight} icon={<LifeBuoy size={20} />} color="bg-emerald-500/10 border-emerald-500/20 text-emerald-500">
-                                7. ¿Qué hacer cuando fallece una mascota?
-                            </SectionTitle>
-                            <p>Si tu mascota acaba de fallecer, intenta darte el tiempo necesario para tomar una decisión informada.</p>
+                        {/* 8. Qué hacer cuando fallece */}
+                        <section id="que-hacer" className="space-y-5 scroll-mt-28 border-t border-[#E6DFD5] pt-10">
+                            <WarmSectionTitle icon={<LifeBuoy size={20} />}>
+                                8. ¿Qué hacer cuando fallece una mascota?
+                            </WarmSectionTitle>
+                            <p>Si tu mascota acaba de fallecer, intenta darte un respiro para tomar una decisión con calma.</p>
                             <ol className="space-y-3">
                                 {PASOS_FALLECIMIENTO.map((t, i) => (
-                                    <li key={t} className={`flex gap-4 items-start p-4 rounded-2xl border ${card}`}>
-                                        <span className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-sm font-black ${numberBadge('rose')}`}>
+                                    <li key={t} className="flex gap-4 items-start p-4 rounded-2xl border border-[#E6DFD5] bg-white">
+                                        <span className="w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-xs font-bold bg-[#F0EAE0] text-[#5B493D] border border-[#C6A56A]/40">
                                             {i + 1}
                                         </span>
-                                        <span className="text-sm pt-1.5">{t}</span>
+                                        <span className="text-sm text-[#292522] pt-1">{t}</span>
                                     </li>
                                 ))}
                             </ol>
-                            <p className="text-sm">
-                                Si el fallecimiento fue inesperado o existen dudas sobre su causa, consulta con un veterinario antes de
-                                autorizar procedimientos que puedan interferir con una evaluación necesaria.
-                            </p>
                         </section>
 
-                        {/* 8 */}
-                        <section id="normativa" className={`space-y-5 scroll-mt-28 border-t pt-10 ${sectionBorder}`}>
-                            <SectionTitle isLight={isLight} icon={<Scale size={20} />} color="bg-violet-500/10 border-violet-500/20 text-violet-500">
-                                8. ¿Qué dice la normativa chilena sobre la cremación de mascotas?
-                            </SectionTitle>
+                        {/* 9. Normativa chilena */}
+                        <section id="normativa" className="space-y-5 scroll-mt-28 border-t border-[#E6DFD5] pt-10">
+                            <WarmSectionTitle icon={<Scale size={20} />}>
+                                9. ¿Qué dice la normativa chilena?
+                            </WarmSectionTitle>
                             <p>
                                 Conviene distinguir entre las normas generales sobre tenencia responsable, las exigencias sanitarias
-                                aplicables y las reglas específicas que puedan corresponder al establecimiento.
+                                aplicables y las reglas municipales correspondientes al establecimiento:
                             </p>
                             <p>
                                 La{' '}
-                                <a href={LEY_21020_URL} target="_blank" rel="noopener noreferrer" className={linkCls}>
+                                <a href={LEY_21020_URL} target="_blank" rel="noopener noreferrer" className="underline font-semibold text-[#5B493D] hover:text-[#292522]">
                                     Ley N.º 21.020<ExternalLink size={12} className="inline ml-1 -mt-0.5" />
                                 </a>{' '}
-                                regula aspectos de la tenencia responsable de mascotas y animales de compañía. Además, el{' '}
-                                <a href={CODIGO_SANITARIO_URL} target="_blank" rel="noopener noreferrer" className={linkCls}>
+                                regula la tenencia responsable de mascotas y animales de compañía, mientras que el{' '}
+                                <a href={CODIGO_SANITARIO_URL} target="_blank" rel="noopener noreferrer" className="underline font-semibold text-[#5B493D] hover:text-[#292522]">
                                     Código Sanitario<ExternalLink size={12} className="inline ml-1 -mt-0.5" />
                                 </a>{' '}
-                                y las disposiciones sanitarias pertinentes deben revisarse para determinar qué autorizaciones
-                                corresponden a una instalación concreta. No se debe asumir que las exigencias para crematorios humanos
-                                se aplican automáticamente, en idénticos términos, a todos los servicios para animales.
+                                y las disposiciones sanitarias y municipales determinan las autorizaciones aplicables según cada
+                                instalación.
                             </p>
-                            <p>Las reglas municipales y las condiciones de uso de suelo también pueden ser relevantes según la actividad y la comuna.</p>
-                            <div className={`p-5 rounded-2xl border text-sm ${card}`}>
-                                Si vas a contratar un servicio, pide información sobre sus antecedentes y autorizaciones aplicables.
-                                Si deseas abrir un crematorio, consulta directamente con la SEREMI de Salud y la municipalidad
-                                correspondientes antes de invertir en instalaciones o equipamiento.
+                        </section>
+
+                        {/* 10. Cómo conservar el recuerdo */}
+                        <section id="recuerdo" className="space-y-5 scroll-mt-28 border-t border-[#E6DFD5] pt-10">
+                            <WarmSectionTitle icon={<Flower2 size={20} />}>
+                                10. Cómo conservar el recuerdo de tu mascota
+                            </WarmSectionTitle>
+                            <p>
+                                No existe una única manera de despedirse. Cada familia elige la forma que más sentido le haga para
+                                honrar el vínculo compartido:
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {RECUERDOS_OPCIONES.map((item) => {
+                                    const Icon = item.icon;
+                                    return (
+                                        <div key={item.titulo} className="p-5 rounded-2xl border border-[#E6DFD5] bg-white space-y-2">
+                                            <div className="w-9 h-9 rounded-xl bg-[#F0EAE0] border border-[#C6A56A]/35 flex items-center justify-center text-[#5B493D]">
+                                                <Icon size={17} />
+                                            </div>
+                                            <h3 className="font-bold text-sm text-[#292522]">{item.titulo}</h3>
+                                            <p className="text-xs text-[#77716A] leading-relaxed">{item.texto}</p>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </section>
 
-                        {/* 9 */}
-                        <section id="recuerdo" className={`space-y-5 scroll-mt-28 border-t pt-10 ${sectionBorder}`}>
-                            <SectionTitle isLight={isLight} icon={<Flower2 size={20} />} color="bg-rose-500/10 border-rose-500/20 text-rose-500">
-                                9. La importancia de conservar un recuerdo de tu mascota
-                            </SectionTitle>
-                            <p>
-                                Cada familia vive la despedida de manera diferente. Para algunas personas, conservar las cenizas es
-                                una forma significativa de recordar a su compañero. Otras prefieren un certificado, una fotografía, un
-                                objeto conmemorativo o un memorial digital.
-                            </p>
-                            <p>
-                                No existe una única forma correcta de despedirse. Lo importante es conocer las alternativas, tomar una
-                                decisión acorde con tus preferencias y sentir que el proceso fue explicado con respeto.
-                            </p>
+                        {/* 11. Preguntas frecuentes */}
+                        <section id="faqs" className="space-y-6 scroll-mt-28 border-t border-[#E6DFD5] pt-10">
+                            <WarmSectionTitle icon={<HelpCircle size={20} />}>
+                                11. Preguntas frecuentes
+                            </WarmSectionTitle>
+                            <VinzerGuideAccordion items={GUIA_CREMATORIO_CHILE_FAQ} theme="light" />
                         </section>
 
-                        {/* 10 FAQ */}
-                        <section id="faqs" className={`space-y-6 scroll-mt-28 border-t pt-10 ${sectionBorder}`}>
-                            <SectionTitle isLight={isLight} icon={<HelpCircle size={20} />} color="bg-sky-500/10 border-sky-500/20 text-sky-500">
-                                10. Preguntas frecuentes sobre crematorios de mascotas en Chile
-                            </SectionTitle>
-                            <VinzerGuideAccordion items={GUIA_CREMATORIO_CHILE_FAQ} theme={theme} />
-                        </section>
-
-                        {/* Conclusión */}
-                        <section className={`space-y-4 border-t pt-10 ${sectionBorder}`}>
-                            <h2 className={`text-xl sm:text-2xl font-black tracking-tight ${strong}`}>
-                                Conclusión: una despedida merece respeto y claridad
-                            </h2>
-                            <p>
-                                Encontrar un crematorio de mascotas en Chile implica comparar alternativas, comprender las modalidades
-                                disponibles y elegir un proveedor que explique claramente cada etapa del servicio. Antes de decidir,
-                                consulta las condiciones, los plazos, los costos y los mecanismos de identificación.
-                            </p>
-                            <p className={`font-bold ${strong}`}>
-                                Porque el vínculo con una mascota no termina en la despedida: permanece en los recuerdos, el cariño y
-                                todo lo que compartieron.
-                            </p>
-                        </section>
-
-                        {/* Bloque B2B */}
-                        <section
-                            id="para-crematorios"
-                            className={`scroll-mt-28 p-6 sm:p-8 rounded-3xl border ${
-                                isLight ? 'bg-white border-sky-200 shadow-sm' : 'bg-gradient-to-br from-[#071120] to-[#0a0f1f] border-[#19B5FE]/25'
-                            }`}
-                        >
-                            <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider border mb-4 ${
-                                isLight ? 'bg-sky-50 border-sky-200 text-[#0284C7]' : 'bg-[#19B5FE]/10 border-[#19B5FE]/25 text-[#19B5FE]'
-                            }`}>
-                                <Building2 size={13} /> Para crematorios
-                            </div>
-                            <h2 className={`text-xl sm:text-2xl font-black tracking-tight ${strong}`}>
-                                ¿Tienes un crematorio de mascotas? Vinzer es el software para gestionarlo
-                            </h2>
-                            <p className="mt-3">
-                                Vinzer no realiza cremaciones: desarrollamos el <strong className={strong}>software de gestión para
-                                crematorios de mascotas</strong> que ayuda a ofrecer exactamente lo que esta guía recomienda pedir.
-                            </p>
-                            <ul className="mt-5 space-y-2.5">
-                                {SOFTWARE_BENEFICIOS.map((b) => (
-                                    <li key={b} className="flex items-start gap-2.5 text-sm">
-                                        <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
-                                        <span>{b}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                            <div className="mt-6 flex flex-wrap items-center gap-4">
-                                <a
-                                    href="/#demo"
-                                    className={`inline-flex items-center gap-2.5 px-6 py-3.5 rounded-full font-black text-xs uppercase tracking-wider transition-all shadow-lg hover:scale-105 active:scale-95 ${primaryBtn}`}
-                                >
-                                    Solicitar demo guiada <ArrowRight size={15} />
-                                </a>
-                                <Link href="/guias" className={`text-sm ${linkCls}`}>
-                                    Ver guías para crematorios
-                                </Link>
+                        {/* Cierre informativo respetuoso (sin venta agresiva de software) */}
+                        <section className="space-y-5 border-t border-[#E6DFD5] pt-10">
+                            <div className="p-7 sm:p-8 rounded-3xl border border-[#C6A56A]/40 bg-[#F0EAE0]/60 space-y-4">
+                                <h2 className="text-xl sm:text-2xl font-serif font-bold text-[#292522]">
+                                    Un recuerdo que permanece
+                                </h2>
+                                <p className="text-sm sm:text-base text-[#5B493D] leading-relaxed">
+                                    Cada mascota deja una historia y un vínculo único. Informarse sobre las alternativas disponibles
+                                    permite tomar una decisión consciente y encontrar una manera serena de conservar su recuerdo.
+                                </p>
+                                <p className="pt-3 border-t border-[#C6A56A]/30 text-xs text-[#77716A] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <span>
+                                        Vinzer es una plataforma tecnológica especializada en la gestión de crematorios de mascotas.
+                                        No realiza directamente servicios de cremación.
+                                    </span>
+                                    <Link href="/guias" className="inline-flex items-center gap-1 font-semibold text-[#5B493D] hover:text-[#292522] shrink-0">
+                                        Explorar más guías <ArrowRight size={13} />
+                                    </Link>
+                                </p>
                             </div>
                         </section>
                     </article>
 
+                    {/* Sidebar solo con índice limpio para lectura cómoda */}
                     <aside className="lg:col-span-4 hidden lg:block">
-                        <VinzerGuideTOC items={TOC_ITEMS} theme={theme} />
-                        <div
-                            className={`mt-6 p-6 rounded-2xl border text-center space-y-3 ${
-                                isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-gradient-to-b from-[#071120] to-[#020210] border-white/10'
-                            }`}
-                        >
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto ${isLight ? 'bg-sky-50 text-[#0284C7]' : 'bg-[#19B5FE]/10 text-[#19B5FE]'}`}>
-                                <Building2 size={20} />
-                            </div>
-                            <h3 className={`text-sm font-bold ${strong}`}>¿Eres un crematorio?</h3>
-                            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                                Vinzer es el software para crematorios de mascotas: trazabilidad, seguimiento para las familias y
-                                certificados en un solo lugar.
-                            </p>
-                            <a
-                                href="/#demo"
-                                className={`block w-full py-2.5 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-md ${primaryBtn}`}
-                            >
-                                Agendar demo guiada
-                            </a>
-                        </div>
+                        <VinzerGuideTOC items={TOC_ITEMS} theme="light" />
                     </aside>
                 </div>
             </main>
 
-            <div className="relative z-10">
-                <VinzerMemorialBanner theme={theme} />
-            </div>
-            <VinzerFooter theme={theme} />
+            <VinzerFooter theme="light" />
         </div>
     );
 }

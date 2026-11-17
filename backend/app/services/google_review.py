@@ -470,6 +470,9 @@ async def run_once() -> int:
                     db.rollback()
                     apply_bypass_rls(db)
                     logger.exception("No se pudo enviar la invitación a reseña (orden %s)", oc_id)
+                from app.services.email import BATCH_EMAIL_DELAY_SECONDS
+                if BATCH_EMAIL_DELAY_SECONDS > 0:
+                    await asyncio.sleep(BATCH_EMAIL_DELAY_SECONDS)
         finally:
             db.execute(text("SELECT pg_advisory_unlock(:id)"), {"id": ADVISORY_LOCK_ID})
             db.commit()

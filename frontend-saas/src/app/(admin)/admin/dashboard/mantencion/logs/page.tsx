@@ -1,9 +1,27 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Search, Filter, ChevronLeft, ChevronRight, AlertCircle, CheckCircle2, Clock, Building2, ArrowLeft } from 'lucide-react';
-import { useSystemAuditLogs, type SystemAuditLogsFilters } from '@/hooks/useSystemAuditLogs';
+import { useSearchParams } from 'next/navigation';
+import {
+    Search,
+    Filter,
+    ChevronLeft,
+    ChevronRight,
+    AlertCircle,
+    CheckCircle2,
+    Clock,
+    Building2,
+    ArrowLeft,
+    RefreshCw,
+    Download,
+    X,
+} from 'lucide-react';
+import {
+    useSystemAuditLogs,
+    type SystemAuditLogsFilters,
+    type SystemAuditLogEntry,
+} from '@/hooks/useSystemAuditLogs';
 import { useAdminTenants } from '@/hooks/useAdminBootstrap';
 
 const PAGE_SIZE = 30;
@@ -32,13 +50,20 @@ function formatDate(iso: string | null): string {
 
 export default function SystemLogsPage() {
     const tenants = useAdminTenants();
+    const searchParams = useSearchParams();
 
     const [page, setPage] = useState(0);
     const [search, setSearch] = useState('');
-    const [statusFilter, setStatusFilter] = useState('');
-    const [tenantFilter, setTenantFilter] = useState('');
+    const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') || '');
+    const [tenantFilter, setTenantFilter] = useState(() => searchParams.get('tenant_id') || '');
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
+    const [selectedLog, setSelectedLog] = useState<SystemAuditLogEntry | null>(null);
+
+    useEffect(() => {
+        const s = searchParams.get('status');
+        if (s !== null) setStatusFilter(s);
+    }, [searchParams]);
 
     const filters: SystemAuditLogsFilters = {
         skip: page * PAGE_SIZE,
@@ -50,7 +75,7 @@ export default function SystemLogsPage() {
         date_to: dateTo || undefined,
     };
 
-    const { data, isLoading, isFetching, error } = useSystemAuditLogs(filters);
+    const { data, isLoading, isFetching, error, refetch } = useSystemAuditLogs(filters);
 
     const logs = data?.logs || [];
     const total = data?.total || 0;
@@ -59,35 +84,98 @@ export default function SystemLogsPage() {
     const resetPage = () => setPage(0);
     const hasFilters = !!(search || statusFilter || tenantFilter || dateFrom || dateTo);
 
+    const exportCsv = () => {
+        if (logs.length === 0) return;
+        const headers = ['ID', 'Fecha', 'Tenant', 'Usuario', 'Accion', 'Estado', 'Codigo', 'Recurso', 'IP', 'Error'];
+        const escape = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+        const rows = logs.map((l) =>
+            [
+                l.id,
+                formatDate(l.created_at),
+                l.tenant_name || '',
+                l.user_name || 'sistema',
+                l.action,
+                l.status,
+                l.status_code ?? '',
+                `${l.resource_type || ''} ${l.resource_name || ''} ${l.resource_id ? `#${l.resource_id}` : ''}`.trim(),
+                l.ip_address || '',
+                l.error_message || '',
+            ]
+                .map(escape)
+                .join(',')
+        );
+        const csv = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `vinzer-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
     return (
-        <div className="p-8 max-w-7xl mx-auto space-y-6">
-            {/* Header */}
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-white/20">
-                <Link href="/dashboard/mantencion" className="hover:text-primary transition-colors">Mantención SaaS</Link>
+        <div className="p-4 sm:p-8 w-full max-w-[1850px] mx-auto space-y-6">
+            {/* Breadcrumb */}
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-white/25">
+                <Link href="/dashboard/mantencion" className="hover:text-primary transition-colors">
+                    Mantención SaaS
+                </Link>
                 <span>/</span>
-                <span className="text-white/40">Logs del Sistema</span>
+                <span className="text-white/50">Logs del Sistema</span>
             </div>
 
-            <div className="flex items-start gap-4 pb-4 border-b border-white/5">
-                <Link href="/dashboard/mantencion" className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl text-white/70 hover:text-white transition-all">
-                    <ArrowLeft size={20} />
-                </Link>
-                <div>
-                    <h1 className="text-3xl font-black text-white tracking-tight">Logs del Sistema</h1>
-                    <p className="text-white/40 text-sm font-medium mt-1">Auditoría agregada de todos los tenants. {total.toLocaleString()} eventos registrados.</p>
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-white/5">
+                <div className="flex items-start gap-4">
+                    <Link
+                        href="/dashboard/mantencion"
+                        className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl text-white/70 hover:text-white transition-all"
+                    >
+                        <ArrowLeft size={20} />
+                    </Link>
+                    <div>
+                        <h1 className="text-3xl font-black text-white tracking-tight">Logs del Sistema</h1>
+                        <p className="text-white/40 text-sm font-medium mt-1">
+                            Auditoría agregada de todos los tenants. {total.toLocaleString()} eventos registrados.
+                        </p>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                    <button
+                        onClick={() => refetch()}
+                        disabled={isFetching}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-white/80 transition-all"
+                    >
+                        <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
+                        Refrescar
+                    </button>
+                    <button
+                        onClick={exportCsv}
+                        disabled={logs.length === 0}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary/15 hover:bg-primary/25 border border-primary/25 disabled:opacity-40 rounded-xl text-xs font-bold text-primary transition-all"
+                    >
+                        <Download size={14} />
+                        Exportar CSV
+                    </button>
                 </div>
             </div>
 
             {/* Filtros */}
             <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 flex flex-wrap items-end gap-3">
                 <div className="flex-1 min-w-[220px]">
-                    <label className="text-[10px] uppercase tracking-widest font-bold text-white/30 block mb-1.5">Buscar</label>
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-white/30 block mb-1.5">
+                        Buscar
+                    </label>
                     <div className="relative">
                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
                         <input
                             type="text"
                             value={search}
-                            onChange={e => { setSearch(e.target.value); resetPage(); }}
+                            onChange={(e) => {
+                                setSearch(e.target.value);
+                                resetPage();
+                            }}
                             placeholder="acción, recurso, error..."
                             className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-primary/50"
                         />
@@ -95,25 +183,37 @@ export default function SystemLogsPage() {
                 </div>
 
                 <div>
-                    <label className="text-[10px] uppercase tracking-widest font-bold text-white/30 block mb-1.5">Tenant</label>
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-white/30 block mb-1.5">
+                        Tenant
+                    </label>
                     <select
                         value={tenantFilter}
-                        onChange={e => { setTenantFilter(e.target.value); resetPage(); }}
-                        className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-primary/50 min-w-[160px]"
+                        onChange={(e) => {
+                            setTenantFilter(e.target.value);
+                            resetPage();
+                        }}
+                        className="bg-[#0a192f] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-primary/50 min-w-[160px]"
                     >
                         <option value="">Todos</option>
-                        {tenants.map(t => (
-                            <option key={t.id} value={t.id}>{t.name}</option>
+                        {tenants.map((t) => (
+                            <option key={t.id} value={t.id}>
+                                {t.name}
+                            </option>
                         ))}
                     </select>
                 </div>
 
                 <div>
-                    <label className="text-[10px] uppercase tracking-widest font-bold text-white/30 block mb-1.5">Estado</label>
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-white/30 block mb-1.5">
+                        Estado
+                    </label>
                     <select
                         value={statusFilter}
-                        onChange={e => { setStatusFilter(e.target.value); resetPage(); }}
-                        className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-primary/50"
+                        onChange={(e) => {
+                            setStatusFilter(e.target.value);
+                            resetPage();
+                        }}
+                        className="bg-[#0a192f] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-primary/50"
                     >
                         <option value="">Todos</option>
                         <option value="success">Success</option>
@@ -123,21 +223,31 @@ export default function SystemLogsPage() {
                 </div>
 
                 <div>
-                    <label className="text-[10px] uppercase tracking-widest font-bold text-white/30 block mb-1.5">Desde</label>
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-white/30 block mb-1.5">
+                        Desde
+                    </label>
                     <input
                         type="date"
                         value={dateFrom}
-                        onChange={e => { setDateFrom(e.target.value); resetPage(); }}
+                        onChange={(e) => {
+                            setDateFrom(e.target.value);
+                            resetPage();
+                        }}
                         className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-primary/50"
                     />
                 </div>
 
                 <div>
-                    <label className="text-[10px] uppercase tracking-widest font-bold text-white/30 block mb-1.5">Hasta</label>
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-white/30 block mb-1.5">
+                        Hasta
+                    </label>
                     <input
                         type="date"
                         value={dateTo}
-                        onChange={e => { setDateTo(e.target.value); resetPage(); }}
+                        onChange={(e) => {
+                            setDateTo(e.target.value);
+                            resetPage();
+                        }}
                         className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-primary/50"
                     />
                 </div>
@@ -145,7 +255,12 @@ export default function SystemLogsPage() {
                 {hasFilters && (
                     <button
                         onClick={() => {
-                            setSearch(''); setStatusFilter(''); setTenantFilter(''); setDateFrom(''); setDateTo(''); resetPage();
+                            setSearch('');
+                            setStatusFilter('');
+                            setTenantFilter('');
+                            setDateFrom('');
+                            setDateTo('');
+                            resetPage();
                         }}
                         className="text-xs font-bold text-white/40 hover:text-white px-3 py-2"
                     >
@@ -155,7 +270,7 @@ export default function SystemLogsPage() {
             </div>
 
             {/* Tabla */}
-            <div className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden">
+            <div className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-x-auto">
                 {error && (
                     <div className="p-8 text-center text-rose-400 text-sm">
                         Error al cargar logs: {(error as any).message || 'desconocido'}
@@ -183,12 +298,16 @@ export default function SystemLogsPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
-                            {logs.map(log => (
-                                <tr key={log.id} className="hover:bg-white/[0.02] transition-colors">
+                            {logs.map((log) => (
+                                <tr
+                                    key={log.id}
+                                    onClick={() => setSelectedLog(log)}
+                                    className="hover:bg-white/[0.04] transition-colors cursor-pointer"
+                                >
                                     <td className="px-5 py-3 text-white/60 font-mono text-xs whitespace-nowrap">
                                         {formatDate(log.created_at)}
                                     </td>
-                                    <td className="px-5 py-3">
+                                    <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
                                         {log.tenant_slug ? (
                                             <Link
                                                 href={`/dashboard/tenants/${log.tenant_slug}/auditoria`}
@@ -206,21 +325,27 @@ export default function SystemLogsPage() {
                                     </td>
                                     <td className="px-5 py-3">
                                         <span className="text-white font-bold text-xs">{log.action}</span>
-                                        {log.status_code && <span className="text-white/30 text-[10px] ml-1.5">{log.status_code}</span>}
+                                        {log.status_code && (
+                                            <span className="text-white/30 text-[10px] ml-1.5">{log.status_code}</span>
+                                        )}
                                     </td>
                                     <td className="px-5 py-3 text-white/60 text-xs">
                                         {log.resource_type ? (
                                             <span>
                                                 <span className="font-bold text-white/80">{log.resource_type}</span>
                                                 {log.resource_name && <span className="text-white/40"> · {log.resource_name}</span>}
-                                                {log.resource_id && <span className="text-white/30 font-mono"> #{log.resource_id}</span>}
+                                                {log.resource_id && (
+                                                    <span className="text-white/30 font-mono"> #{log.resource_id}</span>
+                                                )}
                                             </span>
-                                        ) : <span className="text-white/20">—</span>}
+                                        ) : (
+                                            <span className="text-white/20">—</span>
+                                        )}
                                     </td>
                                     <td className="px-5 py-3">
                                         <StatusBadge status={log.status} />
                                         {log.error_message && (
-                                            <div className="text-[10px] text-rose-400/70 mt-1 max-w-xs truncate" title={log.error_message}>
+                                            <div className="text-[10px] text-rose-400/75 mt-1 max-w-xs truncate">
                                                 {log.error_message}
                                             </div>
                                         )}
@@ -248,7 +373,7 @@ export default function SystemLogsPage() {
                     </div>
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={() => setPage(p => Math.max(0, p - 1))}
+                            onClick={() => setPage((p) => Math.max(0, p - 1))}
                             disabled={page === 0}
                             className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/60 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                         >
@@ -258,12 +383,78 @@ export default function SystemLogsPage() {
                             {page + 1} / {maxPage + 1}
                         </span>
                         <button
-                            onClick={() => setPage(p => Math.min(maxPage, p + 1))}
+                            onClick={() => setPage((p) => Math.min(maxPage, p + 1))}
                             disabled={page >= maxPage}
                             className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/60 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                         >
                             <ChevronRight size={14} />
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Detalle del Evento */}
+            {selectedLog && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+                    onClick={() => setSelectedLog(null)}
+                >
+                    <div
+                        className="bg-[#0a192f] border border-white/15 rounded-3xl w-full max-w-xl p-6 space-y-5 shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                            <div className="flex items-center gap-3">
+                                <StatusBadge status={selectedLog.status} />
+                                <h3 className="text-base font-black text-white">Evento #{selectedLog.id}</h3>
+                            </div>
+                            <button
+                                onClick={() => setSelectedLog(null)}
+                                className="p-2 rounded-xl text-white/40 hover:text-white hover:bg-white/5"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                            <div className="p-3 rounded-xl bg-white/5 space-y-0.5">
+                                <div className="text-[10px] uppercase text-white/40 font-bold">Fecha</div>
+                                <div className="text-white font-mono">{formatDate(selectedLog.created_at)}</div>
+                            </div>
+                            <div className="p-3 rounded-xl bg-white/5 space-y-0.5">
+                                <div className="text-[10px] uppercase text-white/40 font-bold">IP Origen</div>
+                                <div className="text-white font-mono">{selectedLog.ip_address || '—'}</div>
+                            </div>
+                            <div className="p-3 rounded-xl bg-white/5 space-y-0.5">
+                                <div className="text-[10px] uppercase text-white/40 font-bold">Tenant</div>
+                                <div className="text-white font-bold">{selectedLog.tenant_name || 'Global / Admin'}</div>
+                            </div>
+                            <div className="p-3 rounded-xl bg-white/5 space-y-0.5">
+                                <div className="text-[10px] uppercase text-white/40 font-bold">Usuario</div>
+                                <div className="text-white font-bold">{selectedLog.user_name || 'Sistema'}</div>
+                            </div>
+                            <div className="p-3 rounded-xl bg-white/5 space-y-0.5 col-span-2">
+                                <div className="text-[10px] uppercase text-white/40 font-bold">Acción y Recurso</div>
+                                <div className="text-white font-bold">
+                                    {selectedLog.action}{' '}
+                                    {selectedLog.status_code ? `(HTTP ${selectedLog.status_code})` : ''}
+                                    {selectedLog.resource_type ? ` · ${selectedLog.resource_type}` : ''}
+                                    {selectedLog.resource_name ? ` · ${selectedLog.resource_name}` : ''}
+                                    {selectedLog.resource_id ? ` #${selectedLog.resource_id}` : ''}
+                                </div>
+                            </div>
+                        </div>
+
+                        {selectedLog.error_message && (
+                            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/25 space-y-1.5">
+                                <div className="text-[10px] uppercase font-black text-rose-400 tracking-wider">
+                                    Mensaje de Error Completo
+                                </div>
+                                <pre className="text-xs text-rose-200 whitespace-pre-wrap break-words font-mono max-h-56 overflow-y-auto">
+                                    {selectedLog.error_message}
+                                </pre>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

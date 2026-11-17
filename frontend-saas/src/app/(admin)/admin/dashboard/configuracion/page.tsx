@@ -12,7 +12,9 @@ import AiProvidersSettings from './AiProvidersSettings';
 import PaymentSettings from './PaymentSettings';
 import DashboardBannerSettings from './DashboardBannerSettings';
 import TourContentSettings from './TourContentSettings';
-import { MonitorPlay } from 'lucide-react';
+import TrackingTemplateSettings from './TrackingTemplateSettings';
+import ModuleTelemetrySettings from './ModuleTelemetrySettings';
+import { MonitorPlay, Activity } from 'lucide-react';
 import TestEmailButton from './TestEmailButton';
 import HeroAssetSelector from '@/components/admin/landing/HeroAssetSelector';
 import MediaSelector from '@/components/admin/media/MediaSelector';
@@ -332,6 +334,8 @@ export default function LandingConfigPage() {
                         { id: 'pagos', label: 'Datos de pago', icon: Landmark },
                         { id: 'panel', label: 'Banner del panel', icon: ImageIcon },
                         { id: 'tour', label: 'Tour del software', icon: MonitorPlay },
+                        { id: 'seguimiento', label: 'Diseño de Seguimiento', icon: Palette },
+                        { id: 'telemetria', label: 'Telemetría de Módulos', icon: Activity },
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -366,6 +370,14 @@ export default function LandingConfigPage() {
 
                     {activeTab === 'tour' && (
                         <TourContentSettings />
+                    )}
+
+                    {activeTab === 'seguimiento' && (
+                        <TrackingTemplateSettings />
+                    )}
+
+                    {activeTab === 'telemetria' && (
+                        <ModuleTelemetrySettings />
                     )}
 
                     {/* General & SEO */}

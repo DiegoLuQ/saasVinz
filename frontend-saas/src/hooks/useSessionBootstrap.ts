@@ -62,6 +62,10 @@ export interface BootstrapMetadata {
     pending_submissions: number;
     /** Solicitudes de productos del catálogo pendientes (badge celeste del Sidebar) */
     pending_product_requests?: number;
+    /** Órdenes «En proceso» del Panel de Trabajo (badge naranja del Sidebar). */
+    ops_in_progress?: number;
+    /** Interruptor de telemetría de clics en Sidebar (configurado por SuperAdmin). */
+    module_tracking_enabled?: boolean;
 }
 
 export interface BootstrapThemeData {

@@ -30,6 +30,21 @@ def is_owner(user) -> bool:
     return getattr(user, "role", None) in OWNER_ROLES
 
 
+def in_progress_count(db: Session, tenant_id: int) -> int:
+    """Órdenes «En proceso» del Panel de Trabajo (misma regla que su pestaña: estado
+    activo + con fase asignada). Badge del Sidebar."""
+    return (
+        db.query(func.count(models.Cremation.id))
+        .join(models.Pet, models.Cremation.pet_id == models.Pet.id)
+        .join(models.Customer, models.Pet.customer_id == models.Customer.id)
+        .join(models.CremationTechnical, models.CremationTechnical.cremation_id == models.Cremation.id)
+        .filter(models.Cremation.tenant_id == tenant_id,
+                models.Cremation.status.in_(ACTIVE_STATUSES),
+                models.CremationTechnical.step_id.isnot(None))
+        .scalar() or 0
+    )
+
+
 def status_rank(status: Optional[str]) -> Optional[int]:
     """Posición en el flujo: 0 por iniciar, 1 en proceso, 2 entregada.
     None = cancelada (no forma parte del avance)."""

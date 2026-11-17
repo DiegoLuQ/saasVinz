@@ -15,7 +15,8 @@ import {
     Coins,
     Wand2,
     Link2,
-    Star
+    Star,
+    Palette
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -39,6 +40,7 @@ import { AiCreditsTab } from '@/components/tenant/settings/AiCreditsTab';
 import { AutoDocumentsTab } from '@/components/tenant/settings/AutoDocumentsTab';
 import { OfficialLinksTab } from '@/components/tenant/settings/OfficialLinksTab';
 import { GoogleReviewTab } from '@/components/tenant/settings/GoogleReviewTab';
+import { TrackingDesignTab } from '@/components/tenant/settings/TrackingDesignTab';
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState('general');
@@ -109,6 +111,7 @@ export default function SettingsPage() {
                 { id: 'formulario', name: 'Formulario y Pesos', hint: 'Formulario público y tramos', icon: ClipboardList },
                 { id: 'enlaces', name: 'Enlaces oficiales', hint: 'Formulario y catálogos oficiales', icon: Link2 },
                 { id: 'resenas', name: 'Reseñas en Google', hint: 'Invitación tras la entrega', icon: Star },
+                { id: 'diseno-seguimiento', name: 'Diseño de Seguimiento', hint: 'Plantilla para familias', icon: Palette },
             ],
         },
         {
@@ -273,6 +276,9 @@ export default function SettingsPage() {
                         {currentTab === 'documentos-auto' && <AutoDocumentsTab />}
                         {currentTab === 'enlaces' && <OfficialLinksTab />}
                         {currentTab === 'resenas' && <GoogleReviewTab />}
+                        {currentTab === 'diseno-seguimiento' && (
+                            <TrackingDesignTab onNavigateToBilling={() => setActiveTab('facturacion')} />
+                        )}
 
                         {currentTab === 'creditos' && <AiCreditsTab />}
                     </motion.div>

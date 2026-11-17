@@ -411,6 +411,8 @@ class PublicTrackingResponse(BaseModel):
     souvenir_store_url: Optional[str] = None
     feedback: Optional[dict] = None  # {rating, comment} si la familia ya respondió
     show_vinzer_brand: Optional[bool] = True  # «Tecnología por Vinzer» en el pie (marca blanca = False)
+    tracking_template: str = "classic"  # classic | warm | modern | celestial | custom
+    tracking_template_config: Optional[dict] = None
 
 # Workflow Steps
 class WorkflowStepBase(BaseModel):

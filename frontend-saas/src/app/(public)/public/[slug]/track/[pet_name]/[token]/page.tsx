@@ -48,6 +48,17 @@ const getStepIcon = (index: number) => {
     }
 };
 
+const getCelestialStepIcon = (index: number) => {
+    switch (index) {
+        case 0: return <ClipboardList size={18} />;
+        case 1: return <Truck size={18} />;
+        case 2: return <Flame size={18} />;
+        case 3: return <Gift size={18} />;
+        case 4: return <Heart size={18} />;
+        default: return <PawPrint size={18} />;
+    }
+};
+
 // Custom Angel Wing Icon Component
 const AngelWings = ({ className = "w-6 h-6", color = "currentColor" }) => (
     <svg viewBox="0 0 100 100" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -174,7 +185,8 @@ export default function TrackingPage() {
     };
 
     const farewellConfig = React.useMemo(() => {
-        if (!data?.pet_image_url) return null;
+        const primaryPhoto = data?.pet_image_url || (petPhotos.length > 0 ? petPhotos[0] : null) || (data?.pet_images && data.pet_images[0]);
+        if (!primaryPhoto && !data?.pet_name) return null;
         const base = data.farewell_template_config || {
             format: '1:1',
             theme: 'warm',
@@ -195,7 +207,7 @@ export default function TrackingPage() {
                 petName: data.pet_name || 'Tu Angelito',
                 subtitle: '',
                 farewellText: data.pet_dedication || 'Gracias por cada instante de ternura y amor incondicional. Tu recuerdo vivirá por siempre en nuestra memoria.',
-                image2Url: getImageUrl(data.pet_image_url),
+                image2Url: primaryPhoto ? getImageUrl(primaryPhoto) : null,
                 tenantLogoUrl: data.tenant_logo ? getImageUrl(data.tenant_logo) : null,
                 tenantName: (base.elements?.tenantName && String(base.elements.tenantName).trim()) || data.tenant_name || '',
                 tenantWebsite: (base.elements?.tenantWebsite && String(base.elements.tenantWebsite).trim()) || '{sitio_web}',
@@ -203,7 +215,7 @@ export default function TrackingPage() {
             },
             tenantSocialMedia: data.tenant_social_media || {},
         };
-    }, [data]);
+    }, [data, petPhotos]);
 
     useEffect(() => {
         const generatedStars = Array.from({ length: 40 }).map((_, i) => ({
@@ -217,28 +229,207 @@ export default function TrackingPage() {
         setStars(generatedStars);
     }, []);
 
-    const theme = {
-        bg: isDarkMode ? 'bg-[#0a1226]' : 'bg-[#eaf5fd]',
-        text: isDarkMode ? 'text-neutral-200' : 'text-gray-800',
-        headerBg: isDarkMode ? 'bg-[#0a1226]/70 border-white/10' : 'bg-white/60 border-sky-100',
-        petPhotoBorder: isDarkMode ? 'border-[#0f1a35]' : 'border-white',
-        petPhotoShadow: isDarkMode ? 'shadow-[0_0_60px_-10px_rgba(253,230,138,0.35)]' : 'shadow-[0_25px_60px_-12px_rgba(217,119,6,0.35)]',
-        tenantLogoBg: isDarkMode ? 'bg-[#0f1a35] border-white/10 ring-neutral-800' : 'bg-white border-white ring-gray-100',
-        title: isDarkMode ? 'text-neutral-100' : 'text-gray-900',
-        subtitle: isDarkMode ? 'text-neutral-400' : 'text-gray-500',
-        timelineLine: isDarkMode ? 'border-white/10' : 'border-sky-50',
-        indicatorCompleted: isDarkMode ? 'bg-sky-500 border-sky-500' : 'bg-sky-500 border-sky-500',
-        indicatorCurrentInner: isDarkMode ? 'bg-[#0a1226] border-sky-500 ring-sky-500/20' : 'bg-white border-sky-500 ring-sky-500/10',
-        indicatorPending: isDarkMode ? 'bg-[#0f1a35] border-white/10' : 'bg-white border-gray-200',
-        cardCurrentBg: isDarkMode ? 'bg-[#0f1a35] border-neutral-700 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)]' : 'bg-white border-sky-200 shadow-[0_20px_40px_-15px_rgba(2,132,199,0.15)]',
-        cardCompletedBg: isDarkMode ? 'bg-[#0f1a35] border-white/10' : 'bg-white border-gray-100 shadow-sm',
-        cardPendingBg: isDarkMode ? 'bg-[#0a1226]/50 border-white/5' : 'bg-gray-50/50 border-gray-100',
-        cardTitleCurrent: isDarkMode ? 'text-sky-400' : 'text-sky-700',
-        cardTitleOther: isDarkMode ? 'text-neutral-300' : 'text-gray-700',
-        dateBadge: isDarkMode ? 'text-sky-400 bg-sky-500/10 border-sky-500/20' : 'text-sky-800 bg-sky-50 border-sky-100',
-        timeText: isDarkMode ? 'text-sky-500/50' : 'text-sky-600/40',
-        footerTag: isDarkMode ? 'bg-[#0f1a35]/90 border-white/10 text-sky-400 shadow-sm backdrop-blur-md' : 'bg-white/95 border-sky-100/90 text-sky-800 shadow-xs backdrop-blur-md',
-    };
+    useEffect(() => {
+        if (typeof document !== 'undefined') {
+            if (isDarkMode) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        }
+    }, [isDarkMode]);
+
+    const trackingTemplate = ((data?.tracking_template || 'classic') as string);
+    const isVisualTemplate = trackingTemplate === 'celestial' || Boolean((data as any)?.tracking_template_config);
+    const dynamicElementUrl = (data as any)?.tracking_template_config?.element_url || '/tracking/elementos/alas_elemento.webp';
+    const dynamicMobileBg = (data as any)?.tracking_template_config?.background_mobile_url || '/tracking/fondos/movil/fondo_cielo_flores_1_9_16.webp';
+    const dynamicDesktopBg = (data as any)?.tracking_template_config?.background_desktop_url || '/tracking/fondos/desktop/fondo_cielo_flores_1_16_9.webp';
+
+    const theme = React.useMemo(() => {
+        if (isVisualTemplate) {
+            return {
+                bg: isDarkMode ? 'bg-[#120d09]' : 'bg-[#FFFDF7]',
+                text: isDarkMode ? 'text-[#FDF6E2]' : 'text-[#3E2723]',
+                headerBg: isDarkMode ? 'bg-[#120d09]/80 border-amber-900/40' : 'bg-[#FFFDF7]/80 border-amber-200/60',
+                petPhotoBorder: isDarkMode ? 'border-amber-300/80' : 'border-amber-300',
+                petPhotoShadow: isDarkMode
+                    ? 'shadow-[0_0_55px_-10px_rgba(251,191,36,0.45)]'
+                    : 'shadow-[0_15px_40px_-10px_rgba(217,119,6,0.35)]',
+                tenantLogoBg: isDarkMode ? 'bg-[#1f1610] border-amber-900/40 ring-amber-950/40' : 'bg-white border-amber-200 ring-amber-100',
+                title: isDarkMode ? 'text-amber-100' : 'text-[#3E2723]',
+                subtitle: isDarkMode ? 'text-amber-200/75' : 'text-amber-900/80',
+                timelineLine: isDarkMode ? 'border-amber-500/30' : 'border-amber-300/60',
+                indicatorCompleted: 'bg-amber-500 border-amber-500',
+                indicatorCurrentInner: isDarkMode ? 'bg-[#1f1610] border-amber-400 ring-amber-400/30' : 'bg-white border-amber-500 ring-amber-400/25',
+                indicatorPending: isDarkMode ? 'bg-[#1f1610] border-amber-900/40' : 'bg-white border-amber-200',
+                cardCurrentBg: isDarkMode ? 'bg-[#251c16]/95 border-amber-500/60 shadow-xl' : 'bg-white/95 border-amber-300/80 shadow-[0_15px_30px_-10px_rgba(217,119,6,0.18)]',
+                cardCompletedBg: isDarkMode ? 'bg-[#1f1610]/90 border-amber-900/40' : 'bg-white/95 border-amber-200/70 shadow-xs',
+                cardPendingBg: isDarkMode ? 'bg-[#17100b]/60 border-amber-950/40' : 'bg-white/70 border-amber-100/70',
+                cardTitleCurrent: isDarkMode ? 'text-amber-300' : 'text-amber-900',
+                cardTitleOther: isDarkMode ? 'text-amber-100/90' : 'text-slate-800',
+                dateBadge: isDarkMode ? 'text-amber-300 bg-amber-500/15 border-amber-500/30' : 'text-amber-800 bg-amber-100/70 border-amber-200/80',
+                timeText: isDarkMode ? 'text-amber-200/60' : 'text-amber-800/70',
+                footerTag: isDarkMode ? 'bg-[#1f1610]/90 border-amber-900/40 text-amber-300 shadow-sm backdrop-blur-md' : 'bg-white/95 border-amber-200 text-amber-900 shadow-xs backdrop-blur-md',
+            };
+        }
+
+        if (trackingTemplate === 'warm') {
+            return {
+                bg: isDarkMode ? 'bg-[#171311]' : 'bg-[#FAF8F3]',
+                text: isDarkMode ? 'text-[#F5EFE6]' : 'text-[#292522]',
+                headerBg: isDarkMode ? 'bg-[#171311]/85 border-[#3A2E26]' : 'bg-[#FAF8F3]/85 border-[#E6DFD5]',
+                petPhotoBorder: isDarkMode ? 'border-[#C6A56A]/50' : 'border-[#C6A56A]/60',
+                petPhotoShadow: isDarkMode
+                    ? 'shadow-[0_0_55px_-10px_rgba(198,165,106,0.35)]'
+                    : 'shadow-[0_20px_50px_-12px_rgba(198,165,106,0.45)]',
+                tenantLogoBg: isDarkMode ? 'bg-[#221C18] border-[#3A2E26] ring-[#2D241E]' : 'bg-white border-[#E6DFD5] ring-[#F0EAE0]',
+                title: isDarkMode ? 'text-[#FAF8F3]' : 'text-[#292522]',
+                subtitle: isDarkMode ? 'text-[#B5A899]' : 'text-[#77716A]',
+                timelineLine: isDarkMode ? 'border-[#3A2E26]' : 'border-[#E6DFD5]',
+                indicatorCompleted: 'bg-[#C6A56A] border-[#C6A56A]',
+                indicatorCurrentInner: isDarkMode ? 'bg-[#221C18] border-[#C6A56A] ring-[#C6A56A]/25' : 'bg-white border-[#C6A56A] ring-[#C6A56A]/20',
+                indicatorPending: isDarkMode ? 'bg-[#221C18] border-[#3A2E26]' : 'bg-[#FAF8F3] border-[#E6DFD5]',
+                cardCurrentBg: isDarkMode ? 'bg-[#221C18] border-[#C6A56A]/50 shadow-xl' : 'bg-white border-[#C6A56A]/60 shadow-[0_18px_35px_-15px_rgba(91,73,61,0.16)]',
+                cardCompletedBg: isDarkMode ? 'bg-[#221C18]/80 border-[#3A2E26]' : 'bg-white border-[#E6DFD5] shadow-sm',
+                cardPendingBg: isDarkMode ? 'bg-[#1C1714]/60 border-[#2D241E]' : 'bg-[#F0EAE0]/50 border-[#E6DFD5]/80',
+                cardTitleCurrent: isDarkMode ? 'text-[#E7C15A]' : 'text-[#5B493D]',
+                cardTitleOther: isDarkMode ? 'text-[#F5EFE6]' : 'text-[#292522]',
+                dateBadge: isDarkMode ? 'text-[#E7C15A] bg-[#C6A56A]/15 border-[#C6A56A]/30' : 'text-[#5B493D] bg-[#F0EAE0] border-[#C6A56A]/40',
+                timeText: isDarkMode ? 'text-[#B5A899]/70' : 'text-[#77716A]',
+                footerTag: isDarkMode ? 'bg-[#221C18]/90 border-[#3A2E26] text-[#E7C15A] shadow-sm backdrop-blur-md' : 'bg-white/95 border-[#E6DFD5] text-[#5B493D] shadow-xs backdrop-blur-md',
+            };
+        }
+
+        if (trackingTemplate === 'modern') {
+            return {
+                bg: isDarkMode ? 'bg-[#090D16]' : 'bg-[#F8FAFC]',
+                text: isDarkMode ? 'text-slate-100' : 'text-slate-800',
+                headerBg: isDarkMode ? 'bg-[#090D16]/85 border-white/10' : 'bg-white/85 border-slate-200',
+                petPhotoBorder: isDarkMode ? 'border-emerald-500/40' : 'border-emerald-500/30',
+                petPhotoShadow: isDarkMode
+                    ? 'shadow-[0_0_50px_-10px_rgba(16,185,129,0.35)]'
+                    : 'shadow-[0_20px_45px_-12px_rgba(16,185,129,0.22)]',
+                tenantLogoBg: isDarkMode ? 'bg-[#111827] border-white/10 ring-white/5' : 'bg-white border-slate-200 ring-slate-100',
+                title: isDarkMode ? 'text-white' : 'text-slate-900',
+                subtitle: isDarkMode ? 'text-slate-400' : 'text-slate-500',
+                timelineLine: isDarkMode ? 'border-white/10' : 'border-slate-200',
+                indicatorCompleted: 'bg-emerald-500 border-emerald-500',
+                indicatorCurrentInner: isDarkMode ? 'bg-[#111827] border-emerald-400 ring-emerald-500/25' : 'bg-white border-emerald-500 ring-emerald-500/15',
+                indicatorPending: isDarkMode ? 'bg-[#111827] border-white/10' : 'bg-white border-slate-200',
+                cardCurrentBg: isDarkMode ? 'bg-[#111827] border-emerald-500/45 shadow-xl' : 'bg-white border-emerald-300 shadow-[0_18px_36px_-15px_rgba(16,185,129,0.16)]',
+                cardCompletedBg: isDarkMode ? 'bg-[#111827]/80 border-white/10' : 'bg-white border-slate-200 shadow-sm',
+                cardPendingBg: isDarkMode ? 'bg-[#0D1320]/60 border-white/5' : 'bg-slate-100/70 border-slate-200/70',
+                cardTitleCurrent: isDarkMode ? 'text-emerald-400' : 'text-emerald-700',
+                cardTitleOther: isDarkMode ? 'text-slate-200' : 'text-slate-800',
+                dateBadge: isDarkMode ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/25' : 'text-emerald-700 bg-emerald-50 border-emerald-200',
+                timeText: isDarkMode ? 'text-slate-400' : 'text-slate-500',
+                footerTag: isDarkMode ? 'bg-[#111827]/90 border-white/10 text-emerald-400 shadow-sm backdrop-blur-md' : 'bg-white/95 border-slate-200 text-emerald-700 shadow-xs backdrop-blur-md',
+            };
+        }
+
+        // Default: classic
+        return {
+            bg: isDarkMode ? 'bg-[#0a1226]' : 'bg-[#eaf5fd]',
+            text: isDarkMode ? 'text-neutral-200' : 'text-gray-800',
+            headerBg: isDarkMode ? 'bg-[#0a1226]/70 border-white/10' : 'bg-white/60 border-sky-100',
+            petPhotoBorder: isDarkMode ? 'border-[#0f1a35]' : 'border-white',
+            petPhotoShadow: isDarkMode ? 'shadow-[0_0_60px_-10px_rgba(253,230,138,0.35)]' : 'shadow-[0_25px_60px_-12px_rgba(217,119,6,0.35)]',
+            tenantLogoBg: isDarkMode ? 'bg-[#0f1a35] border-white/10 ring-neutral-800' : 'bg-white border-white ring-gray-100',
+            title: isDarkMode ? 'text-neutral-100' : 'text-gray-900',
+            subtitle: isDarkMode ? 'text-neutral-400' : 'text-gray-500',
+            timelineLine: isDarkMode ? 'border-white/10' : 'border-sky-50',
+            indicatorCompleted: isDarkMode ? 'bg-sky-500 border-sky-500' : 'bg-sky-500 border-sky-500',
+            indicatorCurrentInner: isDarkMode ? 'bg-[#0a1226] border-sky-500 ring-sky-500/20' : 'bg-white border-sky-500 ring-sky-500/10',
+            indicatorPending: isDarkMode ? 'bg-[#0f1a35] border-white/10' : 'bg-white border-gray-200',
+            cardCurrentBg: isDarkMode ? 'bg-[#0f1a35] border-neutral-700 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)]' : 'bg-white border-sky-200 shadow-[0_20px_40px_-15px_rgba(2,132,199,0.15)]',
+            cardCompletedBg: isDarkMode ? 'bg-[#0f1a35] border-white/10' : 'bg-white border-gray-100 shadow-sm',
+            cardPendingBg: isDarkMode ? 'bg-[#0a1226]/50 border-white/5' : 'bg-gray-50/50 border-gray-100',
+            cardTitleCurrent: isDarkMode ? 'text-sky-400' : 'text-sky-700',
+            cardTitleOther: isDarkMode ? 'text-neutral-300' : 'text-gray-700',
+            dateBadge: isDarkMode ? 'text-sky-400 bg-sky-500/10 border-sky-500/20' : 'text-sky-800 bg-sky-50 border-sky-100',
+            timeText: isDarkMode ? 'text-sky-500/50' : 'text-sky-600/40',
+            footerTag: isDarkMode ? 'bg-[#0f1a35]/90 border-white/10 text-sky-400 shadow-sm backdrop-blur-md' : 'bg-white/95 border-sky-100/90 text-sky-800 shadow-xs backdrop-blur-md',
+        };
+    }, [trackingTemplate, isDarkMode]);
+
+    const cloudTheme = React.useMemo(() => {
+        if (trackingTemplate === 'warm') {
+            return {
+                light: {
+                    bgGradient: 'linear-gradient(180deg, #F3EAE0 0%, #F9F3EA 32%, #FAF8F3 65%, #FFFDF8 100%)',
+                    cloudColor: 'text-[#FFFDF8]',
+                    cloudShadow: 'drop-shadow-[0_12px_24px_rgba(198,165,106,0.18)]',
+                    cloudOpacityFactor: 0.95,
+                    bottomBankColor: 'text-[#FAF5ED]',
+                    bottomBankOpacity: 0.95,
+                    nebulaColor: 'bg-[#C6A56A]/20',
+                    topLight: 'bg-[#FBECC8]/60',
+                },
+                dark: {
+                    bgGradient: 'linear-gradient(180deg, #0e0a07 0%, #17110d 45%, #241a14 100%)',
+                    cloudColor: 'text-[#E7C15A]',
+                    cloudShadow: 'drop-shadow-[0_10px_25px_rgba(231,193,90,0.22)]',
+                    cloudOpacityFactor: 0.26,
+                    bottomBankColor: 'text-[#241a14]',
+                    bottomBankOpacity: 0.55,
+                    nebulaColor: 'bg-[#C6A56A]/15',
+                    topLight: 'bg-[#E7C15A]/12',
+                    starColor: 'bg-[#FDE68A]',
+                }
+            };
+        }
+
+        if (trackingTemplate === 'modern') {
+            return {
+                light: {
+                    bgGradient: 'linear-gradient(180deg, #EDF7F4 0%, #F3FAF8 32%, #F8FAFC 65%, #FFFFFF 100%)',
+                    cloudColor: 'text-white',
+                    cloudShadow: 'drop-shadow-[0_12px_24px_rgba(16,185,129,0.12)]',
+                    cloudOpacityFactor: 0.92,
+                    bottomBankColor: 'text-[#F1F9F6]',
+                    bottomBankOpacity: 0.95,
+                    nebulaColor: 'bg-emerald-400/15',
+                    topLight: 'bg-teal-50/70',
+                },
+                dark: {
+                    bgGradient: 'linear-gradient(180deg, #050811 0%, #090e1c 45%, #0f172a 100%)',
+                    cloudColor: 'text-teal-200',
+                    cloudShadow: 'drop-shadow-[0_10px_25px_rgba(20,184,166,0.20)]',
+                    cloudOpacityFactor: 0.24,
+                    bottomBankColor: 'text-[#0d1629]',
+                    bottomBankOpacity: 0.50,
+                    nebulaColor: 'bg-emerald-500/15',
+                    topLight: 'bg-teal-400/10',
+                    starColor: 'bg-white',
+                }
+            };
+        }
+
+        // Classic / Default
+        return {
+            light: {
+                bgGradient: 'linear-gradient(180deg, #a9d8f7 0%, #c9e7fb 28%, #e3f2fd 58%, #f6fbff 100%)',
+                cloudColor: 'text-white',
+                cloudShadow: 'drop-shadow-[0_10px_20px_rgba(14,116,144,0.12)]',
+                cloudOpacityFactor: 0.95,
+                bottomBankColor: 'text-white',
+                bottomBankOpacity: 0.95,
+                nebulaColor: 'bg-sky-100/35',
+                topLight: 'bg-amber-50/70',
+            },
+            dark: {
+                bgGradient: 'linear-gradient(180deg, #050b1d 0%, #0b1a3a 45%, #13284f 100%)',
+                cloudColor: 'text-sky-200',
+                cloudShadow: 'drop-shadow-[0_10px_25px_rgba(56,189,248,0.24)]',
+                cloudOpacityFactor: 0.28,
+                bottomBankColor: 'text-[#0e2145]',
+                bottomBankOpacity: 0.55,
+                nebulaColor: 'bg-sky-950/25',
+                topLight: 'bg-sky-400/10',
+                starColor: 'bg-white',
+            }
+        };
+    }, [trackingTemplate]);
 
     // Main fetch effect
     useEffect(() => {
@@ -345,14 +536,20 @@ export default function TrackingPage() {
     const showReview = Boolean(isDelivered && reviewUrl);
 
     return (
-        <div className={`min-h-screen font-outfit transition-colors duration-500 selection:bg-sky-500/30 relative overflow-hidden ${theme.bg} ${theme.text}`}>
+        <div className={`${isDarkMode ? 'dark' : ''} min-h-screen font-outfit transition-colors duration-500 selection:bg-sky-500/30 relative overflow-hidden ${theme.bg} ${theme.text}`}>
             {/* Celestial Background Effect */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
                 <style>{`
-                    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+                    @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@600;700;800&family=Dancing+Script:wght@600;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
                     
                     .font-cinzel {
                         font-family: 'Cinzel', Georgia, serif;
+                    }
+                    .font-dancing {
+                        font-family: 'Dancing Script', cursive, Georgia, serif;
+                    }
+                    .font-alex {
+                        font-family: 'Alex Brush', cursive, Georgia, serif;
                     }
                     .font-outfit {
                         font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -382,11 +579,11 @@ export default function TrackingPage() {
                         animation-delay: var(--delay);
                     }
                     @keyframes halo-float {
-                        0%, 100% { transform: translate(-50%, 0); }
-                        50% { transform: translate(-50%, -4px); }
+                        0%, 100% { transform: translateY(0); }
+                        50% { transform: translateY(-4px); }
                     }
                     @keyframes ring-spin { to { transform: rotate(360deg); } }
-                    .memorial-halo { animation: halo-float 4s ease-in-out infinite; }
+                    .memorial-halo { animation: halo-float 3.5s ease-in-out infinite; }
                     .memorial-ring {
                         background: conic-gradient(from 0deg, #fde68a, #fffbeb, #f59e0b, #fde68a, #fff7d6, #d97706, #fde68a);
                         animation: ring-spin 14s linear infinite;
@@ -401,233 +598,756 @@ export default function TrackingPage() {
                     }
                 `}</style>
 
-                {/* Light Mode Sky Background */}
-                <div className={`absolute inset-0 transition-opacity duration-1000 ${
-                    isDarkMode ? 'opacity-0' : 'opacity-100'
-                }`} style={{
-                    background: 'linear-gradient(180deg, #a9d8f7 0%, #c9e7fb 28%, #e3f2fd 58%, #f6fbff 100%)'
-                }}>
-                    {/* Nebula glow blobs */}
-                    <div 
-                        className="absolute -top-20 -left-20 w-[450px] h-[450px] rounded-full bg-white/60 cloud-nebula"
-                        style={{ animation: 'float-cloud-left 25s ease-in-out infinite' }}
-                    />
-                    <div 
-                        className="absolute top-[40%] -right-40 w-[500px] h-[500px] rounded-full bg-sky-100/30 cloud-nebula"
-                        style={{ animation: 'float-cloud-right 30s ease-in-out infinite' }}
-                    />
-                    <div 
-                        className="absolute -bottom-20 left-[10%] w-[400px] h-[400px] rounded-full bg-white/70 cloud-nebula"
-                        style={{ animation: 'float-cloud-left 20s ease-in-out infinite' }}
-                    />
-
-                    {/* Luz cálida desde arriba */}
-                    <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[520px] rounded-full bg-amber-50/70 cloud-nebula" />
-
-                    {/* Nubes esponjosas a la deriva */}
-                    {CLOUDS.map((c, i) => (
-                        <CloudBackground
-                            key={i}
-                            className={`absolute text-white drop-shadow-[0_10px_18px_rgba(14,116,144,0.10)] ${c.cls}`}
-                            style={{ animation: `drift-cloud ${c.dur}s ease-in-out infinite`, animationDelay: `-${c.delay}s` }}
-                            opacity={c.op}
+                {/* Celestial / Visual Dynamic WebP Backgrounds */}
+                {isVisualTemplate ? (
+                    <div className="absolute inset-0">
+                        {/* Mobile Background 9:16 */}
+                        <img
+                            src={dynamicMobileBg}
+                            alt="Fondo Conmemorativo Móvil"
+                            className="block md:hidden w-full h-full object-cover object-top fixed inset-0"
                         />
-                    ))}
-
-                    {/* Banco de nubes al pie */}
-                    <div className="absolute -bottom-12 inset-x-0 h-48 flex items-end justify-center">
-                        {[0, 1, 2, 3, 4].map((i) => (
-                            <CloudBackground key={i} className="text-white w-[34rem] h-48 -mx-24 shrink-0" opacity={0.95} />
-                        ))}
+                        {/* Desktop Background 16:9 */}
+                        <img
+                            src={dynamicDesktopBg}
+                            alt="Fondo Conmemorativo Desktop"
+                            className="hidden md:block w-full h-full object-cover object-center fixed inset-0"
+                        />
+                        {/* Dark mode overlay */}
+                        <div className={`fixed inset-0 transition-opacity duration-500 pointer-events-none ${
+                            isDarkMode ? 'bg-[#0e0a07]/80 backdrop-brightness-75' : 'bg-transparent'
+                        }`} />
                     </div>
-                </div>
+                ) : (
+                    <>
+                        {/* Light Mode Sky Background (Todas las plantillas: Classic, Warm, Modern) */}
+                        <div className={`absolute inset-0 transition-opacity duration-1000 ${
+                            isDarkMode ? 'opacity-0' : 'opacity-100'
+                        }`} style={{
+                            background: cloudTheme.light.bgGradient
+                        }}>
+                            {/* Nebula glow blobs */}
+                            <div 
+                                className={`absolute -top-20 -left-20 w-[450px] h-[450px] rounded-full cloud-nebula ${cloudTheme.light.nebulaColor}`}
+                                style={{ animation: 'float-cloud-left 25s ease-in-out infinite' }}
+                            />
+                            <div 
+                                className={`absolute top-[40%] -right-40 w-[500px] h-[500px] rounded-full cloud-nebula ${cloudTheme.light.nebulaColor}`}
+                                style={{ animation: 'float-cloud-right 30s ease-in-out infinite' }}
+                            />
+                            <div 
+                                className={`absolute -bottom-20 left-[10%] w-[400px] h-[400px] rounded-full cloud-nebula ${cloudTheme.light.nebulaColor}`}
+                                style={{ animation: 'float-cloud-left 20s ease-in-out infinite' }}
+                            />
 
-                {/* Dark Mode Sky Background */}
-                <div className={`absolute inset-0 transition-opacity duration-1000 ${
-                    isDarkMode ? 'opacity-100' : 'opacity-0'
-                }`} style={{
-                    background: 'linear-gradient(180deg, #050b1d 0%, #0b1a3a 45%, #13284f 100%)'
-                }}>
-                    {stars.map((star) => (
-                        <div
-                            key={star.id}
-                            className="absolute rounded-full bg-white star"
-                            style={{
-                                top: star.top,
-                                left: star.left,
-                                width: `${star.size}px`,
-                                height: `${star.size}px`,
-                                '--duration': star.duration,
-                                '--delay': star.delay,
-                            } as React.CSSProperties}
-                        />
-                    ))}
+                            {/* Luz cálida desde arriba */}
+                            <div className={`absolute -top-40 left-1/2 -translate-x-1/2 w-[900px] h-[520px] rounded-full cloud-nebula ${cloudTheme.light.topLight}`} />
 
-                    <div 
-                        className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full bg-sky-950/15 cloud-nebula"
-                        style={{ animation: 'float-cloud-left 35s ease-in-out infinite' }}
-                    />
-                    <div 
-                        className="absolute top-[30%] -right-40 w-[500px] h-[500px] rounded-full bg-indigo-950/20 cloud-nebula"
-                        style={{ animation: 'float-cloud-right 40s ease-in-out infinite' }}
-                    />
-                    <div 
-                        className="absolute -bottom-40 left-[20%] w-[450px] h-[450px] rounded-full bg-sky-900/10 cloud-nebula"
-                        style={{ animation: 'float-cloud-left 28s ease-in-out infinite' }}
-                    />
-                    {CLOUDS.slice(0, 4).map((c, i) => (
-                        <CloudBackground
-                            key={i}
-                            className={`absolute text-sky-100 ${c.cls}`}
-                            style={{ animation: `drift-cloud ${c.dur}s ease-in-out infinite`, animationDelay: `-${c.delay}s` }}
-                            opacity={0.05}
-                        />
-                    ))}
-                </div>
+                            {/* Nubes esponjosas a la deriva - acorde al diseño */}
+                            {CLOUDS.map((c, i) => (
+                                <CloudBackground
+                                    key={i}
+                                    className={`absolute ${cloudTheme.light.cloudColor} ${cloudTheme.light.cloudShadow} ${c.cls}`}
+                                    style={{ animation: `drift-cloud ${c.dur}s ease-in-out infinite`, animationDelay: `-${c.delay}s` }}
+                                    opacity={c.op * cloudTheme.light.cloudOpacityFactor}
+                                />
+                            ))}
+
+                            {/* Banco de nubes al pie */}
+                            <div className="absolute -bottom-12 inset-x-0 h-48 flex items-end justify-center">
+                                {[0, 1, 2, 3, 4].map((i) => (
+                                    <CloudBackground key={i} className={`${cloudTheme.light.bottomBankColor} w-[34rem] h-48 -mx-24 shrink-0`} opacity={cloudTheme.light.bottomBankOpacity} />
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Dark Mode Sky Background (Todas las plantillas con nubes y estrellas acorde al color y contraste) */}
+                        <div className={`absolute inset-0 transition-opacity duration-1000 ${
+                            isDarkMode ? 'opacity-100' : 'opacity-0'
+                        }`} style={{
+                            background: cloudTheme.dark.bgGradient
+                        }}>
+                            {stars.map((star) => (
+                                <div
+                                    key={star.id}
+                                    className={`absolute rounded-full star ${cloudTheme.dark.starColor}`}
+                                    style={{
+                                        top: star.top,
+                                        left: star.left,
+                                        width: `${star.size}px`,
+                                        height: `${star.size}px`,
+                                        '--duration': star.duration,
+                                        '--delay': star.delay,
+                                    } as React.CSSProperties}
+                                />
+                            ))}
+
+                            <div 
+                                className={`absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full cloud-nebula ${cloudTheme.dark.nebulaColor}`}
+                                style={{ animation: 'float-cloud-left 35s ease-in-out infinite' }}
+                            />
+                            <div 
+                                className={`absolute top-[30%] -right-40 w-[500px] h-[500px] rounded-full cloud-nebula ${cloudTheme.dark.nebulaColor}`}
+                                style={{ animation: 'float-cloud-right 40s ease-in-out infinite' }}
+                            />
+                            <div 
+                                className={`absolute -bottom-40 left-[20%] w-[450px] h-[450px] rounded-full cloud-nebula ${cloudTheme.dark.nebulaColor}`}
+                                style={{ animation: 'float-cloud-left 28s ease-in-out infinite' }}
+                            />
+
+                            {/* Nubes esponjosas nocturnas a la deriva - visibles, etéreas y con contraste perfecto */}
+                            {CLOUDS.map((c, i) => (
+                                <CloudBackground
+                                    key={i}
+                                    className={`absolute ${cloudTheme.dark.cloudColor} ${cloudTheme.dark.cloudShadow} ${c.cls}`}
+                                    style={{ animation: `drift-cloud ${c.dur}s ease-in-out infinite`, animationDelay: `-${c.delay}s` }}
+                                    opacity={c.op * cloudTheme.dark.cloudOpacityFactor}
+                                />
+                            ))}
+
+                            {/* Banco de nubes nocturno al pie */}
+                            <div className="absolute -bottom-12 inset-x-0 h-48 flex items-end justify-center">
+                                {[0, 1, 2, 3, 4].map((i) => (
+                                    <CloudBackground key={i} className={`${cloudTheme.dark.bottomBankColor} w-[34rem] h-48 -mx-24 shrink-0`} opacity={cloudTheme.dark.bottomBankOpacity} />
+                                ))}
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* Header / Brand */}
-            <div className={`fixed top-0 w-full z-20 backdrop-blur-xl border-b transition-colors duration-500 ${theme.headerBg}`}>
-                <div className="max-w-md mx-auto px-6 py-4 flex items-center justify-center relative">
-                    <span className="font-cinzel font-bold text-sm tracking-[0.25em] text-sky-500 uppercase">{data.tenant_name}</span>
-                    <button 
-                        onClick={() => setIsDarkMode(!isDarkMode)}
-                        className="absolute right-4 sm:right-6 p-2 rounded-full hover:bg-sky-500/10 text-sky-500 transition-colors"
-                    >
-                        {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
-                    </button>
+            {isVisualTemplate ? (
+                <div className="fixed top-2 sm:top-3 left-0 right-0 z-20 px-4 pointer-events-none">
+                    <div className={`max-w-md mx-auto px-5 py-2.5 sm:py-3 flex items-center justify-between rounded-2xl backdrop-blur-md shadow-xs pointer-events-auto transition-colors duration-300 ${
+                        isDarkMode
+                            ? 'bg-[#1a1410]/85 border border-amber-500/30 shadow-[0_4px_20px_rgba(0,0,0,0.5)]'
+                            : 'bg-white/20 border border-white/40 shadow-xs'
+                    }`}>
+                        <div className="w-8" />
+                        <span className={`font-cinzel font-bold text-xs sm:text-sm tracking-[0.25em] uppercase transition-colors duration-300 ${
+                            isDarkMode ? 'text-amber-200' : 'text-amber-950'
+                        }`}>
+                            {data.tenant_name}
+                        </span>
+                        <button
+                            onClick={() => setIsDarkMode(!isDarkMode)}
+                            className={`p-1.5 rounded-full transition-colors shrink-0 ${
+                                isDarkMode ? 'hover:bg-amber-400/20 text-amber-300' : 'hover:bg-amber-500/15 text-amber-900'
+                            }`}
+                            aria-label="Cambiar tema día/noche"
+                        >
+                            {isDarkMode ? <Sun size={17} /> : <Moon size={17} />}
+                        </button>
+                    </div>
                 </div>
-            </div>
+            ) : (
+                <div className={`fixed top-0 w-full z-20 backdrop-blur-xl border-b transition-colors duration-500 ${theme.headerBg}`}>
+                    <div className="max-w-md mx-auto px-6 py-4 flex items-center justify-center relative">
+                        <span className={`font-cinzel font-bold text-sm tracking-[0.25em] uppercase ${
+                            trackingTemplate === 'warm'
+                                ? isDarkMode ? 'text-[#E7C15A]' : 'text-[#5B493D]'
+                                : trackingTemplate === 'modern'
+                                    ? 'text-emerald-500'
+                                    : 'text-sky-500'
+                        }`}>{data.tenant_name}</span>
+                        <button 
+                            onClick={() => setIsDarkMode(!isDarkMode)}
+                            className={`absolute right-4 sm:right-6 p-2 rounded-full transition-colors ${
+                                trackingTemplate === 'warm'
+                                    ? 'hover:bg-[#C6A56A]/15 text-[#C6A56A]'
+                                    : trackingTemplate === 'modern'
+                                        ? 'hover:bg-emerald-500/10 text-emerald-500'
+                                        : 'hover:bg-sky-500/10 text-sky-500'
+                            }`}
+                        >
+                            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+                        </button>
+                    </div>
+                    {trackingTemplate === 'modern' && totalSteps > 0 && (
+                        <div className="w-full h-1 bg-slate-200/50 dark:bg-white/5">
+                            <div
+                                className="h-full bg-emerald-500 transition-all duration-700"
+                                style={{ width: `${progressPercentage}%` }}
+                            />
+                        </div>
+                    )}
+                </div>
+            )}
 
-            <div className="max-w-5xl mx-auto pt-24 pb-20 px-4 sm:px-6 relative z-10">
+            <div className={`max-w-5xl mx-auto pb-20 px-4 sm:px-6 relative z-10 ${
+                isVisualTemplate ? 'pt-24 sm:pt-28' : 'pt-24'
+            }`}>
 
                 {/* Main Hero */}
-                <motion.div
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mb-14 text-center"
-                >
-                    <div className="relative inline-block mb-12 mt-6">
-                        {/* Marco conmemorativo: resplandor, aro dorado, halo, alas y anillo de destellos */}
-                        <div aria-hidden="true" className={`absolute -inset-10 rounded-full blur-2xl ${isDarkMode ? 'bg-amber-200/10' : 'bg-amber-100/80'}`} />
-                        <div aria-hidden="true" className={`absolute -inset-[22px] rounded-full border border-dashed memorial-dash ${isDarkMode ? 'border-amber-200/25' : 'border-amber-400/40'}`}>
-                            {[0, 60, 120, 180, 240, 300].map((deg) => (
-                                <Sparkles key={deg} size={10} className="absolute top-1/2 left-1/2 -ml-[5px] -mt-[5px] text-amber-400"
-                                    style={{ transform: `rotate(${deg}deg) translateY(-118px) rotate(-${deg}deg)` }} />
-                            ))}
-                        </div>
-                        <div aria-hidden="true" className="absolute -inset-[7px] rounded-full memorial-ring" />
-                        <div aria-hidden="true" className="memorial-halo absolute left-1/2 -top-10 z-20 w-24 h-6 rounded-[50%] border-[3px] border-amber-300 shadow-[0_0_18px_rgba(252,211,77,0.9),inset_0_0_8px_rgba(252,211,77,0.6)]" />
-                        <AngelWings className={`absolute top-1/2 -translate-y-1/2 -left-24 w-20 h-20 -scale-x-100 hidden sm:block ${isDarkMode ? 'text-amber-100/40' : 'text-amber-500/50'}`} />
-                        <AngelWings className={`absolute top-1/2 -translate-y-1/2 -right-24 w-20 h-20 hidden sm:block ${isDarkMode ? 'text-amber-100/40' : 'text-amber-500/50'}`} />
-                        {/* Main Hero: Pet Photo */}
-                        <div className={`w-48 h-48 mx-auto rounded-full flex items-center justify-center border-[6px] overflow-hidden group relative z-10 transition-all duration-500 ${theme.petPhotoBorder} ${theme.petPhotoShadow}`}>
-                            {petPhotos.length > 0 ? (
-                                <AnimatePresence initial={false}>
-                                    <motion.img
-                                        key={petPhotos[photoIdx % petPhotos.length]}
-                                        src={getImageUrl(petPhotos[photoIdx % petPhotos.length]) || ''}
-                                        alt={data.pet_name}
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        transition={{ duration: 1.2 }}
-                                        className="absolute inset-0 w-full h-full object-cover transition-transform group-hover:scale-105 duration-700"
+                {isVisualTemplate ? (
+                    <motion.div
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mb-8 text-center"
+                    >
+                        <div className="relative inline-block mb-4 mt-4">
+                            {/* Ambient golden aura - muy suave, difuso y con alto blur */}
+                            <div
+                                aria-hidden="true"
+                                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] sm:w-[540px] h-[280px] sm:h-[350px] rounded-full bg-gradient-to-r from-amber-100/25 via-amber-200/35 to-amber-100/25 blur-[75px] pointer-events-none -z-10"
+                            />
+
+                            {/* Real Decorative Element (.webp: Alas, Corona, etc.) */}
+                            <img
+                                src={dynamicElementUrl}
+                                alt="Elemento decorativo conmemorativo"
+                                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] sm:w-[440px] md:w-[490px] max-w-none pointer-events-none z-0 select-none"
+                                style={{
+                                    filter: 'drop-shadow(0 0 25px rgba(254, 243, 199, 0.45)) drop-shadow(0 0 55px rgba(251, 191, 36, 0.2))'
+                                }}
+                            />
+
+                            {/* Floating luminous Halo - Geometría elíptica perfecta con resplandor cálido (idéntico a referencia) */}
+                            <div className="absolute -top-6 sm:-top-7 left-0 right-0 flex justify-center z-20 pointer-events-none">
+                                {/* Resplandor difuso ambiental detrás de la aureola */}
+                                <div
+                                    aria-hidden="true"
+                                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-36 h-12 rounded-full bg-amber-300/35 blur-md pointer-events-none"
+                                />
+                                <svg
+                                    viewBox="0 0 160 44"
+                                    className="memorial-halo w-32 sm:w-36 h-auto overflow-visible relative"
+                                    style={{
+                                        filter: 'drop-shadow(0 0 10px rgba(251, 191, 36, 0.95)) drop-shadow(0 0 22px rgba(245, 158, 11, 0.7))'
+                                    }}
+                                >
+                                    <defs>
+                                        <linearGradient id="celestial-halo-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" stopColor="#FEF08A" />
+                                            <stop offset="20%" stopColor="#FBBF24" />
+                                            <stop offset="50%" stopColor="#F59E0B" />
+                                            <stop offset="80%" stopColor="#FBBF24" />
+                                            <stop offset="100%" stopColor="#FEF08A" />
+                                        </linearGradient>
+                                    </defs>
+                                    <ellipse
+                                        cx="80"
+                                        cy="22"
+                                        rx="62"
+                                        ry="14"
+                                        fill="none"
+                                        stroke="url(#celestial-halo-grad)"
+                                        strokeWidth="4.5"
                                     />
-                                </AnimatePresence>
+                                </svg>
+                            </div>
+
+                            {/* Aro exterior punteado/discontinuo con estrellitas doradas (exacto a la referencia) */}
+                            <div
+                                aria-hidden="true"
+                                className="absolute -inset-4 sm:-inset-5 rounded-full border border-dashed border-amber-300/70 pointer-events-none z-10"
+                            >
+                                {/* 8 Estrellitas decorativas en cuadrantes y diagonales */}
+                                <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-amber-400 text-xs select-none">✦</span>
+                                <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-amber-400 text-xs select-none">✦</span>
+                                <span className="absolute top-1/2 -left-2 -translate-y-1/2 text-amber-400 text-xs select-none">✦</span>
+                                <span className="absolute top-1/2 -right-2 -translate-y-1/2 text-amber-400 text-xs select-none">✦</span>
+                                <span className="absolute top-[10%] left-[10%] text-amber-400/90 text-xs select-none">✦</span>
+                                <span className="absolute top-[10%] right-[10%] text-amber-400/90 text-xs select-none">✦</span>
+                                <span className="absolute bottom-[10%] left-[10%] text-amber-400/90 text-xs select-none">✦</span>
+                                <span className="absolute bottom-[10%] right-[10%] text-amber-400/90 text-xs select-none">✦</span>
+                            </div>
+
+                            {/* Circular Portrait - Marco Relicario con Degradado Dorado idéntico a referencia */}
+                            <div
+                                className="w-36 h-36 sm:w-42 sm:h-42 mx-auto rounded-full p-[6px] sm:p-[7px] relative z-10 shadow-[0_12px_32px_rgba(217,119,6,0.35)]"
+                                style={{
+                                    background: 'linear-gradient(180deg, #FDE68A 0%, #FBBF24 20%, #F59E0B 50%, #D97706 80%, #B45309 100%)',
+                                }}
+                            >
+                                <div className="w-full h-full rounded-full ring-[3px] ring-white overflow-hidden relative bg-white group flex items-center justify-center">
+                                    {petPhotos.length > 0 ? (
+                                        <AnimatePresence initial={false}>
+                                            <motion.img
+                                                key={petPhotos[photoIdx % petPhotos.length]}
+                                                src={getImageUrl(petPhotos[photoIdx % petPhotos.length]) || ''}
+                                                alt={data.pet_name}
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                exit={{ opacity: 0 }}
+                                                transition={{ duration: 1.2 }}
+                                                className="absolute inset-0 w-full h-full object-cover transition-transform group-hover:scale-105 duration-700"
+                                            />
+                                        </AnimatePresence>
+                                    ) : (
+                                        <div className="w-full h-full bg-amber-50 flex items-center justify-center">
+                                            <PawPrint size={56} className="text-amber-300" />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Badge Único (Lado Derecho): Logo del Crematorio Triple Más Grande SIN BORDE */}
+                            <div className="absolute -bottom-2 -right-2 sm:-right-3 z-20 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white shadow-xl p-2 flex items-center justify-center overflow-hidden transition-transform hover:scale-105">
+                                {data.tenant_logo ? (
+                                    <img
+                                        src={getImageUrl(data.tenant_logo) || ''}
+                                        alt={data.tenant_name}
+                                        className="w-full h-full object-contain rounded-full"
+                                    />
+                                ) : (
+                                    <span className="text-teal-600 font-black text-2xl leading-none select-none">
+                                        ∞
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Pet Identity & Heading */}
+                        <div className="space-y-1.5 mt-2">
+                            <p className={`font-outfit font-bold text-[11px] sm:text-xs tracking-[0.24em] uppercase flex items-center justify-center gap-1.5 transition-colors duration-300 ${
+                                isDarkMode ? 'text-amber-300 drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]' : 'text-amber-900/90'
+                            }`}>
+                                <span className={isDarkMode ? 'text-amber-400' : 'text-amber-700'}>♥</span>
+                                <span>ACOMPAÑANDO EL PROCESO</span>
+                                <span className={isDarkMode ? 'text-amber-400' : 'text-amber-700'}>♥</span>
+                            </p>
+                            <h1 className={`font-dancing sm:font-alex text-5xl sm:text-6xl font-bold tracking-wide my-0.5 transition-colors duration-300 ${
+                                isDarkMode ? 'text-amber-100 drop-shadow-[0_2px_12px_rgba(251,191,36,0.35)]' : 'text-amber-950'
+                            }`}>
+                                {data.pet_name}
+                            </h1>
+                            <div className={`flex items-center justify-center gap-2 text-xs sm:text-sm font-semibold transition-colors duration-300 ${
+                                isDarkMode ? 'text-amber-200/90 drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]' : 'text-amber-900/80'
+                            }`}>
+                                <span>{data.pet_species === 'Felino' || data.pet_species === 'Gato' ? '♀ Felino' : '🐾 ' + (data.pet_species || 'Mascota')}</span>
+                                {data.customer_name && (
+                                    <>
+                                        <span>·</span>
+                                        <span>🐾 {data.customer_name}</span>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </motion.div>
+                ) : (
+                    <motion.div
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mb-14 text-center"
+                    >
+                        <div className="relative inline-block mb-12 mt-6">
+                            {/* Marco conmemorativo: resplandor, aro dorado, halo, alas y anillo de destellos */}
+                            <div aria-hidden="true" className={`absolute -inset-10 rounded-full blur-2xl ${isDarkMode ? 'bg-amber-200/10' : 'bg-amber-100/80'}`} />
+                            <div aria-hidden="true" className={`absolute -inset-[22px] rounded-full border border-dashed memorial-dash ${isDarkMode ? 'border-amber-200/25' : 'border-amber-400/40'}`}>
+                                {[0, 60, 120, 180, 240, 300].map((deg) => (
+                                    <Sparkles key={deg} size={10} className="absolute top-1/2 left-1/2 -ml-[5px] -mt-[5px] text-amber-400"
+                                        style={{ transform: `rotate(${deg}deg) translateY(-118px) rotate(-${deg}deg)` }} />
+                                ))}
+                            </div>
+                            <div aria-hidden="true" className="absolute -inset-[7px] rounded-full memorial-ring" />
+                            <div aria-hidden="true" className="memorial-halo absolute left-1/2 -top-10 z-20 w-24 h-6 rounded-[50%] border-[3px] border-amber-300 shadow-[0_0_18px_rgba(252,211,77,0.9),inset_0_0_8px_rgba(252,211,77,0.6)]" />
+                            <AngelWings className={`absolute top-1/2 -translate-y-1/2 -left-24 w-20 h-20 -scale-x-100 hidden sm:block ${isDarkMode ? 'text-amber-100/40' : 'text-amber-500/50'}`} />
+                            <AngelWings className={`absolute top-1/2 -translate-y-1/2 -right-24 w-20 h-20 hidden sm:block ${isDarkMode ? 'text-amber-100/40' : 'text-amber-500/50'}`} />
+                            {/* Main Hero: Pet Photo */}
+                            <div className={`w-48 h-48 mx-auto rounded-full flex items-center justify-center border-[6px] overflow-hidden group relative z-10 transition-all duration-500 ${theme.petPhotoBorder} ${theme.petPhotoShadow}`}>
+                                {petPhotos.length > 0 ? (
+                                    <AnimatePresence initial={false}>
+                                        <motion.img
+                                            key={petPhotos[photoIdx % petPhotos.length]}
+                                            src={getImageUrl(petPhotos[photoIdx % petPhotos.length]) || ''}
+                                            alt={data.pet_name}
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            transition={{ duration: 1.2 }}
+                                            className="absolute inset-0 w-full h-full object-cover transition-transform group-hover:scale-105 duration-700"
+                                        />
+                                    </AnimatePresence>
+                                ) : (
+                                    <div className="w-full h-full bg-sky-50 flex items-center justify-center">
+                                        <PawPrint size={64} className="text-sky-200" />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Puntos para elegir la foto (solo con 2 o más) */}
+                            {petPhotos.length > 1 && (
+                                <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
+                                    {petPhotos.map((_, i) => (
+                                        <button
+                                            key={i}
+                                            type="button"
+                                            onClick={() => setPhotoIdx(i)}
+                                            aria-label={`Ver foto ${i + 1} de ${data.pet_name}`}
+                                            className={`h-1.5 rounded-full transition-all duration-500 ${i === photoIdx % petPhotos.length
+                                                ? `w-4 ${isDarkMode ? 'bg-white/70' : 'bg-gray-500'}`
+                                                : `w-1.5 ${isDarkMode ? 'bg-white/25' : 'bg-gray-300'}`}`}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Corner Badge: Tenant Logo */}
+                            <div className={`absolute -bottom-2 -right-2 z-20 w-16 h-16 rounded-full border-4 shadow-lg overflow-hidden flex items-center justify-center transition-all duration-500 ${theme.tenantLogoBg}`}>
+                                {data.tenant_logo ? (
+                                    <img
+                                        src={getImageUrl(data.tenant_logo) || ''}
+                                        alt={data.tenant_name}
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    <Building2 size={24} className="text-gray-300" />
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-center gap-2 mb-1">
+                                {isUltraDelivered ? (
+                                    <>
+                                        <Sparkles size={14} className="text-amber-500 animate-pulse" />
+                                        <p className="font-outfit font-bold text-[11px] tracking-[0.22em] uppercase text-amber-600 dark:text-amber-400">
+                                            Servicio Finalizado · Homenaje Eterno
+                                        </p>
+                                        <Sparkles size={14} className="text-amber-500 animate-pulse" />
+                                    </>
+                                ) : (
+                                    <>
+                                        <Heart size={14} fill="currentColor" className="text-sky-500" />
+                                        <p className="font-outfit font-bold text-[11px] tracking-[0.22em] uppercase text-sky-600 dark:text-sky-400">
+                                            {isDelivered ? 'Servicio Finalizado' : 'Acompañando el proceso'}
+                                        </p>
+                                        <Heart size={14} fill="currentColor" className="text-sky-500" />
+                                    </>
+                                )}
+                            </div>
+                            <div className="flex items-center justify-center gap-3">
+                                <AngelWings className="w-6 h-6 text-sky-500/30 -scale-x-100" />
+                                <h1 className={`text-2xl sm:text-3xl font-outfit font-extrabold tracking-tight transition-colors duration-500 ${theme.title}`}>{data.pet_name}</h1>
+                                <AngelWings className="w-6 h-6 text-sky-500/30" />
+                            </div>
+                            <div className={`flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm font-outfit font-medium pt-1 transition-colors duration-500 ${theme.subtitle}`}>
+                                <span className="inline-flex items-center gap-1.5 capitalize">
+                                    <PawPrint size={16} className="text-sky-500/50" />
+                                    {data.pet_species || data.pet_breed
+                                        ? `${data.pet_species || ''}${data.pet_species && data.pet_breed ? ' - ' : ''}${data.pet_breed || ''}`
+                                        : 'En Camino al Paraíso'}
+                                </span>
+                                {data.pet_weight != null && (
+                                    <>
+                                        <span className="text-sky-500/30">·</span>
+                                        <span className="inline-flex items-center gap-1.5">
+                                            <Scale size={16} className="text-sky-500/50" />
+                                            {data.pet_weight} kg
+                                        </span>
+                                    </>
+                                )}
+                                {data.customer_name && (
+                                    <>
+                                        <span className="text-sky-500/30">·</span>
+                                        <span className="inline-flex items-center gap-1.5 capitalize">
+                                            <User size={16} className="text-sky-500/50" />
+                                            {data.customer_name}
+                                        </span>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+
+                {isVisualTemplate ? (
+                    <div className="w-full max-w-md lg:max-w-2xl xl:max-w-3xl mx-auto space-y-4">
+                        {/* Selector de Pestañas Homenaje / Recuerdo (Móvil y Desktop - Posicionado ARRIBA del Seguimiento) */}
+                        <div className="flex items-center justify-center gap-3 pt-1 pb-2">
+                            <button
+                                type="button"
+                                onClick={() => setMobileTab('tracking')}
+                                className={`px-6 sm:px-8 py-2.5 sm:py-3 rounded-full font-bold text-xs sm:text-sm uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer shadow-md ${
+                                    mobileTab === 'tracking'
+                                        ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-amber-500/30 scale-[1.03] ring-2 ring-amber-300/40'
+                                        : isDarkMode
+                                            ? 'bg-[#1e1610]/90 text-amber-200 border border-amber-500/40 hover:bg-[#2a1f17]'
+                                            : 'bg-white/85 text-amber-900 border border-amber-300/80 hover:bg-white'
+                                }`}
+                            >
+                                <PawPrint size={15} />
+                                <span>HOMENAJE</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setMobileTab('tribute')}
+                                className={`px-6 sm:px-8 py-2.5 sm:py-3 rounded-full font-bold text-xs sm:text-sm uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer shadow-md ${
+                                    mobileTab === 'tribute'
+                                        ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-amber-500/30 scale-[1.03] ring-2 ring-amber-300/40'
+                                        : isDarkMode
+                                            ? 'bg-[#1e1610]/90 text-amber-200 border border-amber-500/40 hover:bg-[#2a1f17]'
+                                            : 'bg-white/85 text-amber-900 border border-amber-300/80 hover:bg-white'
+                                }`}
+                            >
+                                <Heart size={15} />
+                                <span>RECUERDO</span>
+                            </button>
+                        </div>
+
+                        {/* Main Glassmorphic Card Container */}
+                        <div className={`backdrop-blur-md rounded-[2.25rem] p-4 sm:p-6 shadow-2xl transition-colors duration-300 ${
+                            isDarkMode
+                                ? 'bg-[#140e0a]/90 border border-amber-500/25 shadow-[0_20px_50px_rgba(0,0,0,0.6)]'
+                                : 'bg-white/85 border border-amber-200/60 shadow-[0_20px_50px_rgba(217,119,6,0.12)]'
+                        }`}>
+                            {mobileTab === 'tracking' ? (
+                                <>
+                                    {/* Timeline with vertical gold line and pill steps */}
+                                    <div className="relative pl-6 space-y-3">
+                                        {/* Golden vertical line */}
+                                        <div className={`absolute left-2.5 top-3 bottom-3 w-0.5 rounded-full ${
+                                            isDarkMode ? 'bg-amber-500/60' : 'bg-amber-300/70'
+                                        }`} />
+
+                                        {timeline.map((event: any, idx: number) => {
+                                            const isCompleted = event.status === 'completed';
+                                            const isCurrent = event.status === 'current';
+                                            const hasPhoto = Boolean(event.evidence?.photo_url);
+                                            const hasComments = Boolean(
+                                                event.evidence && (
+                                                    (Array.isArray(event.evidence.comments) && event.evidence.comments.some((c: any) => typeof c === 'string' && c.trim().length > 0)) ||
+                                                    (typeof event.evidence.comments === 'string' && event.evidence.comments.trim().length > 0)
+                                                )
+                                            );
+                                            const hasEvidence = Boolean(event.evidence && (hasPhoto || hasComments));
+
+                                            return (
+                                                <div key={idx} className="relative">
+                                                    {/* Golden Node on the line */}
+                                                    <div className={`absolute -left-6 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                                                        isCompleted
+                                                            ? 'border-amber-500 bg-amber-400 text-white shadow-xs'
+                                                            : isCurrent
+                                                                ? 'border-amber-500 bg-white ring-4 ring-amber-400/30 animate-pulse'
+                                                                : isDarkMode
+                                                                    ? 'border-amber-700 bg-[#140e0a]'
+                                                                    : 'border-amber-200 bg-white'
+                                                    }`}>
+                                                        <div className={`w-2 h-2 rounded-full ${
+                                                            isCompleted ? 'bg-white' : isCurrent ? 'bg-amber-500' : 'bg-transparent'
+                                                        }`} />
+                                                    </div>
+
+                                                    {/* Pill Step Card */}
+                                                    <div className={`rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-3 transition-all ${
+                                                        isCurrent
+                                                            ? isDarkMode
+                                                                ? 'bg-[#261a12] border-2 border-amber-400 shadow-lg ring-2 ring-amber-400/20'
+                                                                : 'bg-white border-2 border-amber-400/90 shadow-md ring-2 ring-amber-400/15'
+                                                            : isDarkMode
+                                                                ? 'bg-[#1b120c]/90 border border-amber-900/50 shadow-xs'
+                                                                : 'bg-white/95 border border-amber-100/90 shadow-xs'
+                                                    }`}>
+                                                        {/* Icon */}
+                                                        <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 ${
+                                                            isCompleted
+                                                                ? isDarkMode
+                                                                    ? 'bg-amber-950/70 text-amber-300 border border-amber-800/40'
+                                                                    : 'bg-amber-100/80 text-amber-700'
+                                                                : isCurrent
+                                                                    ? 'bg-amber-500 text-white shadow-xs'
+                                                                    : isDarkMode
+                                                                        ? 'bg-amber-950/40 text-amber-400/70'
+                                                                        : 'bg-amber-50/70 text-amber-600/70'
+                                                        }`}>
+                                                            {getCelestialStepIcon(idx)}
+                                                        </div>
+
+                                                        {/* Text */}
+                                                        <div className="min-w-0 flex-1">
+                                                            <h3 className={`text-xs sm:text-sm font-bold truncate ${
+                                                                isCurrent
+                                                                    ? isDarkMode ? 'text-amber-200 font-extrabold' : 'text-amber-950 font-extrabold'
+                                                                    : isDarkMode ? 'text-amber-100 font-bold' : 'text-slate-800 font-bold'
+                                                            }`}>
+                                                                {event.step_name}
+                                                            </h3>
+                                                            <p className={`text-[11px] italic truncate ${
+                                                                isDarkMode ? 'text-amber-300/75' : 'text-amber-800/70'
+                                                            }`}>
+                                                                {isCompleted && event.completed_at
+                                                                    ? `${fmtDate(event.completed_at)} · ${fmtTime(event.completed_at)} hrs`
+                                                                    : isCurrent
+                                                                        ? 'En curso'
+                                                                        : 'Pendiente'}
+                                                            </p>
+                                                        </div>
+
+                                                        {/* Right Actions: Evidence Button + Status Badge */}
+                                                        <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1.5 shrink-0">
+                                                            {hasEvidence && (
+                                                                <motion.button
+                                                                    type="button"
+                                                                    whileHover={{ scale: 1.05 }}
+                                                                    whileTap={{ scale: 0.95 }}
+                                                                    onClick={() => setSelectedEvidence(event.evidence)}
+                                                                    className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer shadow-xs ${
+                                                                        isDarkMode
+                                                                            ? 'bg-amber-400/15 hover:bg-amber-400/25 text-amber-200 border border-amber-400/40'
+                                                                            : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-900 border border-amber-300/80'
+                                                                    }`}
+                                                                    title={hasPhoto ? 'Ver fotografías y notas de esta etapa' : 'Ver comentarios y notas de esta etapa'}
+                                                                >
+                                                                    {hasPhoto ? (
+                                                                        <Camera size={13} className={isDarkMode ? 'text-amber-300 shrink-0' : 'text-amber-700 shrink-0'} />
+                                                                    ) : (
+                                                                        <FileText size={13} className={isDarkMode ? 'text-amber-300 shrink-0' : 'text-amber-700 shrink-0'} />
+                                                                    )}
+                                                                    <span>{hasPhoto && hasComments ? 'Ver evidencia' : hasPhoto ? 'Ver fotos' : 'Ver nota'}</span>
+                                                                </motion.button>
+                                                            )}
+                                                            <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-full ${
+                                                                isCompleted
+                                                                    ? 'bg-teal-600 text-white shadow-xs'
+                                                                    : isCurrent
+                                                                        ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-xs animate-pulse'
+                                                                        : isDarkMode
+                                                                            ? 'bg-amber-950/70 text-amber-300 border border-amber-800/50'
+                                                                            : 'bg-amber-100/80 text-amber-800 border border-amber-200/60'
+                                                            }`}>
+                                                                {isCompleted ? 'Completado' : isCurrent ? 'En proceso' : 'Pendiente'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Current Status & Progress Card at bottom of container */}
+                                    <div className={`rounded-2xl p-3.5 border flex items-center justify-between gap-3 mt-4 transition-colors duration-300 ${
+                                        isDarkMode
+                                            ? 'bg-[#1b120c]/85 border-amber-800/40'
+                                            : 'bg-amber-50/70 border-amber-200/50'
+                                    }`}>
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                                                isDarkMode ? 'bg-sky-950/90 text-sky-300 border border-sky-800/40' : 'bg-sky-100 text-sky-600'
+                                            }`}>
+                                                <PawPrint size={15} />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className={`text-[9px] font-black uppercase tracking-wider ${
+                                                    isDarkMode ? 'text-amber-300/70' : 'text-slate-400'
+                                                }`}>
+                                                    ESTADO ACTUAL
+                                                </p>
+                                                <p className={`text-xs font-black truncate ${
+                                                    isDarkMode ? 'text-sky-300' : 'text-sky-700'
+                                                }`}>
+                                                    {currentStepName}
+                                                </p>
+                                                <p className={`text-[10px] ${
+                                                    isDarkMode ? 'text-amber-200/70' : 'text-slate-500'
+                                                }`}>
+                                                    El proceso se encuentra en marcha.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className={`w-px h-9 shrink-0 ${
+                                            isDarkMode ? 'bg-amber-800/50' : 'bg-amber-200/60'
+                                        }`} />
+
+                                        <div className="text-right shrink-0">
+                                            <div className="flex items-center justify-end gap-1.5 mb-1">
+                                                <span className={`text-[9px] font-black uppercase tracking-wider ${
+                                                    isDarkMode ? 'text-amber-300/70' : 'text-slate-400'
+                                                }`}>
+                                                    PROGRESO
+                                                </span>
+                                                <span className={`text-xs font-black ${
+                                                    isDarkMode ? 'text-amber-100' : 'text-slate-800'
+                                                }`}>
+                                                    {progressPercentage}%
+                                                </span>
+                                            </div>
+                                            <div className={`h-1.5 w-24 rounded-full overflow-hidden ${
+                                                isDarkMode ? 'bg-neutral-800' : 'bg-slate-200'
+                                            }`}>
+                                                <div
+                                                    className="h-full bg-gradient-to-r from-amber-400 to-amber-500 transition-all duration-700"
+                                                    style={{ width: `${progressPercentage}%` }}
+                                                />
+                                            </div>
+                                            <p className={`text-[10px] mt-0.5 ${
+                                                isDarkMode ? 'text-amber-200/70' : 'text-slate-500'
+                                            }`}>
+                                                {completedCount} de {totalSteps} etapas
+                                            </p>
+                                        </div>
+                                    </div>
+                                </>
                             ) : (
-                                <div className="w-full h-full bg-sky-50 flex items-center justify-center">
-                                    <PawPrint size={64} className="text-sky-200" />
+                                /* Tribute / Recuerdo tab (Visible en Móvil y Desktop al seleccionar RECUERDO) */
+                                <div className="space-y-5">
+                                    {(farewellConfig || data.ai_design) ? (
+                                        <PublicTributeCarousel
+                                            farewellConfig={farewellConfig}
+                                            aiDesign={data.ai_design}
+                                            petName={data.pet_name}
+                                            isDarkMode={isDarkMode}
+                                            variant="central"
+                                            cardExportRef={cardExportRef}
+                                            isDownloadingCard={isDownloadingCard}
+                                            onDownloadCard={handleDownloadCard}
+                                            copiedLink={copiedLink}
+                                            onShare={handleShare}
+                                        />
+                                    ) : (
+                                        <div className={`text-center py-10 px-4 rounded-2xl border transition-colors ${
+                                            isDarkMode
+                                                ? 'bg-[#1b120c]/80 border-amber-800/40'
+                                                : 'bg-amber-50/60 border-amber-200/50'
+                                        }`}>
+                                            <Heart size={40} className="mx-auto text-amber-400 mb-3" />
+                                            <h4 className={`font-bold text-base ${isDarkMode ? 'text-amber-200' : 'text-amber-900'}`}>
+                                                En Memoria de {data.pet_name}
+                                            </h4>
+                                            <p className={`text-xs mt-1 max-w-sm mx-auto ${isDarkMode ? 'text-amber-300/80' : 'text-amber-800/80'}`}>
+                                                Su recuerdo vivirá por siempre en nuestros corazones y en cada huella compartida.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {data.pet_dedication && (
+                                        <div className={`p-4 sm:p-5 rounded-2xl border shadow-xs transition-colors ${
+                                            isDarkMode
+                                                ? 'bg-[#1b120c]/90 border-amber-800/40 text-amber-100'
+                                                : 'bg-amber-50/70 border-amber-200/60 text-amber-950'
+                                        }`}>
+                                            <div className="flex items-start gap-3">
+                                                <span className="text-2xl text-amber-400 font-serif leading-none select-none">“</span>
+                                                <div className="flex-1">
+                                                    <p className={`text-xs sm:text-sm italic leading-relaxed ${
+                                                        isDarkMode ? 'text-amber-100' : 'text-amber-950'
+                                                    }`}>
+                                                        {data.pet_dedication}
+                                                    </p>
+                                                    <p className={`text-[10px] font-bold uppercase tracking-wider mt-2 ${
+                                                        isDarkMode ? 'text-amber-300' : 'text-amber-700'
+                                                    }`}>
+                                                        — Dedicatoria familiar en memoria de {data.pet_name}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
 
-                        {/* Puntos para elegir la foto (solo con 2 o más) */}
-                        {petPhotos.length > 1 && (
-                            <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
-                                {petPhotos.map((_, i) => (
-                                    <button
-                                        key={i}
-                                        type="button"
-                                        onClick={() => setPhotoIdx(i)}
-                                        aria-label={`Ver foto ${i + 1} de ${data.pet_name}`}
-                                        className={`h-1.5 rounded-full transition-all duration-500 ${i === photoIdx % petPhotos.length
-                                            ? `w-4 ${isDarkMode ? 'bg-white/70' : 'bg-gray-500'}`
-                                            : `w-1.5 ${isDarkMode ? 'bg-white/25' : 'bg-gray-300'}`}`}
-                                    />
-                                ))}
-                            </div>
-                        )}
-
-                        {/* Corner Badge: Tenant Logo */}
-                        <div className={`absolute -bottom-2 -right-2 z-20 w-16 h-16 rounded-full border-4 shadow-lg overflow-hidden flex items-center justify-center transition-all duration-500 ${theme.tenantLogoBg}`}>
-                            {data.tenant_logo ? (
-                                <img
-                                    src={getImageUrl(data.tenant_logo) || ''}
-                                    alt={data.tenant_name}
-                                    className="w-full h-full object-cover"
-                                />
-                            ) : (
-                                <Building2 size={24} className="text-gray-300" />
-                            )}
-                        </div>
+                        {/* Commemorative Footer Quote */}
+                        <p className={`font-dancing italic text-lg sm:text-xl text-center pt-2 transition-colors duration-300 ${
+                            isDarkMode ? 'text-amber-200 drop-shadow-[0_1px_8px_rgba(251,191,36,0.35)]' : 'text-amber-900/80'
+                        }`}>
+                            — Siempre en nuestros corazones —
+                        </p>
                     </div>
-
-                    <div className="space-y-3">
-                        <div className="flex items-center justify-center gap-2 mb-1">
-                            {isUltraDelivered ? (
-                                <>
-                                    <Sparkles size={14} className="text-amber-500 animate-pulse" />
-                                    <p className="font-outfit font-bold text-[11px] tracking-[0.22em] uppercase text-amber-600 dark:text-amber-400">
-                                        Servicio Finalizado · Homenaje Eterno
-                                    </p>
-                                    <Sparkles size={14} className="text-amber-500 animate-pulse" />
-                                </>
-                            ) : (
-                                <>
-                                    <Heart size={14} fill="currentColor" className="text-sky-500" />
-                                    <p className="font-outfit font-bold text-[11px] tracking-[0.22em] uppercase text-sky-600 dark:text-sky-400">
-                                        {isDelivered ? 'Servicio Finalizado' : 'Acompañando el proceso'}
-                                    </p>
-                                    <Heart size={14} fill="currentColor" className="text-sky-500" />
-                                </>
-                            )}
-                        </div>
-                        <div className="flex items-center justify-center gap-3">
-                            <AngelWings className="w-6 h-6 text-sky-500/30 -scale-x-100" />
-                            <h1 className={`text-2xl sm:text-3xl font-outfit font-extrabold tracking-tight transition-colors duration-500 ${theme.title}`}>{data.pet_name}</h1>
-                            <AngelWings className="w-6 h-6 text-sky-500/30" />
-                        </div>
-                        <div className={`flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm font-outfit font-medium pt-1 transition-colors duration-500 ${theme.subtitle}`}>
-                            <span className="inline-flex items-center gap-1.5 capitalize">
-                                <PawPrint size={16} className="text-sky-500/50" />
-                                {data.pet_species || data.pet_breed
-                                    ? `${data.pet_species || ''}${data.pet_species && data.pet_breed ? ' - ' : ''}${data.pet_breed || ''}`
-                                    : 'En Camino al Paraíso'}
-                            </span>
-                            {data.pet_weight != null && (
-                                <>
-                                    <span className="text-sky-500/30">·</span>
-                                    <span className="inline-flex items-center gap-1.5">
-                                        <Scale size={16} className="text-sky-500/50" />
-                                        {data.pet_weight} kg
-                                    </span>
-                                </>
-                            )}
-                            {data.customer_name && (
-                                <>
-                                    <span className="text-sky-500/30">·</span>
-                                    <span className="inline-flex items-center gap-1.5 capitalize">
-                                        <User size={16} className="text-sky-500/50" />
-                                        {data.customer_name}
-                                    </span>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                </motion.div>
-
-                {isUltraDelivered ? (
+                ) : isUltraDelivered ? (
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -867,11 +1587,11 @@ export default function TrackingPage() {
                                     onClick={() => setMobileTab('tribute')}
                                     className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                                         mobileTab === 'tribute'
-                                            ? 'bg-white dark:bg-neutral-800 text-amber-700 dark:text-amber-300 shadow-md scale-[1.01]'
+                                            ? 'bg-white dark:bg-neutral-800 text-orange-600 dark:text-orange-300 shadow-md scale-[1.01]'
                                             : 'text-gray-500 dark:text-neutral-400 hover:text-gray-900'
                                     }`}
                                 >
-                                    <Sparkles size={15} className="text-amber-500" />
+                                    <Sparkles size={15} className="text-orange-400" />
                                     <span>Homenaje</span>
                                 </button>
                             </div>
@@ -905,7 +1625,7 @@ export default function TrackingPage() {
                                                 isStepCompleted 
                                                     ? 'bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.4)]' 
                                                     : isStepCurrent 
-                                                        ? 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.4)] animate-pulse'
+                                                        ? 'bg-gradient-to-r from-orange-500 to-amber-400 shadow-[0_0_10px_rgba(249,115,22,0.6)] animate-pulse'
                                                         : (isDarkMode ? 'bg-neutral-800' : 'bg-gray-200')
                                             }`} 
                                         />
@@ -969,7 +1689,7 @@ export default function TrackingPage() {
                                                         isStepCompleted 
                                                             ? 'bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.4)]' 
                                                             : isStepCurrent 
-                                                                ? 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.4)] animate-pulse'
+                                                                ? 'bg-gradient-to-r from-orange-500 to-amber-400 shadow-[0_0_10px_rgba(249,115,22,0.6)] animate-pulse'
                                                                 : (isDarkMode ? 'bg-neutral-800' : 'bg-gray-200')
                                                     }`} 
                                                 />
@@ -1054,15 +1774,15 @@ export default function TrackingPage() {
                                                 {/* Indicator */}
                                                 <div className={`absolute left-[calc(-2rem-2px-0.875rem)] sm:left-[calc(-2.5rem-2px-0.875rem)] top-1/2 -translate-y-1/2 w-7 h-7 rounded-full border-4 transition-all duration-700 z-10 flex items-center justify-center shadow-sm
                                                     ${isCompleted ? 'bg-sky-500 border-sky-500 text-white shadow-[0_0_12px_rgba(14,165,233,0.3)]' :
-                                                        isCurrent ? `border-amber-400 ${isDarkMode ? 'bg-amber-950/85 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'bg-white text-amber-600 shadow-[0_0_12px_rgba(245,158,11,0.25)]'} scale-110` :
+                                                        isCurrent ? `${isDarkMode ? 'border-orange-400 bg-orange-950/80 text-orange-300 shadow-[0_0_18px_rgba(249,115,22,0.7)]' : 'border-orange-500 bg-white text-orange-600 shadow-[0_0_12px_rgba(249,115,22,0.3)]'} scale-110` :
                                                             isDarkMode ? 'border-neutral-700 bg-[#0f1a35]/40 text-neutral-600' : 'border-gray-300 bg-gray-100 text-gray-400'}`}>
                                                     {isCompleted && <CheckCircle2 size={14} strokeWidth={4} className="text-white" />}
-                                                    {isCurrent && <Heart size={11} fill="currentColor" className={`${isDarkMode ? 'text-amber-400' : 'text-amber-500'} animate-pulse shrink-0`} />}
+                                                    {isCurrent && <Heart size={11} fill="currentColor" className={`${isDarkMode ? 'text-orange-300' : 'text-orange-500'} animate-pulse shrink-0`} />}
                                                 </div>
 
                                                 <div className={`px-6 py-4 sm:px-9 sm:py-5 rounded-[2rem] border transition-all duration-500 ${
                                                     isCurrent
-                                                        ? (isDarkMode ? 'bg-amber-950/10 border-amber-500 shadow-[0_0_25px_rgba(245,158,11,0.25)]' : 'bg-amber-50/70 border-amber-200 shadow-[0_0_20px_rgba(245,158,11,0.15)]') + ' scale-[1.02] backdrop-blur-md'
+                                                        ? (isDarkMode ? 'bg-gradient-to-r from-orange-950/25 via-orange-900/15 to-[#0f1a35]/40 border-orange-500/90 shadow-[0_0_30px_rgba(249,115,22,0.28)] ring-1 ring-orange-400/40' : 'bg-gradient-to-r from-orange-50/80 to-amber-50/50 border-orange-300 shadow-[0_0_20px_rgba(249,115,22,0.18)]') + ' scale-[1.02] backdrop-blur-md'
                                                         : isCompleted
                                                             ? (isDarkMode ? 'bg-sky-950/10 border-sky-500/20' : 'bg-sky-50/20 border-sky-100') + ' shadow-sm'
                                                             : isDarkMode ? 'bg-[#0a1226]/20 border-white/5/60' : 'bg-gray-50/60 border-gray-200 shadow-sm'
@@ -1073,7 +1793,7 @@ export default function TrackingPage() {
                                                             isCompleted 
                                                                 ? (isDarkMode ? 'bg-sky-500/10 border-sky-500/20 text-sky-400' : 'bg-sky-50 border-sky-100 text-sky-600')
                                                                 : isCurrent 
-                                                                    ? (isDarkMode ? 'bg-amber-500/15 border-amber-400/30 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.2)]' : 'bg-amber-50 border-amber-200 text-amber-500')
+                                                                    ? (isDarkMode ? 'bg-orange-500/20 border-orange-400/50 text-orange-300 shadow-[0_0_15px_rgba(249,115,22,0.35)]' : 'bg-orange-50 border-orange-200 text-orange-600')
                                                                     : (isDarkMode ? 'bg-[#0f1a35] border-white/10 text-neutral-500' : 'bg-gray-100 border-gray-200 text-gray-400')
                                                         }`}>
                                                             {getStepIcon(idx)}
@@ -1121,7 +1841,7 @@ export default function TrackingPage() {
                                                                 ) : isCompleted ? (
                                                                     <span className={`text-[10px] font-medium italic ${isDarkMode ? 'text-sky-400' : 'text-sky-600'}`}>Concluido</span>
                                                                 ) : isCurrent ? (
-                                                                    <span className={`text-[10px] font-medium italic ${isDarkMode ? 'text-amber-400' : 'text-amber-600'}`}>En curso</span>
+                                                                    <span className={`text-[11px] font-bold ${isDarkMode ? 'text-orange-300' : 'text-orange-600'}`}>En curso</span>
                                                                 ) : (
                                                                     <span className={`text-[10px] font-medium italic ${isDarkMode ? 'text-slate-500' : 'text-gray-400'}`}>Pendiente</span>
                                                                 )}
@@ -1129,7 +1849,11 @@ export default function TrackingPage() {
                                                                 {isCompleted ? (
                                                                     <span className="px-2.5 py-0.5 bg-sky-500/10 border border-sky-500/20 text-sky-600 dark:text-sky-400 rounded-full text-[9px] font-bold uppercase tracking-wider">Completado</span>
                                                                 ) : isCurrent ? (
-                                                                    <span className="px-2.5 py-0.5 bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 rounded-full text-[9px] font-bold uppercase tracking-wider animate-pulse">En proceso</span>
+                                                                    <span className={`px-3 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border transition-all ${
+                                                                        isDarkMode 
+                                                                            ? 'bg-orange-500/25 border-orange-400/70 text-orange-200 shadow-[0_0_14px_rgba(249,115,22,0.4)]' 
+                                                                            : 'bg-orange-100 border-orange-300 text-orange-800'
+                                                                    } animate-pulse`}>En proceso</span>
                                                                 ) : (
                                                                     <span className={`px-2.5 py-0.5 border rounded-full text-[9px] font-bold uppercase tracking-wider ${isDarkMode ? 'bg-[#0f1a35] border-white/10 text-neutral-500' : 'bg-gray-100 border-gray-200 text-gray-500'}`}>Pendiente</span>
                                                                 )}

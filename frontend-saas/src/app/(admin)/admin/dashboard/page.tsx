@@ -23,6 +23,7 @@ import TenantsTable from '@/components/admin/dashboard/TenantsTable';
 import ExpiringSubscriptions from '@/components/admin/dashboard/ExpiringSubscriptions';
 import TenantStatsModal from '@/components/admin/dashboard/TenantStatsModal';
 import RejectTransactionModal from '@/components/admin/dashboard/RejectTransactionModal';
+import ModuleUsageStatsWidget from '@/components/admin/dashboard/ModuleUsageStatsWidget';
 
 export default function CreatorDashboard() {
     const router = useRouter();
@@ -211,6 +212,8 @@ export default function CreatorDashboard() {
                     </div>
                 </div>
             )}
+
+            <ModuleUsageStatsWidget />
 
             <TenantsTable
                 tenants={filteredTenants}

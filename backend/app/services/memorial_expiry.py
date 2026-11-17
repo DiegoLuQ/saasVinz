@@ -128,6 +128,11 @@ async def send_expiry_notices(db: Session) -> int:
         m.expiry_notice_for = m.valid_until
         db.commit()
         sent += 1
+        if customer and customer.email:
+            import asyncio
+            from app.services.email import BATCH_EMAIL_DELAY_SECONDS
+            if BATCH_EMAIL_DELAY_SECONDS > 0:
+                await asyncio.sleep(BATCH_EMAIL_DELAY_SECONDS)
     return sent
 
 

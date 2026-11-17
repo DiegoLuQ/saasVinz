@@ -35,6 +35,7 @@ NAME_FALLBACK: dict[str, set[str]] = {
     "servicios:planes:catalogo": {"TRACK", "NORMAL", "PRO", "ULTRA"},
     "servicios:planes:descargar_pdf": {"TRACK", "NORMAL", "PRO", "ULTRA"},
     "configuracion:enlaces_oficiales": {"TRACK", "NORMAL", "PRO", "ULTRA"},
+    "configuracion:diseno_seguimiento": {"PRO", "ULTRA"},
 }
 
 

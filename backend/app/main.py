@@ -273,6 +273,9 @@ app.include_router(creator_vets_router)
 from app.api.internal.creator.memorials.router import router as creator_memorials_router
 app.include_router(creator_memorials_router, prefix="/api/internal/creator/memorials", tags=["Creator - Memorials"])
 
+from app.api.internal.creator.tracking_templates.router import router as creator_tracking_templates_router
+app.include_router(creator_tracking_templates_router, prefix="/api/internal/creator/tracking-templates", tags=["Creator - Plantillas de Tracking"])
+
 # Common Module
 
 from app.api.internal.common.notifications.router import router as notifications_router
@@ -333,6 +336,12 @@ app.include_router(creator_widgets_router, prefix="/api/internal/creator/widgets
 # Carga masiva de catálogo (servicios + productos) desde Excel — SuperAdmin
 from app.api.internal.creator.catalog_import.router import router as creator_catalog_import_router
 app.include_router(creator_catalog_import_router, prefix="/api/internal/creator", tags=["Creator - Carga masiva de catálogo"])
+
+from app.api.internal.creator.telemetry.router import router as creator_telemetry_router
+app.include_router(creator_telemetry_router, prefix="/api/internal/creator/telemetry", tags=["Creator - Telemetría"])
+
+from app.api.internal.telemetry.router import router as telemetry_router
+app.include_router(telemetry_router, prefix="/api/internal/telemetry", tags=["Telemetría"])
 
 # ===== API v1 - Public Endpoints =====
 

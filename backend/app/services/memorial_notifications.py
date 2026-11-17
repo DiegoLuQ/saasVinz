@@ -423,6 +423,9 @@ async def check_and_send_anniversary_reminders(db: Session) -> dict:
             db.commit()
 
             sent_count += 1
+            from app.services.email import BATCH_EMAIL_DELAY_SECONDS
+            if BATCH_EMAIL_DELAY_SECONDS > 0:
+                await asyncio.sleep(BATCH_EMAIL_DELAY_SECONDS)
         except Exception as e:
             logger.error(f"Error enviando correo de aniversario de memorial {memorial.id}: {e}")
 
@@ -431,10 +434,14 @@ async def check_and_send_anniversary_reminders(db: Session) -> dict:
 
 import asyncio
 
+MEMORIAL_ADVISORY_LOCK_ID = 815003  # backups 815001, saldo IA 815002, google_review 815004
+
+
 async def memorial_anniversary_scheduler_loop() -> None:
     """Revisa periodicamente si es horario de manana (09:00 - 12:00 CLT) para enviar aniversarios."""
     while True:
         try:
+            from sqlalchemy import text
             from app.database import SessionLocal
             from app.core.tenant_context import apply_bypass_rls
             now_dt = tz.get_now()
@@ -442,9 +449,14 @@ async def memorial_anniversary_scheduler_loop() -> None:
                 db = SessionLocal()
                 try:
                     apply_bypass_rls(db)
-                    await check_and_send_anniversary_reminders(db)
-                    from app.services.memorial_expiry import send_expiry_notices
-                    await send_expiry_notices(db)
+                    if db.execute(text("SELECT pg_try_advisory_lock(:id)"), {"id": MEMORIAL_ADVISORY_LOCK_ID}).scalar():
+                        try:
+                            await check_and_send_anniversary_reminders(db)
+                            from app.services.memorial_expiry import send_expiry_notices
+                            await send_expiry_notices(db)
+                        finally:
+                            db.execute(text("SELECT pg_advisory_unlock(:id)"), {"id": MEMORIAL_ADVISORY_LOCK_ID})
+                            db.commit()
                 finally:
                     db.close()
         except Exception as e:

@@ -180,6 +180,9 @@ def get_tracking_info(
         if isinstance(tenant.social_media, dict):
             tenant_website = tenant.social_media.get("website") or tenant.social_media.get("instagram")
 
+        from app.services.tracking_templates import resolve_tracking_template, resolve_tracking_template_config
+        active_tpl = resolve_tracking_template(db, tenant)
+
         return schemas.PublicTrackingResponse(
             timezone=tenant.timezone or "America/Santiago",
             pet_images=_tracking_photos(None, submission.images),
@@ -201,6 +204,8 @@ def get_tracking_info(
             tenant_plan=(getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper(),
             show_vinzer_brand=_show_brand(tenant),
             souvenir_store_url=_store_url(db, tenant, token),
+            tracking_template=active_tpl,
+            tracking_template_config=resolve_tracking_template_config(db, active_tpl),
         )
 
     # 3. Validar Nombre de Mascota (Seguridad Adicional + UX)
@@ -288,6 +293,9 @@ def get_tracking_info(
     delivered = cremation.status in ("entregado", "completado")
     fb = db.query(models.ServiceFeedback).filter(models.ServiceFeedback.cremation_id == cremation.id).first() if delivered else None
 
+    from app.services.tracking_templates import resolve_tracking_template, resolve_tracking_template_config
+    active_tpl = resolve_tracking_template(db, tenant)
+
     return schemas.PublicTrackingResponse(
         timezone=tenant.timezone or "America/Santiago",
         verification_code=cremation.verification_code,
@@ -314,6 +322,8 @@ def get_tracking_info(
         feedback_enabled=delivered and feature_on(tenant),
         feedback={"rating": fb.rating, "comment": fb.comment} if fb else None,
         souvenir_store_url=_store_url(db, tenant, token),
+        tracking_template=active_tpl,
+        tracking_template_config=resolve_tracking_template_config(db, active_tpl),
     )
 
 

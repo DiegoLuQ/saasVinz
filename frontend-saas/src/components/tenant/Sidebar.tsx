@@ -41,6 +41,7 @@ import { apiRequest, API_URL } from '@/lib/tenant/api';
 import { useSidebar } from '@/app/(tenant)/tenant/context/SidebarContext';
 import { useSessionBootstrap } from '@/hooks/useSessionBootstrap';
 import { useFeatures } from '@/hooks/useFeatures';
+import { recordSidebarClick } from '@/lib/tenant/moduleTelemetry';
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -160,6 +161,8 @@ export default function Sidebar() {
         .map(m => m.module_key) || [];
     const pendingSubmissionsCount = bootstrapData?.metadata?.pending_submissions ?? 0;
     const pendingProductRequests = bootstrapData?.metadata?.pending_product_requests ?? 0;
+    const opsInProgress = bootstrapData?.metadata?.ops_in_progress ?? 0;
+    const isTrackingEnabled = Boolean(bootstrapData?.metadata?.module_tracking_enabled);
 
     // Estado de suscripción: si está en lockdown (post-gracia), todos los módulos
     // excepto los permitidos se muestran con candado.
@@ -355,6 +358,7 @@ export default function Sidebar() {
                                 {hasChildren ? (
                                     <button
                                         onClick={() => {
+                                            recordSidebarClick(item.moduleKey, isTrackingEnabled);
                                             // Colapsado: abre el menú y despliega el grupo
                                             if (collapsed) { toggleSidebar(); setExpandedItem(item.name); }
                                             else toggleSubmenu(item.name);
@@ -388,6 +392,7 @@ export default function Sidebar() {
                                 ) : (
                                     <Link
                                         href={item.href}
+                                        onClick={() => recordSidebarClick(item.moduleKey, isTrackingEnabled)}
                                         title={collapsed ? item.name : undefined}
                                         className={cn(
                                             "flex items-center p-2.5 rounded-xl transition-all duration-200 group relative text-xs",
@@ -409,13 +414,15 @@ export default function Sidebar() {
                                                 </motion.span>
                                             )}
                                         </div>
-                                        {/* Pendientes: ámbar = registros del formulario, celeste = solicitudes de productos del catálogo */}
+                                        {/* Pendientes: ámbar = registros del formulario, celeste = solicitudes de productos del catálogo, naranja = órdenes en proceso */}
                                         {(() => {
                                             const badges: { n: number; title: string; cls: string }[] = [];
                                             if (item.href === '/dashboard' && pendingSubmissionsCount > 0)
                                                 badges.push({ n: pendingSubmissionsCount, title: `${pendingSubmissionsCount} registro(s) del formulario pendiente(s)`, cls: 'bg-amber-500 text-slate-950' });
                                             if ((item.href === '/dashboard' || item.href === '/dashboard/solicitudes-productos') && pendingProductRequests > 0)
                                                 badges.push({ n: pendingProductRequests, title: `${pendingProductRequests} solicitud(es) de productos pendiente(s)`, cls: 'bg-sky-300 text-slate-950 ring-1 ring-sky-500/40' });
+                                            if (item.href === '/dashboard/operaciones/lista' && opsInProgress > 0)
+                                                badges.push({ n: opsInProgress, title: `${opsInProgress} orden(es) en proceso`, cls: 'bg-orange-400 text-slate-950' });
                                             if (!badges.length) return null;
                                             return collapsed ? (
                                                 <span className="absolute top-1 right-1 flex flex-col gap-0.5">
@@ -458,6 +465,7 @@ export default function Sidebar() {
                                                         <Link
                                                             key={child.href}
                                                             href={child.href}
+                                                            onClick={() => recordSidebarClick(item.moduleKey, isTrackingEnabled)}
                                                             className={cn(
                                                                 "flex items-center py-1.5 px-2.5 rounded-lg text-xs transition-colors",
                                                                 isChildActive

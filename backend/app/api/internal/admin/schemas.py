@@ -469,6 +469,8 @@ class SaaSConfigBase(BaseModel):
     whatsapp: Optional[str] = None
     correo: Optional[str] = None
     notification_email: Optional[str] = None
+    default_tracking_template: Optional[str] = "classic"
+    module_tracking_enabled: Optional[bool] = False
     redes_sociales: List[dict] = []
     imagenes: List[str] = []
 
@@ -490,6 +492,8 @@ class SaaSConfigUpdate(BaseModel):
     whatsapp: Optional[str] = None
     correo: Optional[str] = None
     notification_email: Optional[str] = None
+    default_tracking_template: Optional[str] = None
+    module_tracking_enabled: Optional[bool] = None
     redes_sociales: Optional[List[dict]] = None
     imagenes: Optional[List[str]] = None
 
@@ -601,6 +605,7 @@ class AnnouncementInDB(AnnouncementBase):
     target_plan_id: Optional[int] = None
     created_at: datetime
     target_plan: Optional[SubscriptionPlanInDB] = None
+    views_count: int = 0
     model_config = {"from_attributes": True}
 
 # Farewell Template
@@ -710,6 +715,8 @@ class BootstrapMetadata(BaseModel):
     unread_notifications: int = 0
     pending_submissions: int = 0
     pending_product_requests: int = 0  # carrito del catálogo (services/product_requests.py)
+    ops_in_progress: int = 0  # órdenes «En proceso» del Panel de Trabajo (badge del Sidebar)
+    module_tracking_enabled: bool = False  # Telemetría de módulos activa/inactiva para el Sidebar
     total_commission_pending: float = 0.0 # Added for Veterinary
     total_commission_paid: float = 0.0 # Veterinary: total histórico pagado
     active_links_count: int = 0 # Added for Veterinary

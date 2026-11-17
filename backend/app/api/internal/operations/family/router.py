@@ -256,3 +256,57 @@ def list_review_emails(
     if not gr.feature_on(tenant):
         raise HTTPException(status_code=403, detail="Las reseñas en Google no están incluidas en tu plan")
     return gr.tenant_list(db, tenant, state or None, days=max(1, min(days, 90)))
+
+
+class TrackingDesignUpdate(BaseModel):
+    tracking_template: Optional[str] = None
+
+
+def _tracking_design_out(db: Session, tenant: models.Tenant) -> dict:
+    from app.services import tracking_templates as tt
+    global_default = tt.get_global_default_template(db)
+    available = tt.can_customize_tracking_design(tenant)
+    active = tt.resolve_tracking_template(db, tenant)
+    return {
+        "active_template": active,
+        "tenant_template": getattr(tenant, "tracking_template", None),
+        "global_default": global_default,
+        "available": available,
+        "templates": tt.get_template_catalog(db, tenant),
+    }
+
+
+@router.get("/tracking-design-config")
+def get_tracking_design_config(
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Configuración del diseño visual de la página pública de seguimiento."""
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    return _tracking_design_out(db, tenant)
+
+
+@router.put("/tracking-design-config")
+def update_tracking_design_config(
+    data: TrackingDesignUpdate,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    current_user: models.User = Depends(get_current_user),
+):
+    from app.services import tracking_templates as tt
+    if current_user.role not in (models.UserRole.admin, models.UserRole.creator):
+        raise HTTPException(status_code=403, detail="Solo el administrador puede cambiar esta configuración")
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not tt.can_customize_tracking_design(tenant):
+        raise HTTPException(
+            status_code=403,
+            detail="Personalizar la plantilla de seguimiento está disponible en planes PRO y ULTRA",
+        )
+    tpl = (data.tracking_template or "").strip().lower()
+    if tpl and tpl not in tt.VALID_TEMPLATES:
+        raise HTTPException(status_code=400, detail="Plantilla inválida")
+    tenant.tracking_template = tpl or None
+    db.commit()
+    db.refresh(tenant)
+    return _tracking_design_out(db, tenant)

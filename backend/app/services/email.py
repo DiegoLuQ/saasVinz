@@ -15,6 +15,8 @@ load_dotenv()
 # usa SSL directo; cualquier otro, STARTTLS. MAIL_FROM_NAME = nombre del remitente.
 _MAIL_PORT = int(os.getenv("MAIL_PORT", "587") or 587)
 MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "Vinzer") or "Vinzer"
+# Pausa entre correos en envíos masivos/programados para no saturar el SMTP (configurable vía .env).
+BATCH_EMAIL_DELAY_SECONDS = max(0.0, float(os.getenv("EMAIL_BATCH_DELAY_SECONDS", "1.5") or 1.5))
 
 
 def _mail_config(from_name: str) -> ConnectionConfig:
