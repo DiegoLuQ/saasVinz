@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 FEATURE_KEY = "configuracion:diseno_seguimiento"
 DEFAULT_TEMPLATE = "classic"
@@ -44,15 +45,45 @@ TEMPLATE_CATALOG = [
 ]
 
 
+def _has_table(db: Session, table_name: str) -> bool:
+    """Verifica en pg_class si una tabla existe sin lanzar excepción ni abortar la transacción."""
+    try:
+        res = db.execute(
+            text("SELECT 1 FROM pg_class WHERE relname = :t AND relkind = 'r'"),
+            {"t": table_name}
+        ).scalar()
+        return bool(res)
+    except Exception:
+        db.rollback()
+        return False
+
+
+def _has_column(db: Session, table_name: str, column_name: str) -> bool:
+    """Verifica en pg_attribute si una columna existe sin lanzar excepción ni abortar la transacción."""
+    try:
+        res = db.execute(
+            text(
+                "SELECT 1 FROM pg_attribute "
+                "WHERE attrelid = :t::regclass AND attname = :c AND NOT attisdropped"
+            ),
+            {"t": table_name, "c": column_name}
+        ).scalar()
+        return bool(res)
+    except Exception:
+        db.rollback()
+        return False
+
+
 def get_all_valid_template_slugs(db: Session) -> set[str]:
     """Retorna el conjunto de slugs de plantillas válidas (incorporadas + BD activas)."""
-    from app import models
-    from app.core.tenant_context import apply_bypass_rls
-
     valid = set(BUILTIN_TEMPLATES)
     valid.add("celestial")
+
+    if not _has_table(db, "sys_tracking_custom_templates"):
+        return valid
+
     try:
-        apply_bypass_rls(db)
+        from app import models
         custom_slugs = (
             db.query(models.TrackingCustomTemplate.slug)
             .filter(models.TrackingCustomTemplate.is_active == True)
@@ -62,7 +93,7 @@ def get_all_valid_template_slugs(db: Session) -> set[str]:
             if row[0]:
                 valid.add(row[0].strip().lower())
     except Exception:
-        pass
+        db.rollback()
     return valid
 
 
@@ -73,33 +104,54 @@ def normalize_template(db: Session, value: str | None, fallback: str = DEFAULT_T
 
 
 def get_global_default_template(db: Session) -> str:
-    from app import models
-    cfg = db.query(models.SaaSConfig).first()
-    raw = getattr(cfg, "default_tracking_template", None) if cfg else None
-    return normalize_template(db, raw, DEFAULT_TEMPLATE)
+    if not _has_table(db, "sys_saas_config") or not _has_column(db, "sys_saas_config", "default_tracking_template"):
+        return DEFAULT_TEMPLATE
+
+    try:
+        from app import models
+        cfg = db.query(models.SaaSConfig).first()
+        raw = getattr(cfg, "default_tracking_template", None) if cfg else None
+        return normalize_template(db, raw, DEFAULT_TEMPLATE)
+    except Exception:
+        db.rollback()
+        return DEFAULT_TEMPLATE
 
 
 def can_customize_tracking_design(tenant) -> bool:
-    from app.services.plan_features import tenant_has
-    return bool(tenant) and tenant_has(tenant, FEATURE_KEY)
+    try:
+        from app.services.plan_features import tenant_has
+        return bool(tenant) and tenant_has(tenant, FEATURE_KEY)
+    except Exception:
+        return False
 
 
 def get_tenant_plan_name(tenant) -> str:
     if not tenant:
         return ""
-    return (
-        getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "")
-        or getattr(tenant, "plan", "")
-        or ""
-    ).upper()
+    try:
+        return (
+            getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "")
+            or getattr(tenant, "plan", "")
+            or ""
+        ).upper()
+    except Exception:
+        return (getattr(tenant, "plan", "") or "").upper()
 
 
 def resolve_tracking_template(db: Session, tenant) -> str:
     global_default = get_global_default_template(db)
     if not tenant or not can_customize_tracking_design(tenant):
         return global_default
-    custom = getattr(tenant, "tracking_template", None)
-    return normalize_template(db, custom, global_default)
+
+    if not _has_column(db, "sys_tenants", "tracking_template"):
+        return global_default
+
+    try:
+        custom = getattr(tenant, "tracking_template", None)
+        return normalize_template(db, custom, global_default)
+    except Exception:
+        db.rollback()
+        return global_default
 
 
 def resolve_tracking_template_config(db: Session, template_slug: str) -> Optional[dict]:
@@ -107,33 +159,31 @@ def resolve_tracking_template_config(db: Session, template_slug: str) -> Optiona
     Busca la configuración visual completa de la plantilla (recursos, fondos, elemento y colores).
     Si es una plantilla personalizada o celestial, retorna su configuración dinámica.
     """
-    from app import models
-    from app.core.tenant_context import apply_bypass_rls
-
     slug = (template_slug or "").strip().lower()
     if slug in ("classic", "warm", "modern"):
         return None
 
-    try:
-        apply_bypass_rls(db)
-        tpl = (
-            db.query(models.TrackingCustomTemplate)
-            .filter(models.TrackingCustomTemplate.slug == slug)
-            .first()
-        )
-        if tpl:
-            return {
-                "name": tpl.name,
-                "slug": tpl.slug,
-                "element_url": tpl.element_url or "/tracking/elementos/alas_elemento.webp",
-                "background_mobile_url": tpl.background_mobile_url or "/tracking/fondos/movil/fondo_cielo_flores_1_9_16.webp",
-                "background_desktop_url": tpl.background_desktop_url or "/tracking/fondos/desktop/fondo_cielo_flores_1_16_9.webp",
-                "theme_config": tpl.theme_config or {},
-            }
-    except Exception:
-        pass
+    if _has_table(db, "sys_tracking_custom_templates"):
+        try:
+            from app import models
+            tpl = (
+                db.query(models.TrackingCustomTemplate)
+                .filter(models.TrackingCustomTemplate.slug == slug)
+                .first()
+            )
+            if tpl:
+                return {
+                    "name": tpl.name,
+                    "slug": tpl.slug,
+                    "element_url": tpl.element_url or "/tracking/elementos/alas_elemento.webp",
+                    "background_mobile_url": tpl.background_mobile_url or "/tracking/fondos/movil/fondo_cielo_flores_1_9_16.webp",
+                    "background_desktop_url": tpl.background_desktop_url or "/tracking/fondos/desktop/fondo_cielo_flores_1_16_9.webp",
+                    "theme_config": tpl.theme_config or {},
+                }
+        except Exception:
+            db.rollback()
 
-    # Respaldo celestial por defecto
+    # Respaldo celestial por defecto (hardcoded seguro si la tabla aún no existe)
     if slug == "celestial":
         return {
             "name": "Santuario Angelical / Celestial",
@@ -143,7 +193,10 @@ def resolve_tracking_template_config(db: Session, template_slug: str) -> Optiona
             "background_desktop_url": "/tracking/fondos/desktop/fondo_cielo_flores_1_16_9.webp",
             "theme_config": {
                 "accent_color": "#D97706",
-                "halo_style": "gold",
+                "title_color_light": "#3E2723",
+                "title_color_dark": "#FDF6E2",
+                "subtitle_color_light": "#78350F",
+                "subtitle_color_dark": "#FDE68A",
             },
         }
 
@@ -155,9 +208,6 @@ def get_template_catalog(db: Session, tenant=None) -> list[dict]:
     Genera el catálogo completo de plantillas disponibles para el selector del tenant.
     Evalúa si el plan del tenant tiene acceso a cada plantilla personalizada.
     """
-    from app import models
-    from app.core.tenant_context import apply_bypass_rls
-
     catalog = []
     # 1. Built-in
     for tpl in TEMPLATE_CATALOG:
@@ -170,40 +220,40 @@ def get_template_catalog(db: Session, tenant=None) -> list[dict]:
             "locked": False,
         })
 
-    # 2. Custom templates activas de la BD
-    try:
-        apply_bypass_rls(db)
-        custom_templates = (
-            db.query(models.TrackingCustomTemplate)
-            .filter(models.TrackingCustomTemplate.is_active == True)
-            .all()
-        )
-        tenant_plan = get_tenant_plan_name(tenant)
-
-        for c in custom_templates:
-            # Celestial is already in TEMPLATE_CATALOG, don't duplicate
-            if c.slug == "celestial":
-                continue
-
-            allowed_plans = [p.upper() for p in (c.allowed_plans or ["PRO", "ULTRA"])]
-            is_allowed = (
-                not tenant
-                or "ALL" in allowed_plans
-                or "TODOS" in allowed_plans
-                or tenant_plan in allowed_plans
+    # 2. Custom templates activas de la BD (si la tabla existe)
+    if _has_table(db, "sys_tracking_custom_templates"):
+        try:
+            from app import models
+            custom_templates = (
+                db.query(models.TrackingCustomTemplate)
+                .filter(models.TrackingCustomTemplate.is_active == True)
+                .all()
             )
+            tenant_plan = get_tenant_plan_name(tenant)
 
-            catalog.append({
-                "id": c.slug,
-                "name": c.name,
-                "description": c.description or "Plantilla visual personalizada de alta definición.",
-                "accent": (c.theme_config or {}).get("accent_color", "#D97706"),
-                "preview_image_url": c.preview_image_url or c.background_mobile_url,
-                "is_custom": True,
-                "locked": not is_allowed,
-                "required_plans": c.allowed_plans,
-            })
-    except Exception:
-        pass
+            for c in custom_templates:
+                if c.slug == "celestial":
+                    continue
+
+                allowed_plans = [p.upper() for p in (c.allowed_plans or ["PRO", "ULTRA"])]
+                is_allowed = (
+                    not tenant
+                    or "ALL" in allowed_plans
+                    or "TODOS" in allowed_plans
+                    or tenant_plan in allowed_plans
+                )
+
+                catalog.append({
+                    "id": c.slug,
+                    "name": c.name,
+                    "description": c.description or "Plantilla visual personalizada de alta definición.",
+                    "accent": (c.theme_config or {}).get("accent_color", "#D97706"),
+                    "preview_image_url": c.preview_image_url or c.background_mobile_url,
+                    "is_custom": True,
+                    "locked": not is_allowed,
+                    "required_plans": c.allowed_plans,
+                })
+        except Exception:
+            db.rollback()
 
     return catalog

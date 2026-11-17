@@ -100,8 +100,11 @@ def get_tracking_info(
     """
     Obtiene información de seguimiento utilizando Token Seguro + Slug + Nombre Mascota.
     """
-    # 1. Validar Tenant por Slug
-    tenant = db.query(models.Tenant).filter(models.Tenant.slug == slug).first()
+    # 1. Validar Tenant por Slug (con planes cargados para evitar queries perezosas posteriores)
+    tenant = db.query(models.Tenant).options(
+        joinedload(models.Tenant.subscription_plan),
+        joinedload(models.Tenant.demo_plan),
+    ).filter(models.Tenant.slug == slug).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Crematorio no encontrado")
 
@@ -180,8 +183,27 @@ def get_tracking_info(
         if isinstance(tenant.social_media, dict):
             tenant_website = tenant.social_media.get("website") or tenant.social_media.get("instagram")
 
-        from app.services.tracking_templates import resolve_tracking_template, resolve_tracking_template_config
-        active_tpl = resolve_tracking_template(db, tenant)
+        active_tpl = "classic"
+        tpl_config = None
+        try:
+            from app.services.tracking_templates import resolve_tracking_template, resolve_tracking_template_config
+            active_tpl = resolve_tracking_template(db, tenant)
+            tpl_config = resolve_tracking_template_config(db, active_tpl)
+        except Exception:
+            db.rollback()
+            active_tpl = "classic"
+            tpl_config = None
+
+        tenant_plan_name = ""
+        is_ultra = False
+        try:
+            plan_obj = getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None)
+            tenant_plan_name = (getattr(plan_obj, "name", "") or getattr(tenant, "plan", "") or "").upper()
+            is_ultra = _is_ultra(tenant)
+        except Exception:
+            db.rollback()
+            tenant_plan_name = (getattr(tenant, "plan", "") or "").upper()
+            is_ultra = "ULTRA" in tenant_plan_name
 
         return schemas.PublicTrackingResponse(
             timezone=tenant.timezone or "America/Santiago",
@@ -200,12 +222,12 @@ def get_tracking_info(
             tenant_social_media=tenant.social_media if isinstance(tenant.social_media, dict) else None,
             pet_dedication=pet_data.get("dedication"),
             farewell_template_config=farewell_tpl.config if farewell_tpl else None,
-            is_ultra_plan=_is_ultra(tenant),
-            tenant_plan=(getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper(),
+            is_ultra_plan=is_ultra,
+            tenant_plan=tenant_plan_name,
             show_vinzer_brand=_show_brand(tenant),
             souvenir_store_url=_store_url(db, tenant, token),
             tracking_template=active_tpl,
-            tracking_template_config=resolve_tracking_template_config(db, active_tpl),
+            tracking_template_config=tpl_config,
         )
 
     # 3. Validar Nombre de Mascota (Seguridad Adicional + UX)
@@ -293,8 +315,27 @@ def get_tracking_info(
     delivered = cremation.status in ("entregado", "completado")
     fb = db.query(models.ServiceFeedback).filter(models.ServiceFeedback.cremation_id == cremation.id).first() if delivered else None
 
-    from app.services.tracking_templates import resolve_tracking_template, resolve_tracking_template_config
-    active_tpl = resolve_tracking_template(db, tenant)
+    active_tpl = "classic"
+    tpl_config = None
+    try:
+        from app.services.tracking_templates import resolve_tracking_template, resolve_tracking_template_config
+        active_tpl = resolve_tracking_template(db, tenant)
+        tpl_config = resolve_tracking_template_config(db, active_tpl)
+    except Exception:
+        db.rollback()
+        active_tpl = "classic"
+        tpl_config = None
+
+    tenant_plan_name = ""
+    is_ultra = False
+    try:
+        plan_obj = getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None)
+        tenant_plan_name = (getattr(plan_obj, "name", "") or getattr(tenant, "plan", "") or "").upper()
+        is_ultra = _is_ultra(tenant)
+    except Exception:
+        db.rollback()
+        tenant_plan_name = (getattr(tenant, "plan", "") or "").upper()
+        is_ultra = "ULTRA" in tenant_plan_name
 
     return schemas.PublicTrackingResponse(
         timezone=tenant.timezone or "America/Santiago",
@@ -316,14 +357,14 @@ def get_tracking_info(
         pet_dedication=((cremation.details.dedication if cremation.details else None) or None),
         farewell_template_config=farewell_tpl.config if farewell_tpl else None,
         ai_design=_resolve_pet_ai_design(db, tenant, pet),
-        is_ultra_plan=_is_ultra(tenant),
-        tenant_plan=(getattr(getattr(tenant, "effective_plan", None) or getattr(tenant, "subscription_plan", None), "name", "") or getattr(tenant, "plan", "") or "").upper(),
+        is_ultra_plan=is_ultra,
+        tenant_plan=tenant_plan_name,
         show_vinzer_brand=_show_brand(tenant),
         feedback_enabled=delivered and feature_on(tenant),
         feedback={"rating": fb.rating, "comment": fb.comment} if fb else None,
         souvenir_store_url=_store_url(db, tenant, token),
         tracking_template=active_tpl,
-        tracking_template_config=resolve_tracking_template_config(db, active_tpl),
+        tracking_template_config=tpl_config,
     )
 
 
@@ -374,6 +415,7 @@ def _resolve_pet_ai_design(db: Session, tenant: models.Tenant, pet: models.Pet) 
                 id=ill_exp.id, kind="illustration", title=ill_exp.title, url=ill_exp.media_url
             )
     except Exception:
+        db.rollback()
         return None
     return None
 
@@ -383,6 +425,7 @@ def _store_url(db, tenant, ref=None):
     try:
         return with_ref(store_url(db, tenant), ref)
     except Exception:
+        db.rollback()
         return None
 
 
