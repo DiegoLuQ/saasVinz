@@ -64,8 +64,9 @@ def _has_column(db: Session, table_name: str, column_name: str) -> bool:
     try:
         res = db.execute(
             text(
-                "SELECT 1 FROM pg_attribute "
-                "WHERE attrelid = :t::regclass AND attname = :c AND NOT attisdropped"
+                "SELECT 1 FROM pg_attribute a "
+                "JOIN pg_class c ON c.oid = a.attrelid "
+                "WHERE c.relname = :t AND a.attname = :c AND NOT a.attisdropped"
             ),
             {"t": table_name, "c": column_name}
         ).scalar()

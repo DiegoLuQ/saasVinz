@@ -1979,14 +1979,22 @@ export default function TrackingPage() {
                         </div>
                     )}
 
-                    <div className={`inline-flex items-center gap-2 px-5 py-2 rounded-full border shadow-xs transition-colors duration-500 ${theme.footerTag}`}>
-                        <div className="w-2 h-2 rounded-full bg-sky-500 animate-pulse" />
+                    <div className={`inline-flex items-center gap-2 px-5 py-2 rounded-full border shadow-sm transition-colors duration-500 ${
+                        isDarkMode
+                            ? 'bg-[#16120e]/90 border-amber-400/40 text-amber-300 backdrop-blur-md shadow-[0_4px_16px_rgba(0,0,0,0.6)]'
+                            : 'bg-white/95 border-amber-300/80 text-amber-950 backdrop-blur-md shadow-xs'
+                    }`}>
+                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                         <span className="font-outfit text-[11px] font-black uppercase tracking-[0.2em]">
                             {isUltraDelivered ? 'Homenaje y Custodia' : 'Seguimiento en Vivo'}
                         </span>
                     </div>
                     <div className="flex flex-col items-center gap-2">
-                        <p className={`font-outfit text-[11px] uppercase font-bold tracking-[0.24em] transition-colors duration-500 ${isDarkMode ? 'text-neutral-500' : 'text-slate-400'}`}>
+                        <p className={`font-outfit text-xs uppercase font-extrabold tracking-[0.24em] transition-colors duration-500 ${
+                            isDarkMode 
+                                ? 'text-amber-100/95 drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]' 
+                                : 'text-amber-950/85 drop-shadow-xs'
+                        }`}>
                             © {new Date().getFullYear()} {data.tenant_name}
                         </p>
                         {/* Marca Vinzer: solo en planes sin marca blanca (por defecto FREE). */}
@@ -1994,19 +2002,21 @@ export default function TrackingPage() {
                             <a href={vinzerPromoUrl('seguimiento')} target="_blank" rel="noopener noreferrer"
                                 className={`mt-0.5 inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1 text-[11px] font-outfit font-medium transition-all duration-300 ${
                                     isDarkMode 
-                                        ? 'border-white/10 bg-[#0f1a35]/60 text-neutral-400 hover:text-white hover:border-[#38BDF8]/40' 
-                                        : 'border-slate-200 bg-white/80 text-slate-600 hover:text-slate-900 hover:border-[#0EA5E9]/40 shadow-2xs'
+                                        ? 'border-white/20 bg-[#0f1a35]/80 text-slate-200 hover:text-white hover:border-amber-400/60 shadow-md' 
+                                        : 'border-slate-300 bg-white/90 text-slate-700 hover:text-slate-900 hover:border-amber-400/60 shadow-xs'
                                 }`}>
                                 <span>Seguimiento creado con</span>
-                                <span className="font-black text-[#0284C7] dark:text-[#38BDF8] tracking-wide">Vinzer</span>
-                                <span className="opacity-60">· software para crematorios</span>
+                                <span className="font-black text-amber-600 dark:text-amber-400 tracking-wide">Vinzer</span>
+                                <span className="opacity-80">· software para crematorios</span>
                             </a>
                         )}
                     </div>
 
-                    {/* Firma Vinzer: sutil y en todos los planes (la marca blanca solo quita el aviso de arriba). */}
+                    {/* Firma Vinzer: sutil y con alto contraste en ambos modos (sin celeste) */}
                     <div className="mt-6 flex flex-col items-center gap-3">
-                        <div className={`h-px w-24 bg-gradient-to-r from-transparent ${isDarkMode ? 'via-neutral-800' : 'via-slate-300'} to-transparent`} />
+                        <div className={`h-px w-28 bg-gradient-to-r from-transparent ${
+                            isDarkMode ? 'via-amber-200/40' : 'via-amber-900/30'
+                        } to-transparent`} />
                         <a
                             href={vinzerPromoUrl('seguimiento')}
                             target="_blank"
@@ -2014,13 +2024,19 @@ export default function TrackingPage() {
                             aria-label="Con tecnología de Vinzer, software para crematorios"
                             className="group inline-flex items-center gap-2 transition-all duration-300 py-1"
                         >
-                            <span className={`font-outfit text-[10px] uppercase tracking-[0.26em] font-semibold transition-colors duration-300 ${
-                                isDarkMode ? 'text-neutral-500 group-hover:text-neutral-300' : 'text-slate-400 group-hover:text-slate-600'
+                            <span className={`font-outfit text-[11px] uppercase tracking-[0.26em] font-bold transition-colors duration-300 ${
+                                isDarkMode 
+                                    ? 'text-amber-100/90 group-hover:text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.95)]' 
+                                    : 'text-amber-950/80 group-hover:text-amber-950 drop-shadow-xs'
                             }`}>
                                 Con tecnología de
                             </span>
-                            <span className="font-outfit text-[13px] font-black tracking-wide text-[#0284C7] dark:text-[#38BDF8] group-hover:text-[#0EA5E9] dark:group-hover:text-[#00D2FF] transition-colors inline-flex items-center drop-shadow-xs">
-                                Vinzer<span className="text-[#0284C7] dark:text-[#38BDF8] group-hover:text-[#0EA5E9] dark:group-hover:text-[#00D2FF]">.</span>
+                            <span className={`font-outfit text-[14px] font-black tracking-wide transition-colors inline-flex items-center ${
+                                isDarkMode
+                                    ? 'text-amber-400 group-hover:text-amber-300 drop-shadow-[0_0_12px_rgba(251,191,36,0.6)]'
+                                    : 'text-amber-700 group-hover:text-amber-800 drop-shadow-xs'
+                            }`}>
+                                Vinzer<span className={isDarkMode ? 'text-amber-400' : 'text-amber-700'}>.</span>
                             </span>
                         </a>
                     </div>
