@@ -95,9 +95,10 @@ def update_saas_config(
     
     update_data = config_update.model_dump(exclude_unset=True)
     if "default_tracking_template" in update_data:
-        from app.services.tracking_templates import VALID_TEMPLATES
+        from app.services.tracking_templates import get_all_valid_template_slugs, VALID_TEMPLATES
         tpl = (update_data["default_tracking_template"] or "").strip().lower()
-        if tpl not in VALID_TEMPLATES:
+        valid = get_all_valid_template_slugs(db)
+        if tpl not in valid and tpl not in VALID_TEMPLATES:
             raise HTTPException(status_code=400, detail="Plantilla de seguimiento inválida")
         update_data["default_tracking_template"] = tpl
     for field, value in update_data.items():

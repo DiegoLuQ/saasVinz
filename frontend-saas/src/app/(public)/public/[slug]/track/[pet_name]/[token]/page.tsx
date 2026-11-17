@@ -933,38 +933,90 @@ export default function TrackingPage() {
                         className="mb-14 text-center"
                     >
                         <div className="relative inline-block mb-12 mt-6">
-                            {/* Marco conmemorativo: resplandor, aro dorado, halo, alas y anillo de destellos */}
+                            {/* Marco conmemorativo: resplandor, aro dorado degradado, halo perfectamente centrado y destellos */}
                             <div aria-hidden="true" className={`absolute -inset-10 rounded-full blur-2xl ${isDarkMode ? 'bg-amber-200/10' : 'bg-amber-100/80'}`} />
-                            <div aria-hidden="true" className={`absolute -inset-[22px] rounded-full border border-dashed memorial-dash ${isDarkMode ? 'border-amber-200/25' : 'border-amber-400/40'}`}>
-                                {[0, 60, 120, 180, 240, 300].map((deg) => (
-                                    <Sparkles key={deg} size={10} className="absolute top-1/2 left-1/2 -ml-[5px] -mt-[5px] text-amber-400"
-                                        style={{ transform: `rotate(${deg}deg) translateY(-118px) rotate(-${deg}deg)` }} />
-                                ))}
+
+                            {/* Floating luminous Halo - Geometría elíptica perfecta centrada horizontalmente */}
+                            <div className="absolute -top-7 sm:-top-8 left-0 right-0 flex justify-center z-20 pointer-events-none">
+                                {/* Resplandor difuso ambiental detrás de la aureola */}
+                                <div
+                                    aria-hidden="true"
+                                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-36 h-12 rounded-full bg-amber-300/35 blur-md pointer-events-none"
+                                />
+                                <svg
+                                    viewBox="0 0 160 44"
+                                    className="memorial-halo w-32 sm:w-36 h-auto overflow-visible relative"
+                                    style={{
+                                        filter: 'drop-shadow(0 0 10px rgba(251, 191, 36, 0.95)) drop-shadow(0 0 22px rgba(245, 158, 11, 0.7))'
+                                    }}
+                                >
+                                    <defs>
+                                        <linearGradient id="classic-halo-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" stopColor="#FEF08A" />
+                                            <stop offset="20%" stopColor="#FBBF24" />
+                                            <stop offset="50%" stopColor="#F59E0B" />
+                                            <stop offset="80%" stopColor="#FBBF24" />
+                                            <stop offset="100%" stopColor="#FEF08A" />
+                                        </linearGradient>
+                                    </defs>
+                                    <ellipse
+                                        cx="80"
+                                        cy="22"
+                                        rx="62"
+                                        ry="14"
+                                        fill="none"
+                                        stroke="url(#classic-halo-grad)"
+                                        strokeWidth="4.5"
+                                    />
+                                </svg>
                             </div>
-                            <div aria-hidden="true" className="absolute -inset-[7px] rounded-full memorial-ring" />
-                            <div aria-hidden="true" className="memorial-halo absolute left-1/2 -top-10 z-20 w-24 h-6 rounded-[50%] border-[3px] border-amber-300 shadow-[0_0_18px_rgba(252,211,77,0.9),inset_0_0_8px_rgba(252,211,77,0.6)]" />
-                            <AngelWings className={`absolute top-1/2 -translate-y-1/2 -left-24 w-20 h-20 -scale-x-100 hidden sm:block ${isDarkMode ? 'text-amber-100/40' : 'text-amber-500/50'}`} />
-                            <AngelWings className={`absolute top-1/2 -translate-y-1/2 -right-24 w-20 h-20 hidden sm:block ${isDarkMode ? 'text-amber-100/40' : 'text-amber-500/50'}`} />
-                            {/* Main Hero: Pet Photo */}
-                            <div className={`w-48 h-48 mx-auto rounded-full flex items-center justify-center border-[6px] overflow-hidden group relative z-10 transition-all duration-500 ${theme.petPhotoBorder} ${theme.petPhotoShadow}`}>
-                                {petPhotos.length > 0 ? (
-                                    <AnimatePresence initial={false}>
-                                        <motion.img
-                                            key={petPhotos[photoIdx % petPhotos.length]}
-                                            src={getImageUrl(petPhotos[photoIdx % petPhotos.length]) || ''}
-                                            alt={data.pet_name}
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            exit={{ opacity: 0 }}
-                                            transition={{ duration: 1.2 }}
-                                            className="absolute inset-0 w-full h-full object-cover transition-transform group-hover:scale-105 duration-700"
-                                        />
-                                    </AnimatePresence>
-                                ) : (
-                                    <div className="w-full h-full bg-sky-50 flex items-center justify-center">
-                                        <PawPrint size={64} className="text-sky-200" />
-                                    </div>
-                                )}
+
+                            {/* Aro exterior punteado/discontinuo con 8 estrellitas doradas (exacto a la referencia) */}
+                            <div
+                                aria-hidden="true"
+                                className="absolute -inset-4 sm:-inset-5 rounded-full border border-dashed border-amber-300/70 pointer-events-none z-10"
+                            >
+                                <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-amber-400 text-xs select-none">✦</span>
+                                <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-amber-400 text-xs select-none">✦</span>
+                                <span className="absolute top-1/2 -left-2 -translate-y-1/2 text-amber-400 text-xs select-none">✦</span>
+                                <span className="absolute top-1/2 -right-2 -translate-y-1/2 text-amber-400 text-xs select-none">✦</span>
+                                <span className="absolute top-[10%] left-[10%] text-amber-400/90 text-xs select-none">✦</span>
+                                <span className="absolute top-[10%] right-[10%] text-amber-400/90 text-xs select-none">✦</span>
+                                <span className="absolute bottom-[10%] left-[10%] text-amber-400/90 text-xs select-none">✦</span>
+                                <span className="absolute bottom-[10%] right-[10%] text-amber-400/90 text-xs select-none">✦</span>
+                            </div>
+
+                            {/* Alas de ángel decorativas laterales */}
+                            <AngelWings className={`absolute top-1/2 -translate-y-1/2 -left-20 sm:-left-24 w-20 h-20 -scale-x-100 hidden sm:block pointer-events-none ${isDarkMode ? 'text-amber-100/40' : 'text-amber-500/50'}`} />
+                            <AngelWings className={`absolute top-1/2 -translate-y-1/2 -right-20 sm:-right-24 w-20 h-20 hidden sm:block pointer-events-none ${isDarkMode ? 'text-amber-100/40' : 'text-amber-500/50'}`} />
+
+                            {/* Main Hero: Pet Photo - Marco Relicario con Degradado Dorado Continuo */}
+                            <div
+                                className="w-44 h-44 sm:w-48 sm:h-48 mx-auto rounded-full p-[6px] sm:p-[7px] relative z-10 shadow-[0_12px_32px_rgba(217,119,6,0.35)]"
+                                style={{
+                                    background: 'linear-gradient(180deg, #FDE68A 0%, #FBBF24 20%, #F59E0B 50%, #D97706 80%, #B45309 100%)',
+                                }}
+                            >
+                                <div className="w-full h-full rounded-full ring-[3px] ring-white overflow-hidden relative bg-white group flex items-center justify-center">
+                                    {petPhotos.length > 0 ? (
+                                        <AnimatePresence initial={false}>
+                                            <motion.img
+                                                key={petPhotos[photoIdx % petPhotos.length]}
+                                                src={getImageUrl(petPhotos[photoIdx % petPhotos.length]) || ''}
+                                                alt={data.pet_name}
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                exit={{ opacity: 0 }}
+                                                transition={{ duration: 1.2 }}
+                                                className="absolute inset-0 w-full h-full object-cover transition-transform group-hover:scale-105 duration-700"
+                                            />
+                                        </AnimatePresence>
+                                    ) : (
+                                        <div className="w-full h-full bg-amber-50 flex items-center justify-center">
+                                            <PawPrint size={56} className="text-amber-300" />
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Puntos para elegir la foto (solo con 2 o más) */}
@@ -984,16 +1036,18 @@ export default function TrackingPage() {
                                 </div>
                             )}
 
-                            {/* Corner Badge: Tenant Logo */}
-                            <div className={`absolute -bottom-2 -right-2 z-20 w-16 h-16 rounded-full border-4 shadow-lg overflow-hidden flex items-center justify-center transition-all duration-500 ${theme.tenantLogoBg}`}>
+                            {/* Badge: Logo del Crematorio Blanco Limpio SIN BORDE con Sombra */}
+                            <div className="absolute -bottom-2 -right-2 sm:-right-3 z-20 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white shadow-xl p-2 flex items-center justify-center overflow-hidden transition-transform hover:scale-105">
                                 {data.tenant_logo ? (
                                     <img
                                         src={getImageUrl(data.tenant_logo) || ''}
                                         alt={data.tenant_name}
-                                        className="w-full h-full object-cover"
+                                        className="w-full h-full object-contain rounded-full"
                                     />
                                 ) : (
-                                    <Building2 size={24} className="text-gray-300" />
+                                    <span className="text-teal-600 font-black text-2xl leading-none select-none">
+                                        ∞
+                                    </span>
                                 )}
                             </div>
                         </div>

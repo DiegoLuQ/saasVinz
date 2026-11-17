@@ -304,7 +304,8 @@ def update_tracking_design_config(
             detail="Personalizar la plantilla de seguimiento está disponible en planes PRO y ULTRA",
         )
     tpl = (data.tracking_template or "").strip().lower()
-    if tpl and tpl not in tt.VALID_TEMPLATES:
+    valid_slugs = tt.get_all_valid_template_slugs(db)
+    if tpl and tpl not in valid_slugs and tpl not in getattr(tt, "VALID_TEMPLATES", ()):
         raise HTTPException(status_code=400, detail="Plantilla inválida")
     tenant.tracking_template = tpl or None
     db.commit()

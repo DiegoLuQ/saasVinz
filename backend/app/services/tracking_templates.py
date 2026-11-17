@@ -16,6 +16,7 @@ from sqlalchemy import text
 FEATURE_KEY = "configuracion:diseno_seguimiento"
 DEFAULT_TEMPLATE = "classic"
 BUILTIN_TEMPLATES = ("classic", "warm", "modern")
+VALID_TEMPLATES = ("classic", "warm", "modern", "celestial")
 
 TEMPLATE_CATALOG = [
     {
