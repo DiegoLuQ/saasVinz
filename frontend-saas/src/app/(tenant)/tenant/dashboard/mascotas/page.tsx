@@ -43,6 +43,7 @@ import QuickCustomerModal from '@/components/tenant/crm/QuickCustomerModal';
 import PetDateInput from '@/components/tenant/crm/PetDateInput';
 import PetPhotosDownload from '@/components/tenant/crm/PetPhotosDownload';
 import { asPrecision, formatPetDate } from '@/lib/petDates';
+import { formatTitleCaseName } from '@/lib/formatters';
 
 interface Pet {
     id: number;
@@ -221,8 +222,8 @@ export default function PetsPage() {
             return;
         }
 
-        // Validación: Al menos 1 imagen
-        if (selectedImages.length === 0 && (!currentPet?.images || currentPet.images.length === 0)) {
+        // Validación: Al menos 1 imagen solo al registrar nueva mascota
+        if (!currentPet?.id && selectedImages.length === 0 && (!currentPet?.images || currentPet.images.length === 0)) {
             showToast('Debe subir al menos 1 imagen', 'error');
             return;
         }
@@ -250,6 +251,7 @@ export default function PetsPage() {
             // Sanitize optional fields to avoid empty string validation errors in the backend
             const sanitizedPet = {
                 ...currentPet,
+                name: formatTitleCaseName(currentPet?.name || '').trim(),
                 birth_date: currentPet?.birth_date && currentPet.birth_date !== '' ? currentPet.birth_date : null,
                 death_date: currentPet?.death_date && currentPet.death_date !== '' ? currentPet.death_date : null,
                 birth_date_precision: currentPet?.birth_date ? (currentPet.birth_date_precision || 'day') : 'day',
@@ -881,7 +883,8 @@ export default function PetsPage() {
                 maxWidth="max-w-4xl"
             >
                 <form onSubmit={handleSave} className="space-y-5">
-                    {/* Sección Fotografías */}
+                    {/* Sección Fotografías (solo al registrar nueva mascota; en edición no es necesaria) */}
+                    {!currentPet?.id && (
                     <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 dark:bg-white/[0.03] dark:border-white/10 space-y-3.5">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
@@ -989,6 +992,7 @@ export default function PetsPage() {
                             className="hidden"
                         />
                     </div>
+                    )}
 
                     {/* Bloque 1: Identificación y Tutor */}
                     <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 dark:bg-white/[0.03] dark:border-white/10 space-y-4">
@@ -1006,7 +1010,7 @@ export default function PetsPage() {
                                 <input
                                     required
                                     value={currentPet?.name || ''}
-                                    onChange={(e) => setCurrentPet({ ...currentPet, name: e.target.value })}
+                                    onChange={(e) => setCurrentPet({ ...currentPet, name: formatTitleCaseName(e.target.value) })}
                                     placeholder="Ej: Mía, Rocky..."
                                     className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-white/15 rounded-xl py-2.5 px-3.5 text-sm text-slate-900 dark:text-white outline-none focus:border-amber-500 transition-colors"
                                 />

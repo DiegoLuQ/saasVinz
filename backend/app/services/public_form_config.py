@@ -78,6 +78,64 @@ DEFAULT_WELCOME_MODAL: dict[str, Any] = {
 
 VIDEO_POSITIONS = ("start", "end")
 
+# ===== Orden y nombre de las fases (formularios personalizados) =====
+# Los ids internos nunca cambian (métricas, validación, resumen); cada formulario
+# personalizado puede reordenarlos y darles otro nombre visible. Sin `phase_order`
+# = orden clásico. «Resumen» siempre va al final y no se configura.
+PHASE_KEYS: tuple[str, ...] = ("familia", "angel", "camino", "recuerdos")
+PHASE_DEFAULT_NAMES = {"familia": "Familia", "angel": "Ángel", "camino": "Camino", "recuerdos": "Recuerdos"}
+MAX_PHASE_NAME = 24
+MAX_PHASE_PHRASE = 120
+
+
+def clean_phase_order(raw: Any) -> list[str] | None:
+    """Permutación válida de PHASE_KEYS (las que falten se agregan al final en orden clásico).
+    «Camino» siempre después de «Ángel»: el tamaño elegido ahí define los precios.
+    None si no se configuró o queda igual al clásico."""
+    if not isinstance(raw, list):
+        return None
+    order: list[str] = []
+    for k in raw:
+        if isinstance(k, str) and k in PHASE_KEYS and k not in order:
+            order.append(k)
+    order += [k for k in PHASE_KEYS if k not in order]
+    if order.index("camino") < order.index("angel"):
+        order.remove("camino")
+        order.insert(order.index("angel") + 1, "camino")
+    return None if tuple(order) == PHASE_KEYS else order
+
+
+def clean_phase_labels(raw: Any) -> dict | None:
+    """{fase: {"name": ≤24, "phrase": ≤120}}; solo lo escrito (vacío = el de siempre)."""
+    if not isinstance(raw, dict):
+        return None
+    out: dict = {}
+    for k in PHASE_KEYS:
+        item = raw.get(k)
+        if not isinstance(item, dict):
+            continue
+        name = " ".join(str(item.get("name") or "").split())[:MAX_PHASE_NAME]
+        phrase = " ".join(str(item.get("phrase") or "").split())[:MAX_PHASE_PHRASE]
+        entry = {**({"name": name} if name else {}), **({"phrase": phrase} if phrase else {})}
+        if entry:
+            out[k] = entry
+    return out or None
+
+
+def form_phase_layout(raw: Any, form_id: str | None) -> tuple[list[str], dict[str, str]]:
+    """(orden de fases, nombre visible por fase) de un formulario; «main» = clásico."""
+    names = dict(PHASE_DEFAULT_NAMES)
+    if form_id and form_id != "main":
+        cfg = raw if isinstance(raw, dict) else {}
+        for cf in cfg.get("custom_forms") or []:
+            if isinstance(cf, dict) and str(cf.get("id") or "") == str(form_id):
+                order = clean_phase_order(cf.get("phase_order")) or list(PHASE_KEYS)
+                for k, v in (clean_phase_labels(cf.get("phase_labels")) or {}).items():
+                    if v.get("name"):
+                        names[k] = v["name"]
+                return order, names
+    return list(PHASE_KEYS), names
+
 
 def _int_or_none(v) -> int | None:
     try:
@@ -185,6 +243,9 @@ def normalize_form_config(raw: Any) -> dict:
                 "fields": cf_fields,
                 "welcome_modal": cf_welcome,
                 "associated_service_id": str(cf.get("associated_service_id") or "").strip() or None,
+                # Orden y nombre propio de las fases (None = clásico)
+                "phase_order": clean_phase_order(cf.get("phase_order")),
+                "phase_labels": clean_phase_labels(cf.get("phase_labels")),
                 # Tabla de precios (rangos de peso) de este formulario; None = la del formulario principal
                 "price_list_id": _int_or_none(cf.get("price_list_id")),
                 "created_at": cf.get("created_at"),

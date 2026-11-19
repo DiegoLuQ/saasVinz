@@ -13,6 +13,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, ClipboardList, ExternalLink, Gift, Layers, Loader2, Package, XCircle } from 'lucide-react';
 import { apiRequest } from '@/lib/tenant/api';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
+import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
 import {
     getOfficialLinks, saveOfficialLinks, OFFICIAL_LABELS, OFFICIAL_WHERE, type OfficialLinkKey,
 } from '@/lib/tenant/officialLinks';
@@ -29,6 +30,7 @@ const selectCls = 'w-full bg-white dark:bg-slate-950 border-2 border-slate-300 d
 
 export function OfficialLinksTab() {
     const { showToast } = useToast();
+    const { refreshTenantData } = useTenant();
     const queryClient = useQueryClient();
     const { data: status, isLoading } = useQuery({ queryKey: ['official-links'], queryFn: getOfficialLinks });
     const { data: plansLinks = [] } = useQuery({ queryKey: ['catalog-links', 'plans'], queryFn: () => listLinks('plans') });
@@ -55,6 +57,8 @@ export function OfficialLinksTab() {
                 products_token_id: products ? Number(products) : null,
             });
             queryClient.setQueryData(['official-links'], res);
+            // «Compartir formulario» (Navbar) lee el formulario oficial del bootstrap
+            refreshTenantData().catch(() => { });
             queryClient.invalidateQueries({ queryKey: ['catalog-links'] });
             showToast(res.complete ? 'Enlaces oficiales guardados. La tiendita de recuerdos está activa.' : 'Guardado. Aún faltan enlaces oficiales.', res.complete ? 'success' : 'info');
         } catch (e) {
@@ -112,10 +116,23 @@ export function OfficialLinksTab() {
             </div>
 
             {row('form', <ClipboardList size={16} className="text-primary" />, (
-                <select value={form} onChange={(e) => setForm(e.target.value)} className={selectCls}>
-                    <option value="">Sin elegir</option>
-                    {status.form_options.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                </select>
+                <>
+                    <select value={form} onChange={(e) => setForm(e.target.value)} className={selectCls}>
+                        <option value="">Sin elegir</option>
+                        {status.form_options.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                    </select>
+                    {status.form && (
+                        <p className="text-xs text-muted-foreground">
+                            Formulario oficial actual: <b className="text-foreground">{status.form.name}</b>
+                        </p>
+                    )}
+                    {status.form_options.length <= 1 && (
+                        <p className="text-xs text-muted-foreground">
+                            Las plantillas (como «Formulario Huella») aparecen aquí cuando creas un formulario con ellas:
+                            Configuración → Formulario y Pesos → Enlaces → «Crear desde plantilla».
+                        </p>
+                    )}
+                </>
             ))}
 
             {row('plans', <Layers size={16} className="text-primary" />, (

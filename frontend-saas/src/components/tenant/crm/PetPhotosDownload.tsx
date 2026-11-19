@@ -25,7 +25,7 @@ interface PhotosPage {
     items: PhotoItem[];
 }
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 5;
 
 async function downloadFile(path: string, fallbackName: string) {
     const res = await fetch(path, { headers: authHeader(), credentials: 'same-origin' });
@@ -43,7 +43,7 @@ async function downloadFile(path: string, fallbackName: string) {
     URL.revokeObjectURL(url);
 }
 
-/** Mascotas → «Fotos de mascotas»: buscar por mascota o dueño, 10 por página, descarga individual o ZIP. */
+/** Mascotas → «Fotos de mascotas»: buscar por mascota o dueño, 5 por página, descarga individual o ZIP. */
 export default function PetPhotosDownload() {
     const { showToast } = useToast();
     const [search, setSearch] = useState('');
@@ -96,7 +96,7 @@ export default function PetPhotosDownload() {
                 <div className="flex items-center gap-3">
                     <div className="p-2.5 rounded-2xl bg-primary/10 text-primary"><Images size={18} /></div>
                     <div>
-                        <h3 className="text-xl font-bold text-white">Fotos de mascotas</h3>
+                        <h3 className="text-xl font-bold text-slate-900 dark:text-white">Fotos de mascotas</h3>
                         <p className="text-xs text-muted-foreground">
                             {data ? `${total} foto${total === 1 ? '' : 's'} de ${data.pets} mascota${data.pets === 1 ? '' : 's'}` : 'Descarga las fotos de tus mascotas'}
                         </p>

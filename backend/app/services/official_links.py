@@ -65,11 +65,20 @@ def _valid_token(db: Session, tenant_id: int, token_id, kind: str):
 
 def form_options(tenant) -> list[dict]:
     cfg = normalize_form_config(tenant.form_config)
-    out = [{"id": "main", "name": "Formulario principal"}]
+    out = [{"id": "main", "name": "Formulario principal (Clásico)"}]
     for f in cfg.get("custom_forms", []) or []:
         if f.get("id"):
             out.append({"id": str(f["id"]), "name": f.get("name") or "Formulario personalizado"})
     return out
+
+
+def official_form_preset(tenant) -> str | None:
+    """Id del formulario personalizado elegido como oficial (None = el principal o ninguno).
+    Lo usan «Compartir formulario» y el botón «Solicitar este plan» del catálogo (?form=)."""
+    form = _config(tenant)["form"]
+    if not form or str(form) == "main":
+        return None
+    return str(form) if any(o["id"] == str(form) for o in form_options(tenant)) else None
 
 
 def status(db: Session, tenant) -> dict:
@@ -80,7 +89,7 @@ def status(db: Session, tenant) -> dict:
     products = _valid_token(db, tenant.id, cfg["products_token_id"], "products")
 
     def link(t):
-        return {"id": t.id, "name": t.name, "url": catalog_url(tenant.slug, t.token)} if t else None
+        return {"id": t.id, "name": t.name, "token": t.token, "url": catalog_url(tenant.slug, t.token)} if t else None
 
     missing = [k for k, v in (("form", form), ("plans", plans), ("products", products)) if not v]
     return {

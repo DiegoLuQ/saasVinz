@@ -94,14 +94,16 @@ def resolve_form_id(tenant, form: str | None) -> str:
     return "main"
 
 
-def official_form_id(tenant) -> str:
+def official_form_id(tenant) -> str | None:
     raw = tenant.official_links if isinstance(getattr(tenant, "official_links", None), dict) else {}
     form = raw.get("form")
-    if not form or str(form) == "main":
-        return "main"
+    if not form:
+        return None
     form = str(form)
+    if form == "main":
+        return form
     from app.services.official_links import form_options
-    return form if any(o["id"] == form for o in form_options(tenant)) else "main"
+    return form if any(o["id"] == form for o in form_options(tenant)) else None
 
 
 def tenant_has_welcome_video(tenant) -> bool:
@@ -195,15 +197,27 @@ def _last_step(ev: dict) -> str:
         return "submitted"
     if ("submit_click", "") in ev:
         return "submit_click"
-    reached = [s for s in STEPS if ("step_view", s) in ev]
-    return reached[-1] if reached else "open"
+    # La fase vista más tarde (los formularios personalizados pueden reordenar las fases)
+    reached = [(ev[("step_view", s)], s) for s in STEPS if ("step_view", s) in ev]
+    return max(reached)[1] if reached else "open"
+
+
+def _secs_since_prev(ev: dict, key: tuple[str, str]) -> float | None:
+    """Segundos desde el paso anterior que vio esa sesión (apertura o fase previa en el tiempo),
+    sin suponer un orden fijo de fases."""
+    at = ev.get(key)
+    if at is None:
+        return None
+    prev = [t for (k, d), t in ev.items() if (k == "open" or (k == "step_view" and (k, d) != key)) and t <= at]
+    return (at - max(prev)).total_seconds() if prev else None
 
 
 def _count(sessions: list[dict], key: tuple[str, str]) -> int:
     return sum(1 for s in sessions if key in s["events"])
 
 
-def _phases(sessions: list[dict], abandon: dict[str, int], last_fields: dict[str, dict[str, int]], video_configured: bool = False) -> list[dict]:
+def _phases(sessions: list[dict], abandon: dict[str, int], last_fields: dict[str, dict[str, int]], video_configured: bool = False,
+            step_order: list[str] | None = None, step_labels: dict[str, str] | None = None) -> list[dict]:
     """Recorrido fase por fase: Inicio (bienvenida/video) → pasos del formulario → Enviado.
     En cada una: cuántos llegan, qué tocan, campos que llenan, errores y cuántos se quedaron ahí."""
     n = len(sessions)
@@ -228,14 +242,12 @@ def _phases(sessions: list[dict], abandon: dict[str, int], last_fields: dict[str
                 "video_offered": total_offered, "video_configured": video_configured,
                 "fields": [], "errors": [], "last_fields": []})
 
-    prev_key = ("open", "")
-    for st in STEPS:
+    for st in _ordered_steps(step_order):
         key = ("step_view", st)
         hit = [s for s in sessions if key in s["events"]]
         if not hit:
             continue
-        secs = [(s["events"][key] - s["events"][prev_key]).total_seconds()
-                for s in hit if prev_key in s["events"] and s["events"][key] >= s["events"][prev_key]]
+        secs = [x for s in hit for x in [_secs_since_prev(s["events"], key)] if x is not None]
         touched: dict[str, int] = {}
         errs: dict[str, int] = {}
         for s in hit:
@@ -253,7 +265,7 @@ def _phases(sessions: list[dict], abandon: dict[str, int], last_fields: dict[str
         lost = abandon.get(st, 0) + (abandon.get("submit_click", 0) if st == "resumen" else 0)
         lf = last_fields.get(st, {})
         out.append({
-            "key": st, "label": STEP_LABELS[st], "reached": len(hit), "pct": pct(len(hit)),
+            "key": st, "label": (step_labels or {}).get(st) or STEP_LABELS[st], "reached": len(hit), "pct": pct(len(hit)),
             "lost_here": lost, "median_seconds": round(median(secs)) if secs else None,
             "actions": acts,
             "fields": [{"field": f, "label": FIELD_LABELS.get(f, f), "sessions": c, "pct": pct(c, len(hit))}
@@ -264,11 +276,9 @@ def _phases(sessions: list[dict], abandon: dict[str, int], last_fields: dict[str
                             for f, c in sorted(lf.items(), key=lambda kv: (kv[0] == "", -kv[1]))],
             "stuck_on_submit": abandon.get("submit_click", 0) if st == "resumen" else 0,
         })
-        prev_key = key
 
     sent = [s for s in sessions if ("submitted", "") in s["events"]]
-    sent_secs = [(s["events"][("submitted", "")] - s["events"][prev_key]).total_seconds()
-                 for s in sent if prev_key in s["events"] and s["events"][("submitted", "")] >= s["events"][prev_key]]
+    sent_secs = [x for s in sent for x in [_secs_since_prev(s["events"], ("submitted", ""))] if x is not None]
     out.append({
         "key": "enviado", "label": "Enviado", "reached": len(sent), "pct": pct(len(sent)), "lost_here": 0,
         "median_seconds": round(median(sent_secs)) if sent_secs else None,
@@ -279,29 +289,35 @@ def _phases(sessions: list[dict], abandon: dict[str, int], last_fields: dict[str
     return out
 
 
-def _summary(sessions: list[dict], video_configured: bool = False) -> dict:
+def _ordered_steps(step_order: list[str] | None) -> list[str]:
+    """Fases en el orden del formulario (sin orden propio = clásico); «resumen» al final."""
+    order = [s for s in (step_order or []) if s in STEPS and s != "resumen"]
+    return [*order, *[s for s in STEPS if s not in order]]
+
+
+def _summary(sessions: list[dict], video_configured: bool = False,
+             step_order: list[str] | None = None, step_labels: dict[str, str] | None = None) -> dict:
     n_open = len(sessions)
     submitted = sum(1 for s in sessions if ("submitted", "") in s["events"])
+    labels = {**STEP_LABELS, **(step_labels or {})}
+    ordered = _ordered_steps(step_order)
 
     # Pasos (solo los que el formulario usa) + «Enviar» + «Enviado»
-    keys = [("step_view", st) for st in STEPS] + [("submit_click", ""), ("submitted", "")]
-    steps, prev_count, prev_key = [], n_open, ("open", "")
+    keys = [("step_view", st) for st in ordered] + [("submit_click", ""), ("submitted", "")]
+    steps, prev_count = [], n_open
     for key in keys:
         hit = [s for s in sessions if key in s["events"]]
         if not hit and key[0] == "step_view":
             continue
-        secs = [
-            (s["events"][key] - s["events"][prev_key]).total_seconds()
-            for s in hit if prev_key in s["events"] and s["events"][key] >= s["events"][prev_key]
-        ]
+        secs = [x for s in hit for x in [_secs_since_prev(s["events"], key)] if x is not None]
         name = key[1] if key[0] == "step_view" else key[0]
         steps.append({
-            "key": name, "label": STEP_LABELS.get(name, name), "sessions": len(hit),
+            "key": name, "label": labels.get(name, name), "sessions": len(hit),
             "pct": round(len(hit) * 100 / n_open, 1) if n_open else 0,
             "lost": max(prev_count - len(hit), 0),
             "median_seconds": round(median(secs)) if secs else None,
         })
-        prev_count, prev_key = len(hit), key
+        prev_count = len(hit)
 
     abandon: dict[str, int] = {}
     last_fields: dict[str, dict[str, int]] = {}
@@ -316,9 +332,9 @@ def _summary(sessions: list[dict], video_configured: bool = False) -> dict:
                        if k == "field_touch" and d.startswith(f"{last}.")]
             field = max(touched)[1] if touched else ""
             last_fields.setdefault(last, {})[field] = last_fields.setdefault(last, {}).get(field, 0) + 1
-    order = ["open", *STEPS, "submit_click"]
+    order = ["open", *ordered, "submit_click"]
     abandon_list = [
-        {"key": k, "label": "Solo abrió" if k == "open" else STEP_LABELS.get(k, k), "sessions": n,
+        {"key": k, "label": "Solo abrió" if k == "open" else labels.get(k, k), "sessions": n,
          "fields": [
              {"field": f, "label": FIELD_LABELS.get(f, f) if f else "Sin tocar ningún campo", "sessions": c}
              for f, c in sorted(last_fields.get(k, {}).items(), key=lambda kv: (kv[0] == "", -kv[1]))
@@ -326,7 +342,8 @@ def _summary(sessions: list[dict], video_configured: bool = False) -> dict:
         for k, n in sorted(abandon.items(), key=lambda kv: (-kv[1], order.index(kv[0]) if kv[0] in order else 99))
     ]
 
-    phases = _phases(sessions, abandon, last_fields, video_configured=video_configured)
+    phases = _phases(sessions, abandon, last_fields, video_configured=video_configured,
+                     step_order=ordered, step_labels=step_labels)
 
     errors: dict[str, int] = {}
     clicks: dict[str, int] = {}
@@ -395,7 +412,7 @@ def report(db: Session, date_from, date_to, tenant_id: int | None) -> dict:
     for tid, sess in per_tenant.items():
         t = tenants.get(tid)
         t_has_vid = tenant_has_welcome_video(t)
-        summ = _summary(sess, video_configured=t_has_vid)
+        summ = _summary(sess, video_configured=t_has_vid, **_layout_kwargs(t, sess))
         forms = {s["form_id"] for s in sess}
         by_tenant.append({
             "tenant_id": tid,
@@ -417,4 +434,17 @@ def report(db: Session, date_from, date_to, tenant_id: int | None) -> dict:
         if t and not official_form_id(t):
             without.append({"tenant_id": t.id, "tenant_name": t.name})
 
-    return {**_summary(all_sessions, video_configured=overall_video_configured), "by_tenant": by_tenant, "without_official": without}
+    # Un solo crematorio: las fases en el orden y con los nombres de su formulario
+    layout = _layout_kwargs(target_tenant, all_sessions) if target_tenant else {}
+    return {**_summary(all_sessions, video_configured=overall_video_configured, **layout),
+            "by_tenant": by_tenant, "without_official": without}
+
+
+def _layout_kwargs(tenant, sessions: list[dict]) -> dict:
+    """Orden y nombres de fase del formulario medido (si todas las sesiones son del mismo)."""
+    forms = {s["form_id"] for s in sessions}
+    if not tenant or len(forms) != 1:
+        return {}
+    from app.services.public_form_config import form_phase_layout
+    order, names = form_phase_layout(tenant.form_config, next(iter(forms)))
+    return {"step_order": order, "step_labels": names}

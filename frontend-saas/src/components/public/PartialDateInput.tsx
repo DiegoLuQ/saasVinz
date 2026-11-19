@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { MONTHS_ES, PRECISION_LABELS, THIS_YEAR, partialPrecision, validYear, type DatePrecision } from '@/lib/petDates';
+import { MIN_PET_YEAR, MONTHS_ES, PRECISION_LABELS, THIS_YEAR, partialPrecision, todayLocal, validYear, type DatePrecision } from '@/lib/petDates';
 
 interface Props {
     /** «2015» · «2015-03» · «2015-03-12» · '' */
@@ -43,7 +43,7 @@ export default function PartialDateInput({ value, onChange, className = '', aria
         if (m === 'day') onChange('');
         else emit(m, year, month);
     };
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayLocal();
     const partial = mode !== 'day' && year !== '' && !validYear(year);
 
     const yearInput = (
@@ -66,7 +66,7 @@ export default function PartialDateInput({ value, onChange, className = '', aria
                 ))}
             </div>
             {mode === 'day' ? (
-                <input type="date" value={/^\d{4}-\d{2}-\d{2}$/.test(value) ? value : ''} max={today}
+                <input type="date" value={/^\d{4}-\d{2}-\d{2}$/.test(value) ? value : ''} min={`${MIN_PET_YEAR}-01-01`} max={today}
                     aria-label={ariaLabel} onChange={(e) => onChange(e.target.value)} className={className} />
             ) : mode === 'month' ? (
                 <div className="grid grid-cols-[1.3fr_1fr] gap-2">

@@ -36,6 +36,7 @@ import {
     HeartHandshake,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
 import { apiRequest } from '@/lib/tenant/api';
@@ -58,7 +59,16 @@ import {
     DEFAULT_PHASES,
     DEFAULT_MEMORIES_CONFIG,
     DEFAULT_WELCOME_MODAL_CONFIG,
-    NEVER_REQUIRED
+    NEVER_REQUIRED,
+    PHASE_DEFAULTS,
+    PHASE_KEYS,
+    MAX_PHASE_NAME,
+    MAX_PHASE_PHRASE,
+    HUELLA_TEMPLATE,
+    cleanPhaseOrder,
+    type PhaseKey,
+    type PhaseLabels,
+    type FormTemplate,
 } from '@/lib/publicFormConfig';
 
 // Configuración del formulario público (el enlace que se envía a la familia).
@@ -169,12 +179,13 @@ function Toggle({
 
 type PhaseId = 'familia' | 'angel' | 'camino' | 'recuerdos';
 type SectionId = 'fases' | 'pesos' | 'bienvenida' | 'enlaces';
+type PresetModalTab = 'general' | 'pasos' | 'bienvenida';
 
 const SECTIONS: { id: SectionId; name: string; hint: string; icon: React.ElementType }[] = [
-    { id: 'fases', name: 'Pasos y datos', hint: 'Fases y campos', icon: Layers },
-    { id: 'pesos', name: 'Pesos y precios', hint: 'Rangos, precios y traslados', icon: Scale },
-    { id: 'bienvenida', name: 'Bienvenida y avisos', hint: 'Mensaje inicial y plazo', icon: HeartHandshake },
-    { id: 'enlaces', name: 'Enlaces', hint: 'Principal y personalizados', icon: Share2 },
+    { id: 'enlaces', name: 'Mis Formularios', hint: 'Principal, plantillas y a medida', icon: FileText },
+    { id: 'fases', name: 'Pasos y Campos', hint: 'Estructura del formulario base', icon: Layers },
+    { id: 'pesos', name: 'Pesos y Tarifas', hint: 'Rangos, precios y traslados', icon: Scale },
+    { id: 'bienvenida', name: 'Bienvenida y Avisos', hint: 'Mensaje inicial, video y plazo', icon: HeartHandshake },
 ];
 
 interface PhaseMeta {
@@ -226,15 +237,25 @@ const PHASES_LIST: PhaseMeta[] = [
     }
 ];
 
+// Qué contiene cada fase (editor de formularios personalizados)
+const PHASE_EDITOR_DESC: Record<PhaseKey, string> = {
+    familia: 'Datos de contacto y retiro',
+    angel: 'Mascota, especie y tamaño',
+    camino: 'Planes y servicios',
+    recuerdos: 'Fotos y dedicatoria',
+};
+
 export function PublicFormTab() {
     const { showToast } = useToast();
     const { tenantData, refreshTenantData } = useTenant();
+    const queryClient = useQueryClient();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
-    // Sección visible y, dentro de «Pasos y datos», la fase que se edita
-    const [section, setSection] = useState<SectionId>('fases');
+    // Sección visible y, dentro de «Pasos y Campos», la fase que se edita
+    const [section, setSection] = useState<SectionId>('enlaces');
     const [selectedPhase, setSelectedPhase] = useState<PhaseId>('familia');
+    const [presetModalTab, setPresetModalTab] = useState<PresetModalTab>('general');
 
     // Fases activas / mostradas
     const [phases, setPhases] = useState<PhaseConfig>(DEFAULT_PHASES);
@@ -242,8 +263,9 @@ export function PublicFormTab() {
     // Plazo o nota de entrega de cenizas (general)
     const [deliveryNotice, setDeliveryNotice] = useState<string>('');
 
-    // Formularios específicos personalizados (Presets)
+    // Formularios específicos personalizados (Presets) y cuál es el formulario oficial en uso
     const [customForms, setCustomForms] = useState<CustomFormPreset[]>([]);
+    const [officialFormId, setOfficialFormId] = useState<string | null>(null);
     const [copiedPresetId, setCopiedPresetId] = useState<string | null>(null);
 
     // Mensaje de Bienvenida / Condolencias General
@@ -257,6 +279,18 @@ export function PublicFormTab() {
     const [presetName, setPresetName] = useState('');
     const [presetDescription, setPresetDescription] = useState('');
     const [presetPhases, setPresetPhases] = useState<PhaseConfig>({ familia: true, angel: true, camino: true, recuerdos: true });
+    // Orden y nombre propio de las fases de este formulario (ids fijos)
+    const [presetPhaseOrder, setPresetPhaseOrder] = useState<PhaseKey[]>([...PHASE_KEYS]);
+    const [presetPhaseLabels, setPresetPhaseLabels] = useState<PhaseLabels>({});
+    // Plantillas de Vinzer (Admin → Configuración → Plantillas de formulario); sin respuesta = Huella
+    const [formTemplates, setFormTemplates] = useState<FormTemplate[]>([HUELLA_TEMPLATE]);
+    // Plantilla desde la que se está creando el formulario ('' = en blanco / clásico)
+    const [presetTemplateId, setPresetTemplateId] = useState('');
+    useEffect(() => {
+        apiRequest('/api/internal/maintenance/form-templates')
+            .then((d: { templates?: FormTemplate[] }) => { if (Array.isArray(d?.templates)) setFormTemplates(d.templates); })
+            .catch(() => { /* se queda con la plantilla incluida */ });
+    }, []);
     const [presetIncludeHealth, setPresetIncludeHealth] = useState(false);
     const [presetDeliveryNotice, setPresetDeliveryNotice] = useState('');
     const [presetFields, setPresetFields] = useState<FieldRow[]>([]);
@@ -333,8 +367,18 @@ export function PublicFormTab() {
                     setWelcomeModal({ ...DEFAULT_WELCOME_MODAL_CONFIG, ...cfg.welcome_modal });
                 }
                 setVideoAllowed(!!cfg.video_allowed);
-                if (Array.isArray(cfg.custom_forms)) {
-                    setCustomForms(cfg.custom_forms);
+                const loadedCustomForms: CustomFormPreset[] = Array.isArray(cfg.custom_forms) ? cfg.custom_forms : [];
+                setCustomForms(loadedCustomForms);
+                const offId = cfg.official_form || (tenantData?.form_config as { official_form?: string | null } | null)?.official_form || null;
+                setOfficialFormId(offId);
+                if (offId) {
+                    const found = loadedCustomForms.find(f => f.id === offId);
+                    if (found) {
+                        const firstOrderedPhase = cleanPhaseOrder(found.phase_order)[0];
+                        if (firstOrderedPhase) {
+                            setSelectedPhase(firstOrderedPhase);
+                        }
+                    }
                 }
                 setFields(cfg.fields || []);
                 setShowPrices(!!cfg.show_weight_prices);
@@ -377,26 +421,90 @@ export function PublicFormTab() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Formulario activo/oficial en uso (si eligió uno personalizado como "Formulario Eterno", se usa ese; si no, el principal)
+    const activePreset = officialFormId ? customForms.find(f => f.id === officialFormId) || null : null;
+    const activeFormName = activePreset ? activePreset.name : 'Formulario Principal (Predeterminado)';
+    const activePhaseOrder: PhaseKey[] = activePreset ? cleanPhaseOrder(activePreset.phase_order) : [...PHASE_KEYS];
+    const activePhases: PhaseConfig = activePreset
+        ? { ...DEFAULT_PHASES, ...(activePreset.phases || {}) }
+        : phases;
+    const activeOrderedPhases: PhaseMeta[] = activePhaseOrder.map((key, idx) => {
+        const base = PHASES_LIST.find(p => p.id === key)!;
+        const customName = activePreset?.phase_labels?.[key]?.name?.trim();
+        const customPhrase = activePreset?.phase_labels?.[key]?.phrase?.trim();
+        return {
+            ...base,
+            num: idx + 1,
+            name: customName || base.name,
+            description: customPhrase || base.description,
+        };
+    });
+    const activeFields: FieldRow[] = activePreset
+        ? fields.map(f => {
+            const ov = activePreset.fields?.[f.key as FormFieldKey];
+            if (ov) {
+                const vis = Boolean(ov.visible);
+                return {
+                    ...f,
+                    visible: vis,
+                    required: Boolean(ov.required) && vis,
+                    customLabel: ov.label || '',
+                };
+            }
+            if (f.key === 'healthStatus' && activePreset.include_health_status) {
+                return { ...f, visible: true, required: true };
+            }
+            return f;
+        })
+        : fields;
+
     const togglePhase = (phaseKey: PhaseId) => {
-        const isCurrentlyActive = phases[phaseKey];
+        const isCurrentlyActive = activePhases[phaseKey];
         if (isCurrentlyActive) {
-            const activeCount = Object.values(phases).filter(Boolean).length;
+            const activeCount = Object.values(activePhases).filter(Boolean).length;
             if (activeCount <= 1) {
                 showToast('Debes mantener al menos una fase activa en el formulario', 'error');
                 return;
             }
         }
-        setPhases(prev => ({ ...prev, [phaseKey]: !prev[phaseKey] }));
+        if (activePreset) {
+            const nextPhases = { ...activePhases, [phaseKey]: !activePhases[phaseKey] };
+            setCustomForms(prev => prev.map(cf => (cf.id === activePreset.id ? { ...cf, phases: nextPhases } : cf)));
+        } else {
+            setPhases(prev => ({ ...prev, [phaseKey]: !prev[phaseKey] }));
+        }
     };
 
     const updateField = (key: string, patch: Partial<FieldRow>) => {
-        setFields(prev => prev.map(f => {
-            if (f.key !== key) return f;
-            const next = { ...f, ...patch };
-            if (!next.visible) next.required = false; // oculto nunca es obligatorio
-            if (patch.required) next.visible = true;
-            return next;
-        }));
+        if (activePreset) {
+            setCustomForms(prev => prev.map(cf => {
+                if (cf.id !== activePreset.id) return cf;
+                const currentField = activeFields.find(f => f.key === key);
+                if (!currentField) return cf;
+                const next = { ...currentField, ...patch };
+                if (!next.visible) next.required = false;
+                if (patch.required) next.visible = true;
+                const nextFieldsMap: Partial<Record<FormFieldKey, FormFieldSetting>> = { ...(cf.fields || {}) };
+                nextFieldsMap[key as FormFieldKey] = {
+                    visible: next.visible,
+                    required: next.required && next.visible,
+                    ...(next.customLabel?.trim() ? { label: next.customLabel.trim().slice(0, MAX_FIELD_LABEL) } : {}),
+                };
+                return {
+                    ...cf,
+                    fields: nextFieldsMap,
+                    include_health_status: key === 'healthStatus' ? next.visible : cf.include_health_status,
+                };
+            }));
+        } else {
+            setFields(prev => prev.map(f => {
+                if (f.key !== key) return f;
+                const next = { ...f, ...patch };
+                if (!next.visible) next.required = false; // oculto nunca es obligatorio
+                if (patch.required) next.visible = true;
+                return next;
+            }));
+        }
     };
 
     const updateTier = (idx: number, patch: Partial<TierRow>) =>
@@ -528,6 +636,8 @@ export function PublicFormTab() {
         });
         // Navbar > Compartir lista los enlaces propios desde el bootstrap.
         refreshTenantData().catch(() => { });
+        // «Enlaces oficiales» lista los formularios: que vea el recién creado / renombrado
+        queryClient.invalidateQueries({ queryKey: ['official-links'] });
     };
 
     const handleSave = async () => {
@@ -672,11 +782,14 @@ export function PublicFormTab() {
 
     const handleOpenCreateModal = () => {
         setEditingPresetId(null);
+        setPresetTemplateId('');
         setPresetName('');
         setPresetDescription('');
         setPresetAssociatedServiceId('');
         setPresetPriceListId('');
         setPresetPhases({ familia: true, angel: true, camino: true, recuerdos: true });
+        setPresetPhaseOrder([...PHASE_KEYS]);
+        setPresetPhaseLabels({});
         setPresetIncludeHealth(false);
         setPresetDeliveryNotice('');
         setPresetFields(fields.map(f => ({ ...f })));
@@ -688,7 +801,46 @@ export function PublicFormTab() {
         setPresetVideoMode('inherit');
         setPresetVideoButton('');
         setPresetVideo(null);
+        setPresetModalTab('general');
         setIsCreatingPreset(true);
+    };
+
+    // «Formulario Huella»: abre el editor ya armado con la plantilla (se puede ajustar antes de guardar)
+    const handleCreateFromTemplate = (t: FormTemplate) => {
+        handleOpenCreateModal();
+        setPresetTemplateId(t.id);
+        const taken = new Set(customForms.map(f => f.name.trim().toLowerCase()));
+        let name = t.name;
+        for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${t.name} ${n}`;
+        setPresetName(name);
+        setPresetDescription(t.description || '');
+        setPresetPhases({ ...DEFAULT_PHASES, ...(t.phases || {}) });
+        setPresetPhaseOrder(cleanPhaseOrder(t.phase_order));
+        setPresetPhaseLabels({ ...(t.phase_labels || {}) });
+        setPresetFields(fields.map(f => {
+            const o = t.fields?.[f.key as FormFieldKey];
+            return o ? { ...f, visible: o.visible, required: o.required && o.visible, customLabel: '' } : { ...f, customLabel: '' };
+        }));
+    };
+
+    const movePresetPhase = (key: PhaseKey, dir: -1 | 1) => {
+        setPresetPhaseOrder(prev => {
+            const i = prev.indexOf(key);
+            const j = i + dir;
+            if (i < 0 || j < 0 || j >= prev.length) return prev;
+            const next = [...prev];
+            [next[i], next[j]] = [next[j], next[i]];
+            // «Camino» no puede quedar antes de «Ángel»: ahí se elige el tamaño que define los precios
+            if (next.indexOf('camino') < next.indexOf('angel')) {
+                showToast('«Camino» debe ir después de «Ángel»: el tamaño elegido define los precios', 'error');
+                return prev;
+            }
+            return next;
+        });
+    };
+
+    const setPresetPhaseLabel = (key: PhaseKey, part: 'name' | 'phrase', value: string) => {
+        setPresetPhaseLabels(prev => ({ ...prev, [key]: { ...(prev[key] || {}), [part]: value } }));
     };
 
     const handleStartEditPreset = (preset: CustomFormPreset) => {
@@ -698,6 +850,8 @@ export function PublicFormTab() {
         setPresetAssociatedServiceId(preset.associated_service_id || '');
         setPresetPriceListId(preset.price_list_id ? String(preset.price_list_id) : '');
         setPresetPhases({ familia: true, angel: true, camino: true, recuerdos: true, ...(preset.phases || {}) });
+        setPresetPhaseOrder(cleanPhaseOrder(preset.phase_order));
+        setPresetPhaseLabels({ ...(preset.phase_labels || {}) });
         setPresetIncludeHealth(Boolean(preset.include_health_status));
         setPresetDeliveryNotice(preset.delivery_notice || '');
 
@@ -741,6 +895,7 @@ export function PublicFormTab() {
             setPresetVideoPosition('inherit');
         }
 
+        setPresetModalTab('general');
         setIsCreatingPreset(true);
     };
 
@@ -804,6 +959,17 @@ export function PublicFormTab() {
             associated_service_id: presetAssociatedServiceId.trim() || null,
             price_list_id: presetPriceListId ? Number(presetPriceListId) : null,
             phases: presetPhases,
+            // Orden clásico = null (se ve exactamente como el formulario principal)
+            phase_order: presetPhaseOrder.join() === PHASE_KEYS.join() ? null : presetPhaseOrder,
+            phase_labels: (() => {
+                const out: PhaseLabels = {};
+                PHASE_KEYS.forEach(k => {
+                    const name = presetPhaseLabels[k]?.name?.trim().slice(0, MAX_PHASE_NAME);
+                    const phrase = presetPhaseLabels[k]?.phrase?.trim().slice(0, MAX_PHASE_PHRASE);
+                    if (name || phrase) out[k] = { ...(name ? { name } : {}), ...(phrase ? { phrase } : {}) };
+                });
+                return Object.keys(out).length ? out : null;
+            })(),
             include_health_status: presetIncludeHealth || Boolean(presetFields.find(f => f.key === 'healthStatus')?.visible),
             delivery_notice: presetDeliveryNotice.trim() || undefined,
             fields: presetFieldsMap,
@@ -835,6 +1001,8 @@ export function PublicFormTab() {
         setPresetAssociatedServiceId('');
         setPresetPriceListId('');
         setPresetPhases({ familia: true, angel: true, camino: true, recuerdos: true });
+        setPresetPhaseOrder([...PHASE_KEYS]);
+        setPresetPhaseLabels({});
         setPresetIncludeHealth(false);
         setPresetDeliveryNotice('');
         setPresetWelcomeCustom(false);
@@ -877,80 +1045,234 @@ export function PublicFormTab() {
         return <div className="py-16 text-center text-sm text-muted-foreground animate-pulse">Cargando configuración del formulario…</div>;
     }
 
+    const activeBasePhasesCount = Object.values(activePhases).filter(Boolean).length;
+    const currentPhaseMeta = activeOrderedPhases.find(p => p.id === selectedPhase) || activeOrderedPhases[0];
+    const activeFormUrl = getPresetUrl(activePreset?.id);
+
     return (
-        <div className="space-y-8 animate-fade-in">
-            {/* Encabezado */}
-            <div>
-                <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">Formulario para la familia</h3>
-                <p className="text-sm text-slate-600 dark:text-muted-foreground mt-1 max-w-2xl">
-                    Lo que completa la familia al abrir tu enlace: qué pasos ve, qué datos se le piden, los rangos de peso con sus precios y los enlaces para compartir.
+        <div className="space-y-6 sm:space-y-8 animate-fade-in">
+            {/* Encabezado Principal con Resumen y Acciones Rápidas */}
+            <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-gradient-to-br from-slate-50 via-white to-slate-50/70 dark:from-white/[0.04] dark:via-white/[0.02] dark:to-transparent p-5 sm:p-6 shadow-xs space-y-3">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-2 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                Formulario en uso: {activeFormName}
+                            </span>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-300">
+                                {activeBasePhasesCount}/4 pasos visibles
+                            </span>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/20">
+                                {customForms.length + 1} {customForms.length === 0 ? 'enlace disponible' : 'formularios creados'}
+                            </span>
+                        </div>
+                        <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                            Formulario para la familia
+                        </h3>
+                    </div>
+
+                    {/* Acciones rápidas siempre visibles */}
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => handleCopyUrl(activePreset?.id || 'base', activeFormUrl)}
+                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold border border-slate-200 dark:border-white/15 bg-white dark:bg-white/5 text-slate-800 dark:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-all cursor-pointer"
+                            title={`Copiar enlace de ${activeFormName}`}
+                        >
+                            {copiedPresetId === (activePreset?.id || 'base') ? <Check size={15} className="text-emerald-500" /> : <Copy size={15} />}
+                            <span>{copiedPresetId === (activePreset?.id || 'base') ? 'Enlace copiado' : 'Copiar activo'}</span>
+                        </button>
+                        <a
+                            href={activeFormUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold border border-slate-200 dark:border-white/15 bg-white dark:bg-white/5 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 transition-all cursor-pointer"
+                            title={`Abrir ${activeFormName} en nueva pestaña`}
+                        >
+                            <ExternalLink size={15} />
+                            <span>Ver formulario</span>
+                        </a>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSection('enlaces');
+                                handleOpenCreateModal();
+                            }}
+                            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black bg-primary text-primary-foreground hover:opacity-95 shadow-md shadow-primary/20 transition-all cursor-pointer"
+                        >
+                            <Plus size={16} />
+                            <span>Nuevo formulario</span>
+                        </button>
+                    </div>
+                </div>
+
+                <p className="w-full text-xs sm:text-sm text-slate-600 dark:text-muted-foreground leading-relaxed pt-1 border-t border-slate-100 dark:border-white/5">
+                    Crea y personaliza los formularios que envías a las familias por WhatsApp o web: define sus pasos, campos obligatorios, tarifas por peso y mensajes de bienvenida.
                 </p>
             </div>
 
-            {/* Secciones */}
-            <nav className="grid grid-cols-2 lg:grid-cols-4 gap-2" aria-label="Secciones del formulario">
+            {/* Navegación por pestañas: 2 columnas x 2 filas en tablet/escritorio, 1 columna en móvil */}
+            <nav className="grid grid-cols-1 sm:grid-cols-2 gap-3" aria-label="Secciones del formulario">
                 {SECTIONS.map(s => {
                     const Icon = s.icon;
                     const active = section === s.id;
+                    const badge =
+                        s.id === 'enlaces'
+                            ? `${customForms.length + 1}`
+                            : s.id === 'fases'
+                                ? `${activeBasePhasesCount}/4`
+                                : s.id === 'pesos'
+                                    ? `${tiers.length}`
+                                    : welcomeModal.enabled !== false
+                                        ? 'Activo'
+                                        : null;
                     return (
                         <button
                             key={s.id}
                             type="button"
                             onClick={() => setSection(s.id)}
                             aria-current={active ? 'page' : undefined}
-                            className={`flex items-start gap-3 p-3 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                            className={`group flex items-start gap-3.5 p-4 rounded-2xl border text-left transition-all cursor-pointer ${
                                 active
-                                    ? 'border-primary bg-primary/10 ring-1 ring-primary/30'
-                                    : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]'
+                                    ? 'border-primary bg-primary/10 dark:bg-primary/15 ring-1 ring-primary/30 shadow-xs'
+                                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]'
                             }`}
                         >
-                            <span className={`p-2 rounded-xl shrink-0 ${active ? 'bg-primary text-primary-foreground' : 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-muted-foreground'}`}>
-                                <Icon size={16} />
+                            <span className={`p-2.5 rounded-xl shrink-0 transition-colors ${
+                                active
+                                    ? 'bg-primary text-primary-foreground shadow-xs'
+                                    : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200/70 dark:bg-white/10 dark:text-muted-foreground'
+                            }`}>
+                                <Icon size={18} />
                             </span>
-                            <span className="min-w-0">
-                                <span className="flex items-center gap-1.5 text-sm font-bold text-slate-900 dark:text-white">
-                                    {s.name}
-                                    {s.id === 'enlaces' && customForms.length > 0 && (
-                                        <span className="px-1.5 rounded-full bg-slate-200 text-slate-700 dark:bg-white/10 dark:text-white text-[10px] font-mono">{customForms.length + 1}</span>
+                            <span className="min-w-0 flex-1">
+                                <span className="flex items-center justify-between gap-2">
+                                    <span className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">
+                                        {s.name}
+                                    </span>
+                                    {badge && (
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold shrink-0 ${
+                                            active
+                                                ? 'bg-primary text-primary-foreground'
+                                                : 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300'
+                                        }`}>
+                                            {badge}
+                                        </span>
                                     )}
                                 </span>
-                                <span className="block text-[11px] text-slate-500 dark:text-muted-foreground mt-0.5 leading-snug">{s.hint}</span>
+                                <span className="block text-xs text-slate-500 dark:text-muted-foreground mt-0.5 leading-snug">
+                                    {s.id === 'fases' ? `Fases en orden de «${activeFormName}»` : s.hint}
+                                </span>
                             </span>
                         </button>
                     );
                 })}
             </nav>
 
-            {/* Fases: elegir cuál configurar */}
+            {/* Stepper visual de Fases cuando estamos en "Pasos y Campos" (2 columnas x 2 filas en el orden del formulario activo) */}
             {section === 'fases' && (
-                <div className="flex flex-wrap items-center gap-2">
-                    {PHASES_LIST.map(phase => {
-                        const Icon = phase.icon;
-                        const active = selectedPhase === phase.id;
-                        return (
-                            <button
-                                key={phase.id}
-                                type="button"
-                                onClick={() => setSelectedPhase(phase.id)}
-                                className={`flex items-center gap-2 pl-3 pr-3.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                                    active
-                                        ? 'bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-900 dark:border-white'
-                                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 dark:bg-white/[0.03] dark:text-white/80 dark:border-white/10 dark:hover:bg-white/[0.06]'
-                                }`}
-                            >
-                                <Icon size={14} />
-                                <span>{phase.num}. {phase.name}</span>
-                                <span
-                                    className={`w-2 h-2 rounded-full ${phases[phase.id] ? 'bg-emerald-500' : 'bg-amber-500'}`}
-                                    title={phases[phase.id] ? 'Visible' : 'Oculta'}
-                                />
-                            </button>
-                        );
-                    })}
-                    <span className="text-[11px] text-slate-500 dark:text-muted-foreground ml-1">
-                        <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1" />visible
-                        <span className="inline-block w-2 h-2 rounded-full bg-amber-500 ml-3 mr-1" />oculta
-                    </span>
+                <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-white/[0.02] p-4 sm:p-5 space-y-3.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <h4 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
+                                    Recorrido del Formulario Activo
+                                </h4>
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                    En uso: {activeFormName}
+                                </span>
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-muted-foreground">
+                                Estás viendo las fases en el orden exacto de <strong>{activeFormName}</strong>. Selecciona un paso para configurar sus campos o activarlo/ocultarlo.
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold text-slate-600 dark:text-muted-foreground shrink-0">
+                            {activePreset && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        handleStartEditPreset(activePreset);
+                                        setPresetModalTab('pasos');
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-white/10 border border-slate-200 dark:border-white/15 text-slate-800 dark:text-white font-bold text-xs hover:bg-slate-100 dark:hover:bg-white/15 transition-all cursor-pointer"
+                                >
+                                    <Pencil size={13} />
+                                    <span>Reordenar o renombrar fases</span>
+                                </button>
+                            )}
+                            <span className="inline-flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500" /> Paso visible
+                            </span>
+                            <span className="inline-flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-amber-500" /> Paso oculto
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {activeOrderedPhases.map(phase => {
+                            const Icon = phase.icon;
+                            const active = selectedPhase === phase.id;
+                            const isVisible = activePhases[phase.id];
+                            const fieldSummary =
+                                phase.id === 'familia'
+                                    ? `${FIXED_FIELDS.owner.length + activeFields.filter(f => f.section === 'owner' && f.visible).length} campos activos`
+                                    : phase.id === 'angel'
+                                        ? `${FIXED_FIELDS.pet.length + activeFields.filter(f => f.section === 'pet' && f.visible).length} campos activos`
+                                        : phase.id === 'camino'
+                                            ? `${allCatalogPlans.length} planes · ${specials.filter(s => s.show_in_form !== false).length} extras`
+                                            : [
+                                                memories.allow_photos ? 'Fotos' : null,
+                                                memories.allow_dedication ? 'Dedicatoria' : null,
+                                            ].filter(Boolean).join(' + ') || 'Sin elementos';
+
+                            return (
+                                <button
+                                    key={phase.id}
+                                    type="button"
+                                    onClick={() => setSelectedPhase(phase.id)}
+                                    className={`flex flex-col justify-between p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                                        active
+                                            ? 'bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-900 dark:border-white shadow-md'
+                                            : 'bg-white text-slate-800 border-slate-200 hover:border-slate-300 dark:bg-slate-900/60 dark:text-white dark:border-white/10 dark:hover:border-white/20'
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between gap-2 w-full">
+                                        <span className={`inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider ${
+                                            active ? 'text-white dark:text-slate-900' : 'text-slate-500 dark:text-slate-400'
+                                        }`}>
+                                            <Icon size={14} />
+                                            Paso {phase.num}
+                                        </span>
+                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                            isVisible
+                                                ? active
+                                                    ? 'bg-emerald-500/20 text-emerald-300 dark:bg-emerald-600/15 dark:text-emerald-700'
+                                                    : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                                                : active
+                                                    ? 'bg-amber-500/20 text-amber-300 dark:bg-amber-600/15 dark:text-amber-700'
+                                                    : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                                        }`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${isVisible ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                                            {isVisible ? 'Visible' : 'Oculto'}
+                                        </span>
+                                    </div>
+                                    <div className="mt-2">
+                                        <p className="text-sm sm:text-base font-extrabold leading-tight">
+                                            {phase.name} · {phase.shortTitle}
+                                        </p>
+                                        <p className={`text-xs mt-0.5 ${
+                                            active ? 'text-slate-300 dark:text-slate-600' : 'text-slate-500 dark:text-muted-foreground'
+                                        }`}>
+                                            {fieldSummary}
+                                        </p>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
 
@@ -958,58 +1280,66 @@ export function PublicFormTab() {
             <div className="space-y-6">
 
                 {/* ============================================================== */}
-                {/* FASE 1: FAMILIA */}
+                {/* FASE: FAMILIA */}
                 {/* ============================================================== */}
                 {section === 'fases' && selectedPhase === 'familia' && (
                     <PhaseSectionContainer
                         id="familia"
-                        num={1}
-                        name="Familia"
+                        num={currentPhaseMeta.num}
+                        name={currentPhaseMeta.name}
                         title="Datos de contacto y entrega"
-                        description="Configura si este paso se solicita a la familia y qué datos del cliente son obligatorios para el servicio."
+                        description={currentPhaseMeta.description}
                         icon={User}
-                        isActive={phases.familia}
+                        isActive={activePhases.familia}
                         onToggle={() => togglePhase('familia')}
                     >
-                        <div className="glass-card p-5 sm:p-6 rounded-3xl min-w-0">
-                            <div className="flex items-center gap-2 mb-4">
-                                <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
-                                    <User size={16} />
+                        <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/50 p-5 sm:p-6 min-w-0 shadow-xs space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                                        <User size={18} />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-base">
+                                            Campos del tutor / cliente ({activeFormName})
+                                        </h4>
+                                        <p className="text-xs text-slate-500 dark:text-muted-foreground">
+                                            Datos personales y de contacto para coordinar el retiro y la entrega.
+                                        </p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h4 className="font-bold text-white">Campos del tutor / cliente</h4>
-                                    <p className="text-xs text-muted-foreground">Datos personales y de contacto para coordinar el retiro y entrega.</p>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                    {FIXED_FIELDS.owner.map(name => (
+                                        <span key={name} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-200 text-xs font-bold">
+                                            <Lock size={12} className="text-primary shrink-0" />
+                                            {name} (Fijo)
+                                        </span>
+                                    ))}
                                 </div>
                             </div>
 
-                            <div className={`${FIELD_GRID} pb-2 border-b border-foreground/10 text-[11px] font-semibold text-muted-foreground`}>
-                                <span>Campo</span>
+                            <div className={`${FIELD_GRID} pb-2 border-b border-slate-200 dark:border-white/10 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-muted-foreground`}>
+                                <span>Campo adicional</span>
                                 <span className="text-center">Mostrar</span>
                                 <span className="text-center">Obligatorio</span>
                             </div>
 
-                            <div className="divide-y divide-foreground/5">
-                                {FIXED_FIELDS.owner.map(name => (
-                                    <div key={name} className={`${FIELD_GRID} py-3`}>
-                                        <span className="flex items-center gap-2 min-w-0 text-sm text-muted-foreground">
-                                            <Lock size={13} className="shrink-0 text-primary" />
-                                            <span className="truncate">{name}</span>
-                                        </span>
-                                        <span className="col-span-2 justify-self-center rounded-full bg-foreground/5 px-3 py-1 text-[11px] font-medium text-muted-foreground">
-                                            Siempre obligatorio
-                                        </span>
-                                    </div>
-                                ))}
-                                {fields.filter(f => f.section === 'owner').map(f => {
-                                    const status = !f.visible ? 'Oculto' : f.required ? 'Obligatorio' : 'Opcional';
+                            <div className="divide-y divide-slate-100 dark:divide-white/5">
+                                {activeFields.filter(f => f.section === 'owner').map(f => {
+                                    const status = !f.visible ? 'Oculto en el formulario' : f.required ? 'Obligatorio' : 'Opcional';
                                     const statusClass = !f.visible
-                                        ? 'text-muted-foreground'
-                                        : f.required ? 'text-primary' : 'text-emerald-400';
+                                        ? 'text-slate-400 dark:text-muted-foreground'
+                                        : f.required ? 'text-primary font-semibold' : 'text-emerald-600 dark:text-emerald-400 font-semibold';
                                     return (
-                                        <div key={f.key} className={`${FIELD_GRID} py-3`}>
-                                            <div className="min-w-0">
-                                                <p className={`text-sm font-medium break-words ${f.visible ? 'text-white' : 'text-muted-foreground'}`}>{f.label}</p>
-                                                <p className={`text-[11px] font-medium mt-0.5 ${statusClass}`}>{status}</p>
+                                        <div key={f.key} className={`${FIELD_GRID} py-3.5`}>
+                                            <div className="min-w-0 pr-2">
+                                                <p className={`text-sm font-bold break-words ${f.visible ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-muted-foreground line-through'}`}>
+                                                    {f.customLabel?.trim() || f.label}
+                                                    {f.customLabel?.trim() && (
+                                                        <span className="ml-1.5 text-xs font-normal text-slate-400 dark:text-muted-foreground">({f.label})</span>
+                                                    )}
+                                                </p>
+                                                <p className={`text-[11px] mt-0.5 ${statusClass}`}>{status}</p>
                                             </div>
                                             <div className="flex justify-center">
                                                 <Toggle label={`Mostrar ${f.label}`} checked={f.visible} onChange={v => updateField(f.key, { visible: v })} />
@@ -1026,146 +1356,154 @@ export function PublicFormTab() {
                 )}
 
                 {/* ============================================================== */}
-                {/* FASE 2: ÁNGEL */}
+                {/* FASE: ÁNGEL / HUELLA */}
                 {/* ============================================================== */}
                 {section === 'fases' && selectedPhase === 'angel' && (
                     <PhaseSectionContainer
                         id="angel"
-                        num={2}
-                        name="Ángel"
+                        num={currentPhaseMeta.num}
+                        name={currentPhaseMeta.name}
                         title="Datos de la mascota"
-                        description="Qué datos de la mascota se piden. El rango de peso que elige la familia se configura en «Pesos y precios»."
+                        description={currentPhaseMeta.description}
                         icon={PawPrint}
-                        isActive={phases.angel}
+                        isActive={activePhases.angel}
                         onToggle={() => togglePhase('angel')}
                     >
-                        <div className="space-y-6">
-                            {/* Campos de la mascota */}
-                            <div className="glass-card p-5 sm:p-6 rounded-3xl min-w-0">
-                                <div className="flex items-center gap-2 mb-4">
-                                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
-                                        <PawPrint size={16} />
+                        <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/50 p-5 sm:p-6 min-w-0 shadow-xs space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                                        <PawPrint size={18} />
                                     </div>
                                     <div>
-                                        <h4 className="font-bold text-white">Campos de la mascota</h4>
-                                        <p className="text-xs text-muted-foreground">Información básica y conmemorativa de la mascota.</p>
+                                        <h4 className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-base">
+                                            Campos de la mascota ({activeFormName})
+                                        </h4>
+                                        <p className="text-xs text-slate-500 dark:text-muted-foreground">
+                                            Información básica y conmemorativa del compañero.
+                                        </p>
                                     </div>
                                 </div>
-
-                                <div className={`${FIELD_GRID} pb-2 border-b border-foreground/10 text-[11px] font-semibold text-muted-foreground`}>
-                                    <span>Campo</span>
-                                    <span className="text-center">Mostrar</span>
-                                    <span className="text-center">Obligatorio</span>
-                                </div>
-
-                                <div className="divide-y divide-foreground/5">
+                                <div className="flex flex-wrap items-center gap-1.5">
                                     {FIXED_FIELDS.pet.map(name => (
-                                        <div key={name} className={`${FIELD_GRID} py-3`}>
-                                            <span className="flex items-center gap-2 min-w-0 text-sm text-muted-foreground">
-                                                <Lock size={13} className="shrink-0 text-primary" />
-                                                <span className="truncate">{name}</span>
-                                            </span>
-                                            <span className="col-span-2 justify-self-center rounded-full bg-foreground/5 px-3 py-1 text-[11px] font-medium text-muted-foreground">
-                                                Siempre obligatorio
-                                            </span>
-                                        </div>
+                                        <span key={name} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-200 text-xs font-bold">
+                                            <Lock size={12} className="text-primary shrink-0" />
+                                            {name} (Fijo)
+                                        </span>
                                     ))}
-                                    {fields.filter(f => f.section === 'pet').map(f => {
-                                        const status = !f.visible ? 'Oculto' : f.required ? 'Obligatorio' : 'Opcional';
-                                        const statusClass = !f.visible
-                                            ? 'text-muted-foreground'
-                                            : f.required ? 'text-primary' : 'text-emerald-400';
-                                        return (
-                                            <div key={f.key} className={`${FIELD_GRID} py-3`}>
-                                                <div className="min-w-0">
-                                                    <p className={`text-sm font-medium break-words ${f.visible ? 'text-white' : 'text-muted-foreground'}`}>{f.label}</p>
-                                                    <p className={`text-[11px] font-medium mt-0.5 ${statusClass}`}>{status}</p>
-                                                </div>
-                                                <div className="flex justify-center">
-                                                    <Toggle label={`Mostrar ${f.label}`} checked={f.visible} onChange={v => updateField(f.key, { visible: v })} />
-                                                </div>
-                                                <div className="flex justify-center">
-                                                    <Toggle label={`${f.label} obligatorio`} checked={f.required && !NEVER_REQUIRED.has(f.key)} disabled={!f.visible || NEVER_REQUIRED.has(f.key)} onChange={v => updateField(f.key, { required: v })} />
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
                                 </div>
                             </div>
 
+                            <div className={`${FIELD_GRID} pb-2 border-b border-slate-200 dark:border-white/10 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-muted-foreground`}>
+                                <span>Campo adicional</span>
+                                <span className="text-center">Mostrar</span>
+                                <span className="text-center">Obligatorio</span>
+                            </div>
+
+                            <div className="divide-y divide-slate-100 dark:divide-white/5">
+                                {activeFields.filter(f => f.section === 'pet').map(f => {
+                                    const status = !f.visible ? 'Oculto en el formulario' : f.required ? 'Obligatorio' : 'Opcional';
+                                    const statusClass = !f.visible
+                                        ? 'text-slate-400 dark:text-muted-foreground'
+                                        : f.required ? 'text-primary font-semibold' : 'text-emerald-600 dark:text-emerald-400 font-semibold';
+                                    return (
+                                        <div key={f.key} className={`${FIELD_GRID} py-3.5`}>
+                                            <div className="min-w-0 pr-2">
+                                                <p className={`text-sm font-bold break-words ${f.visible ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-muted-foreground line-through'}`}>
+                                                    {f.customLabel?.trim() || f.label}
+                                                    {f.customLabel?.trim() && (
+                                                        <span className="ml-1.5 text-xs font-normal text-slate-400 dark:text-muted-foreground">({f.label})</span>
+                                                    )}
+                                                </p>
+                                                <p className={`text-[11px] mt-0.5 ${statusClass}`}>{status}</p>
+                                            </div>
+                                            <div className="flex justify-center">
+                                                <Toggle label={`Mostrar ${f.label}`} checked={f.visible} onChange={v => updateField(f.key, { visible: v })} />
+                                            </div>
+                                            <div className="flex justify-center">
+                                                <Toggle label={`${f.label} obligatorio`} checked={f.required && !NEVER_REQUIRED.has(f.key)} disabled={!f.visible || NEVER_REQUIRED.has(f.key)} onChange={v => updateField(f.key, { required: v })} />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </PhaseSectionContainer>
                 )}
 
                 {/* ============================================================== */}
-                {/* FASE 3: CAMINO */}
+                {/* FASE: CAMINO */}
                 {/* ============================================================== */}
                 {section === 'fases' && selectedPhase === 'camino' && (
                     <PhaseSectionContainer
                         id="camino"
-                        num={3}
-                        name="Camino"
+                        num={currentPhaseMeta.num}
+                        name={currentPhaseMeta.name}
                         title="Selección de planes, servicios y precios"
-                        description="Permite que la familia elija su plan de cremación, servicios especiales y visualice los precios."
+                        description={currentPhaseMeta.description}
                         icon={Package}
-                        isActive={phases.camino}
+                        isActive={activePhases.camino}
                         onToggle={() => togglePhase('camino')}
                     >
-                        <div className="glass-card p-5 sm:p-6 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/50 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
                             <div>
-                                <h4 className="font-bold text-white">Planes, servicios especiales y precios</h4>
-                                <p className="text-xs text-muted-foreground mt-1 max-w-xl">
-                                    En este paso la familia elige su plan de cremación y los servicios especiales. Qué servicios aparecen y qué precios se muestran se configura en «Pesos y precios».
+                                <h4 className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-base">
+                                    Planes, servicios especiales y precios
+                                </h4>
+                                <p className="text-xs text-slate-500 dark:text-muted-foreground mt-1 max-w-xl leading-relaxed">
+                                    En este paso la familia elige su plan de cremación y los servicios adicionales. Qué servicios aparecen y qué precios se muestran se configura en «Pesos y Tarifas».
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setSection('pesos')}
-                                className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary/10 text-primary text-sm font-bold hover:bg-primary/15 cursor-pointer"
+                                className="shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-primary/10 text-primary text-xs sm:text-sm font-bold hover:bg-primary/15 cursor-pointer"
                             >
-                                Ir a Pesos y precios <ChevronRight size={15} />
+                                Ir a Pesos y Tarifas <ChevronRight size={15} />
                             </button>
                         </div>
                     </PhaseSectionContainer>
                 )}
 
                 {/* ============================================================== */}
-                {/* FASE 4: RECUERDOS */}
+                {/* FASE: RECUERDOS / HOMENAJE */}
                 {/* ============================================================== */}
                 {section === 'fases' && selectedPhase === 'recuerdos' && (
                     <PhaseSectionContainer
                         id="recuerdos"
-                        num={4}
-                        name="Recuerdos"
+                        num={currentPhaseMeta.num}
+                        name={currentPhaseMeta.name}
                         title="Homenaje, fotos y dedicatoria"
-                        description="Paso para que la familia suba fotografías conmemorativas y redacte una dedicatoria o mensaje de despedida."
+                        description={currentPhaseMeta.description}
                         icon={Heart}
-                        isActive={phases.recuerdos}
+                        isActive={activePhases.recuerdos}
                         onToggle={() => togglePhase('recuerdos')}
                     >
-                        <div className="glass-card p-5 sm:p-6 rounded-3xl space-y-6">
+                        <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/50 p-5 sm:p-6 space-y-5 shadow-xs">
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <Heart size={18} className="text-rose-400" />
-                                    <h4 className="font-bold text-white">Opciones de Homenaje y Recuerdos</h4>
+                                    <Heart size={18} className="text-rose-500 dark:text-rose-400" />
+                                    <h4 className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-base">
+                                        Opciones de Homenaje y Recuerdos
+                                    </h4>
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1 max-w-xl">
+                                <p className="text-xs text-slate-500 dark:text-muted-foreground mt-1 max-w-xl">
                                     Define si la familia puede subir fotos, escribir una dedicatoria y si estos elementos son obligatorios.
                                 </p>
                             </div>
 
-                            <div className="divide-y divide-foreground/5">
+                            <div className="divide-y divide-slate-100 dark:divide-white/5">
                                 {/* Fotos conmemorativas */}
                                 <div className="py-4 space-y-3">
                                     <div className="flex items-center justify-between gap-4">
                                         <div className="flex items-start gap-3">
-                                            <div className="p-2 rounded-xl bg-rose-500/10 text-rose-400 shrink-0 mt-0.5">
+                                            <div className="p-2 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5">
                                                 <Camera size={16} />
                                             </div>
                                             <div>
-                                                <p className="text-sm font-medium text-white">Subida de fotos de la mascota</p>
-                                                <p className="text-[11px] text-muted-foreground mt-0.5">
-                                                    Permite a la familia adjuntar de 1 a 3 fotos para enmarcar su recuerdo y generar la tarjeta conmemorativa. Se recortan en cuadrado y se optimizan automáticamente.
+                                                <p className="text-sm font-bold text-slate-900 dark:text-white">Subida de fotos de la mascota</p>
+                                                <p className="text-xs text-slate-500 dark:text-muted-foreground mt-0.5">
+                                                    Permite a la familia adjuntar de 1 a 3 fotos para enmarcar su recuerdo y generar la tarjeta conmemorativa.
                                                 </p>
                                             </div>
                                         </div>
@@ -1181,10 +1519,10 @@ export function PublicFormTab() {
                                     </div>
 
                                     {memories.allow_photos && (
-                                        <div className="ml-11 flex items-center justify-between gap-4 pt-2 border-t border-foreground/5">
+                                        <div className="ml-11 flex items-center justify-between gap-4 pt-2.5 border-t border-slate-100 dark:border-white/5">
                                             <div>
-                                                <p className="text-xs font-medium text-white">Al menos una foto obligatoria</p>
-                                                <p className="text-[10px] text-muted-foreground">La familia no podrá avanzar sin subir al menos una fotografía.</p>
+                                                <p className="text-xs font-bold text-slate-800 dark:text-white">Al menos una foto obligatoria</p>
+                                                <p className="text-[11px] text-slate-500 dark:text-muted-foreground">La familia no podrá avanzar sin subir al menos una fotografía.</p>
                                             </div>
                                             <Toggle
                                                 label="Foto obligatoria"
@@ -1199,12 +1537,12 @@ export function PublicFormTab() {
                                 <div className="py-4 space-y-3">
                                     <div className="flex items-center justify-between gap-4">
                                         <div className="flex items-start gap-3">
-                                            <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 shrink-0 mt-0.5">
+                                            <div className="p-2 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5">
                                                 <MessageSquareQuote size={16} />
                                             </div>
                                             <div>
-                                                <p className="text-sm font-medium text-white">Palabras de despedida / Dedicatoria</p>
-                                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                                <p className="text-sm font-bold text-slate-900 dark:text-white">Palabras de despedida / Dedicatoria</p>
+                                                <p className="text-xs text-slate-500 dark:text-muted-foreground mt-0.5">
                                                     Espacio emotivo para que el tutor escriba un mensaje personalizado para honrar la partida de su mascota.
                                                 </p>
                                             </div>
@@ -1221,10 +1559,10 @@ export function PublicFormTab() {
                                     </div>
 
                                     {memories.allow_dedication && (
-                                        <div className="ml-11 flex items-center justify-between gap-4 pt-2 border-t border-foreground/5">
+                                        <div className="ml-11 flex items-center justify-between gap-4 pt-2.5 border-t border-slate-100 dark:border-white/5">
                                             <div>
-                                                <p className="text-xs font-medium text-white">Dedicatoria obligatoria</p>
-                                                <p className="text-[10px] text-muted-foreground">Exige escribir unas palabras antes de continuar al resumen.</p>
+                                                <p className="text-xs font-bold text-slate-800 dark:text-white">Dedicatoria obligatoria</p>
+                                                <p className="text-[11px] text-slate-500 dark:text-muted-foreground">Exige escribir unas palabras antes de continuar al resumen.</p>
                                             </div>
                                             <Toggle
                                                 label="Dedicatoria obligatoria"
@@ -1238,13 +1576,13 @@ export function PublicFormTab() {
                                 {/* Sugerencias de despedida con IA / precargadas */}
                                 <div className="py-4 flex items-center justify-between gap-4">
                                     <div className="flex items-start gap-3">
-                                        <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 shrink-0 mt-0.5">
+                                        <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5">
                                             <Sparkles size={16} />
                                         </div>
                                         <div>
-                                            <p className="text-sm font-medium text-white">Sugerencias y apoyo para redactar</p>
-                                            <p className="text-[11px] text-muted-foreground mt-0.5">
-                                                Muestra el botón "Sugerir mensaje" para acompañar a los tutores que se sienten abrumados o sin palabras.
+                                            <p className="text-sm font-bold text-slate-900 dark:text-white">Sugerencias y apoyo para redactar</p>
+                                            <p className="text-xs text-slate-500 dark:text-muted-foreground mt-0.5">
+                                                Muestra el botón «Sugerir mensaje» para acompañar a los tutores que se sienten abrumados o sin palabras.
                                             </p>
                                         </div>
                                     </div>
@@ -1266,27 +1604,27 @@ export function PublicFormTab() {
                 {section === 'pesos' && (
                     <section className="space-y-6">
                         {/* Tramos de peso (Acordeón colapsable para mantener la pantalla compacta) */}
-                        <div className="glass-card rounded-3xl overflow-hidden transition-all">
+                        <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/50 overflow-hidden transition-all shadow-xs">
                             <button
                                 type="button"
                                 onClick={() => setTiersAccordionOpen(prev => !prev)}
-                                className="w-full p-5 sm:p-6 flex flex-wrap items-center justify-between gap-4 text-left cursor-pointer hover:bg-white/[0.02] transition-colors"
+                                className="w-full p-5 sm:p-6 flex flex-wrap items-center justify-between gap-4 text-left cursor-pointer hover:bg-slate-50/70 dark:hover:bg-white/[0.02] transition-colors"
                             >
                                 <div className="flex items-start sm:items-center gap-3.5">
-                                    <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+                                    <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
                                         <Scale size={20} />
                                     </div>
                                     <div>
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <h4 className="font-bold text-white text-base">Rangos de peso (Tabla General)</h4>
-                                            <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                                            <h4 className="font-extrabold text-slate-900 dark:text-white text-base">Rangos de peso (Tabla General)</h4>
+                                            <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
                                                 {tiers.length === 1 ? '1 rango' : `${tiers.length} rangos configurados`}
                                             </span>
-                                            <span className="text-[10px] font-medium text-muted-foreground">
+                                            <span className="text-[11px] font-medium text-slate-500 dark:text-muted-foreground">
                                                 · {weightMode === 'table' ? 'Precio por plan y peso' : 'Recargo por peso'}
                                             </span>
                                         </div>
-                                        <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
+                                        <p className="text-xs text-slate-500 dark:text-muted-foreground mt-0.5 max-w-xl">
                                             {tiersAccordionOpen
                                                 ? 'Define los tramos en kg y la matriz de precios base de cada plan.'
                                                 : 'Haz clic para desplegar y editar los rangos de peso o modificar los precios de cada plan.'}
@@ -1304,10 +1642,10 @@ export function PublicFormTab() {
                             </button>
 
                             {tiersAccordionOpen && (
-                                <div className="p-5 sm:p-6 pt-0 space-y-6 border-t border-white/5">
+                                <div className="p-5 sm:p-6 pt-0 space-y-6 border-t border-slate-100 dark:border-white/5">
                                     {/* Cómo cobra el peso */}
                                     <fieldset className="pt-4">
-                                        <legend className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">¿Cómo cobras según el peso?</legend>
+                                        <legend className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-muted-foreground">¿Cómo cobras según el peso?</legend>
                                         <div className="grid gap-2 sm:grid-cols-2">
                                             {([
                                                 { id: 'surcharge', title: 'Recargo por peso', desc: 'Cada rango suma un monto al plan o servicio elegido.' },
@@ -1317,7 +1655,7 @@ export function PublicFormTab() {
                                                 return (
                                                     <label
                                                         key={opt.id}
-                                                        className={`flex cursor-pointer gap-3 rounded-2xl border p-3.5 transition-colors ${active ? 'border-primary bg-primary/10' : 'border-foreground/10 hover:border-foreground/20'}`}
+                                                        className={`flex cursor-pointer gap-3 rounded-2xl border p-3.5 transition-colors ${active ? 'border-primary bg-primary/10' : 'border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20'}`}
                                                     >
                                                         <input
                                                             type="radio"
@@ -1328,8 +1666,8 @@ export function PublicFormTab() {
                                                             className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--primary)]"
                                                         />
                                                         <span className="min-w-0">
-                                                            <span className="block text-sm font-bold text-foreground">{opt.title}</span>
-                                                            <span className="mt-0.5 block text-xs text-muted-foreground">{opt.desc}</span>
+                                                            <span className="block text-sm font-bold text-slate-900 dark:text-white">{opt.title}</span>
+                                                            <span className="mt-0.5 block text-xs text-slate-500 dark:text-muted-foreground">{opt.desc}</span>
                                                         </span>
                                                     </label>
                                                 );
@@ -1338,12 +1676,12 @@ export function PublicFormTab() {
                                     </fieldset>
 
                                     {tiers.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground py-4">
+                                        <p className="text-sm text-slate-500 dark:text-muted-foreground py-4">
                                             Sin rangos definidos: el formulario usa rangos genéricos (Pequeño, Mediano, Grande, Gigante) sin recargo.
                                         </p>
                                     ) : (
                                         <div className="space-y-3">
-                                            <div className={`hidden md:grid ${weightMode === 'table' ? TIER_GRID_MD_TABLE : TIER_GRID_MD} gap-3 px-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground`}>
+                                            <div className={`hidden md:grid ${weightMode === 'table' ? TIER_GRID_MD_TABLE : TIER_GRID_MD} gap-3 px-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-muted-foreground`}>
                                                 <span>Nombre (opcional)</span>
                                                 <span>Desde</span>
                                                 <span>Hasta</span>
@@ -1353,7 +1691,7 @@ export function PublicFormTab() {
                                             {tiers.map((t, idx) => {
                                                 const isLast = idx === tiers.length - 1;
                                                 return (
-                                                    <div key={idx} className={`grid grid-cols-2 gap-x-3 gap-y-2.5 rounded-2xl border border-foreground/10 p-3 ${weightMode === 'table' ? TIER_GRID_MD_TABLE : TIER_GRID_MD} md:items-start md:gap-3 md:rounded-none md:border-0 md:p-0`}>
+                                                    <div key={idx} className={`grid grid-cols-2 gap-x-3 gap-y-2.5 rounded-2xl border border-slate-200 dark:border-white/10 p-3 ${weightMode === 'table' ? TIER_GRID_MD_TABLE : TIER_GRID_MD} md:items-start md:gap-3 md:rounded-none md:border-0 md:p-0`}>
                                                         <div className="col-span-2 md:col-span-1 flex items-end gap-2 min-w-0">
                                                             <div className="flex-1 min-w-0">
                                                                 <TierLabel>Rango {idx + 1} · Nombre (opcional)</TierLabel>
@@ -1397,7 +1735,7 @@ export function PublicFormTab() {
                                                         </div>}
                                                         <TierActions idx={idx} total={tiers.length} onMove={dir => moveTier(idx, dir)} onRemove={() => removeTier(idx)} className="hidden md:flex" />
                                                         {/* Tarjeta del tamaño en el catálogo de planes */}
-                                                        <div className="col-span-2 md:col-span-full flex items-center gap-3 md:pb-3 md:border-b md:border-foreground/5">
+                                                        <div className="col-span-2 md:col-span-full flex items-center gap-3 md:pb-3 md:border-b md:border-slate-100 dark:md:border-white/5">
                                                             <TierIconField value={t.icon_url} label={`Rango ${idx + 1}`} onChange={url => updateTier(idx, { icon_url: url })} />
                                                             <div className="flex-1 min-w-0">
                                                                 <FormInputLite
@@ -1427,13 +1765,13 @@ export function PublicFormTab() {
 
                                     {/* Precio por plan y peso dentro del acordeón */}
                                     {weightMode === 'table' && (
-                                        <div className="pt-6 border-t border-white/5 space-y-4">
+                                        <div className="pt-6 border-t border-slate-100 dark:border-white/5 space-y-4">
                                             <div>
                                                 <div className="flex items-center gap-2">
-                                                    <Layers size={18} className="text-amber-400" />
-                                                    <h4 className="font-bold text-white">Precio de cada plan según el peso</h4>
+                                                    <Layers size={18} className="text-amber-500 dark:text-amber-400" />
+                                                    <h4 className="font-extrabold text-slate-900 dark:text-white">Precio de cada plan según el peso</h4>
                                                 </div>
-                                                <p className="text-xs text-muted-foreground mt-1 max-w-xl">
+                                                <p className="text-xs text-slate-500 dark:text-muted-foreground mt-1 max-w-xl">
                                                     Escribe el precio final de cada plan en cada rango (ya incluye el peso, no se suma recargo).
                                                     Si dejas una celda vacía se usa el precio base del plan. Se aplica en el formulario, el catálogo y las órdenes nuevas.
                                                 </p>
@@ -1460,21 +1798,20 @@ export function PublicFormTab() {
                             onSelectActiveList={setFormPriceListId}
                         />
                         {/* Rangos de peso / precios que usa el formulario principal */}
-                        <div className="glass-card p-5 sm:p-6 rounded-3xl space-y-3">
+                        <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/50 p-5 sm:p-6 space-y-3 shadow-xs">
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <Layers size={18} className="text-sky-400" />
-                                    <h4 className="font-bold text-white">Rangos y precios del formulario</h4>
+                                    <Layers size={18} className="text-sky-500 dark:text-sky-400" />
+                                    <h4 className="font-extrabold text-slate-900 dark:text-white">Rangos y precios del formulario principal</h4>
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1 max-w-xl">
-                                    Elige qué rangos de peso y precios ve la familia en el formulario principal. Los formularios personalizados usan esta misma, salvo que elijan otra en «Enlaces».
-                                    Un enlace del catálogo de planes con su propia tabla siempre usa la suya.
+                                <p className="text-xs text-slate-500 dark:text-muted-foreground mt-1 max-w-xl">
+                                    Elige qué rangos de peso y precios ve la familia en el formulario principal. Los formularios personalizados usan esta misma tabla, salvo que elijan otra en «Mis Formularios».
                                 </p>
                             </div>
                             <select
                                 value={formPriceListId ?? ''}
                                 onChange={e => setFormPriceListId(e.target.value ? Number(e.target.value) : null)}
-                                className="w-full sm:max-w-md bg-white/5 border border-white/10 rounded-2xl py-3 px-4 text-sm font-semibold outline-none focus:border-primary/50"
+                                className="w-full sm:max-w-md bg-white dark:bg-slate-950 border border-slate-300 dark:border-white/10 text-slate-900 dark:text-white rounded-2xl py-3 px-4 text-sm font-semibold outline-none focus:border-primary/50"
                             >
                                 <option value="">General (los rangos de arriba)</option>
                                 {priceListOptions.map(pl => (
@@ -1487,89 +1824,91 @@ export function PublicFormTab() {
                             {formPriceListId && (() => {
                                 const pl = priceListOptions.find(p => p.id === formPriceListId);
                                 return pl && pl.status !== 'activa' ? (
-                                    <p className="text-xs font-semibold text-amber-500">
+                                    <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
                                         «{pl.name}» está {PRICE_LIST_STATUS[pl.status]?.label.toLowerCase() || pl.status}: mientras no esté vigente el formulario usa la General.
                                     </p>
                                 ) : null;
                             })()}
                         </div>
-                        {/* Precios visibles en el formulario */}
-                        <div className="glass-card p-5 sm:p-6 rounded-3xl space-y-4">
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <Tag size={18} className="text-emerald-400" />
-                                    <h4 className="font-bold text-white">Precios en el formulario</h4>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1 max-w-xl">
-                                    Elige qué precios ve la familia. Al activar alguno, el resumen final muestra el total estimado (plan elegido + servicios especiales + recargo por peso).
-                                </p>
-                            </div>
-                            <div className="divide-y divide-foreground/5">
-                                {weightMode !== 'table' && (
-                                    <PriceToggleRow
-                                        title="Precio según el peso"
-                                        description="Muestra el recargo correspondiente a cada rango de peso."
-                                        checked={showPrices}
-                                        onChange={setShowPrices}
-                                    />
-                                )}
-                                <PriceToggleRow
-                                    title="Precio según el plan elegido"
-                                    description={weightMode === 'table'
-                                        ? 'Muestra el precio de cada plan (según el peso elegido) y de los servicios adicionales.'
-                                        : 'Muestra el precio de cada plan de cremación y de los servicios adicionales al seleccionarlos.'}
-                                    checked={showServicePrices}
-                                    onChange={setShowServicePrices}
-                                />
-                            </div>
-                        </div>
 
-                        {/* Catálogo de planes compartido */}
-                        <div className="glass-card p-5 sm:p-6 rounded-3xl space-y-4">
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <Tag size={18} className="text-emerald-400" />
-                                    <h4 className="font-bold text-white">Catálogo de planes</h4>
+                        {/* Precios visibles y Catálogo en grid de 2 columnas en desktop */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/50 p-5 sm:p-6 space-y-4 shadow-xs">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <Tag size={18} className="text-emerald-500 dark:text-emerald-400" />
+                                        <h4 className="font-extrabold text-slate-900 dark:text-white">Precios visibles en el formulario</h4>
+                                    </div>
+                                    <p className="text-xs text-slate-500 dark:text-muted-foreground mt-1">
+                                        Elige qué precios ve la familia. Al activar alguno, el resumen final muestra el total estimado.
+                                    </p>
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1 max-w-xl">
-                                    Lo que ve la familia en el enlace del catálogo de planes (Gestión de Servicios → Compartir Catálogo de Planes).
-                                </p>
+                                <div className="divide-y divide-slate-100 dark:divide-white/5">
+                                    {weightMode !== 'table' && (
+                                        <PriceToggleRow
+                                            title="Precio según el peso"
+                                            description="Muestra el recargo correspondiente a cada rango de peso."
+                                            checked={showPrices}
+                                            onChange={setShowPrices}
+                                        />
+                                    )}
+                                    <PriceToggleRow
+                                        title="Precio según el plan elegido"
+                                        description={weightMode === 'table'
+                                            ? 'Muestra el precio de cada plan (según el peso elegido) y de los servicios adicionales.'
+                                            : 'Muestra el precio de cada plan de cremación y de los servicios adicionales al seleccionarlos.'}
+                                        checked={showServicePrices}
+                                        onChange={setShowServicePrices}
+                                    />
+                                </div>
                             </div>
-                            <div className="divide-y divide-foreground/5">
-                                <PriceToggleRow
-                                    title="Botón «Solicitar este plan»"
-                                    description="Lleva al formulario de registro con el plan y el peso elegidos. Si lo ocultas, cada plan solo muestra «Consultar por WhatsApp»."
-                                    checked={showPlanRequest}
-                                    onChange={setShowPlanRequest}
-                                />
+
+                            <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/50 p-5 sm:p-6 space-y-4 shadow-xs">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <Tag size={18} className="text-emerald-500 dark:text-emerald-400" />
+                                        <h4 className="font-extrabold text-slate-900 dark:text-white">Catálogo de planes</h4>
+                                    </div>
+                                    <p className="text-xs text-slate-500 dark:text-muted-foreground mt-1">
+                                        Lo que ve la familia en el enlace del catálogo de planes (Gestión de Servicios → Compartir Catálogo).
+                                    </p>
+                                </div>
+                                <div className="divide-y divide-slate-100 dark:divide-white/5">
+                                    <PriceToggleRow
+                                        title="Botón «Solicitar este plan»"
+                                        description="Lleva al formulario de registro con el plan y el peso elegidos. Si lo ocultas, solo muestra «Consultar por WhatsApp»."
+                                        checked={showPlanRequest}
+                                        onChange={setShowPlanRequest}
+                                    />
+                                </div>
                             </div>
                         </div>
 
                         {/* Servicios especiales */}
-                        <div className="glass-card p-5 sm:p-6 rounded-3xl space-y-4">
+                        <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/50 p-5 sm:p-6 space-y-4 shadow-xs">
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <Sparkles size={18} className="text-emerald-400" />
-                                    <h4 className="font-bold text-white">Servicios especiales</h4>
+                                    <Sparkles size={18} className="text-emerald-500 dark:text-emerald-400" />
+                                    <h4 className="font-extrabold text-slate-900 dark:text-white">Servicios especiales</h4>
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1 max-w-xl">
+                                <p className="text-xs text-slate-500 dark:text-muted-foreground mt-1 max-w-xl">
                                     Servicios como eutanasia o exhumación ofrecidos a la familia tras elegir el plan. Se administran en el{' '}
                                     <Link href="/dashboard/gestion-servicios" className="text-primary font-semibold hover:underline">catálogo de servicios</Link>.
                                 </p>
                             </div>
 
                             {specials.length === 0 ? (
-                                <p className="text-sm text-muted-foreground py-2">Aún no tienes servicios especiales configurados.</p>
+                                <p className="text-sm text-slate-500 dark:text-muted-foreground py-2">Aún no tienes servicios especiales configurados.</p>
                             ) : (
-                                <div className="divide-y divide-foreground/5">
+                                <div className="divide-y divide-slate-100 dark:divide-white/5">
                                     {specials.map(sv => (
                                         <div key={sv.id} className="flex items-center justify-between gap-4 py-3">
                                             <div className="min-w-0">
-                                                <p className={`text-sm font-medium break-words ${sv.show_in_form !== false ? 'text-white' : 'text-muted-foreground'}`}>
+                                                <p className={`text-sm font-bold break-words ${sv.show_in_form !== false ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-muted-foreground'}`}>
                                                     {sv.name}
-                                                    <span className="ml-2 text-xs font-semibold text-muted-foreground">{formatCLP(sv.price || 0)}</span>
+                                                    <span className="ml-2 text-xs font-semibold text-slate-500 dark:text-muted-foreground">{formatCLP(sv.price || 0)}</span>
                                                 </p>
-                                                <p className="text-[11px] text-muted-foreground mt-0.5 break-words">
+                                                <p className="text-[11px] text-slate-500 dark:text-muted-foreground mt-0.5 break-words">
                                                     {!sv.is_active ? 'Inactivo en el catálogo · ' : ''}{sv.description || 'Sin descripción'}
                                                 </p>
                                             </div>
@@ -1584,10 +1923,10 @@ export function PublicFormTab() {
                             )}
 
                             {newSpecial ? (
-                                <div className="rounded-2xl border border-foreground/10 p-4 space-y-3 bg-white/5">
+                                <div className="rounded-2xl border border-slate-200 dark:border-white/10 p-4 space-y-3 bg-slate-50 dark:bg-white/5">
                                     <div className="flex items-center justify-between">
-                                        <p className="text-sm font-bold text-white">Nuevo servicio especial</p>
-                                        <button type="button" onClick={() => setNewSpecial(null)} aria-label="Cancelar" className="p-1.5 rounded-lg text-muted-foreground hover:bg-foreground/5">
+                                        <p className="text-sm font-bold text-slate-900 dark:text-white">Nuevo servicio especial</p>
+                                        <button type="button" onClick={() => setNewSpecial(null)} aria-label="Cancelar" className="p-1.5 rounded-lg text-slate-500 dark:text-muted-foreground hover:bg-slate-200/60 dark:hover:bg-white/5">
                                             <X size={16} />
                                         </button>
                                     </div>
@@ -1628,24 +1967,24 @@ export function PublicFormTab() {
                 {/* ============================================================== */}
                 {section === 'bienvenida' && (
                     <section className="space-y-6">
-                        {/* 3. Mensaje de Bienvenida / Condolencias (Modal Inicial) */}
-                        <div className="p-6 rounded-3xl border-2 border-indigo-200 dark:border-indigo-500/30 bg-indigo-50/70 dark:bg-indigo-950/20 space-y-4 shadow-sm">
+                        {/* 1. Mensaje de Bienvenida / Condolencias (Modal Inicial) */}
+                        <div className="p-5 sm:p-6 rounded-3xl border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50/50 dark:bg-indigo-950/20 space-y-4 shadow-xs">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                <div className="flex items-center gap-2.5">
-                                    <div className="p-2 rounded-xl bg-indigo-200 text-indigo-900 dark:bg-indigo-500/20 dark:text-indigo-400">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2.5 rounded-xl bg-indigo-500/15 text-indigo-700 dark:text-indigo-400">
                                         <HeartHandshake size={18} />
                                     </div>
                                     <div>
-                                        <div className="flex items-center gap-2">
-                                            <h5 className="font-extrabold text-indigo-950 dark:text-white text-sm">
-                                                Mensaje de Bienvenida y Condolencias (Modal Inicial)
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <h5 className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-base">
+                                                Mensaje de Bienvenida y Condolencias
                                             </h5>
-                                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-500/30">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30">
                                                 Al abrir enlace
                                             </span>
                                         </div>
-                                        <p className="text-[11px] text-indigo-900/80 dark:text-muted-foreground font-medium">
-                                            Ventana emergente que recibe a la familia con tu logo y un mensaje de acompañamiento antes de iniciar el formulario.
+                                        <p className="text-xs text-slate-600 dark:text-muted-foreground">
+                                            Ventana que recibe a la familia con tu logo y un mensaje de acompañamiento antes de iniciar el formulario.
                                         </p>
                                     </div>
                                 </div>
@@ -1654,7 +1993,7 @@ export function PublicFormTab() {
                                     <button
                                         type="button"
                                         onClick={() => setPreviewWelcomeModal(welcomeModal)}
-                                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                                        className="px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
                                         title="Ver cómo lo verá la familia"
                                     >
                                         <Eye size={14} />
@@ -1669,9 +2008,9 @@ export function PublicFormTab() {
                             </div>
 
                             {welcomeModal.enabled !== false && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2 border-t border-indigo-200/60 dark:border-indigo-500/20">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-3 border-t border-indigo-200/60 dark:border-indigo-500/20">
                                     <div>
-                                        <label className="block text-xs font-bold uppercase tracking-wider text-indigo-950 dark:text-slate-200 mb-1">
+                                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-1">
                                             Título del Modal
                                         </label>
                                         <input
@@ -1680,12 +2019,12 @@ export function PublicFormTab() {
                                             onChange={e => setWelcomeModal(prev => ({ ...prev, title: e.target.value }))}
                                             placeholder="Lamentamos tu pérdida"
                                             maxLength={60}
-                                            className="w-full bg-white dark:bg-slate-900 border-2 border-indigo-200 dark:border-indigo-500/40 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-muted-foreground rounded-2xl py-2.5 px-3.5 outline-none focus:border-indigo-600 font-semibold shadow-xs"
+                                            className="w-full bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-500/40 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 rounded-xl py-2.5 px-3.5 outline-none focus:border-indigo-600 font-semibold"
                                         />
                                     </div>
 
                                     <div>
-                                        <label className="block text-xs font-bold uppercase tracking-wider text-indigo-950 dark:text-slate-200 mb-1">
+                                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-1">
                                             Texto del Botón
                                         </label>
                                         <input
@@ -1694,12 +2033,12 @@ export function PublicFormTab() {
                                             onChange={e => setWelcomeModal(prev => ({ ...prev, button_text: e.target.value }))}
                                             placeholder="Continuar"
                                             maxLength={30}
-                                            className="w-full bg-white dark:bg-slate-900 border-2 border-indigo-200 dark:border-indigo-500/40 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-muted-foreground rounded-2xl py-2.5 px-3.5 outline-none focus:border-indigo-600 font-semibold shadow-xs"
+                                            className="w-full bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-500/40 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 rounded-xl py-2.5 px-3.5 outline-none focus:border-indigo-600 font-semibold"
                                         />
                                     </div>
 
                                     <div className="sm:col-span-2">
-                                        <label className="block text-xs font-bold uppercase tracking-wider text-indigo-950 dark:text-slate-200 mb-1">
+                                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-1">
                                             Mensaje de Condolencias / Acompañamiento
                                         </label>
                                         <textarea
@@ -1708,21 +2047,21 @@ export function PublicFormTab() {
                                             placeholder="En estos momentos difíciles, en {empresa} queremos acompañarte y brindarte todo nuestro apoyo. Estamos aquí para ayudarte a honrar la memoria de tu ser querido."
                                             rows={3}
                                             maxLength={350}
-                                            className="w-full bg-white dark:bg-slate-900 border-2 border-indigo-200 dark:border-indigo-500/40 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-muted-foreground rounded-2xl py-2.5 px-3.5 outline-none focus:border-indigo-600 font-medium resize-none shadow-xs"
+                                            className="w-full bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-500/40 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 rounded-xl py-2.5 px-3.5 outline-none focus:border-indigo-600 font-medium resize-none"
                                         />
-                                        <p className="text-[11px] text-indigo-900/70 dark:text-muted-foreground mt-1 font-medium">
-                                            Tip: Puedes escribir <code className="bg-indigo-100 dark:bg-indigo-950 px-1.5 py-0.5 rounded text-indigo-800 dark:text-indigo-300 font-mono font-bold">{"{empresa}"}</code> para que se reemplace automáticamente por el nombre de tu crematorio en negrita.
+                                        <p className="text-[11px] text-slate-600 dark:text-muted-foreground mt-1 font-medium">
+                                            Tip: Escribe <code className="bg-indigo-100 dark:bg-indigo-950 px-1.5 py-0.5 rounded text-indigo-800 dark:text-indigo-300 font-mono font-bold">{"{empresa}"}</code> para insertar automáticamente el nombre de tu crematorio en negrita.
                                         </p>
                                     </div>
                                 </div>
                             )}
 
-                            {/* Video opcional (PRO / ULTRA): al inicio (en el mensaje) o al final (tras enviar) */}
-                            <div className="rounded-2xl border border-indigo-200 dark:border-indigo-500/30 bg-white/70 dark:bg-slate-900/50 p-4 space-y-3">
+                            {/* Video opcional (PRO / ULTRA) */}
+                            <div className="rounded-2xl border border-indigo-200/80 dark:border-indigo-500/30 bg-white/80 dark:bg-slate-900/50 p-4 space-y-3">
                                 <div className="flex items-start justify-between gap-4">
                                     <div>
-                                        <p className="text-sm font-extrabold text-indigo-950 dark:text-white">Video para la familia (opcional)</p>
-                                        <p className="text-[11px] text-indigo-900/80 dark:text-muted-foreground font-medium">
+                                        <p className="text-sm font-extrabold text-slate-900 dark:text-white">Video para la familia (opcional)</p>
+                                        <p className="text-xs text-slate-500 dark:text-muted-foreground">
                                             Un video corto (máx. 60 s) que la familia ve solo si pulsa el botón. No se reproduce solo.
                                         </p>
                                     </div>
@@ -1741,7 +2080,7 @@ export function PublicFormTab() {
                                 />
                                 {videoAllowed && welcomeModal.video && (
                                     <div>
-                                        <label className="block text-[11px] font-bold uppercase tracking-wider text-indigo-950 dark:text-slate-200 mb-1">¿Cuándo se muestra?</label>
+                                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-1">¿Cuándo se muestra?</label>
                                         <VideoPositionPicker
                                             value={welcomeModal.video_position === 'end' ? 'end' : 'start'}
                                             onChange={v => setWelcomeModal(prev => ({ ...prev, video_position: v }))}
@@ -1755,14 +2094,14 @@ export function PublicFormTab() {
                                 )}
                                 {videoAllowed && welcomeModal.video && (
                                     <div className="max-w-xs">
-                                        <label className="block text-[11px] font-bold uppercase tracking-wider text-indigo-950 dark:text-slate-200 mb-1">Texto del botón del video</label>
+                                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 mb-1">Texto del botón del video</label>
                                         <input
                                             type="text"
                                             value={welcomeModal.video_button_text || ''}
                                             onChange={e => setWelcomeModal(prev => ({ ...prev, video_button_text: e.target.value }))}
                                             placeholder="Ver video"
                                             maxLength={40}
-                                            className="w-full bg-white dark:bg-slate-900 border-2 border-indigo-200 dark:border-indigo-500/40 text-sm text-slate-900 dark:text-white rounded-xl py-2 px-3 outline-none focus:border-indigo-600 font-semibold"
+                                            className="w-full bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-500/40 text-sm text-slate-900 dark:text-white rounded-xl py-2 px-3 outline-none focus:border-indigo-600 font-semibold"
                                         />
                                     </div>
                                 )}
@@ -1770,32 +2109,30 @@ export function PublicFormTab() {
                         </div>
 
                         {/* 2. Plazo / Aviso de Entrega de Cenizas General */}
-                        <div className="p-6 rounded-3xl border-2 border-amber-300 dark:border-amber-500/30 bg-amber-50/80 dark:bg-amber-950/20 space-y-3 shadow-sm">
-                            <div className="flex items-center gap-2.5">
-                                <div className="p-2 rounded-xl bg-amber-200 text-amber-900 dark:bg-amber-500/20 dark:text-amber-400">
-                                    <Info size={16} />
+                        <div className="p-5 sm:p-6 rounded-3xl border border-amber-200 dark:border-amber-500/30 bg-amber-50/50 dark:bg-amber-950/20 space-y-3 shadow-xs">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-400">
+                                    <Info size={18} />
                                 </div>
                                 <div>
-                                    <h5 className="font-extrabold text-amber-950 dark:text-white text-sm">
+                                    <h5 className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-base">
                                         Plazo o Nota de Entrega de Cenizas (Aviso General)
                                     </h5>
-                                    <p className="text-[11px] text-amber-900/80 dark:text-muted-foreground font-medium">
+                                    <p className="text-xs text-slate-600 dark:text-muted-foreground">
                                         Mensaje que verá la familia en el resumen y al confirmar su solicitud para conocer los tiempos de entrega.
                                     </p>
                                 </div>
                             </div>
 
-                            <div className="relative">
-                                <input
-                                    type="text"
-                                    value={deliveryNotice}
-                                    onChange={e => setDeliveryNotice(e.target.value)}
-                                    placeholder="Ej: Las cenizas serán entregadas en un plazo de 72 horas hábiles."
-                                    maxLength={200}
-                                    className="w-full bg-white dark:bg-slate-900 border-2 border-amber-300 dark:border-amber-500/40 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-muted-foreground rounded-2xl py-3 px-4 outline-none focus:border-amber-600 focus:ring-4 focus:ring-amber-500/15 transition-all shadow-sm font-medium"
-                                />
-                            </div>
-                            <p className="text-[10px] text-amber-900/70 dark:text-muted-foreground italic font-medium">
+                            <input
+                                type="text"
+                                value={deliveryNotice}
+                                onChange={e => setDeliveryNotice(e.target.value)}
+                                placeholder="Ej: Las cenizas serán entregadas en un plazo de 72 horas hábiles."
+                                maxLength={200}
+                                className="w-full bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-500/40 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 rounded-xl py-3 px-4 outline-none focus:border-amber-600 transition-all font-medium"
+                            />
+                            <p className="text-[11px] text-slate-500 dark:text-muted-foreground">
                                 Puedes dejarlo vacío si no deseas mostrar un plazo automático.
                             </p>
                         </div>
@@ -1803,294 +2140,370 @@ export function PublicFormTab() {
                 )}
 
                 {/* ============================================================== */}
-                {/* SECCIÓN: FORMULARIOS Y ENLACES (PRESETS) */}
+                {/* SECCIÓN: MIS FORMULARIOS Y ENLACES (PRESETS) */}
                 {/* ============================================================== */}
                 {section === 'enlaces' && (
                     <section className="space-y-6">
-                        {/* Cabecera de la sección */}
-                        <div className="p-6 sm:p-7 rounded-3xl border-2 border-violet-200 dark:border-violet-500/20 bg-gradient-to-br from-violet-50 via-purple-50/40 to-white dark:from-violet-500/10 dark:via-purple-500/5 dark:to-slate-900 shadow-sm">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                <div className="flex items-start gap-4">
-                                    <div className="p-3 rounded-2xl bg-violet-600 text-white shrink-0 shadow-md shadow-violet-600/25">
-                                        <FileText size={24} />
+                        {/* 1. Tarjeta Destacada: Formulario Principal (Oficial) */}
+                        <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/60 p-5 sm:p-6 shadow-xs space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                                <div className="flex items-start gap-3.5">
+                                    <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                                        <Globe size={20} />
                                     </div>
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[10px] font-black uppercase tracking-widest text-violet-700 dark:text-violet-400">
-                                                Formularios y Enlaces
-                                            </span>
-                                            <span className="text-slate-300 dark:text-white/30 text-xs">·</span>
-                                            <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 dark:bg-violet-500/15 dark:text-violet-300 border border-violet-200 dark:border-violet-500/30">
-                                                Personalizables
+                                    <div className="space-y-1">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <h4 className="font-black text-slate-900 dark:text-white text-base sm:text-lg">
+                                                Formulario Principal (Predeterminado)
+                                            </h4>
+                                            {!activePreset ? (
+                                                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                    En uso (Oficial)
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300 border border-slate-200 dark:border-white/10">
+                                                    Base clásica
+                                                </span>
+                                            )}
+                                            <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                                                Tarifa: {priceListName(formPriceListId)}
                                             </span>
                                         </div>
-                                        <h4 className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white mt-1">
-                                            Generador de Formularios y Enlaces
-                                        </h4>
-                                        <p className="text-xs sm:text-sm text-slate-600 dark:text-muted-foreground mt-1 max-w-2xl leading-relaxed">
-                                            Crea formularios específicos con <strong className="text-slate-900 dark:text-white">Nombre</strong> y <strong className="text-slate-900 dark:text-white">Descripción</strong> (ej. <em>Datos para proceso de Eutanasia</em>, <em>Servicios Extras</em>) para enviar directamente por WhatsApp o enlace. Elige qué fases mostrar y si incluir el campo médico/diagnóstico sin alterar tu formulario base.
+                                        <p className="text-xs sm:text-sm text-slate-600 dark:text-muted-foreground leading-relaxed">
+                                            Tu formulario general clásico. {activePreset ? `Actualmente tu formulario oficial en uso es «${activePreset.name}».` : 'Actualmente es tu formulario oficial activo.'}
                                         </p>
                                     </div>
                                 </div>
 
                                 <button
                                     type="button"
-                                    onClick={handleOpenCreateModal}
-                                    className="bg-violet-600 hover:bg-violet-700 text-white font-black py-3 px-5 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-violet-600/25 shrink-0 cursor-pointer self-start sm:self-auto hover:scale-[1.01] active:scale-[0.99]"
+                                    onClick={() => setSection('fases')}
+                                    className="self-start inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-white/15 bg-slate-50 hover:bg-slate-100 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 transition-all cursor-pointer shrink-0"
                                 >
-                                    <Plus size={18} />
-                                    <span>Crear Formulario</span>
+                                    <SlidersHorizontal size={14} />
+                                    <span>Configurar pasos base</span>
                                 </button>
                             </div>
-                        </div>
 
-                        {/* 1. Formulario Principal / Oficial (Base) */}
-                        <div className="p-6 rounded-3xl border-2 border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/60 shadow-sm space-y-4">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                <div className="flex items-center gap-2.5">
-                                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
-                                    <h5 className="font-extrabold text-slate-900 dark:text-white text-base">
-                                        Formulario Principal (Oficial)
-                                    </h5>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
-                                        Base activa
-                                    </span>
-                                </div>
-                                <span className="text-xs text-slate-500 dark:text-muted-foreground">
-                                    Usa la configuración de «Pasos y datos», «Pesos y precios» y «Bienvenida y avisos»
+                            {/* Recorrido visual de pasos del formulario principal */}
+                            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                                <span className="text-[11px] font-bold text-slate-500 dark:text-muted-foreground mr-1">
+                                    Recorrido actual:
+                                </span>
+                                {PHASES_LIST.map((p, idx) => {
+                                    const active = phases[p.id];
+                                    return (
+                                        <React.Fragment key={p.id}>
+                                            <span
+                                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                                                    active
+                                                        ? 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-white/10 dark:text-white dark:border-white/15'
+                                                        : 'bg-slate-50 text-slate-400 border-slate-200/60 dark:bg-white/[0.02] dark:text-slate-500 dark:border-white/5 line-through'
+                                                }`}
+                                            >
+                                                <span>{idx + 1}. {p.name}</span>
+                                            </span>
+                                            {idx < PHASES_LIST.length - 1 && (
+                                                <ChevronRight size={13} className="text-slate-400 dark:text-slate-600 shrink-0" />
+                                            )}
+                                        </React.Fragment>
+                                    );
+                                })}
+                                <ChevronRight size={13} className="text-slate-400 dark:text-slate-600 shrink-0" />
+                                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                                    Resumen
                                 </span>
                             </div>
 
-                            <p className="text-xs text-slate-600 dark:text-muted-foreground leading-relaxed">
-                                Este es el formulario general del crematorio. Utilízalo para compartir en tu sitio web, biografía de Instagram o atenciones estándar.
-                            </p>
-
-                            {/* Enlace y acciones */}
-                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2">
+                            {/* Barra de enlace y botones de acción */}
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2 border-t border-slate-100 dark:border-white/5">
                                 <div className="relative flex-1 min-w-0">
                                     <input
                                         type="text"
                                         readOnly
                                         value={getPresetUrl()}
-                                        className="w-full bg-slate-50 dark:bg-black/40 border-2 border-slate-200 dark:border-white/10 text-xs sm:text-sm font-mono text-slate-900 dark:text-white/90 rounded-2xl py-3 pl-4 pr-10 outline-none select-all focus:border-primary font-semibold"
+                                        className="w-full bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 text-xs sm:text-sm font-mono text-slate-800 dark:text-white/90 rounded-xl py-2.5 pl-3.5 pr-9 outline-none select-all focus:border-primary font-medium"
                                     />
-                                    <Globe size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-muted-foreground pointer-events-none" />
+                                    <Globe size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
                                     <button
                                         type="button"
                                         onClick={() => handleCopyUrl('base', getPresetUrl())}
-                                        className="flex-1 sm:flex-none px-4 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 text-slate-800 dark:text-white font-bold text-xs rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer border border-slate-200 dark:border-transparent"
+                                        className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                                     >
-                                        {copiedPresetId === 'base' ? <Check size={16} className="text-emerald-600 dark:text-emerald-400" /> : <Copy size={16} />}
-                                        <span>{copiedPresetId === 'base' ? 'Copiado' : 'Copiar Enlace'}</span>
+                                        {copiedPresetId === 'base' ? <Check size={14} className="text-emerald-400 dark:text-emerald-600" /> : <Copy size={14} />}
+                                        <span>{copiedPresetId === 'base' ? 'Copiado' : 'Copiar enlace'}</span>
                                     </button>
-
                                     <a
                                         href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Hola, te comparto nuestro formulario para el servicio de cremación:\n\n${getPresetUrl()}`)}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="px-4 py-3 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold text-xs rounded-2xl flex items-center justify-center gap-2 transition-all shadow-md shadow-[#25D366]/20 cursor-pointer"
+                                        className="px-3.5 py-2.5 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
                                     >
-                                        <Share2 size={16} />
+                                        <Share2 size={14} />
                                         <span>WhatsApp</span>
                                     </a>
-
                                     <a
                                         href={getPresetUrl()}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="p-3 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 hover:text-slate-900 dark:text-muted-foreground dark:hover:text-white rounded-2xl transition-all cursor-pointer border border-slate-200 dark:border-transparent"
-                                        title="Probar formulario en nueva pestaña"
+                                        className="p-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 rounded-xl transition-all cursor-pointer border border-slate-200 dark:border-white/10"
+                                        title="Abrir formulario en nueva pestaña"
                                     >
-                                        <ExternalLink size={16} />
+                                        <ExternalLink size={15} />
                                     </a>
                                 </div>
                             </div>
                         </div>
 
+                        {/* 2. Plantillas Rápidas de Vinzer (Ancho completo) */}
+                        {formTemplates.length > 0 && (
+                            <div className="w-full rounded-3xl border border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-white/[0.02] p-5 sm:p-6 space-y-3.5">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <div>
+                                        <h5 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-800 dark:text-white flex items-center gap-1.5">
+                                            <Sparkles size={15} className="text-primary" />
+                                            Plantillas rápidas recomendadas
+                                        </h5>
+                                        <p className="text-xs sm:text-sm text-slate-500 dark:text-muted-foreground mt-0.5">
+                                            Inicia un formulario nuevo a partir de una estructura probada sin afectar tu formulario principal.
+                                        </p>
+                                    </div>
+                                </div>
 
-                        {/* 2. Listado de Formularios Personalizados */}
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h5 className="text-sm font-extrabold uppercase tracking-wider text-slate-800 dark:text-muted-foreground">
-                                    Formularios Creados ({customForms.length})
-                                </h5>
-                                {customForms.length > 0 && (
-                                    <button
-                                        type="button"
-                                        onClick={handleOpenCreateModal}
-                                        className="text-xs font-black text-violet-700 dark:text-violet-400 hover:text-violet-800 bg-violet-50 dark:bg-violet-500/10 hover:bg-violet-100 border border-violet-200 dark:border-violet-500/20 px-3 py-1.5 rounded-xl flex items-center gap-1 cursor-pointer transition-all"
-                                    >
-                                        <Plus size={14} />
-                                        Nuevo formulario
-                                    </button>
-                                )}
+                                <div className="grid grid-cols-1 gap-3 w-full">
+                                    {formTemplates.map(t => (
+                                        <div
+                                            key={t.id}
+                                            className="w-full rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/80 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs"
+                                        >
+                                            <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                                                <span className="p-3 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 shrink-0">
+                                                    <PawPrint size={18} />
+                                                </span>
+                                                <div className="min-w-0 flex-1 space-y-1">
+                                                    <p className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">
+                                                        Plantilla «{t.name}»
+                                                    </p>
+                                                    {t.description && (
+                                                        <p className="text-xs sm:text-sm text-slate-600 dark:text-muted-foreground leading-relaxed">
+                                                            {t.description}
+                                                        </p>
+                                                    )}
+                                                    <p className="text-xs font-bold text-rose-600 dark:text-rose-400 pt-0.5">
+                                                        {cleanPhaseOrder(t.phase_order).filter(k => t.phases?.[k] !== false).map((k, i) => `${i + 1}. ${t.phase_labels?.[k]?.name || PHASE_DEFAULTS[k].name}`).join(' → ')} → Resumen
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleCreateFromTemplate(t)}
+                                                className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm transition-all cursor-pointer shadow-xs"
+                                            >
+                                                <Plus size={15} />
+                                                <span>Usar plantilla</span>
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 3. Listado de Formularios Personalizados (Ancho completo) */}
+                        <div className="w-full space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div>
+                                    <h5 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                                        Formularios Personalizados ({customForms.length})
+                                    </h5>
+                                    <p className="text-xs sm:text-sm text-slate-500 dark:text-muted-foreground">
+                                        Crea enlaces a medida para casos específicos (ej. Eutanasia, Convenios, Retiros urgentes o Servicios adicionales).
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleOpenCreateModal}
+                                    className="self-start sm:self-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-xs sm:text-sm hover:opacity-95 transition-all cursor-pointer shadow-sm shrink-0"
+                                >
+                                    <Plus size={15} />
+                                    <span>Crear formulario a medida</span>
+                                </button>
                             </div>
 
                             {customForms.length === 0 ? (
-                                <div className="p-10 rounded-3xl border-2 border-dashed border-violet-300 dark:border-violet-500/30 bg-violet-50/40 dark:bg-transparent text-center space-y-3">
-                                    <div className="w-14 h-14 rounded-2xl bg-violet-600 text-white shadow-md shadow-violet-600/20 flex items-center justify-center mx-auto">
-                                        <FileText size={26} />
+                                <div className="w-full p-8 sm:p-10 rounded-3xl border-2 border-dashed border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.01] text-center space-y-3">
+                                    <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto">
+                                        <FileText size={22} />
                                     </div>
-                                    <h6 className="font-black text-slate-900 dark:text-white text-lg">
-                                        No has creado formularios personalizados todavía
+                                    <h6 className="font-extrabold text-slate-900 dark:text-white text-base">
+                                        Aún no tienes formularios personalizados
                                     </h6>
-                                    <p className="text-xs text-slate-600 dark:text-muted-foreground max-w-md mx-auto leading-relaxed">
-                                        Crea uno con nombre y descripción específica (por ejemplo para <em>Eutanasia</em>, <em>Servicios Extras</em> o <em>Retiros Urgentes</em>) y genera su enlace con 1 clic.
+                                    <p className="text-xs sm:text-sm text-slate-500 dark:text-muted-foreground max-w-xl mx-auto leading-relaxed">
+                                        Puedes crear formularios con pasos propios, un servicio fijo (como Eutanasia), otra lista de precios o campos médicos adicionales sin modificar tu formulario principal.
                                     </p>
                                     <button
                                         type="button"
                                         onClick={handleOpenCreateModal}
-                                        className="mt-2 inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-violet-600 hover:bg-violet-700 text-white font-black text-xs transition-all cursor-pointer shadow-lg shadow-violet-600/30 hover:scale-[1.02] active:scale-[0.98]"
+                                        className="mt-1 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-xs transition-all cursor-pointer shadow-sm"
                                     >
-                                        <Plus size={16} />
-                                        Crear primer formulario personalizado
+                                        <Plus size={15} />
+                                        Crear primer formulario
                                     </button>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 gap-4">
+                                <div className="grid grid-cols-1 gap-4 w-full">
                                     {customForms.map((preset) => {
                                         const url = getPresetUrl(preset.id);
                                         const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(`Hola, te comparto el formulario de ${preset.name}:\n\n${url}`)}`;
 
+                                        const isOfficialPreset = preset.id === officialFormId;
+
                                         return (
                                             <div
                                                 key={preset.id}
-                                                className="p-5 sm:p-6 rounded-3xl border-2 border-slate-200 dark:border-white/10 hover:border-violet-500/60 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all space-y-4 group"
+                                                className={`w-full p-5 sm:p-6 rounded-3xl border shadow-xs transition-all flex flex-col justify-between gap-4 ${
+                                                    isOfficialPreset
+                                                        ? 'border-emerald-500/50 bg-emerald-500/[0.03] dark:bg-emerald-500/[0.04] ring-1 ring-emerald-500/20'
+                                                        : 'border-slate-200 dark:border-white/10 hover:border-primary/40 bg-white dark:bg-slate-900/60'
+                                                }`}
                                             >
-                                                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                                                    <div>
-                                                        <div className="flex flex-wrap items-center gap-2">
-                                                            <span className="badge px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider bg-violet-600 text-white shadow-sm">
-                                                                {preset.name}
-                                                            </span>
-                                                            {preset.include_health_status && (
-                                                                <span className="badge px-2.5 py-1 rounded-xl text-xs font-bold uppercase tracking-wider bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-300 border border-sky-300 dark:border-sky-500/30">
-                                                                    🩺 Incluye Diagnóstico Clínico
+                                                <div className="space-y-3">
+                                                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <h6 className="font-black text-slate-900 dark:text-white text-base sm:text-lg">
+                                                                    {preset.name}
+                                                                </h6>
+                                                                {isOfficialPreset && (
+                                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                                        En uso (Formulario Oficial)
+                                                                    </span>
+                                                                )}
+                                                                {preset.associated_service_id && (
+                                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/20">
+                                                                        <Sparkles size={12} />
+                                                                        {getAssociatedServiceName(preset.associated_service_id)}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {preset.description && (
+                                                                <p className="text-xs sm:text-sm text-slate-600 dark:text-muted-foreground mt-1.5 leading-relaxed">
+                                                                    {preset.description}
+                                                                </p>
+                                                            )}
+                                                        </div>
+
+                                                        <div className="flex items-center gap-1.5 shrink-0">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleStartEditPreset(preset)}
+                                                                className="px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+                                                                title="Editar este formulario"
+                                                            >
+                                                                <Pencil size={13} />
+                                                                <span>Editar</span>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    if (confirm(`¿Estás seguro de eliminar el formulario "${preset.name}"?`)) {
+                                                                        handleDeletePreset(preset.id);
+                                                                    }
+                                                                }}
+                                                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-500/10 rounded-xl transition-all cursor-pointer"
+                                                                title="Eliminar formulario"
+                                                            >
+                                                                <Trash2 size={15} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Recorrido de fases de este formulario */}
+                                                    <div className="flex flex-wrap items-center gap-1.5">
+                                                        {cleanPhaseOrder(preset.phase_order).map((key, i) => {
+                                                            const isAct = preset.phases?.[key] !== false;
+                                                            const custom = preset.phase_labels?.[key]?.name?.trim();
+                                                            return (
+                                                                <span
+                                                                    key={key}
+                                                                    className={`px-2 py-0.5 rounded-lg text-[11px] font-bold border ${
+                                                                        isAct
+                                                                            ? 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-white/10 dark:text-slate-200 dark:border-white/15'
+                                                                            : 'bg-slate-50 text-slate-400 border-slate-200/50 dark:bg-white/[0.02] dark:text-slate-600 dark:border-white/5 line-through'
+                                                                    }`}
+                                                                >
+                                                                    {i + 1}. {custom || PHASE_DEFAULTS[key].name}
+                                                                </span>
+                                                            );
+                                                        })}
+                                                    </div>
+
+                                                    {/* Etiquetas adicionales */}
+                                                    {(preset.include_health_status || preset.price_list_id || preset.delivery_notice || preset.welcome_modal) && (
+                                                        <div className="flex flex-wrap items-center gap-1.5">
+                                                            {preset.price_list_id && (
+                                                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20">
+                                                                    Tarifa: {priceListName(preset.price_list_id)}
                                                                 </span>
                                                             )}
-                                                            {preset.fields && Object.keys(preset.fields).length > 0 && (
-                                                                <span className="badge px-2.5 py-1 rounded-xl text-xs font-bold uppercase tracking-wider bg-violet-100 text-violet-800 dark:bg-violet-500/20 dark:text-violet-300 border border-violet-300 dark:border-violet-500/30">
-                                                                    ⚙ Campos personalizados
+                                                            {preset.include_health_status && (
+                                                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                                                                    Incluye diagnóstico clínico
+                                                                </span>
+                                                            )}
+                                                            {preset.welcome_modal && (
+                                                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20">
+                                                                    Bienvenida propia
                                                                 </span>
                                                             )}
                                                             {preset.delivery_notice && (
-                                                                <span className="badge px-2.5 py-1 rounded-xl text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-300 border border-amber-300 dark:border-amber-500/30">
-                                                                    ⏱ {preset.delivery_notice}
+                                                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/20 truncate max-w-xs">
+                                                                    Plazo: {preset.delivery_notice}
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        {preset.description && (
-                                                            <p className="text-xs sm:text-sm text-slate-700 dark:text-muted-foreground mt-2 leading-relaxed font-medium">
-                                                                {preset.description}
-                                                            </p>
-                                                        )}
-                                                    </div>
-
-                                                    <div className="flex items-center gap-2 self-end sm:self-start">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleStartEditPreset(preset)}
-                                                            className="px-3 py-1.5 text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 dark:text-violet-300 dark:bg-violet-500/10 dark:hover:bg-violet-500/20 border-2 border-violet-200 dark:border-violet-500/30 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
-                                                            title="Editar este formulario"
-                                                        >
-                                                            <Pencil size={13} />
-                                                            <span>Editar</span>
-                                                        </button>
-
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                if (confirm(`¿Estás seguro de eliminar el formulario "${preset.name}"?`)) {
-                                                                    handleDeletePreset(preset.id);
-                                                                }
-                                                            }}
-                                                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:text-muted-foreground dark:hover:text-red-400 dark:hover:bg-red-500/10 rounded-xl transition-all cursor-pointer border border-transparent hover:border-red-200"
-                                                            title="Eliminar formulario"
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                {/* Fases activas y servicio asociado con colores contrastados */}
-                                                <div className="flex flex-wrap items-center gap-2 pt-1">
-                                                    {preset.associated_service_id && (
-                                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black bg-amber-100 text-amber-950 border-2 border-amber-300 dark:bg-amber-500/20 dark:text-amber-200 dark:border-amber-500/40 shadow-xs">
-                                                            <Sparkles size={13} className="text-amber-600 dark:text-amber-400 shrink-0" />
-                                                            <span>Servicio fijado: <strong>{getAssociatedServiceName(preset.associated_service_id)}</strong></span>
-                                                        </span>
                                                     )}
-                                                    <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-muted-foreground tracking-wider ml-0.5">
-                                                        Fases:
-                                                    </span>
-                                                    {Object.entries(preset.phases || {}).map(([key, isAct]) => {
-                                                        const pLabels: Record<string, string> = {
-                                                            familia: '1. Familia',
-                                                            angel: '2. Ángel',
-                                                            camino: '3. Camino',
-                                                            recuerdos: '4. Recuerdos',
-                                                        };
-                                                        const pColors: Record<string, string> = {
-                                                            familia: 'bg-indigo-100 text-indigo-900 border-indigo-300 dark:bg-indigo-500/20 dark:text-indigo-300 dark:border-indigo-500/30',
-                                                            angel: 'bg-sky-100 text-sky-900 border-sky-300 dark:bg-sky-500/20 dark:text-sky-300 dark:border-sky-500/30',
-                                                            camino: 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30',
-                                                            recuerdos: 'bg-purple-100 text-purple-900 border-purple-300 dark:bg-purple-500/20 dark:text-purple-300 dark:border-purple-500/30',
-                                                        };
-                                                        return (
-                                                            <span
-                                                                key={key}
-                                                                className={`badge px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
-                                                                    isAct
-                                                                        ? pColors[key] || 'bg-violet-100 text-violet-900 border-violet-300'
-                                                                        : 'bg-slate-100 text-slate-400 border-slate-200 dark:bg-white/5 dark:text-slate-500 dark:border-white/5 line-through opacity-70'
-                                                                }`}
-                                                            >
-                                                                {pLabels[key] || key}
-                                                            </span>
-                                                        );
-                                                    })}
                                                 </div>
 
-                                                {/* Input de URL y botones */}
-                                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2 border-t border-slate-100 dark:border-white/5">
+                                                {/* Enlace y acciones */}
+                                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-3 border-t border-slate-100 dark:border-white/5">
                                                     <div className="relative flex-1 min-w-0">
                                                         <input
                                                             type="text"
                                                             readOnly
                                                             value={url}
-                                                            className="w-full bg-slate-50 dark:bg-black/50 border-2 border-slate-200 dark:border-white/10 text-xs sm:text-sm font-mono text-violet-700 dark:text-violet-300 rounded-2xl py-2.5 pl-3.5 pr-10 outline-none select-all focus:border-violet-600 font-semibold"
+                                                            className="w-full bg-slate-50 dark:bg-black/40 border border-slate-200 dark:border-white/10 text-xs font-mono text-slate-700 dark:text-slate-300 rounded-xl py-2 px-3 outline-none select-all"
                                                         />
                                                     </div>
-                                                    <div className="flex items-center gap-2 shrink-0">
+                                                    <div className="flex items-center gap-1.5 shrink-0">
                                                         <button
                                                             type="button"
                                                             onClick={() => handleCopyUrl(preset.id, url)}
-                                                            className="flex-1 sm:flex-none px-4 py-2.5 bg-violet-50 hover:bg-violet-100 dark:bg-violet-600/20 dark:hover:bg-violet-600/30 text-violet-700 dark:text-violet-200 border-2 border-violet-200 dark:border-violet-500/30 font-bold text-xs rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer"
+                                                            className="flex-1 sm:flex-none px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 text-slate-800 dark:text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                                                         >
-                                                            {copiedPresetId === preset.id ? <Check size={15} className="text-emerald-600 dark:text-emerald-400" /> : <Copy size={15} />}
+                                                            {copiedPresetId === preset.id ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
                                                             <span>{copiedPresetId === preset.id ? 'Copiado' : 'Copiar'}</span>
                                                         </button>
-
                                                         <a
                                                             href={waUrl}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
-                                                            className="px-4 py-2.5 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold text-xs rounded-2xl flex items-center justify-center gap-2 transition-all shadow-md shadow-[#25D366]/20 cursor-pointer"
+                                                            className="px-3 py-2 bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                                                         >
-                                                            <Share2 size={15} />
+                                                            <Share2 size={14} />
                                                             <span>WhatsApp</span>
                                                         </a>
-
                                                         <a
                                                             href={url}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
-                                                            className="p-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 hover:text-slate-900 dark:text-muted-foreground dark:hover:text-white rounded-2xl transition-all cursor-pointer border border-slate-200 dark:border-transparent"
-                                                            title="Probar formulario en nueva pestaña"
+                                                            className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300 rounded-xl transition-all cursor-pointer border border-slate-200 dark:border-white/10"
+                                                            title="Abrir formulario en nueva pestaña"
                                                         >
-                                                            <ExternalLink size={15} />
+                                                            <ExternalLink size={14} />
                                                         </a>
                                                     </div>
                                                 </div>
@@ -2111,8 +2524,8 @@ export function PublicFormTab() {
                     <CheckCircle2 size={15} className="shrink-0 text-emerald-500 dark:text-emerald-400" />
                     <span>
                         {section === 'enlaces'
-                            ? 'Los formularios personalizados se guardan al crearlos o editarlos. Este botón guarda el resto de la configuración.'
-                            : 'Los cambios se aplican a todos los enlaces que compartas con las familias.'}
+                            ? 'Los formularios personalizados se guardan al crearlos o editarlos. Este botón guarda la configuración base.'
+                            : 'Los cambios se aplican al formulario principal y a los enlaces que hereden su configuración.'}
                     </span>
                 </div>
 
@@ -2129,484 +2542,643 @@ export function PublicFormTab() {
                 </div>
             </div>
 
-            {/* Modal para crear formulario personalizado */}
+            {/* Modal para crear / editar formulario personalizado (Organizado en 3 pasos claros y responsive) */}
             <AnimatePresence>
                 {isCreatingPreset && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 dark:bg-black/85 backdrop-blur-md">
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 dark:bg-black/85 backdrop-blur-md">
                         <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                            initial={{ opacity: 0, scale: 0.96, y: 12 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 15 }}
-                            className="bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-white/15 rounded-[2rem] p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-6 max-h-[92vh] overflow-y-auto"
+                            exit={{ opacity: 0, scale: 0.96, y: 12 }}
+                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/15 rounded-3xl max-w-3xl w-full shadow-2xl flex flex-col max-h-[92vh] overflow-hidden"
                         >
-                            <div className="flex items-center justify-between pb-4 border-b-2 border-slate-100 dark:border-white/10">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-3 rounded-2xl bg-violet-600 text-white shadow-md shadow-violet-600/25">
-                                        <FileText size={22} />
+                            {/* Cabecera fija del modal */}
+                            <div className="px-5 sm:px-7 pt-5 pb-4 border-b border-slate-200 dark:border-white/10 shrink-0 space-y-3">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="p-2.5 rounded-2xl bg-primary/10 text-primary shrink-0">
+                                            <FileText size={20} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h4 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight truncate">
+                                                {editingPresetId ? `Editar: ${presetName || 'Formulario'}` : 'Nuevo Formulario Personalizado'}
+                                            </h4>
+                                            <p className="text-xs text-slate-500 dark:text-muted-foreground">
+                                                Configura los datos, el orden de los pasos y la bienvenida de este enlace.
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <h4 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                                            {editingPresetId ? 'Editar Formulario Personalizado' : 'Crear Formulario Personalizado'}
-                                        </h4>
-                                        <p className="text-xs sm:text-sm text-slate-600 dark:text-muted-foreground mt-0.5 font-medium">
-                                            {editingPresetId
-                                                ? 'Modifica el nombre, descripción, fases y nota de entrega de este formulario'
-                                                : 'Configura nombre, descripción y fases para generar su enlace'}
-                                        </p>
-                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsCreatingPreset(false);
+                                            setEditingPresetId(null);
+                                        }}
+                                        className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-muted-foreground dark:hover:text-white dark:hover:bg-white/10 rounded-xl transition-all cursor-pointer"
+                                    >
+                                        <X size={18} />
+                                    </button>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsCreatingPreset(false);
-                                        setEditingPresetId(null);
-                                    }}
-                                    className="p-2.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-muted-foreground dark:hover:text-white rounded-xl transition-all cursor-pointer border border-slate-200 dark:border-transparent"
-                                >
-                                    <X size={18} />
-                                </button>
+
+                                {/* Vista previa en vivo del recorrido que verá la familia */}
+                                <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-50 dark:bg-white/[0.04] border border-slate-200/80 dark:border-white/10 text-[11px]">
+                                    <span className="font-bold text-slate-500 dark:text-muted-foreground mr-1">
+                                        Vista previa de pasos:
+                                    </span>
+                                    {presetPhaseOrder.filter(k => presetPhases[k]).map((key, i) => (
+                                        <React.Fragment key={key}>
+                                            <span className="font-bold text-slate-800 dark:text-white bg-white dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200 dark:border-white/10">
+                                                {i + 1}. {presetPhaseLabels[key]?.name?.trim() || PHASE_DEFAULTS[key].name}
+                                            </span>
+                                            <ChevronRight size={12} className="text-slate-400 shrink-0" />
+                                        </React.Fragment>
+                                    ))}
+                                    <span className="font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                                        Resumen
+                                    </span>
+                                </div>
+
+                                {/* Pestañas del modal (3 pasos claros) */}
+                                <div className="grid grid-cols-3 gap-1.5 bg-slate-100 dark:bg-white/5 p-1 rounded-2xl">
+                                    {([
+                                        { id: 'general', label: '1. Datos y Servicio', icon: FileText },
+                                        { id: 'pasos', label: '2. Pasos y Campos', icon: Layers },
+                                        { id: 'bienvenida', label: '3. Bienvenida y Plazo', icon: HeartHandshake },
+                                    ] as const).map(tab => {
+                                        const TabIcon = tab.icon;
+                                        const active = presetModalTab === tab.id;
+                                        return (
+                                            <button
+                                                key={tab.id}
+                                                type="button"
+                                                onClick={() => setPresetModalTab(tab.id)}
+                                                className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                                    active
+                                                        ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
+                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                                                }`}
+                                            >
+                                                <TabIcon size={14} className="shrink-0" />
+                                                <span className="truncate">{tab.label}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
 
-                            <div className="space-y-5">
-                                {/* Nombre */}
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-wider text-slate-900 dark:text-slate-200 mb-1.5">
-                                        Nombre del Formulario *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={presetName}
-                                        onChange={e => setPresetName(e.target.value)}
-                                        placeholder="Ej: Datos para proceso de Eutanasia, Servicios Extras..."
-                                        maxLength={60}
-                                        className="w-full bg-white dark:bg-slate-950 border-2 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-2xl py-3 px-4 text-sm font-semibold outline-none focus:border-violet-600 dark:focus:border-violet-500 focus:ring-4 focus:ring-violet-600/15 transition-all shadow-sm"
-                                    />
-                                </div>
-
-                                {/* Descripción */}
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-wider text-slate-900 dark:text-slate-200 mb-1.5">
-                                        Descripción para la Familia
-                                    </label>
-                                    <textarea
-                                        value={presetDescription}
-                                        onChange={e => setPresetDescription(e.target.value)}
-                                        placeholder="Ej: Por favor completa la información médica y de contacto para coordinar el procedimiento con nuestro equipo."
-                                        rows={3}
-                                        maxLength={250}
-                                        className="w-full bg-white dark:bg-slate-950 border-2 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-2xl py-2.5 px-4 text-sm font-medium outline-none focus:border-violet-600 dark:focus:border-violet-500 focus:ring-4 focus:ring-violet-600/15 transition-all resize-none shadow-sm"
-                                    />
-                                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 font-medium">
-                                        Aparecerá en la parte superior del formulario cuando el cliente abra el enlace.
-                                    </p>
-                                </div>
-
-                                {/* Servicio o Plan Asociado al Formulario */}
-                                <div>
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <label className="block text-xs font-black uppercase tracking-wider text-slate-900 dark:text-slate-200">
-                                            Servicio o Plan Asociado (Opcional)
-                                        </label>
-                                        {presetAssociatedServiceId && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setPresetAssociatedServiceId('')}
-                                                className="text-[11px] font-bold text-red-600 dark:text-red-400 hover:underline cursor-pointer"
-                                            >
-                                                Quitar servicio fijado
-                                            </button>
-                                        )}
-                                    </div>
-                                    <select
-                                        value={presetAssociatedServiceId}
-                                        onChange={e => setPresetAssociatedServiceId(e.target.value)}
-                                        className="w-full bg-white dark:bg-slate-950 border-2 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-2xl py-3 px-4 text-sm font-semibold outline-none focus:border-violet-600 dark:focus:border-violet-500 focus:ring-4 focus:ring-violet-600/15 transition-all shadow-sm cursor-pointer"
-                                    >
-                                        <option value="">-- Sin servicio predeterminado (selección libre) --</option>
-
-                                        {allCatalogServices.some(s => s.is_special) && (
-                                            <optgroup label="🩺 Servicios Especiales / Clínicos (Eutanasia, Exhumación...)">
-                                                {allCatalogServices.filter(s => s.is_special).map(sv => (
-                                                    <option key={`svc_${sv.id}`} value={`svc_${sv.id}`}>
-                                                        {sv.name} {sv.price ? `(${formatCLP(sv.price)})` : ''}
-                                                    </option>
-                                                ))}
-                                            </optgroup>
-                                        )}
-
-                                        {allCatalogPlans.length > 0 && (
-                                            <optgroup label="🕊️ Planes de Cremación">
-                                                {allCatalogPlans.map(pl => (
-                                                    <option key={`plan_${pl.id}`} value={`plan_${pl.id}`}>
-                                                        {pl.name} {pl.price ? `(${formatCLP(pl.price)})` : ''}
-                                                    </option>
-                                                ))}
-                                            </optgroup>
-                                        )}
-
-                                        {allCatalogServices.some(s => !s.is_special) && (
-                                            <optgroup label="📋 Otros Servicios del Catálogo">
-                                                {allCatalogServices.filter(s => !s.is_special).map(sv => (
-                                                    <option key={`svc_${sv.id}`} value={`svc_${sv.id}`}>
-                                                        {sv.name} {sv.price ? `(${formatCLP(sv.price)})` : ''}
-                                                    </option>
-                                                ))}
-                                            </optgroup>
-                                        )}
-                                    </select>
-                                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1.5 font-medium leading-relaxed">
-                                        {presetAssociatedServiceId ? (
-                                            <span className="text-violet-700 dark:text-violet-300 font-bold flex items-center gap-1.5">
-                                                <Sparkles size={13} className="shrink-0 text-amber-500" />
-                                                La solicitud se registrará automáticamente con {getAssociatedServiceName(presetAssociatedServiceId)}, incluso si ocultas la fase de planes.
-                                            </span>
-                                        ) : (
-                                            'Si este enlace es para un servicio específico (ej: Eutanasia o Exhumación), elígelo aquí para asociarlo directamente al formulario.'
-                                        )}
-                                    </p>
-                                </div>
-
-                                {/* Rangos de peso / tabla de precios del formulario personalizado */}
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-wider text-slate-900 dark:text-slate-200 mb-1.5">
-                                        Rangos de peso y precios
-                                    </label>
-                                    <select
-                                        value={presetPriceListId}
-                                        onChange={e => setPresetPriceListId(e.target.value)}
-                                        className="w-full bg-white dark:bg-slate-950 border-2 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-2xl py-3 px-4 text-sm font-semibold outline-none focus:border-violet-600 dark:focus:border-violet-500 focus:ring-4 focus:ring-violet-600/15 transition-all shadow-sm cursor-pointer"
-                                    >
-                                        <option value="">Igual que el formulario principal ({priceListName(formPriceListId)})</option>
-                                        {priceListOptions.map(pl => (
-                                            <option key={pl.id} value={pl.id}>{pl.name} · {PRICE_LIST_STATUS[pl.status]?.label || pl.status}</option>
-                                        ))}
-                                    </select>
-                                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1.5 font-medium leading-relaxed">
-                                        Los rangos de peso y precios que verá la familia en este formulario. Se crean en «Pesos y precios» → Tablas de precios.
-                                    </p>
-                                </div>
-
-                                {/* Selector de Fases */}
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-wider text-slate-900 dark:text-slate-200 mb-2">
-                                        Fases que verá la familia en este formulario
-                                    </label>
-                                    <div className="grid grid-cols-2 gap-2.5">
-                                        {[
-                                            { key: 'familia', label: '1. Familia', desc: 'Datos del cliente y retiro' },
-                                            { key: 'angel', label: '2. Ángel', desc: 'Mascota, peso y especie' },
-                                            { key: 'camino', label: '3. Camino', desc: 'Planes y servicios' },
-                                            { key: 'recuerdos', label: '4. Recuerdos', desc: 'Fotos y dedicatoria' },
-                                        ].map(phase => {
-                                            const isAct = presetPhases[phase.key as keyof PhaseConfig];
-                                            return (
-                                                <button
-                                                    key={phase.key}
-                                                    type="button"
-                                                    onClick={() => setPresetPhases(prev => ({
-                                                        ...prev,
-                                                        [phase.key]: !prev[phase.key as keyof PhaseConfig]
-                                                    }))}
-                                                    className={`p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer ${
-                                                        isAct
-                                                            ? 'border-violet-600 bg-violet-50 dark:bg-violet-950/40 text-slate-900 dark:text-white shadow-md ring-2 ring-violet-600/20'
-                                                            : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:border-slate-300 hover:bg-slate-100 dark:hover:bg-white/10'
-                                                    }`}
-                                                >
-                                                    <div className="flex items-center justify-between">
-                                                        <span className={`text-xs font-black ${isAct ? 'text-violet-950 dark:text-violet-200' : 'text-slate-700 dark:text-slate-400'}`}>
-                                                            {phase.label}
-                                                        </span>
-                                                        <span className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${
-                                                            isAct ? 'bg-violet-600 text-white shadow-sm' : 'border-2 border-slate-300 dark:border-white/20 bg-white dark:bg-slate-800'
-                                                        }`}>
-                                                            {isAct && <Check size={12} strokeWidth={3} />}
-                                                        </span>
-                                                    </div>
-                                                    <p className={`text-[11px] mt-1 truncate ${isAct ? 'text-violet-900 dark:text-violet-300 font-bold' : 'text-slate-400 dark:text-slate-500 font-medium'}`}>
-                                                        {phase.desc}
-                                                    </p>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                {/* Selector / Editor de Campos de este formulario */}
-                                <div className="rounded-2xl border-2 border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/40 p-4 sm:p-5 space-y-4">
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-white/10">
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="p-1.5 rounded-lg bg-violet-600 text-white">
-                                                    <SlidersHorizontal size={14} />
-                                                </span>
-                                                <h5 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                                                    Campos de este Formulario
-                                                </h5>
-                                            </div>
-                                            <p className="text-[11px] text-slate-600 dark:text-muted-foreground mt-0.5 font-medium">
-                                                Configura qué datos solicitar a la familia y cuáles son obligatorios para este formulario.
-                                            </p>
-                                        </div>
-
-                                        {/* Pestañas para alternar entre Familia y Mascota */}
-                                        <div className="flex items-center bg-slate-200/80 dark:bg-white/10 p-1 rounded-xl self-start sm:self-auto shrink-0">
-                                            <button
-                                                type="button"
-                                                onClick={() => setPresetSectionTab('owner')}
-                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                                                    presetSectionTab === 'owner'
-                                                        ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
-                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                                                }`}
-                                            >
-                                                <User size={13} />
-                                                <span>Familia ({presetFields.filter(f => f.section === 'owner' && f.visible).length})</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setPresetSectionTab('pet')}
-                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                                                    presetSectionTab === 'pet'
-                                                        ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
-                                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                                                }`}
-                                            >
-                                                <PawPrint size={13} />
-                                                <span>Ángel ({presetFields.filter(f => f.section === 'pet' && f.visible).length})</span>
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Tabla de campos */}
-                                    <div className="space-y-1">
-                                        <div className={`${FIELD_GRID} pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-muted-foreground border-b border-slate-200 dark:border-white/5`}>
-                                            <span>Nombre del Campo</span>
-                                            <span className="text-center">Mostrar</span>
-                                            <span className="text-center">Obligatorio</span>
-                                        </div>
-
-                                        <div className="divide-y divide-slate-200 dark:divide-white/5">
-                                            {/* Campos fijos del sistema */}
-                                            {FIXED_FIELDS[presetSectionTab].map(fixedName => (
-                                                <div key={fixedName} className={`${FIELD_GRID} py-2.5`}>
-                                                    <span className="flex items-center gap-2 min-w-0 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                                        <Lock size={12} className="shrink-0 text-violet-600 dark:text-violet-400" />
-                                                        <span className="truncate">{fixedName}</span>
-                                                    </span>
-                                                    <span className="col-span-2 justify-self-center rounded-full bg-slate-200/80 dark:bg-white/10 px-2.5 py-0.5 text-[10px] font-bold text-slate-600 dark:text-slate-400">
-                                                        Siempre obligatorio
-                                                    </span>
-                                                </div>
-                                            ))}
-
-                                            {/* Campos configurables */}
-                                            {presetFields
-                                                .filter(f => f.section === presetSectionTab)
-                                                .map(f => {
-                                                    const status = !f.visible ? 'Oculto' : f.required ? 'Obligatorio' : 'Opcional';
-                                                    const statusClass = !f.visible
-                                                        ? 'text-slate-400 dark:text-slate-500'
-                                                        : f.required
-                                                            ? 'text-violet-700 dark:text-violet-400 font-bold'
-                                                            : 'text-emerald-700 dark:text-emerald-400 font-bold';
-                                                    return (
-                                                        <div key={f.key} className={`${FIELD_GRID} py-2.5`}>
-                                                            <div className="min-w-0 pr-2">
-                                                                <p className={`text-xs sm:text-sm font-semibold break-words ${f.visible ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500 line-through'}`}>
-                                                                    {f.label}
-                                                                </p>
-                                                                <p className={`text-[10px] mt-0.5 ${statusClass}`}>
-                                                                    {status}
-                                                                </p>
-                                                                {f.visible && (
-                                                                    <input
-                                                                        type="text"
-                                                                        value={f.customLabel || ''}
-                                                                        onChange={e => updatePresetField(f.key, { customLabel: e.target.value })}
-                                                                        maxLength={MAX_FIELD_LABEL}
-                                                                        placeholder={`Nombre en este formulario (ej. ${f.key === 'pickup' ? 'Dirección' : f.label})`}
-                                                                        aria-label={`Nombre de ${f.label} en este formulario`}
-                                                                        className="mt-1.5 w-full max-w-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-[11px] text-slate-900 dark:text-white placeholder:text-slate-400 rounded-lg py-1.5 px-2.5 outline-none focus:border-violet-600"
-                                                                    />
-                                                                )}
-                                                            </div>
-                                                            <div className="flex justify-center">
-                                                                <Toggle
-                                                                    label={`Mostrar ${f.label}`}
-                                                                    checked={f.visible}
-                                                                    onChange={v => updatePresetField(f.key, { visible: v })}
-                                                                />
-                                                            </div>
-                                                            <div className="flex justify-center">
-                                                                <Toggle
-                                                                    label={`${f.label} obligatorio`}
-                                                                    checked={f.required && !NEVER_REQUIRED.has(f.key)}
-                                                                    disabled={!f.visible || NEVER_REQUIRED.has(f.key)}
-                                                                    onChange={v => updatePresetField(f.key, { required: v })}
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Mensaje de bienvenida específico para este formulario (opcional) */}
-                                <div className="rounded-2xl border-2 border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/40 p-4 space-y-3">
-                                    <div className="flex items-center justify-between gap-4">
-                                        <div>
-                                            <p className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
-                                                Personalizar mensaje de bienvenida para este formulario
-                                            </p>
-                                            <p className="text-[11px] text-slate-500 dark:text-muted-foreground font-medium">
-                                                Si lo activas, este enlace usará su propio título y mensaje de bienvenida en lugar del general.
-                                            </p>
-                                        </div>
-                                        <Toggle
-                                            label="Personalizar mensaje de bienvenida para este formulario"
-                                            checked={presetWelcomeCustom}
-                                            onChange={setPresetWelcomeCustom}
-                                        />
-                                    </div>
-
-                                    {presetWelcomeCustom && (
-                                        <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-white/5">
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                <div>
-                                                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
-                                                        Título del Modal
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        value={presetWelcomeTitle}
-                                                        onChange={e => setPresetWelcomeTitle(e.target.value)}
-                                                        placeholder="Ej: Acompañamiento en Eutanasia"
-                                                        maxLength={60}
-                                                        className="w-full bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white rounded-xl py-2 px-3 outline-none focus:border-violet-600 font-semibold shadow-xs"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
-                                                        Texto del Botón
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        value={presetWelcomeButton}
-                                                        onChange={e => setPresetWelcomeButton(e.target.value)}
-                                                        placeholder="Continuar"
-                                                        maxLength={30}
-                                                        className="w-full bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white rounded-xl py-2 px-3 outline-none focus:border-violet-600 font-semibold shadow-xs"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
-                                                    Mensaje para la Familia
-                                                </label>
-                                                <textarea
-                                                    value={presetWelcomeMessage}
-                                                    onChange={e => setPresetWelcomeMessage(e.target.value)}
-                                                    placeholder="Ej: En este proceso tan sensible, queremos brindarte toda la tranquilidad y cuidado que merecen..."
-                                                    rows={3}
-                                                    maxLength={350}
-                                                    className="w-full bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white rounded-xl py-2 px-3 outline-none focus:border-violet-600 font-medium resize-none shadow-xs"
-                                                />
-                                                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
-                                                    Usa <code className="bg-slate-200 dark:bg-slate-800 px-1 rounded font-bold">{"{empresa}"}</code> para incluir el nombre de tu empresa en negrita.
+                            {/* Cuerpo desplazable del modal */}
+                            <div className="flex-1 overflow-y-auto px-5 sm:px-7 py-5 space-y-5">
+                                {/* ========================================== */}
+                                {/* PESTAÑA 1: DATOS Y SERVICIO */}
+                                {/* ========================================== */}
+                                {presetModalTab === 'general' && (
+                                    <div className="space-y-4">
+                                        {/* Partir de una plantilla de Vinzer (solo al crear) */}
+                                        {!editingPresetId && formTemplates.length > 0 && (
+                                            <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-white/[0.03] p-4 space-y-2.5">
+                                                <p className="text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                                                    Punto de partida
                                                 </p>
-                                            </div>
-
-                                            {/* Botón "Ver video" de este formulario */}
-                                            <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-white/5">
-                                                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                                                    Botón «Ver video»
-                                                </label>
-                                                <div className="inline-flex p-1 rounded-xl bg-slate-200/80 dark:bg-white/10 text-xs font-bold">
-                                                    {([['inherit', 'Igual que el general'], ['show', 'Mostrar'], ['hide', 'No mostrar']] as const).map(([id, label]) => (
+                                                <div className="flex flex-wrap gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleOpenCreateModal}
+                                                        className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${!presetTemplateId
+                                                            ? 'bg-slate-900 border-slate-900 text-white dark:bg-white dark:border-white dark:text-slate-900'
+                                                            : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 dark:bg-slate-900 dark:border-white/10 dark:text-slate-300'}`}
+                                                    >
+                                                        En blanco (orden clásico)
+                                                    </button>
+                                                    {formTemplates.map(t => (
                                                         <button
-                                                            key={id}
+                                                            key={t.id}
                                                             type="button"
-                                                            onClick={() => setPresetVideoMode(id)}
-                                                            disabled={id === 'show' && !videoAllowed}
-                                                            className={`px-3 py-1.5 rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${presetVideoMode === id ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}
+                                                            onClick={() => handleCreateFromTemplate(t)}
+                                                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${presetTemplateId === t.id
+                                                                ? 'bg-rose-600 border-rose-600 text-white'
+                                                                : 'bg-white border-rose-200 text-rose-700 hover:border-rose-300 dark:bg-slate-900 dark:border-rose-500/30 dark:text-rose-300'}`}
                                                         >
-                                                            {label}
+                                                            <PawPrint size={13} />
+                                                            Plantilla «{t.name}»
                                                         </button>
                                                     ))}
                                                 </div>
-                                                {presetVideoMode === 'show' && (
-                                                    <div className="space-y-2">
-                                                        <p className="text-[11px] text-slate-500 dark:text-muted-foreground">
-                                                            {presetVideo ? 'Este formulario usa su propio video.' : welcomeModal.video ? 'Sin video propio se usa el video general. Puedes elegir otro solo para este formulario:' : 'Elige el video de este formulario:'}
-                                                        </p>
-                                                        <WelcomeVideoField video={presetVideo} onChange={setPresetVideo} allowed={videoAllowed} onError={msg => showToast(msg, 'error')} />
-                                                        <div>
-                                                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">¿Cuándo se muestra?</label>
-                                                            <div className="inline-flex flex-wrap p-1 rounded-xl bg-slate-200/80 dark:bg-white/10 text-xs font-bold">
-                                                                {([['inherit', `Igual que el general (${welcomeModal.video_position === 'end' ? 'al final' : 'al inicio'})`], ['start', 'Al inicio'], ['end', 'Al final']] as const).map(([id, label]) => (
-                                                                    <button
-                                                                        key={id}
-                                                                        type="button"
-                                                                        onClick={() => setPresetVideoPosition(id)}
-                                                                        className={`px-3 py-1.5 rounded-lg cursor-pointer ${presetVideoPosition === id ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}
-                                                                    >
-                                                                        {label}
-                                                                    </button>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                        <input
-                                                            type="text"
-                                                            value={presetVideoButton}
-                                                            onChange={e => setPresetVideoButton(e.target.value)}
-                                                            placeholder={`Texto del botón (ej: ${welcomeModal.video_button_text || 'Ver video'})`}
-                                                            maxLength={40}
-                                                            className="w-full max-w-xs bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white rounded-xl py-2 px-3 outline-none focus:border-violet-600 font-semibold"
-                                                        />
-                                                    </div>
-                                                )}
+                                                <p className="text-[11px] text-slate-500 dark:text-muted-foreground">
+                                                    Al elegir una plantilla se precargan sus fases y campos recomendados. Luego puedes ajustar cualquier detalle en la pestaña «2. Pasos y Campos».
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* Nombre */}
+                                        <div>
+                                            <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-800 dark:text-slate-200 mb-1.5">
+                                                Nombre del Formulario *
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={presetName}
+                                                onChange={e => setPresetName(e.target.value)}
+                                                placeholder="Ej: Atención Eutanasia, Convenio Veterinaria, Retiro Urgente..."
+                                                maxLength={60}
+                                                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 rounded-xl py-2.5 px-3.5 text-sm font-semibold outline-none focus:border-primary"
+                                            />
+                                        </div>
+
+                                        {/* Descripción */}
+                                        <div>
+                                            <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-800 dark:text-slate-200 mb-1.5">
+                                                Descripción para la Familia (Opcional)
+                                            </label>
+                                            <textarea
+                                                value={presetDescription}
+                                                onChange={e => setPresetDescription(e.target.value)}
+                                                placeholder="Ej: Por favor completa la información médica y de contacto para coordinar el procedimiento con nuestro equipo."
+                                                rows={2}
+                                                maxLength={250}
+                                                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 rounded-xl py-2.5 px-3.5 text-sm font-medium outline-none focus:border-primary resize-none"
+                                            />
+                                            <p className="text-[11px] text-slate-500 dark:text-muted-foreground mt-1">
+                                                Se muestra como subtítulo en la cabecera cuando la familia abre este enlace.
+                                            </p>
+                                        </div>
+
+                                        {/* Grid 2 cols: Servicio asociado + Tabla de precios */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                                            <div>
+                                                <div className="flex items-center justify-between mb-1.5">
+                                                    <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                                                        Servicio o Plan Fijado
+                                                    </label>
+                                                    {presetAssociatedServiceId && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setPresetAssociatedServiceId('')}
+                                                            className="text-[11px] font-bold text-red-600 dark:text-red-400 hover:underline cursor-pointer"
+                                                        >
+                                                            Quitar
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <select
+                                                    value={presetAssociatedServiceId}
+                                                    onChange={e => setPresetAssociatedServiceId(e.target.value)}
+                                                    className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-2.5 px-3 text-xs sm:text-sm font-semibold outline-none focus:border-primary cursor-pointer"
+                                                >
+                                                    <option value="">Selección libre por la familia</option>
+                                                    {allCatalogServices.some(s => s.is_special) && (
+                                                        <optgroup label="Servicios Especiales / Clínicos">
+                                                            {allCatalogServices.filter(s => s.is_special).map(sv => (
+                                                                <option key={`svc_${sv.id}`} value={`svc_${sv.id}`}>
+                                                                    {sv.name} {sv.price ? `(${formatCLP(sv.price)})` : ''}
+                                                                </option>
+                                                            ))}
+                                                        </optgroup>
+                                                    )}
+                                                    {allCatalogPlans.length > 0 && (
+                                                        <optgroup label="Planes de Cremación">
+                                                            {allCatalogPlans.map(pl => (
+                                                                <option key={`plan_${pl.id}`} value={`plan_${pl.id}`}>
+                                                                    {pl.name} {pl.price ? `(${formatCLP(pl.price)})` : ''}
+                                                                </option>
+                                                            ))}
+                                                        </optgroup>
+                                                    )}
+                                                    {allCatalogServices.some(s => !s.is_special) && (
+                                                        <optgroup label="Otros Servicios">
+                                                            {allCatalogServices.filter(s => !s.is_special).map(sv => (
+                                                                <option key={`svc_${sv.id}`} value={`svc_${sv.id}`}>
+                                                                    {sv.name} {sv.price ? `(${formatCLP(sv.price)})` : ''}
+                                                                </option>
+                                                            ))}
+                                                        </optgroup>
+                                                    )}
+                                                </select>
+                                                <p className="text-[11px] text-slate-500 dark:text-muted-foreground mt-1">
+                                                    {presetAssociatedServiceId
+                                                        ? `Se asignará automáticamente «${getAssociatedServiceName(presetAssociatedServiceId)}».`
+                                                        : 'Opcional: útil si este formulario es exclusivo para un servicio.'}
+                                                </p>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-800 dark:text-slate-200 mb-1.5">
+                                                    Tabla de Precios y Pesos
+                                                </label>
+                                                <select
+                                                    value={presetPriceListId}
+                                                    onChange={e => setPresetPriceListId(e.target.value)}
+                                                    className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl py-2.5 px-3 text-xs sm:text-sm font-semibold outline-none focus:border-primary cursor-pointer"
+                                                >
+                                                    <option value="">Misma que el principal ({priceListName(formPriceListId)})</option>
+                                                    {priceListOptions.map(pl => (
+                                                        <option key={pl.id} value={pl.id}>{pl.name} · {PRICE_LIST_STATUS[pl.status]?.label || pl.status}</option>
+                                                    ))}
+                                                </select>
+                                                <p className="text-[11px] text-slate-500 dark:text-muted-foreground mt-1">
+                                                    Define qué rangos y tarifas verá la familia en este enlace.
+                                                </p>
                                             </div>
                                         </div>
+                                    </div>
+                                )}
+
+                                {/* ========================================== */}
+                                {/* PESTAÑA 2: PASOS Y CAMPOS */}
+                                {/* ========================================== */}
+                                {presetModalTab === 'pasos' && (
+                                    <div className="space-y-5">
+                                        {/* Orden y visibilidad de Fases */}
+                                        <div className="space-y-2.5">
+                                            <div>
+                                                <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                                                    Orden y Nombre de los Pasos
+                                                </label>
+                                                <p className="text-xs text-slate-500 dark:text-muted-foreground">
+                                                    Usa las flechas para reordenar, actívalos u ocúltalos, y personaliza su título si lo deseas.
+                                                </p>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {presetPhaseOrder.map((key, idx) => {
+                                                    const isAct = presetPhases[key];
+                                                    const desc = PHASE_EDITOR_DESC[key];
+                                                    const pos = presetPhaseOrder.slice(0, idx + 1).filter(k => presetPhases[k]).length;
+                                                    return (
+                                                        <div
+                                                            key={key}
+                                                            className={`rounded-2xl border p-3 transition-all ${
+                                                                isAct
+                                                                    ? 'border-slate-300 dark:border-white/20 bg-white dark:bg-slate-950/60 shadow-2xs'
+                                                                    : 'border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-white/[0.02] opacity-75'
+                                                            }`}
+                                                        >
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="flex items-center gap-0.5 shrink-0">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => movePresetPhase(key, -1)}
+                                                                        disabled={idx === 0}
+                                                                        className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:hover:text-white dark:hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                                                                        aria-label="Subir fase"
+                                                                    >
+                                                                        <ChevronUp size={15} />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => movePresetPhase(key, 1)}
+                                                                        disabled={idx === presetPhaseOrder.length - 1}
+                                                                        className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:hover:text-white dark:hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                                                                        aria-label="Bajar fase"
+                                                                    >
+                                                                        <ChevronDown size={15} />
+                                                                    </button>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className={`text-xs sm:text-sm font-extrabold ${isAct ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500 line-through'}`}>
+                                                                        {isAct ? `${pos}. ` : ''}{PHASE_DEFAULTS[key].name}
+                                                                        <span className="font-medium text-xs text-slate-500 dark:text-muted-foreground no-underline"> · {desc}</span>
+                                                                    </p>
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setPresetPhases(prev => ({ ...prev, [key]: !prev[key] }))}
+                                                                    className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                                                                        isAct
+                                                                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+                                                                            : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-white/15 text-slate-600 dark:text-slate-400'
+                                                                    }`}
+                                                                >
+                                                                    {isAct ? <Eye size={13} /> : <EyeOff size={13} />}
+                                                                    {isAct ? 'Visible' : 'Oculto'}
+                                                                </button>
+                                                            </div>
+                                                            {isAct && (
+                                                                <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.5fr)] gap-2 mt-2.5 pt-2.5 border-t border-slate-100 dark:border-white/5">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={presetPhaseLabels[key]?.name || ''}
+                                                                        onChange={e => setPresetPhaseLabel(key, 'name', e.target.value)}
+                                                                        placeholder={`Título (por defecto: ${PHASE_DEFAULTS[key].name})`}
+                                                                        maxLength={MAX_PHASE_NAME}
+                                                                        aria-label={`Nombre de la fase ${PHASE_DEFAULTS[key].name}`}
+                                                                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 rounded-xl py-1.5 px-3 text-xs font-semibold outline-none focus:border-primary"
+                                                                    />
+                                                                    <input
+                                                                        type="text"
+                                                                        value={presetPhaseLabels[key]?.phrase || ''}
+                                                                        onChange={e => setPresetPhaseLabel(key, 'phrase', e.target.value)}
+                                                                        placeholder={`Subtítulo: ${PHASE_DEFAULTS[key].phrase}`}
+                                                                        maxLength={MAX_PHASE_PHRASE}
+                                                                        aria-label={`Frase de la fase ${PHASE_DEFAULTS[key].name}`}
+                                                                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 rounded-xl py-1.5 px-3 text-xs font-medium outline-none focus:border-primary"
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        {/* Campos específicos de este formulario */}
+                                        <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50/60 dark:bg-slate-950/40 p-4 space-y-3">
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-white/10">
+                                                <div>
+                                                    <h5 className="text-xs font-extrabold uppercase tracking-wider text-slate-900 dark:text-white">
+                                                        Campos solicitados en este formulario
+                                                    </h5>
+                                                    <p className="text-[11px] text-slate-500 dark:text-muted-foreground">
+                                                        Activa, marca como obligatorios o cambia el nombre de los campos para este enlace.
+                                                    </p>
+                                                </div>
+
+                                                <div className="flex items-center bg-slate-200/80 dark:bg-white/10 p-1 rounded-xl self-start sm:self-auto shrink-0">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPresetSectionTab('owner')}
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                                                            presetSectionTab === 'owner'
+                                                                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs'
+                                                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                                                        }`}
+                                                    >
+                                                        <User size={13} />
+                                                        <span>Familia ({presetFields.filter(f => f.section === 'owner' && f.visible).length})</span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPresetSectionTab('pet')}
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                                                            presetSectionTab === 'pet'
+                                                                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs'
+                                                                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                                                        }`}
+                                                    >
+                                                        <PawPrint size={13} />
+                                                        <span>Ángel ({presetFields.filter(f => f.section === 'pet' && f.visible).length})</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-wrap items-center gap-1.5 pb-1">
+                                                <span className="text-[11px] font-semibold text-slate-500 dark:text-muted-foreground">Siempre obligatorios:</span>
+                                                {FIXED_FIELDS[presetSectionTab].map(fixedName => (
+                                                    <span key={fixedName} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-200/70 dark:bg-white/10 text-slate-700 dark:text-slate-300 text-[11px] font-bold">
+                                                        <Lock size={11} className="text-primary" />
+                                                        {fixedName}
+                                                    </span>
+                                                ))}
+                                            </div>
+
+                                            <div className={`${FIELD_GRID} pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-muted-foreground border-b border-slate-200 dark:border-white/5`}>
+                                                <span>Campo</span>
+                                                <span className="text-center">Mostrar</span>
+                                                <span className="text-center">Obligatorio</span>
+                                            </div>
+
+                                            <div className="divide-y divide-slate-200/70 dark:divide-white/5">
+                                                {presetFields
+                                                    .filter(f => f.section === presetSectionTab)
+                                                    .map(f => {
+                                                        const status = !f.visible ? 'Oculto' : f.required ? 'Obligatorio' : 'Opcional';
+                                                        const statusClass = !f.visible
+                                                            ? 'text-slate-400 dark:text-slate-500'
+                                                            : f.required
+                                                                ? 'text-primary font-bold'
+                                                                : 'text-emerald-600 dark:text-emerald-400 font-bold';
+                                                        return (
+                                                            <div key={f.key} className={`${FIELD_GRID} py-2.5`}>
+                                                                <div className="min-w-0 pr-2">
+                                                                    <div className="flex flex-wrap items-center gap-1.5">
+                                                                        <p className={`text-xs sm:text-sm font-bold break-words ${f.visible ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500 line-through'}`}>
+                                                                            {f.label}
+                                                                        </p>
+                                                                        <span className={`text-[10px] ${statusClass}`}>· {status}</span>
+                                                                    </div>
+                                                                    {f.visible && (
+                                                                        <input
+                                                                            type="text"
+                                                                            value={f.customLabel || ''}
+                                                                            onChange={e => updatePresetField(f.key, { customLabel: e.target.value })}
+                                                                            maxLength={MAX_FIELD_LABEL}
+                                                                            placeholder={`Etiqueta personalizada (por defecto: ${f.label})`}
+                                                                            aria-label={`Nombre de ${f.label} en este formulario`}
+                                                                            className="mt-1.5 w-full max-w-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-[11px] text-slate-900 dark:text-white placeholder:text-slate-400 rounded-lg py-1 px-2.5 outline-none focus:border-primary"
+                                                                        />
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex justify-center">
+                                                                    <Toggle
+                                                                        label={`Mostrar ${f.label}`}
+                                                                        checked={f.visible}
+                                                                        onChange={v => updatePresetField(f.key, { visible: v })}
+                                                                    />
+                                                                </div>
+                                                                <div className="flex justify-center">
+                                                                    <Toggle
+                                                                        label={`${f.label} obligatorio`}
+                                                                        checked={f.required && !NEVER_REQUIRED.has(f.key)}
+                                                                        disabled={!f.visible || NEVER_REQUIRED.has(f.key)}
+                                                                        onChange={v => updatePresetField(f.key, { required: v })}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* ========================================== */}
+                                {/* PESTAÑA 3: BIENVENIDA Y PLAZO */}
+                                {/* ========================================== */}
+                                {presetModalTab === 'bienvenida' && (
+                                    <div className="space-y-4">
+                                        {/* Mensaje de bienvenida específico para este formulario */}
+                                        <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-slate-950/40 p-4 space-y-3">
+                                            <div className="flex items-center justify-between gap-4">
+                                                <div>
+                                                    <p className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white">
+                                                        Mensaje de bienvenida propio para este formulario
+                                                    </p>
+                                                    <p className="text-xs text-slate-500 dark:text-muted-foreground">
+                                                        Si lo dejas desactivado, usará el mensaje de condolencias general del crematorio.
+                                                    </p>
+                                                </div>
+                                                <Toggle
+                                                    label="Personalizar mensaje de bienvenida para este formulario"
+                                                    checked={presetWelcomeCustom}
+                                                    onChange={setPresetWelcomeCustom}
+                                                />
+                                            </div>
+
+                                            {presetWelcomeCustom && (
+                                                <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-white/10">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                        <div>
+                                                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                                                                Título del Modal
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={presetWelcomeTitle}
+                                                                onChange={e => setPresetWelcomeTitle(e.target.value)}
+                                                                placeholder="Ej: Acompañamiento en Eutanasia"
+                                                                maxLength={60}
+                                                                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white rounded-xl py-2 px-3 outline-none focus:border-primary font-semibold"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                                                                Texto del Botón
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={presetWelcomeButton}
+                                                                onChange={e => setPresetWelcomeButton(e.target.value)}
+                                                                placeholder="Continuar"
+                                                                maxLength={30}
+                                                                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white rounded-xl py-2 px-3 outline-none focus:border-primary font-semibold"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                                                            Mensaje para la Familia
+                                                        </label>
+                                                        <textarea
+                                                            value={presetWelcomeMessage}
+                                                            onChange={e => setPresetWelcomeMessage(e.target.value)}
+                                                            placeholder="Ej: En este proceso tan sensible, queremos brindarte toda la tranquilidad y cuidado que merecen..."
+                                                            rows={3}
+                                                            maxLength={350}
+                                                            className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white rounded-xl py-2 px-3 outline-none focus:border-primary font-medium resize-none"
+                                                        />
+                                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                                                            Usa <code className="bg-slate-200 dark:bg-slate-800 px-1 rounded font-bold">{"{empresa}"}</code> para incluir el nombre de tu empresa en negrita.
+                                                        </p>
+                                                    </div>
+
+                                                    {/* Botón "Ver video" de este formulario */}
+                                                    <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-white/5">
+                                                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                                                            Botón «Ver video»
+                                                        </label>
+                                                        <div className="inline-flex p-1 rounded-xl bg-slate-200/80 dark:bg-white/10 text-xs font-bold">
+                                                            {([['inherit', 'Igual que el general'], ['show', 'Mostrar'], ['hide', 'No mostrar']] as const).map(([id, label]) => (
+                                                                <button
+                                                                    key={id}
+                                                                    type="button"
+                                                                    onClick={() => setPresetVideoMode(id)}
+                                                                    disabled={id === 'show' && !videoAllowed}
+                                                                    className={`px-3 py-1.5 rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${presetVideoMode === id ? 'bg-white text-slate-900 shadow-2xs dark:bg-slate-800 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}
+                                                                >
+                                                                    {label}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                        {presetVideoMode === 'show' && (
+                                                            <div className="space-y-2">
+                                                                <p className="text-[11px] text-slate-500 dark:text-muted-foreground">
+                                                                    {presetVideo ? 'Este formulario usa su propio video.' : welcomeModal.video ? 'Sin video propio se usa el video general. Puedes elegir otro solo para este formulario:' : 'Elige el video de este formulario:'}
+                                                                </p>
+                                                                <WelcomeVideoField video={presetVideo} onChange={setPresetVideo} allowed={videoAllowed} onError={msg => showToast(msg, 'error')} />
+                                                                <div>
+                                                                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">¿Cuándo se muestra?</label>
+                                                                    <div className="inline-flex flex-wrap p-1 rounded-xl bg-slate-200/80 dark:bg-white/10 text-xs font-bold">
+                                                                        {([['inherit', `Igual que el general (${welcomeModal.video_position === 'end' ? 'al final' : 'al inicio'})`], ['start', 'Al inicio'], ['end', 'Al final']] as const).map(([id, label]) => (
+                                                                            <button
+                                                                                key={id}
+                                                                                type="button"
+                                                                                onClick={() => setPresetVideoPosition(id)}
+                                                                                className={`px-3 py-1.5 rounded-lg cursor-pointer ${presetVideoPosition === id ? 'bg-white text-slate-900 shadow-2xs dark:bg-slate-800 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}
+                                                                            >
+                                                                                {label}
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                                <input
+                                                                    type="text"
+                                                                    value={presetVideoButton}
+                                                                    onChange={e => setPresetVideoButton(e.target.value)}
+                                                                    placeholder={`Texto del botón (ej: ${welcomeModal.video_button_text || 'Ver video'})`}
+                                                                    maxLength={40}
+                                                                    className="w-full max-w-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white rounded-xl py-2 px-3 outline-none focus:border-primary font-semibold"
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Plazo de entrega específico */}
+                                        <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-slate-950/40 p-4 space-y-2">
+                                            <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                                                Plazo o Nota de Entrega Específico (Opcional)
+                                            </label>
+                                            <p className="text-xs text-slate-500 dark:text-muted-foreground">
+                                                Si lo dejas vacío, se mostrará el aviso de entrega general del crematorio.
+                                            </p>
+                                            <input
+                                                type="text"
+                                                value={presetDeliveryNotice}
+                                                onChange={e => setPresetDeliveryNotice(e.target.value)}
+                                                placeholder="Ej: Entrega en 48 horas hábiles"
+                                                maxLength={200}
+                                                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 rounded-xl py-2.5 px-3.5 text-xs sm:text-sm font-medium outline-none focus:border-primary"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Pie fijo del modal con navegación entre pasos y botón de guardado */}
+                            <div className="px-5 sm:px-7 py-4 border-t border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-slate-950/50 flex flex-wrap items-center justify-between gap-2 shrink-0">
+                                <div className="flex items-center gap-2">
+                                    {presetModalTab !== 'general' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setPresetModalTab(presetModalTab === 'bienvenida' ? 'pasos' : 'general')}
+                                            className="inline-flex items-center gap-1 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-white/10 transition-all cursor-pointer"
+                                        >
+                                            <ChevronLeft size={15} />
+                                            Anterior
+                                        </button>
+                                    )}
+                                    {presetModalTab !== 'bienvenida' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setPresetModalTab(presetModalTab === 'general' ? 'pasos' : 'bienvenida')}
+                                            className="inline-flex items-center gap-1 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-slate-200/80 hover:bg-slate-300/70 text-slate-800 dark:bg-white/10 dark:hover:bg-white/15 dark:text-white transition-all cursor-pointer"
+                                        >
+                                            Siguiente paso
+                                            <ChevronRight size={15} />
+                                        </button>
                                     )}
                                 </div>
 
-                                {/* Plazo de entrega específico */}
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-wider text-slate-900 dark:text-slate-200 mb-1.5">
-                                        Plazo o Nota de Entrega Específico (Opcional)
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={presetDeliveryNotice}
-                                        onChange={e => setPresetDeliveryNotice(e.target.value)}
-                                        placeholder="Ej: Entrega en 48 horas hábiles (o dejar vacío para usar el general)"
-                                        maxLength={200}
-                                        className="w-full bg-white dark:bg-slate-950 border-2 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-2xl py-3 px-4 text-xs sm:text-sm font-medium outline-none focus:border-violet-600 dark:focus:border-violet-500 focus:ring-4 focus:ring-violet-600/15 transition-all shadow-sm"
-                                    />
+                                <div className="flex items-center gap-2.5 ml-auto">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsCreatingPreset(false);
+                                            setEditingPresetId(null);
+                                        }}
+                                        className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-white/10 transition-all cursor-pointer"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveNewPreset}
+                                        disabled={savingPreset}
+                                        className="disabled:opacity-60 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-black text-xs sm:text-sm transition-all shadow-md shadow-primary/20 hover:opacity-95 cursor-pointer"
+                                    >
+                                        {savingPreset ? 'Subiendo video…' : editingPresetId ? 'Guardar cambios' : 'Crear y copiar enlace'}
+                                    </button>
                                 </div>
-                            </div>
-
-                            <div className="flex items-center justify-end gap-3 pt-4 border-t-2 border-slate-100 dark:border-white/10">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsCreatingPreset(false);
-                                        setEditingPresetId(null);
-                                    }}
-                                    className="px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 border-2 border-slate-200 dark:border-white/10 transition-all cursor-pointer"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleSaveNewPreset}
-                                    disabled={savingPreset}
-                                    className="disabled:opacity-60 px-7 py-3 rounded-2xl bg-violet-600 hover:bg-violet-700 text-white font-black text-xs sm:text-sm transition-all shadow-lg shadow-violet-600/30 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-                                >
-                                    {savingPreset ? 'Subiendo video…' : editingPresetId ? 'Guardar Cambios' : 'Crear y generar enlace'}
-                                </button>
                             </div>
                         </motion.div>
                     </div>
@@ -2649,44 +3221,44 @@ function PhaseSectionContainer({
     children: React.ReactNode;
 }) {
     return (
-        <section className={`space-y-4 rounded-3xl transition-all ${!isActive ? 'opacity-75' : ''}`}>
+        <section className={`space-y-4 rounded-3xl transition-all ${!isActive ? 'opacity-80' : ''}`}>
             {/* Tarjeta de cabecera de la fase con switch maestro */}
-            <div className={`glass-card p-5 sm:p-6 rounded-3xl border transition-all ${
+            <div className={`p-5 sm:p-6 rounded-3xl border transition-all ${
                 isActive
-                    ? 'border-white/10 bg-gradient-to-r from-white/5 to-transparent'
-                    : 'border-amber-500/20 bg-amber-500/5'
+                    ? 'border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900/60 shadow-xs'
+                    : 'border-amber-300 bg-amber-50/60 dark:border-amber-500/25 dark:bg-amber-500/5'
             }`}>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-start gap-4">
-                        <div className="p-3 rounded-2xl bg-white/5 border border-white/10 shrink-0 text-white">
-                            <Icon size={22} />
+                    <div className="flex items-start gap-3.5">
+                        <div className="p-3 rounded-2xl bg-slate-100 border border-slate-200 text-slate-800 dark:bg-white/5 dark:border-white/10 shrink-0 dark:text-white">
+                            <Icon size={20} />
                         </div>
                         <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                                 <span className="text-[10px] font-black uppercase tracking-widest text-primary">
-                                    Fase {num}
+                                    Paso {num} de 4
                                 </span>
-                                <span className="text-white/30 text-xs">·</span>
-                                <span className={`text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                                <span className="text-slate-300 dark:text-white/30 text-xs">·</span>
+                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
                                     isActive
-                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                        ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
+                                        : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20'
                                 }`}>
-                                    {isActive ? 'Visible en formulario' : 'Fase desactivada'}
+                                    {isActive ? 'Visible en formulario' : 'Paso oculto'}
                                 </span>
                             </div>
-                            <h4 className="text-lg sm:text-xl font-extrabold text-white mt-0.5">
+                            <h4 className="text-base sm:text-lg font-black text-slate-900 dark:text-white mt-0.5">
                                 {name} · {title}
                             </h4>
-                            <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
+                            <p className="text-xs text-slate-500 dark:text-muted-foreground mt-1 max-w-2xl">
                                 {description}
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3 sm:self-center shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/5">
-                        <span className="text-xs font-semibold text-white/70">
-                            {isActive ? 'Mostrar fase' : 'Ocultar fase'}
+                    <div className="flex items-center justify-between sm:justify-end gap-3 sm:self-center shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-white/5">
+                        <span className="text-xs font-bold text-slate-700 dark:text-white/80">
+                            {isActive ? 'Paso activo' : 'Paso oculto'}
                         </span>
                         <Toggle
                             label={`Mostrar fase ${name} en el formulario`}
@@ -2697,9 +3269,9 @@ function PhaseSectionContainer({
                 </div>
 
                 {!isActive && (
-                    <div className="mt-4 pt-3 border-t border-amber-500/15 flex items-center gap-2 text-xs text-amber-300">
+                    <div className="mt-4 pt-3 border-t border-amber-200 dark:border-amber-500/15 flex items-center gap-2 text-xs text-amber-800 dark:text-amber-300 font-medium">
                         <Info size={14} className="shrink-0" />
-                        <span>Esta fase está desactivada. La familia no verá este paso y pasará directamente a las fases siguientes. Puedes configurar sus opciones aquí si decides activarla en el futuro.</span>
+                        <span>Este paso está oculto. La familia no lo verá y avanzará directamente al siguiente paso activo.</span>
                     </div>
                 )}
             </div>
@@ -2713,7 +3285,7 @@ function PhaseSectionContainer({
 }
 
 function TierLabel({ children }: { children: React.ReactNode }) {
-    return <span className="md:hidden block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 ml-1">{children}</span>;
+    return <span className="md:hidden block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-muted-foreground mb-1 ml-1">{children}</span>;
 }
 
 /** Subir / bajar / eliminar un rango de peso (al guardar igual se ordenan por «desde»). */
@@ -2724,7 +3296,7 @@ function TierActions({ idx, total, onMove, onRemove, className = '' }: {
     onRemove: () => void;
     className?: string;
 }) {
-    const moveCls = 'flex h-[42px] w-8 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:bg-foreground/5 hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-all cursor-pointer';
+    const moveCls = 'flex h-[42px] w-8 shrink-0 items-center justify-center rounded-xl text-slate-500 dark:text-muted-foreground hover:bg-slate-100 dark:hover:bg-foreground/5 hover:text-slate-900 dark:hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-all cursor-pointer';
     return (
         <div className={`${className} shrink-0 items-center gap-0.5`}>
             <button type="button" onClick={() => onMove(-1)} disabled={idx === 0} aria-label={`Subir rango ${idx + 1}`} title="Subir" className={moveCls}>
@@ -2738,7 +3310,7 @@ function TierActions({ idx, total, onMove, onRemove, className = '' }: {
                 onClick={onRemove}
                 aria-label={`Eliminar rango ${idx + 1}`}
                 title="Eliminar"
-                className="flex h-[42px] w-9 shrink-0 items-center justify-center text-red-400 hover:bg-red-500/10 rounded-xl transition-all cursor-pointer"
+                className="flex h-[42px] w-9 shrink-0 items-center justify-center text-red-500 dark:text-red-400 hover:bg-red-500/10 rounded-xl transition-all cursor-pointer"
             >
                 <Trash2 size={16} />
             </button>
@@ -2750,8 +3322,8 @@ function PriceToggleRow({ title, description, checked, onChange }: { title: stri
     return (
         <div className="flex items-center justify-between gap-4 py-3">
             <div className="min-w-0">
-                <p className="text-sm font-medium text-white">{title}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{description}</p>
+                <p className="text-sm font-bold text-slate-900 dark:text-white">{title}</p>
+                <p className="text-xs text-slate-500 dark:text-muted-foreground mt-0.5">{description}</p>
             </div>
             <Toggle label={title} checked={checked} onChange={onChange} />
         </div>

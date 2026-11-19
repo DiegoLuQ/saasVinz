@@ -152,3 +152,14 @@ export const validatePhoneStrict = (phone?: string): string | null => {
     }
     return null;
 };
+
+/**
+ * Formatea un nombre propio o de mascota con la primera letra de cada palabra
+ * en mayúscula y el resto en minúscula (Title Case).
+ */
+export const formatTitleCaseName = (raw: string): string => {
+    if (!raw) return '';
+    return raw
+        .toLowerCase()
+        .replace(/(^|\s)\S/g, (char) => char.toUpperCase());
+};

@@ -220,6 +220,16 @@ class FormConfigUpdate(BaseModel):
     welcome_modal: Optional[Dict[str, Any]] = None
     custom_forms: Optional[List[Dict[str, Any]]] = None
 
+@router.get("/form-templates")
+def get_form_templates(
+    db: Session = Depends(get_db),
+    _: models.User = Depends(check_permission("configuracion", "view"))
+):
+    """Plantillas activas de Vinzer para crear un formulario personalizado (services/form_templates.py)."""
+    from app.services import form_templates
+    return {"templates": form_templates.active(db)}
+
+
 @router.get("/form-config")
 def get_form_config(
     db: Session = Depends(get_db),
@@ -227,10 +237,15 @@ def get_form_config(
     admin: models.User = Depends(check_permission("configuracion", "view"))
 ):
     """Campos configurables del formulario público con su estado actual."""
+    from app.services.official_links import official_form_preset
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Empresa no encontrada")
-    return {**form_config_with_meta(tenant.form_config), "video_allowed": form_video.tenant_can_use_form_video(tenant)}
+    return {
+        **form_config_with_meta(tenant.form_config),
+        "video_allowed": form_video.tenant_can_use_form_video(tenant),
+        "official_form": official_form_preset(tenant),
+    }
 
 @router.put("/form-config")
 def update_form_config(

@@ -3,7 +3,7 @@ import { apiRequest } from '@/lib/tenant/api';
 /** Enlaces oficiales del crematorio (backend: app/services/official_links.py). */
 export type OfficialLinkKey = 'form' | 'plans' | 'products';
 
-export interface OfficialCatalogLink { id: number; name: string | null; url: string }
+export interface OfficialCatalogLink { id: number; name: string | null; token?: string; url: string }
 
 export interface OfficialLinksStatus {
     form: { id: string; name: string } | null;

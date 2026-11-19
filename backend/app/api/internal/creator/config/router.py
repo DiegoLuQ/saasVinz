@@ -29,6 +29,29 @@ def update_tour_content(
     return {"content": tour_content.save(db, payload.get("content")), "max_modules": tour_content.MAX_MODULES}
 
 
+@router.get("/form-templates")
+def get_form_templates(
+    db: Session = Depends(get_db),
+    current_creator: models.User = Depends(auth.get_current_creator)
+):
+    """Plantillas de formulario para las familias + catálogo de campos y fases."""
+    from app.services import form_templates
+    templates, is_default = form_templates.get(db)
+    return {"templates": templates, "is_default": is_default, **form_templates.catalog()}
+
+
+@router.put("/form-templates")
+def update_form_templates(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_creator: models.User = Depends(auth.get_current_creator)
+):
+    """Guarda la lista completa; {"templates": null} vuelve a la original."""
+    from app.services import form_templates
+    templates, is_default = form_templates.save(db, payload.get("templates"))
+    return {"templates": templates, "is_default": is_default, **form_templates.catalog()}
+
+
 @router.get("/dashboard-slides")
 def get_dashboard_slides(
     db: Session = Depends(get_db),

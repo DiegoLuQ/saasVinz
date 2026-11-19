@@ -81,6 +81,8 @@ interface Props {
     showVinzerBrand?: boolean;
     /** Botón «Solicitar este plan» (Configuración → Formulario y Pesos); false = solo WhatsApp */
     showRequestButton?: boolean;
+    /** Formulario oficial personalizado (id) que abre «Solicitar este plan»; null = el principal */
+    formPreset?: string | null;
     /** Video de bienvenida configurado por el SuperAdmin para este crematorio */
     catalogVideo?: {
         source: 'upload' | 'vimeo' | 'cloudflare';
@@ -184,7 +186,7 @@ interface PlanView {
 }
 
 /** Catálogo público de planes: diseño sobrio y cálido; los datos son los de cada tenant. */
-export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare, copiedLink, catalogToken, weightTiers = [], message, showVinzerBrand = true, showRequestButton = true, catalogVideo }: Props) {
+export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare, copiedLink, catalogToken, weightTiers = [], message, showVinzerBrand = true, showRequestButton = true, catalogVideo, formPreset = null }: Props) {
     const [searchTerm, setSearchTerm] = useState('');
     const [videoModalOpen, setVideoModalOpen] = useState(false);
     const sizes = useMemo<SizeOption[]>(
@@ -485,6 +487,7 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                                       plan_id: view.plan.id,
                                       weight_tier: sizeKey,
                                       cs: sessionId || undefined,
+                                      form: formPreset || undefined,
                                   })
                                 : null;
 

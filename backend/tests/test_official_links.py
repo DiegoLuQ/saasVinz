@@ -84,3 +84,36 @@ def test_recuerdos_mas_vendido_siempre(client, auth, db, world):
         "title": "Recuerdos para honrar a Luna", "url": "https://catalogo.test/x/y", "button_label": "Ver catálogo",
         "items": [{"name": p.name, "price": "$10.000", "image_url": p.image_url} for p in chosen]})
     assert "Recuerdos para honrar a Luna" in html and chosen[0].image_url in html and "https://catalogo.test/x/y" in html
+
+
+def test_formulario_oficial_personalizado_en_compartir_y_catalogo(client, auth, db, world):
+    """El formulario oficial elegido llega al bootstrap (Compartir) y al catálogo de planes (?form=)."""
+    h = auth("a")
+    tid = world["tenant_a"]
+    tenant = db.query(models.Tenant).get(tid)
+    old_cfg, old_links = tenant.form_config, tenant.official_links
+    try:
+        cfg = dict(tenant.form_config or {})
+        cfg["custom_forms"] = [{"id": "huella", "name": "Formulario Huella", "phase_order": ["angel", "recuerdos", "camino", "familia"]}]
+        tenant.form_config = cfg
+        db.commit()
+        plans = _link(db, tid, "plans")
+        prods = _link(db, tid, "products")
+        r = client.put("/api/internal/official-links", headers=h,
+                       json={"form": "huella", "plans_token_id": plans.id, "products_token_id": prods.id})
+        assert r.status_code == 200 and r.json()["form"]["name"] == "Formulario Huella", r.text
+
+        boot = client.get("/api/internal/auth/bootstrap", headers=h).json()
+        assert boot["tenant"]["form_config"]["official_form"] == "huella"
+        cat = client.get(f"/api/public/catalog/crematorio-a/{plans.token}?preview=true").json()
+        assert cat["form_preset"] == "huella"
+
+        # Oficial = el principal → sin ?form=
+        client.put("/api/internal/official-links", headers=h,
+                   json={"form": "main", "plans_token_id": plans.id, "products_token_id": prods.id})
+        assert client.get(f"/api/public/catalog/crematorio-a/{plans.token}?preview=true").json()["form_preset"] is None
+        assert client.get("/api/internal/auth/bootstrap", headers=h).json()["tenant"]["form_config"]["official_form"] is None
+    finally:
+        tenant = db.query(models.Tenant).get(tid)
+        tenant.form_config, tenant.official_links = old_cfg, old_links
+        db.commit()

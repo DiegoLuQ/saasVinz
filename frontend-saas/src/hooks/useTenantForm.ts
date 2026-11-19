@@ -8,7 +8,8 @@ import { Service } from '@/components/public/ServiceSelectionStep';
 import { saveDraftImages, loadDraftImages, clearDraftImages } from '@/lib/formDraftImages';
 import { changedFields, formSessionId, resetFormSession, sendFormEvent, type FormEventKind } from '@/lib/formEvents';
 import { MAX_MEMORIAL_PHOTOS } from '@/components/public/ImageUploadStep';
-import { mergeWelcomeModal, planFitsWeight, planPriceForTier, resolveFormConfig, tierForWeight, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
+import { isFuturePartialDate, isValidPartialDate } from '@/lib/petDates';
+import { cleanPhaseOrder, mergeWelcomeModal, phaseName, phrasePhase, planFitsWeight, planPriceForTier, PHASE_DEFAULTS, resolveFormConfig, tierForWeight, type PhaseKey, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
 import { validateEmailStrict, validatePhoneStrict, autoFixEmailDomain } from '@/lib/formatters';
 
 export interface Tenant {
@@ -546,11 +547,16 @@ export function useTenantForm(
             }
         }
 
-        const todayStr = new Date().toISOString().split('T')[0];
-        if (petData.birthDate && petData.birthDate > todayStr) {
+        // Fechas opcionales y parciales («2015», «2015-03», «2015-03-12»): vacías no se validan;
+        // primero que estén bien escritas, después que no sean futuras (hora local).
+        if (petData.birthDate && !isValidPartialDate(petData.birthDate)) {
+            errors.birthDate = 'Fecha inválida: revisa el año (4 dígitos)';
+        } else if (petData.birthDate && isFuturePartialDate(petData.birthDate)) {
             errors.birthDate = 'La fecha de nacimiento no puede ser futura';
         }
-        if (petData.deathDate && petData.deathDate > todayStr) {
+        if (petData.deathDate && !isValidPartialDate(petData.deathDate)) {
+            errors.deathDate = 'Fecha inválida: revisa el año (4 dígitos)';
+        } else if (petData.deathDate && isFuturePartialDate(petData.deathDate)) {
             errors.deathDate = 'La fecha de fallecimiento no puede ser futura';
         } else if (petData.birthDate && petData.deathDate && petData.deathDate.slice(0, 4) < petData.birthDate.slice(0, 4)) {
             errors.deathDate = 'El fallecimiento no puede ser anterior al nacimiento';
@@ -570,43 +576,17 @@ export function useTenantForm(
     }, [petData, formConfig, weightTiers, trackFormEvent]);
 
     // 6.1 Fases activas dinámicas
+    // Un formulario personalizado puede reordenar las fases y darles otro nombre
+    // (los ids no cambian: validación, métricas y resumen siguen igual).
+    const phaseOrder = useMemo(() => cleanPhaseOrder(customFormPreset?.phase_order), [customFormPreset]);
+    const phaseLabels = customFormPreset?.phase_labels || null;
     const activeSteps = useMemo(() => {
-        const steps: { id: 'familia' | 'angel' | 'camino' | 'recuerdos' | 'resumen'; name: string; phrase: string }[] = [];
-        if (formConfig.phases.familia !== false) {
-            steps.push({
-                id: 'familia',
-                name: 'Familia',
-                phrase: 'Necesitamos conocerte para poder acompañarte de la mejor forma.',
-            });
-        }
-        if (formConfig.phases.angel !== false) {
-            steps.push({
-                id: 'angel',
-                name: 'Ángel',
-                phrase: 'Cuéntanos sobre tu compañero de vida.',
-            });
-        }
-        if (formConfig.phases.camino !== false) {
-            steps.push({
-                id: 'camino',
-                name: 'Camino',
-                phrase: 'Elige cómo quieres honrar su memoria.',
-            });
-        }
-        if (formConfig.phases.recuerdos !== false) {
-            steps.push({
-                id: 'recuerdos',
-                name: 'Recuerdos',
-                phrase: 'Un último recuerdo para guardar para siempre.',
-            });
-        }
-        steps.push({
-            id: 'resumen',
-            name: 'Resumen',
-            phrase: 'Confirma que todo esté correcto antes de enviar.',
-        });
+        const steps: { id: PhaseKey | 'resumen'; name: string; phrase: string }[] = phaseOrder
+            .filter(id => formConfig.phases[id] !== false)
+            .map(id => ({ id, name: phaseName(phaseLabels, id), phrase: phrasePhase(phaseLabels, id) }));
+        steps.push({ id: 'resumen', ...PHASE_DEFAULTS.resumen });
         return steps;
-    }, [formConfig.phases]);
+    }, [formConfig.phases, phaseOrder, phaseLabels]);
 
     const currentStepDef = activeSteps[currentStep - 1] || activeSteps[0];
     const currentStepKey = currentStepDef?.id || 'familia';
@@ -838,6 +818,8 @@ export function useTenantForm(
     };
 
     return {
+        phaseOrder,
+        phaseLabels,
         tenant,
         formConfig,
         weightTiers,

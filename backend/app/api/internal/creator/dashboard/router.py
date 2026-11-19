@@ -1491,6 +1491,9 @@ async def update_plan(
     if not plan:
         raise HTTPException(status_code=404, detail="Plan no encontrado")
 
+    from app.services.plan_impact import snapshot_plan, record_plan_diff_event
+    plan_before_snapshot = snapshot_plan(plan)
+
     old_modules = set(plan.allowed_modules or [])
     new_data = plan_data.dict()
     new_modules = set(new_data.get('allowed_modules', []))
@@ -1527,6 +1530,11 @@ async def update_plan(
 
     db.commit()
     db.refresh(plan)
+
+    try:
+        record_plan_diff_event(db, plan, plan_before_snapshot, user_id=current_creator.id)
+    except Exception:
+        db.rollback()
 
     # Propagation Logic: Symmetrically synchronize modules for all tenants on this plan
     # Modules added: Activate them for existing configs

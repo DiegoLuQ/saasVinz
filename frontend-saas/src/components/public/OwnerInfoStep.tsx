@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { formatRut, sanitizeEmailInput, autoFixEmailDomain, emailHasInvalidChars } from '@/lib/formatters';
+import { formatRut, sanitizeEmailInput, autoFixEmailDomain, emailHasInvalidChars, formatTitleCaseName } from '@/lib/formatters';
 import { ChevronDown, MessageCircle, Phone, Sparkles, MapPin, Truck } from 'lucide-react';
 import { ownerCommunes, quotePriceText, quoteTransport, transportPlaces, type PublicTransport } from '@/lib/transport';
 import { Country, State, City } from 'country-state-city';
@@ -272,7 +272,7 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                     <input
                         type="text"
                         value={data.fullName}
-                        onChange={(e) => updateData({ fullName: e.target.value.slice(0, 50) })}
+                        onChange={(e) => updateData({ fullName: formatTitleCaseName(e.target.value).slice(0, 50) })}
                         className={`input-emotional ${errors.fullName ? 'border-red-500/50 focus:ring-red-500/10' : ''}`}
                         placeholder="Ingresa tu nombre"
                         maxLength={50}

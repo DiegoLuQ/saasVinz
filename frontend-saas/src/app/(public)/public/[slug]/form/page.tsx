@@ -145,6 +145,8 @@ export default function TenantFormPage() {
         currentStep,
         maxVisitedStep,
         activeSteps,
+        phaseOrder,
+        phaseLabels,
         currentStepDef,
         currentStepKey,
         totalSteps,
@@ -865,6 +867,8 @@ export default function TenantFormPage() {
                                         formConfig={formConfig}
                                         weightTiers={weightTiers}
                                         transport={tenant.transport}
+                                        phaseOrder={phaseOrder}
+                                        phaseLabels={phaseLabels}
                                     />
                                 )}
                                 {currentStepKey === 'resumen' && images.length > 0 && (

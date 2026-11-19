@@ -24,6 +24,7 @@ import ExpiringSubscriptions from '@/components/admin/dashboard/ExpiringSubscrip
 import TenantStatsModal from '@/components/admin/dashboard/TenantStatsModal';
 import RejectTransactionModal from '@/components/admin/dashboard/RejectTransactionModal';
 import ModuleUsageStatsWidget from '@/components/admin/dashboard/ModuleUsageStatsWidget';
+import PlanStrategyImpactWidget from '@/components/admin/dashboard/PlanStrategyImpactWidget';
 
 export default function CreatorDashboard() {
     const router = useRouter();
@@ -214,6 +215,8 @@ export default function CreatorDashboard() {
             )}
 
             <ModuleUsageStatsWidget />
+
+            <PlanStrategyImpactWidget />
 
             <TenantsTable
                 tenants={filteredTenants}

@@ -10,7 +10,6 @@ import {
     MessageCircle,
     Clock,
     Sparkles,
-    ShieldAlert,
     Phone,
     Share2,
     Check,
@@ -33,6 +32,7 @@ import FormVideoPlayer from '@/components/public/FormVideoPlayer';
 import type { WeightTier } from '@/lib/publicFormConfig';
 import { vinzerPromoUrl } from '@/lib/publicUrls';
 import ProductCart, { type CartLine } from '@/components/public/catalog/ProductCart';
+import CatalogNotFound from '@/components/public/catalog/CatalogNotFound';
 
 interface ProductItem {
     id: number;
@@ -76,6 +76,8 @@ interface PublicCatalogData {
     weight_tiers?: WeightTier[];
     catalog_message?: string | null;
     show_plan_request?: boolean;
+    /** Formulario personalizado oficial: «Solicitar este plan» lo abre (?form=) */
+    form_preset?: string | null;
     /** Abierto con ?ref= (correo / seguimiento): mascota y si se puede pedir */
     order_ref?: { pet_name?: string | null; can_request: boolean } | null;
     /** Video de bienvenida configurado por el SuperAdmin */
@@ -275,23 +277,7 @@ export default function PublicCatalogPage() {
 
     // 2. Not found / generic error
     if (error || !data) {
-        return (
-            <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-[#0a0d14] dark:text-white flex flex-col items-center justify-center p-6 text-center">
-                <div className="w-20 h-20 rounded-3xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mb-6 shadow-xl shadow-red-500/5">
-                    <ShieldAlert size={36} />
-                </div>
-                <h1 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Catálogo no disponible</h1>
-                <p className="text-sm text-slate-600 dark:text-neutral-400 max-w-md mb-8">
-                    {error || "El enlace ingresado no existe o no tiene autorización de acceso."}
-                </p>
-                <button
-                    onClick={() => window.location.reload()}
-                    className="px-6 py-3 rounded-2xl bg-slate-200 hover:bg-slate-300 text-slate-900 dark:bg-white/10 dark:hover:bg-white/15 dark:text-white font-bold text-sm transition-all active:scale-95"
-                >
-                    Reintentar
-                </button>
-            </div>
-        );
+        return <CatalogNotFound showRetry />;
     }
 
     // 3. Expired Token State
@@ -387,6 +373,7 @@ export default function PublicCatalogPage() {
                 weightTiers={data.weight_tiers ?? []}
                 message={data.catalog_message}
                 showRequestButton={data.show_plan_request !== false}
+                formPreset={data.form_preset || null}
                 catalogVideo={data.catalog_video}
                 catalogToken={token}
                 getImageUrl={getImageUrl}

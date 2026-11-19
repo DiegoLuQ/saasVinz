@@ -383,6 +383,8 @@ class PublicCatalogResponse(BaseModel):
     # el crematorio habilitó mostrarlo; ver app/services/public_form_config.py)
     weight_tiers: List[dict] = []
     show_plan_request: bool = True  # catálogo de planes: botón «Solicitar este plan»
+    # Formulario personalizado oficial (Enlaces oficiales): «Solicitar este plan» lo abre (?form=)
+    form_preset: Optional[str] = None
     # Catálogo de productos abierto con ?ref= (enlace de seguimiento / correo):
     # {pet_name, can_request}. None = sin orden (compra externa).
     order_ref: Optional[dict] = None

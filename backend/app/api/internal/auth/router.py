@@ -626,7 +626,12 @@ def get_bootstrap(
     # Prepare tenant data with renewal date and cycle
     tenant_resp = schemas.BootstrapTenantData.model_validate(user.tenant)
     from app.services.public_form_config import normalize_form_config
-    tenant_resp.form_config = {"custom_forms": normalize_form_config(user.tenant.form_config).get("custom_forms", [])}
+    from app.services.official_links import official_form_preset
+    tenant_resp.form_config = {
+        "custom_forms": normalize_form_config(user.tenant.form_config).get("custom_forms", []),
+        # Formulario oficial (Enlaces oficiales): «Compartir formulario» lo usa en el enlace permanente
+        "official_form": official_form_preset(user.tenant),
+    }
 
     # Use consolidated fields from Tenant model
     tenant_resp.next_billing_date = user.tenant.billing_end_date

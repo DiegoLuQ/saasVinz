@@ -93,8 +93,21 @@ def priority_plan_name(crem) -> Optional[str]:
     """Nombre del primer plan prioritario de la orden (None = sin prioridad)."""
     for line in getattr(crem, "planes", None) or []:
         if line.plan is not None and line.plan.is_priority:
-            return line.plan.name
+            return line.plan_name or line.plan.name
     return None
+
+
+def display_plan_or_cremation_type(crem) -> Optional[str]:
+    """Nombre del plan principal de la orden si tiene planes contratados; si no, cremation_type."""
+    lines = list(getattr(crem, "planes", None) or [])
+    if lines:
+        principal = next((l for l in lines if getattr(l, "es_principal", False)), None) or lines[0]
+        plan_name = getattr(principal, "plan_name", None) or (
+            principal.plan.name if getattr(principal, "plan", None) else None
+        )
+        if plan_name and plan_name.strip():
+            return plan_name.strip()
+    return crem.cremation_type
 
 
 def base_query(db: Session, tenant_id: int):
@@ -206,7 +219,7 @@ def to_daily_order(row, tzinfo) -> schemas.DailyOrderSchema:
         delivery_address=crem.logistics.address if crem.logistics else None,
         delivery_city=crem.logistics.city if crem.logistics else None,
         delivery_region=crem.logistics.region if crem.logistics else None,
-        cremation_type=crem.cremation_type,
+        cremation_type=display_plan_or_cremation_type(crem),
         notes=crem.details.notes if crem.details else None,
         pet_image_url=pet.image_url if pet else None,
         priority_plan=priority_plan_name(crem),

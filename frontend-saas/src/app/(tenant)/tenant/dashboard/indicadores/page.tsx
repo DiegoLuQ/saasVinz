@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { apiRequest } from '@/lib/tenant/api';
 import { useCurrentUser } from '@/hooks/useSessionBootstrap';
+import TenantPlanImpactWidget from '@/components/tenant/indicadores/TenantPlanImpactWidget';
 
 /** `pending` (servicios especiales): órdenes con el servicio «a cotizar» aún en $0. */
 interface RankRow { label: string; count: number; revenue: number; extra?: number; pending?: number }
@@ -396,6 +397,8 @@ export default function IndicadoresPage() {
                     </div>
 
                     <MonthlyChart rows={data.monthly} selected={data.month} year={data.year} />
+
+                    <TenantPlanImpactWidget />
 
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                         <RankCard title="Por plan" icon={Layers} rows={data.by_plan} countLabel="Órdenes" empty="Sin planes en el periodo" />

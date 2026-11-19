@@ -34,8 +34,8 @@ class CremationService:
                 models.PlanOC.cremation_id == db_cremation.id
             ).first()
             
-        if principal_plan and principal_plan.plan:
-            db_cremation.cremation_type = principal_plan.plan.name
+        if principal_plan and (principal_plan.plan_name or principal_plan.plan):
+            db_cremation.cremation_type = principal_plan.plan_name or principal_plan.plan.name
             return
 
         principal_service = self.db.query(models.ServicioOC).filter(
@@ -47,8 +47,8 @@ class CremationService:
                 models.ServicioOC.cremation_id == db_cremation.id
             ).first()
             
-        if principal_service and principal_service.service:
-            db_cremation.cremation_type = principal_service.service.name
+        if principal_service and (principal_service.service_name or principal_service.service):
+            db_cremation.cremation_type = principal_service.service_name or principal_service.service.name
             return
             
         db_cremation.cremation_type = "Servicio Personalizado"

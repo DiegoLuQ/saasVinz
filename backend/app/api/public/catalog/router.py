@@ -119,6 +119,7 @@ def get_public_catalog(
 
     # 5a. Catálogo de planes (compartido desde Gestión de Servicios)
     if catalog_type == "plans":
+        from app.services.official_links import official_form_preset
         from app.services.price_lists import effective_for_token
         price_list = effective_for_token(db, share_token)  # promoción del enlace (None = General)
         price_table = uses_price_table(tenant) or price_list is not None
@@ -129,6 +130,7 @@ def get_public_catalog(
             plans=_active_plans(db, tenant.id, price_table, share_token.plan_groups, price_list),
             catalog_message=share_token.message,
             show_plan_request=normalize_form_config(tenant.form_config)["show_plan_request_button"],
+            form_preset=official_form_preset(tenant),
             # Con la tabla por plan los tramos no llevan recargo (el precio va en cada plan).
             weight_tiers=public_weight_tiers(
                 db, tenant.id,

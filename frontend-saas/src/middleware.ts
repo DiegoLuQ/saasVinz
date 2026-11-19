@@ -185,7 +185,9 @@ export default async function middleware(req: NextRequest) {
             url.pathname = `/public${url.pathname}`;
             return NextResponse.rewrite(url);
         }
-        url.pathname = `/public${url.pathname}`;
+        // Raíz, enlace incompleto (/slug) o cualquier otra ruta: no hay catálogo.
+        // (Antes reescribía a /public y mostraba la landing de memoriales.)
+        url.pathname = '/public/catalogo-no-encontrado';
         return NextResponse.rewrite(url);
     }
 

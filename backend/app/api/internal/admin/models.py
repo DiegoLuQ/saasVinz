@@ -294,6 +294,8 @@ class SaaSConfig(Base):
     dashboard_slides = Column(JSON, nullable=True)
     # Página pública /tour: {"video_url", "modules": [...]}; NULL = contenido original (services/tour_content.py)
     tour_content = Column(JSON, nullable=True)
+    # Plantillas de formulario para las familias (services/form_templates.py); NULL = las originales
+    form_templates = Column(JSON, nullable=True)
     # Plantilla por defecto para el seguimiento público (classic | warm | modern)
     default_tracking_template = Column(String(50), nullable=False, default="classic")
     # Telemetría ligera y anónima de uso de módulos en el sidebar (False por defecto)
@@ -388,4 +390,24 @@ class TrackingCustomTemplate(Base):
 
     created_at = Column(DateTime(timezone=True), default=tz.get_now)
     updated_at = Column(DateTime(timezone=True), default=tz.get_now, onupdate=tz.get_now)
+
+
+class PlanChangeEvent(Base):
+    """
+    Bitácora de hitos y cambios de estrategia en planes de suscripción.
+    Registra automáticamente cambios en módulos/precios/límites y permite
+    anotar manualmente movimientos estratégicos para medir su impacto antes/después.
+    """
+    __tablename__ = "sys_plan_change_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    plan_id = Column(Integer, ForeignKey("sys_subscription_plans.id", ondelete="SET NULL"), nullable=True, index=True)
+    plan_name = Column(String(80), nullable=True)
+    event_type = Column(String(30), default="auto_diff", nullable=False)  # auto_diff | manual_note
+    title = Column(String(200), nullable=False)
+    notes = Column(Text, nullable=True)
+    changes = Column(JSON, default=dict, nullable=False)
+    created_by = Column(Integer, ForeignKey("sys_users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=tz.get_now, index=True, nullable=False)
+
 

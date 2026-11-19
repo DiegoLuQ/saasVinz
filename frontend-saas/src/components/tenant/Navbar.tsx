@@ -206,13 +206,17 @@ export default function Navbar() {
                 : 'http://localhost:3000');
         
         const permToken = tenantData.public_token;
+        // Formulario oficial (Configuración → Enlaces oficiales): los enlaces permanente y
+        // temporal abren ese formulario (?form=); sin oficial personalizado = el principal.
+        const officialForm = (tenantData.form_config as { official_form?: string | null } | null)?.official_form || null;
+        const withForm = (url: string) => officialForm ? `${url}&form=${encodeURIComponent(officialForm)}` : url;
         if (mode === 'permanent') {
-            return permToken 
-                ? `${baseUrl}/${tenantData.slug}/form?token=${permToken}` 
-                : `${baseUrl}/${tenantData.slug}/form`;
+            return permToken
+                ? withForm(`${baseUrl}/${tenantData.slug}/form?token=${permToken}`)
+                : `${baseUrl}/${tenantData.slug}/form${officialForm ? `?form=${encodeURIComponent(officialForm)}` : ''}`;
         } else if (mode === 'temporary') {
-            return tempToken 
-                ? `${baseUrl}/${tenantData.slug}/form?token=${tempToken}` 
+            return tempToken
+                ? withForm(`${baseUrl}/${tenantData.slug}/form?token=${tempToken}`)
                 : '';
         } else {
             const base = `${baseUrl}/${tenantData.slug}/form`;
@@ -687,6 +691,14 @@ export default function Navbar() {
                     {/* Selector de tipo de enlace */}
                     {(() => {
                         const customFormsList: CustomFormPreset[] = (tenantData?.form_config as any)?.custom_forms || [];
+                        const officialFormId: string | null = (tenantData?.form_config as any)?.official_form || null;
+                        const officialFormName = officialFormId ? customFormsList.find(f => f.id === officialFormId)?.name : null;
+                        const officialNote = (
+                            <p className="text-[11px] text-muted-foreground">
+                                Abre tu formulario oficial: <b className="text-foreground">{officialFormName || 'Formulario principal (Clásico)'}</b>.{' '}
+                                Se cambia en Configuración → Enlaces oficiales.
+                            </p>
+                        );
                         return (
                             <>
                                 <div className="grid grid-cols-3 p-1.5 bg-foreground/5 rounded-2xl border border-foreground/10 gap-1.5">
@@ -757,6 +769,7 @@ export default function Navbar() {
                                                 <Copy size={17} />
                                             </button>
                                         </div>
+                                        {officialNote}
                                     </div>
                                 ) : shareMode === 'temporary' ? (
                                     <div className="space-y-4">
@@ -801,6 +814,7 @@ export default function Navbar() {
                                         >
                                             {isGeneratingToken ? 'Generando nuevo token...' : '🔄 Generar Nuevo Enlace Temporal'}
                                         </button>
+                                        {officialNote}
                                     </div>
                                 ) : (
                                     /* Modo Formularios Específicos */

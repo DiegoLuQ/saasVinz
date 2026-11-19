@@ -4,6 +4,7 @@ import PartialDateInput from './PartialDateInput';
 import AgeInput from './AgeInput';
 import { ageFromPartialDates } from '@/lib/petAge';
 import { DEFAULT_FORM_CONFIG, fieldLabel, fieldSuffix, formatCLP, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
+import { formatTitleCaseName } from '@/lib/formatters';
 
 export interface PetData {
     name: string;
@@ -121,7 +122,7 @@ export default function PetInfoStep({ data, updateData, errors, formConfig = DEF
                         <input
                             type="text"
                             value={data.name}
-                            onChange={(e) => updateData({ name: e.target.value.slice(0, 50) })}
+                            onChange={(e) => updateData({ name: formatTitleCaseName(e.target.value).slice(0, 50) })}
                             className={`input-emotional ${errClass(errors.name)}`}
                             placeholder="Ej: Max"
                             maxLength={50}

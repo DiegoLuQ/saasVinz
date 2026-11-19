@@ -36,12 +36,12 @@ def get_pets(
 def list_pet_photos(
     q: Optional[str] = None,
     page: int = 1,
-    page_size: int = 10,
+    page_size: int = 5,
     db: Session = Depends(get_db),
     tenant_id: int = Depends(get_tenant_id),
     _: bool = Depends(check_permission("mascotas", "view"))
 ):
-    """Fotos de las mascotas (10 por página), filtradas por mascota o dueño."""
+    """Fotos de las mascotas (5 por página), filtradas por mascota o dueño."""
     from app.services.pet_photos import photo_rows, ZIP_MAX_PHOTOS
     page = max(1, page)
     page_size = max(1, min(page_size, 50))

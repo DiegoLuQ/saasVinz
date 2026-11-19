@@ -94,8 +94,98 @@ export interface CustomFormPreset {
     associated_service_id?: string | null;
     /** Tabla de precios (rangos de peso) de este formulario; null = la del formulario principal. */
     price_list_id?: number | null;
+    /** Orden de las fases (ids fijos); null = clásico. «Resumen» siempre al final. */
+    phase_order?: PhaseKey[] | null;
+    /** Nombre y frase propios de cada fase; vacío = los de siempre. */
+    phase_labels?: PhaseLabels | null;
     created_at?: string;
 }
+
+// ===== Orden y nombre de las fases =====
+// Espejo de clean_phase_order / clean_phase_labels (backend/app/services/public_form_config.py).
+
+export type PhaseLabels = Partial<Record<PhaseKey, { name?: string; phrase?: string }>>;
+
+export const PHASE_KEYS: PhaseKey[] = ['familia', 'angel', 'camino', 'recuerdos'];
+export const MAX_PHASE_NAME = 24;
+export const MAX_PHASE_PHRASE = 120;
+
+/** Nombre y frase de siempre de cada fase (el formulario clásico). */
+export const PHASE_DEFAULTS: Record<PhaseKey | 'resumen', { name: string; phrase: string }> = {
+    familia: { name: 'Familia', phrase: 'Necesitamos conocerte para poder acompañarte de la mejor forma.' },
+    angel: { name: 'Ángel', phrase: 'Cuéntanos sobre tu compañero de vida.' },
+    camino: { name: 'Camino', phrase: 'Elige cómo quieres honrar su memoria.' },
+    recuerdos: { name: 'Recuerdos', phrase: 'Un último recuerdo para guardar para siempre.' },
+    resumen: { name: 'Resumen', phrase: 'Confirma que todo esté correcto antes de enviar.' },
+};
+
+/** Orden válido: todas las fases una vez y «Camino» después de «Ángel» (el tamaño define los precios). */
+export function cleanPhaseOrder(raw?: readonly string[] | null): PhaseKey[] {
+    const order: PhaseKey[] = [];
+    for (const k of raw || []) {
+        if ((PHASE_KEYS as string[]).includes(k) && !order.includes(k as PhaseKey)) order.push(k as PhaseKey);
+    }
+    PHASE_KEYS.forEach(k => { if (!order.includes(k)) order.push(k); });
+    if (order.indexOf('camino') < order.indexOf('angel')) {
+        order.splice(order.indexOf('camino'), 1);
+        order.splice(order.indexOf('angel') + 1, 0, 'camino');
+    }
+    return order;
+}
+
+/** Nombre / frase visibles de una fase en un formulario. */
+export function phaseName(labels: PhaseLabels | null | undefined, key: PhaseKey | 'resumen'): string {
+    return (key !== 'resumen' && labels?.[key]?.name?.trim()) || PHASE_DEFAULTS[key].name;
+}
+export function phrasePhase(labels: PhaseLabels | null | undefined, key: PhaseKey | 'resumen'): string {
+    return (key !== 'resumen' && labels?.[key]?.phrase?.trim()) || PHASE_DEFAULTS[key].phrase;
+}
+
+/**
+ * Plantilla «Formulario Huella»: primero la mascota, luego el homenaje, después el plan
+ * y al final los datos de contacto (cuando ya hay vínculo, se completan sin dudar).
+ * Los campos ocultos conservan su fase (la de siempre) por si se activan.
+ */
+/** Plantilla de formulario de Vinzer (backend/app/services/form_templates.py). */
+export interface FormTemplate extends Omit<CustomFormPreset, 'created_at'> {
+    active?: boolean;
+}
+
+export const HUELLA_TEMPLATE: FormTemplate = {
+    id: 'huella',
+    active: true,
+    name: 'Formulario Huella',
+    description: 'Cuéntanos de tu compañero, honra su memoria y elige cómo despedirlo. Al final te pedimos tus datos para coordinar el retiro.',
+    phases: { familia: true, angel: true, camino: true, recuerdos: true },
+    phase_order: ['angel', 'recuerdos', 'camino', 'familia'],
+    phase_labels: {
+        angel: { name: 'Tu compañero', phrase: 'Empecemos por quien más importa: cuéntanos de tu compañero de vida.' },
+        recuerdos: { name: 'Su recuerdo', phrase: 'Una foto y unas palabras para honrar su memoria.' },
+        camino: { name: 'Su despedida', phrase: 'Elige cómo quieres despedirlo.' },
+        familia: { name: 'Tus datos', phrase: 'Por último, tus datos para coordinar el retiro y acompañarte.' },
+    },
+    include_health_status: false,
+    fields: {
+        // Ángel
+        nickname: { visible: false, required: false },
+        breed: { visible: false, required: false },
+        weight: { visible: true, required: true },
+        age: { visible: true, required: false },
+        birthDate: { visible: false, required: false },
+        deathDate: { visible: true, required: false },
+        healthStatus: { visible: false, required: false },
+        // Familia
+        email: { visible: true, required: true },
+        rut: { visible: true, required: false },
+        contactPreference: { visible: true, required: false },
+        pickup: { visible: true, required: true },
+        address: { visible: true, required: false },
+        comments: { visible: true, required: false },
+    },
+    welcome_modal: null,
+    associated_service_id: null,
+    price_list_id: null,
+};
 
 export interface PublicFormConfig {
     phases: PhaseConfig;

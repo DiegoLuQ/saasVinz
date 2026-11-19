@@ -416,7 +416,9 @@ class PlanService:
         return self.get_by_id(tenant_id, new.id)
 
     def update(self, tenant_id: int, plan_id: int, plan_update: schemas.PlanUpdate) -> models.Plan:
+        from app.services.tenant_plan_impact import snapshot_tenant_plan, record_tenant_plan_diff_event
         db_plan = self.get_by_id(tenant_id, plan_id)
+        plan_before_snapshot = snapshot_tenant_plan(db_plan)
         
         update_data = plan_update.model_dump(exclude_unset=True)
 
@@ -476,6 +478,12 @@ class PlanService:
 
         self.db.commit()
         self.db.refresh(db_plan)
+
+        try:
+            record_tenant_plan_diff_event(self.db, tenant_id, db_plan, plan_before_snapshot)
+        except Exception:
+            self.db.rollback()
+
         return db_plan
 
     def _link_services(self, tenant_id: int, plan_id: int, service_ids: List[int], optional_ids: List[int]):

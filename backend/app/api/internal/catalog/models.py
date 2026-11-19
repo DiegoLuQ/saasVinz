@@ -251,3 +251,23 @@ class ProductRequest(Base):
     delivered_at = Column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (UniqueConstraint('tenant_id', 'number', name='uix_product_request_number'),)
+
+
+class TenantPlanChangeEvent(Base):
+    """
+    Bitácora de hitos y cambios en los planes propios del crematorio (`srv_plans`).
+    Registra automáticamente cambios en servicios incluidos, productos o precios
+    para analizar el impacto antes/después en órdenes e ingresos.
+    """
+    __tablename__ = "srv_plan_change_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("sys_tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    plan_id = Column(Integer, ForeignKey("srv_plans.id", ondelete="SET NULL"), nullable=True, index=True)
+    plan_name = Column(String(120), nullable=True)
+    event_type = Column(String(30), nullable=False, default="auto_diff")  # auto_diff | manual_note
+    title = Column(String(200), nullable=False)
+    notes = Column(Text, nullable=True)
+    changes = Column(JSON, nullable=False, default=dict)
+    created_by = Column(Integer, ForeignKey("sys_users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=tz.get_now, nullable=False, index=True)

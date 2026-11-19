@@ -56,6 +56,30 @@ export function formatPetDate(v?: string | null, precision?: string | null, iso 
 export const partialPrecision = (v?: string | null): DatePrecision =>
     !v ? 'day' : /^\d{4}$/.test(v) ? 'year' : /^\d{4}-\d{2}$/.test(v) ? 'month' : 'day';
 
+/** Hoy en la hora local del navegador (AAAA-MM-DD); toISOString() daría el día UTC. */
+export function todayLocal(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** ¿Es una fecha parcial bien escrita? «2015» · «2015-03» · «2015-03-12» (año 1950–hoy, mes 1–12, día real). */
+export function isValidPartialDate(v: string): boolean {
+    const m = /^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?$/.exec(v);
+    if (!m || Number(m[1]) < MIN_PET_YEAR) return false;
+    if (m[2] && (Number(m[2]) < 1 || Number(m[2]) > 12)) return false;
+    if (m[3]) {
+        const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+        if (d.getMonth() !== Number(m[2]) - 1) return false;  // 31 de febrero, etc.
+    }
+    return true;
+}
+
+/** ¿La fecha parcial es futura? Se compara solo lo que se sabe (año / mes / día). */
+export function isFuturePartialDate(v: string): boolean {
+    const today = todayLocal();
+    return v > today.slice(0, v.length);
+}
+
 /** Texto legible de una fecha parcial del formulario («2015», «marzo 2015», «12/03/2015»). */
 export function formatPartialDate(v?: string | null): string {
     if (!v) return '';

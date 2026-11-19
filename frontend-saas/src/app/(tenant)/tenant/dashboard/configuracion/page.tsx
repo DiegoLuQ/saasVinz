@@ -152,7 +152,7 @@ export default function SettingsPage() {
     }
 
     return (
-        <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto animate-fade-in pb-20 px-3 sm:px-4 md:px-8">
+        <div className="space-y-6 sm:space-y-8 max-w-[1560px] w-full mx-auto animate-fade-in pb-20 px-3 sm:px-4 md:px-8">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6 pb-6 border-b border-white/5">
                 <div className="flex items-start gap-5 min-w-0">
                     <div className="space-y-1 min-w-0">

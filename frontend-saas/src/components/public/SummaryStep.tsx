@@ -8,7 +8,7 @@ import FarewellPreview from '@/app/(tenant)/tenant/dashboard/documentos/disenos/
 import { formatAge } from '@/lib/petAge';
 import { formatPartialDate } from '@/lib/petDates';
 import { ownerCommunes, quoteTransport, transportPlaces, type PublicTransport } from '@/lib/transport';
-import { DEFAULT_FORM_CONFIG, fieldLabel, formatCLP, tierDisplay, tierForWeight, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
+import { DEFAULT_FORM_CONFIG, PHASE_KEYS, cleanPhaseOrder, fieldLabel, formatCLP, tierDisplay, tierForWeight, type PhaseKey, type PhaseLabels, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
 
 interface OwnerData {
     fullName: string;
@@ -74,6 +74,9 @@ interface Props {
     weightTiers?: WeightTier[];
     /** Cobro de traslado por comuna (null = no se cobra) */
     transport?: PublicTransport | null;
+    /** Orden y nombre de las fases del formulario (personalizado); sin dato = clásico */
+    phaseOrder?: PhaseKey[] | null;
+    phaseLabels?: PhaseLabels | null;
 }
 
 const WEIGHT_LABELS: Record<string, string> = {
@@ -244,7 +247,7 @@ function PlanAccordionItem({ item, showPrice }: { item: ServiceItem; showPrice: 
     );
 }
 
-export default function SummaryStep({ ownerData, petData, selectedServices, services, images, onEditStep, farewellTemplate, formConfig = DEFAULT_FORM_CONFIG, weightTiers = [], transport }: Props) {
+export default function SummaryStep({ ownerData, petData, selectedServices, services, images, onEditStep, farewellTemplate, formConfig = DEFAULT_FORM_CONFIG, weightTiers = [], transport, phaseOrder, phaseLabels }: Props) {
     const f = formConfig.fields;
     const tier = weightTiers.find(t => String(t.id) === petData.weightTierId);
     const tierText = tier
@@ -317,117 +320,15 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
 
     const p = formConfig?.phases || { familia: true, angel: true, camino: true, recuerdos: true };
 
-    return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* Header */}
-            <div className="text-center mb-8">
-                <h2 className="text-3xl font-extrabold uppercase italic tracking-tight text-slate-800 dark:text-slate-100 mb-1.5">
-                    Revisa tu solicitud
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-normal tracking-wide">
-                    Confirma que todo esté correcto antes de enviar
-                </p>
-            </div>
-
-            {/* 1. Datos de la Familia */}
-            {p.familia !== false && (
-                <SectionCard icon={User} title="Datos de la Familia" step="familia" onEdit={onEditStep}>
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                        <DataRow label="Nombre" value={ownerData.fullName} />
-                        {f.email.visible && ownerData.email && <DataRow label={fieldLabel(f.email, 'Email')} value={ownerData.email} />}
-                        <DataRow label="Teléfono" value={ownerData.phone} />
-                        {f.rut.visible && ownerData.rut && <DataRow label={fieldLabel(f.rut, 'RUT')} value={ownerData.rut} />}
-                        {/* Retiro y entrega con la misma estructura: dirección, comuna, región */}
-                        {f.pickup.visible && ownerData.veterinary && !sameAddress && (
-                            <DataRow
-                                label={fieldLabel(f.pickup, 'Lugar de Retiro')}
-                                value={[ownerData.veterinary, ownerData.pickupCommune, ownerData.pickupRegion].filter(Boolean).join(', ')}
-                            />
-                        )}
-                        {f.address.visible && (
-                            <DataRow
-                                label={sameAddress ? 'Retiro y Entrega' : fieldLabel(f.address, 'Dirección Entrega')}
-                                value={[ownerData.address, ownerData.commune, ownerData.region].filter(Boolean).join(', ')}
-                            />
-                        )}
-                        {f.contactPreference.visible && ownerData.contactPreference && (
-                            <DataRow label={fieldLabel(f.contactPreference, 'Contacto')} value={CONTACT_LABELS[ownerData.contactPreference] || ownerData.contactPreference} />
-                        )}
-                        {f.comments.visible && ownerData.comments && <DataRow label={fieldLabel(f.comments, 'Comentarios')} value={ownerData.comments} />}
-                    </div>
-                </SectionCard>
-            )}
-
-            {/* 2. Datos del Angelito */}
-            {p.angel !== false && (
-                <SectionCard icon={PawPrint} title="Tu Angelito" step="angel" onEdit={onEditStep}>
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                        <DataRow label="Nombre" value={petData.name} />
-                        {f.nickname.visible && petData.nickname && <DataRow label={fieldLabel(f.nickname, 'Apodo')} value={petData.nickname} />}
-                        <DataRow label="Especie" value={petData.type} />
-                        {f.breed.visible && petData.breed && <DataRow label={fieldLabel(f.breed, 'Raza')} value={petData.breed} />}
-                        {f.age.visible && <DataRow label={fieldLabel(f.age, 'Edad')} value={formatAge(petData.age, petData.ageUnit) || undefined} />}
-                        {f.weight.visible && tierText && <DataRow label={fieldLabel(f.weight, 'Peso')} value={tierText} />}
-                        {f.weight.visible && !tier && weightTiers.length === 0 && petData.weightRange && <DataRow label="Peso" value={WEIGHT_LABELS[petData.weightRange]} />}
-                        {f.weight.visible && petData.weightKg && <DataRow label="Peso exacto" value={`${petData.weightKg} kg`} />}
-                        {f.healthStatus?.visible && petData.healthStatus && <DataRow label={fieldLabel(f.healthStatus, 'Estado de salud')} value={petData.healthStatus} />}
-                        {f.birthDate.visible && petData.birthDate && <DataRow label={fieldLabel(f.birthDate, 'Nacimiento')} value={formatDate(petData.birthDate)} />}
-                        {f.deathDate.visible && petData.deathDate && <DataRow label={fieldLabel(f.deathDate, 'Fallecimiento')} value={formatDate(petData.deathDate)} />}
-                    </div>
-                </SectionCard>
-            )}
-
-            {/* 3. El Camino Elegido */}
-            {p.camino !== false && (
-                <SectionCard icon={Package} title="El Camino Elegido" step="camino" onEdit={onEditStep}>
-                    {selectedItems.length > 0 || weightTierForPrice ? (
-                        <div className="space-y-3">
-                            {selectedItems.map(item => (
-                                <PlanAccordionItem key={item.id} item={item} showPrice={showServicePrices} />
-                            ))}
-
-                            {weightTierForPrice && (
-                                <div className="rounded-2xl bg-gradient-to-br from-sky-50/70 via-white to-slate-50/50 dark:from-sky-950/20 dark:via-slate-900 dark:to-slate-950/40 border border-sky-200/60 dark:border-sky-900/30 p-4 flex items-center justify-between">
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="w-7 h-7 rounded-lg bg-sky-100 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
-                                            <PawPrint size={14} />
-                                        </div>
-                                        <div>
-                                            <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                                                Tramo de peso: {weightTierForPrice.label ? `${weightTierForPrice.label} (${weightTierForPrice.range_text})` : weightTierForPrice.range_text}
-                                            </span>
-                                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                                                Recargo aplicado según el tamaño de tu mascota
-                                            </p>
-                                        </div>
-                                    </div>
-                                    {showWeightPrices && weightTierForPrice.price != null && weightTierForPrice.price > 0 && (
-                                        <span className="shrink-0 text-sm font-bold text-sky-700 dark:text-sky-400">
-                                            +{formatCLP(weightTierForPrice.price)}
-                                        </span>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <p className="text-[12px] text-slate-400 dark:text-slate-500 italic font-medium py-2">
-                            No seleccionaste servicios — el crematorio te asesorará.
-                        </p>
-                    )}
-                </SectionCard>
-            )}
-
-            {/* Formulario específico sin fase Camino: el servicio viene fijado y no se edita */}
-            {p.camino === false && selectedItems.length > 0 && (
-                <SectionCard icon={Package} title={selectedItems.length === 1 ? 'Servicio incluido' : 'Servicios incluidos'} step="camino">
-                    <div className="space-y-3">
-                        {selectedItems.map(item => (
-                            <PlanAccordionItem key={item.id} item={item} showPrice={showServicePrices} />
-                        ))}
-                    </div>
-                </SectionCard>
-            )}
-
+    // Orden del resumen. Clásico = el de siempre (total justo después de Camino).
+    // Formulario con orden propio: orden fijo de revisión — datos de la familia, mascota,
+    // recuerdos, plan elegido y al final el total con su desglose y los avisos (antes de
+    // la autorización de la foto y el botón Enviar), sin importar en qué orden se llenó.
+    const classic = cleanPhaseOrder(phaseOrder).join() === PHASE_KEYS.join();
+    const order: PhaseKey[] = classic ? [...PHASE_KEYS] : ['familia', 'angel', 'recuerdos', 'camino'];
+    const title = (key: PhaseKey, fallback: string) => phaseLabels?.[key]?.name?.trim() || fallback;
+    const totalsBlock = (
+        <>
             {showTotal && (
                 <motion.div
                     initial={{ opacity: 0, y: 12 }}
@@ -517,9 +418,125 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
                 </motion.div>
             )}
 
+        </>
+    );
+    const sections: Record<PhaseKey, React.ReactNode> = {
+        familia: (
+        <>
+            {/* 1. Datos de la Familia */}
+            {p.familia !== false && (
+                <SectionCard icon={User} title={title('familia', 'Datos de la Familia')} step="familia" onEdit={onEditStep}>
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                        <DataRow label="Nombre" value={ownerData.fullName} />
+                        {f.email.visible && ownerData.email && <DataRow label={fieldLabel(f.email, 'Email')} value={ownerData.email} />}
+                        <DataRow label="Teléfono" value={ownerData.phone} />
+                        {f.rut.visible && ownerData.rut && <DataRow label={fieldLabel(f.rut, 'RUT')} value={ownerData.rut} />}
+                        {/* Retiro y entrega con la misma estructura: dirección, comuna, región */}
+                        {f.pickup.visible && ownerData.veterinary && !sameAddress && (
+                            <DataRow
+                                label={fieldLabel(f.pickup, 'Lugar de Retiro')}
+                                value={[ownerData.veterinary, ownerData.pickupCommune, ownerData.pickupRegion].filter(Boolean).join(', ')}
+                            />
+                        )}
+                        {f.address.visible && (
+                            <DataRow
+                                label={sameAddress ? 'Retiro y Entrega' : fieldLabel(f.address, 'Dirección Entrega')}
+                                value={[ownerData.address, ownerData.commune, ownerData.region].filter(Boolean).join(', ')}
+                            />
+                        )}
+                        {f.contactPreference.visible && ownerData.contactPreference && (
+                            <DataRow label={fieldLabel(f.contactPreference, 'Contacto')} value={CONTACT_LABELS[ownerData.contactPreference] || ownerData.contactPreference} />
+                        )}
+                        {f.comments.visible && ownerData.comments && <DataRow label={fieldLabel(f.comments, 'Comentarios')} value={ownerData.comments} />}
+                    </div>
+                </SectionCard>
+            )}
+
+        </>
+        ),
+        angel: (
+        <>
+            {/* 2. Datos del Angelito */}
+            {p.angel !== false && (
+                <SectionCard icon={PawPrint} title={title('angel', 'Tu Angelito')} step="angel" onEdit={onEditStep}>
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                        <DataRow label="Nombre" value={petData.name} />
+                        {f.nickname.visible && petData.nickname && <DataRow label={fieldLabel(f.nickname, 'Apodo')} value={petData.nickname} />}
+                        <DataRow label="Especie" value={petData.type} />
+                        {f.breed.visible && petData.breed && <DataRow label={fieldLabel(f.breed, 'Raza')} value={petData.breed} />}
+                        {f.age.visible && <DataRow label={fieldLabel(f.age, 'Edad')} value={formatAge(petData.age, petData.ageUnit) || undefined} />}
+                        {f.weight.visible && tierText && <DataRow label={fieldLabel(f.weight, 'Peso')} value={tierText} />}
+                        {f.weight.visible && !tier && weightTiers.length === 0 && petData.weightRange && <DataRow label="Peso" value={WEIGHT_LABELS[petData.weightRange]} />}
+                        {f.weight.visible && petData.weightKg && <DataRow label="Peso exacto" value={`${petData.weightKg} kg`} />}
+                        {f.healthStatus?.visible && petData.healthStatus && <DataRow label={fieldLabel(f.healthStatus, 'Estado de salud')} value={petData.healthStatus} />}
+                        {f.birthDate.visible && petData.birthDate && <DataRow label={fieldLabel(f.birthDate, 'Nacimiento')} value={formatDate(petData.birthDate)} />}
+                        {f.deathDate.visible && petData.deathDate && <DataRow label={fieldLabel(f.deathDate, 'Fallecimiento')} value={formatDate(petData.deathDate)} />}
+                    </div>
+                </SectionCard>
+            )}
+
+        </>
+        ),
+        camino: (
+        <>
+            {/* 3. El Camino Elegido */}
+            {p.camino !== false && (
+                <SectionCard icon={Package} title={title('camino', 'El Camino Elegido')} step="camino" onEdit={onEditStep}>
+                    {selectedItems.length > 0 || weightTierForPrice ? (
+                        <div className="space-y-3">
+                            {selectedItems.map(item => (
+                                <PlanAccordionItem key={item.id} item={item} showPrice={showServicePrices} />
+                            ))}
+
+                            {weightTierForPrice && (
+                                <div className="rounded-2xl bg-gradient-to-br from-sky-50/70 via-white to-slate-50/50 dark:from-sky-950/20 dark:via-slate-900 dark:to-slate-950/40 border border-sky-200/60 dark:border-sky-900/30 p-4 flex items-center justify-between">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-7 h-7 rounded-lg bg-sky-100 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+                                            <PawPrint size={14} />
+                                        </div>
+                                        <div>
+                                            <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                                                Tramo de peso: {weightTierForPrice.label ? `${weightTierForPrice.label} (${weightTierForPrice.range_text})` : weightTierForPrice.range_text}
+                                            </span>
+                                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                Recargo aplicado según el tamaño de tu mascota
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {showWeightPrices && weightTierForPrice.price != null && weightTierForPrice.price > 0 && (
+                                        <span className="shrink-0 text-sm font-bold text-sky-700 dark:text-sky-400">
+                                            +{formatCLP(weightTierForPrice.price)}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <p className="text-[12px] text-slate-400 dark:text-slate-500 italic font-medium py-2">
+                            No seleccionaste servicios — el crematorio te asesorará.
+                        </p>
+                    )}
+                </SectionCard>
+            )}
+
+            {/* Formulario específico sin fase Camino: el servicio viene fijado y no se edita */}
+            {p.camino === false && selectedItems.length > 0 && (
+                <SectionCard icon={Package} title={selectedItems.length === 1 ? 'Servicio incluido' : 'Servicios incluidos'} step="camino">
+                    <div className="space-y-3">
+                        {selectedItems.map(item => (
+                            <PlanAccordionItem key={item.id} item={item} showPrice={showServicePrices} />
+                        ))}
+                    </div>
+                </SectionCard>
+            )}
+
+        </>
+        ),
+        recuerdos: (
+        <>
             {/* 4. Fotos y Dedicatoria */}
             {p.recuerdos !== false && (
-                <SectionCard icon={Heart} title="Recuerdos" step="recuerdos" onEdit={onEditStep}>
+                <SectionCard icon={Heart} title={title('recuerdos', 'Recuerdos')} step="recuerdos" onEdit={onEditStep}>
                 <div className="space-y-4">
                     {images.length > 0 ? (
                         <div className="space-y-2.5">
@@ -580,6 +597,30 @@ export default function SummaryStep({ ownerData, petData, selectedServices, serv
                 </div>
             </SectionCard>
             )}
+
+        </>
+        ),
+    };
+
+    return (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Header */}
+            <div className="text-center mb-8">
+                <h2 className="text-3xl font-extrabold uppercase italic tracking-tight text-slate-800 dark:text-slate-100 mb-1.5">
+                    Revisa tu solicitud
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-normal tracking-wide">
+                    Confirma que todo esté correcto antes de enviar
+                </p>
+            </div>
+
+            {order.map(key => (
+                <React.Fragment key={key}>
+                    {sections[key]}
+                    {classic && key === 'camino' && totalsBlock}
+                </React.Fragment>
+            ))}
+            {!classic && totalsBlock}
 
             {/* Aviso de Entrega si está configurado */}
             {formConfig?.delivery_notice && (

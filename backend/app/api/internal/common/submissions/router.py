@@ -753,14 +753,15 @@ def create_services_from_submission(
         backorder: list = []
 
         # 1. Procesar Planes
-        for p in resolved_plans:
+        for idx, p in enumerate(resolved_plans):
             db_plan_oc = models.PlanOC(
                 tenant_id=tenant_id,
                 cremation_id=db_cremation.id,
                 plan_id=p["id"],
                 cantidad=1,
                 precio_costo=p["cost"],
-                precio_venta=p["price"]
+                precio_venta=p["price"],
+                es_principal=(idx == 0),
             )
             db.add(db_plan_oc)
             
@@ -825,6 +826,14 @@ def create_services_from_submission(
                 precio_venta=p["price"]
             )
             db.add(db_assoc)
+
+        # Sincronizar cremation_type con el nombre del plan o servicio principal
+        db.flush()
+        if resolved_plans or resolved_services:
+            from app.api.internal.operations.services import CremationService
+            CremationService(db)._sync_cremation_type(db_cremation)
+        elif plan_name and plan_name not in ("No especificado", "Plan"):
+            db_cremation.cremation_type = plan_name
                 
         # Cleanup physical files from storage folder
         try:

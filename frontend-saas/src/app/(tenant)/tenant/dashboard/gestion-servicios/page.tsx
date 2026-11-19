@@ -509,30 +509,26 @@ export default function ServicesPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2.5">
-                    {/* Botones contextuales de Planes */}
-                    {activeTab === 'planes' && (
-                        <>
-                            {hasFeature('servicios:planes:catalogo', true) && (
-                                <button
-                                    onClick={() => setShowSharePlansModal(true)}
-                                    className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-all"
-                                    title="Generar enlace público del catálogo"
-                                >
-                                    <Share2 size={15} className="text-primary" />
-                                    <span>Compartir</span>
-                                </button>
-                            )}
-                            {hasFeature('servicios:planes:descargar_pdf', true) && (
-                                <button
-                                    onClick={() => setShowPlansCatalogModal(true)}
-                                    className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-all"
-                                    title="Previsualizar catálogo y descargar PDF"
-                                >
-                                    <BookOpen size={15} className="text-primary" />
-                                    <span>Ver Catálogo PDF</span>
-                                </button>
-                            )}
-                        </>
+                    {/* Botones de Catálogo siempre visibles al entrar al módulo */}
+                    {hasFeature('servicios:planes:catalogo', true) && (
+                        <button
+                            onClick={() => setShowSharePlansModal(true)}
+                            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-all cursor-pointer"
+                            title="Generar enlace público del catálogo"
+                        >
+                            <Share2 size={15} className="text-primary" />
+                            <span>Compartir Catálogo</span>
+                        </button>
+                    )}
+                    {hasFeature('servicios:planes:descargar_pdf', true) && (
+                        <button
+                            onClick={() => setShowPlansCatalogModal(true)}
+                            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-sm transition-all cursor-pointer"
+                            title="Previsualizar catálogo y descargar PDF"
+                        >
+                            <BookOpen size={15} className="text-primary" />
+                            <span>Ver Catálogo PDF</span>
+                        </button>
                     )}
 
                     {activeTab === 'servicios' && canCreate('servicios') && (

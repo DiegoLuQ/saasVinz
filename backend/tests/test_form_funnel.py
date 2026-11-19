@@ -93,4 +93,4 @@ def test_reporte_hasta_donde_llegan(client, db, world, auth):
     assert ph["enviado"]["reached"] >= 1
     assert next(x for x in ph["enviado"]["actions"] if x["key"] == "card_download")["sessions"] >= 1
     row = next(t for t in d["by_tenant"] if t["tenant_id"] == tid)
-    assert row["form_name"] == "Formulario principal"
+    assert row["form_name"] == "Formulario principal (Clásico)"
