@@ -132,6 +132,19 @@ def health_metrics(
     }
 
 
+@router.get("/health/server-metrics")
+def server_telemetry_metrics(
+    db: Session = Depends(get_db),
+    current_creator = Depends(get_current_creator),
+):
+    """
+    Telemetría avanzada de hardware del VPS (RAM, CPU, Tráfico de Red),
+    rendimiento y conexiones de PostgreSQL, y desglose de consumo por crematorio.
+    """
+    from app.services.server_metrics import collect_server_telemetry
+    return collect_server_telemetry(db)
+
+
 @router.post("/health/optimize")
 def optimize_system(
     db: Session = Depends(get_db),

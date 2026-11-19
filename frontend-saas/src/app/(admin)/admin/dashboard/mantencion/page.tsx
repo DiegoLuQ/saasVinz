@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import SystemHealth, { type HealthMetricsResponse } from '@/components/admin/SaaSMaintenance/SystemHealth';
 import GlobalAnnouncementManager from '@/components/admin/SaaSMaintenance/GlobalAnnouncementManager';
+import ServerTelemetryMonitor from '@/components/admin/SaaSMaintenance/ServerTelemetryMonitor';
 import { useAdminStats } from '@/hooks/useAdminBootstrap';
 import { apiRequest } from '@/lib/admin/api';
 
@@ -48,6 +49,9 @@ export default function MaintenancePage() {
                     </p>
                 </div>
             </header>
+
+            {/* Monitor Avanzado de Servidor VPS y Base de Datos (Global e Individual) */}
+            <ServerTelemetryMonitor />
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
                 {/* Salud + Infraestructura técnica (4/12) */}
