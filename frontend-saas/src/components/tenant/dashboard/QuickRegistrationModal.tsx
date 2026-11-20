@@ -33,6 +33,7 @@ import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { regions } from '@/lib/tenant/chile-data';
 import SearchableSelect from '@/components/tenant/SearchableSelect';
+import { formatTitleCaseName } from '@/lib/formatters';
 import ImageCropper from '@/components/tenant/ImageCropper';
 
 interface QuickRegistrationModalProps {
@@ -366,7 +367,7 @@ export default function QuickRegistrationModal({ isOpen, onClose, onSuccess }: Q
                 const custRes = await apiRequest('/api/internal/customers/', {
                     method: 'POST',
                     body: JSON.stringify({
-                        name: newCustomer.full_name.trim(),
+                        name: formatTitleCaseName(newCustomer.full_name).trim(),
                         phone: newCustomer.phone.trim(),
                         rut: newCustomer.rut.trim() || null,
                         email: newCustomer.email.trim() || null,
@@ -441,7 +442,7 @@ export default function QuickRegistrationModal({ isOpen, onClose, onSuccess }: Q
                     method: 'POST',
                     body: JSON.stringify({
                         customer_id: finalCustomerId,
-                        name: newPet.name.trim(),
+                        name: formatTitleCaseName(newPet.name).trim(),
                         species: newPet.species,
                         breed: newPet.breed || 'Mestizo',
                         weight: newPet.weight ? parseFloat(newPet.weight) : null,
@@ -743,7 +744,7 @@ export default function QuickRegistrationModal({ isOpen, onClose, onSuccess }: Q
                                                 <input
                                                     type="text"
                                                     value={newCustomer.full_name}
-                                                    onChange={(e) => setNewCustomer({ ...newCustomer, full_name: e.target.value })}
+                                                    onChange={(e) => setNewCustomer({ ...newCustomer, full_name: formatTitleCaseName(e.target.value) })}
                                                     placeholder="Ej. María González Pérez"
                                                     className="w-full mt-1 p-2.5 rounded-xl bg-background border border-foreground/10 text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
                                                 />
@@ -823,7 +824,7 @@ export default function QuickRegistrationModal({ isOpen, onClose, onSuccess }: Q
                                                 <input
                                                     type="text"
                                                     value={newPet.name}
-                                                    onChange={(e) => setNewPet({ ...newPet, name: e.target.value })}
+                                                    onChange={(e) => setNewPet({ ...newPet, name: formatTitleCaseName(e.target.value) })}
                                                     placeholder="Ej. Rocky, Pelusa"
                                                     className="w-full mt-1 p-2.5 rounded-xl bg-background border border-foreground/10 text-xs font-medium focus:ring-2 focus:ring-primary focus:outline-none"
                                                 />

@@ -37,7 +37,7 @@ import {
 import Link from 'next/link';
 import { copyToClipboard } from '@/lib/clipboard';
 import { buildTrackingUrl } from '@/lib/publicUrls';
-import { formatRut } from '@/lib/formatters';
+import { formatRut, formatTitleCaseName } from '@/lib/formatters';
 import { CHILE_REGIONS_COMUNAS } from '@/lib/geo-data';
 import ImageCropper from '@/components/tenant/ImageCropper';
 
@@ -347,8 +347,14 @@ export default function PartnerPortalPage() {
         setIsSubmitting(true);
         try {
             const formData = new FormData();
-            formData.append('owner_data', JSON.stringify(ownerData));
-            formData.append('pet_data', JSON.stringify(petData));
+            formData.append('owner_data', JSON.stringify({
+                ...ownerData,
+                fullName: formatTitleCaseName(ownerData.fullName).trim()
+            }));
+            formData.append('pet_data', JSON.stringify({
+                ...petData,
+                name: formatTitleCaseName(petData.name).trim()
+            }));
             formData.append('selected_services', JSON.stringify([`plan_${selectedPlanId}`]));
             formData.append('pin', pin);
 
@@ -723,7 +729,7 @@ export default function PartnerPortalPage() {
                                             <input
                                                 required
                                                 value={ownerData.fullName}
-                                                onChange={e => setOwnerData({ ...ownerData, fullName: e.target.value })}
+                                                onChange={e => setOwnerData({ ...ownerData, fullName: formatTitleCaseName(e.target.value) })}
                                                 placeholder="Ej: Juan Pérez Morales"
                                                 className="w-full bg-[#161c2e] border border-slate-700 rounded-2xl py-3 px-4 text-sm text-white placeholder:text-slate-500 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 transition-all"
                                             />
@@ -911,7 +917,7 @@ export default function PartnerPortalPage() {
                                             <input
                                                 required
                                                 value={petData.name}
-                                                onChange={e => setPetData({ ...petData, name: e.target.value })}
+                                                onChange={e => setPetData({ ...petData, name: formatTitleCaseName(e.target.value) })}
                                                 placeholder="Ej: Max, Luna..."
                                                 className="w-full bg-[#161c2e] border border-slate-700 rounded-2xl py-3 px-4 text-sm text-white placeholder:text-slate-500 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 transition-all"
                                             />

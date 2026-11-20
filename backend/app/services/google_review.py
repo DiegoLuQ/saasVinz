@@ -26,6 +26,10 @@ crematorio. Configuración → «Reseñas en Google»; la guarda
   Que la familia haya dejado la reseña no se puede saber (Google no lo informa).
   `stats()` / `recent()` alimentan KPIs del catálogo (global y por crematorio).
 - La tarea revisa cada 10 min con advisory lock (una sola réplica envía).
+- Cancelar la invitación automática de UNA orden (check de la orden o «Cancelar
+  envío» en la lista): una fila kind 'review' con status 'cancelled' (quién y
+  cuándo); `set_auto(enabled=True)` la borra y vuelve a programarse. «Enviar ahora»
+  sigue funcionando (es manual). El aviso de fase final no depende de esto.
 """
 from __future__ import annotations
 
@@ -59,6 +63,7 @@ CHECK_INTERVAL_SECONDS = 600
 FIRST_CHECK_DELAY_SECONDS = 90
 ADVISORY_LOCK_ID = 815004  # backups 815001, saldo IA 815002
 FINAL_STATUSES = {"entregado", "completado", "completed", "delivered"}
+CANCELLED = "cancelled"  # invitación automática cancelada para esa orden
 
 
 # ---------------------------------------------------------------------------
@@ -145,6 +150,23 @@ def _failed(rows: list) -> list:
     return [r for r in rows if r.status == "failed"]
 
 
+def _cancelled(rows: list):
+    return next((r for r in rows if r.status == CANCELLED), None)
+
+
+def set_auto(db: Session, cremation, enabled: bool, user_id: int | None = None) -> None:
+    """Activa o cancela la invitación automática de esta orden (no toca «Enviar ahora»)."""
+    q = db.query(models.FamilyNotice).filter(models.FamilyNotice.cremation_id == cremation.id,
+                                             models.FamilyNotice.kind == KIND,
+                                             models.FamilyNotice.status == CANCELLED)
+    if enabled:
+        q.delete(synchronize_session=False)
+        db.commit()
+    elif not q.first():
+        from app.services import family_notices as fn
+        fn._record(db, cremation, KIND, "email", None, None, user_id, status=CANCELLED)
+
+
 def _after_enabled(tenant, completed_at: datetime | None) -> bool:
     enabled_at = config(tenant)["enabled_at"]
     if not enabled_at or not completed_at:
@@ -168,9 +190,13 @@ def order_status(db: Session, cremation, notices: list | None = None, now: datet
     rows = notices if notices is not None else _notices(db, [cremation.id]).get(cremation.id, [])
     sent = _sent(db, cremation.id, rows)
     failed = _failed(rows)
+    cancelled = _cancelled(rows)
     customer = cremation.pet.customer if cremation.pet and cremation.pet.customer else None
     out = {
         "available": True,
+        # Check «Enviar invitación automática» de la orden (False = cancelada a mano)
+        "auto": cancelled is None,
+        "cancelled_at": cancelled.created_at if cancelled else None,
         "state": "sent" if sent else "skipped",
         "sent_at": sent.created_at if sent else None,
         "sent_to": sent.sent_to if sent else None,
@@ -184,6 +210,9 @@ def order_status(db: Session, cremation, notices: list | None = None, now: datet
         "can_send": bool(review_link(tenant)) and bool(customer and (customer.email or "").strip()),
     }
     if sent:
+        return out
+    if cancelled:
+        out["state"], out["reason"] = CANCELLED, CANCELLED
         return out
     if not review_link(tenant):
         out["reason"] = "no_link"
@@ -230,7 +259,7 @@ def tenant_list(db: Session, tenant, state: str | None = None, days: int = LIST_
     )
     notices = _notices(db, [c.id for c in rows])
     groups = {"pending": "scheduled", "retrying": "scheduled"}
-    items, counts = [], {"sent": 0, "scheduled": 0, "failed": 0, "skipped": 0}
+    items, counts = [], {"sent": 0, "scheduled": 0, "failed": 0, "skipped": 0, CANCELLED: 0}
     for c in rows:
         st = order_status(db, c, notices.get(c.id, []), now)
         if not st.get("available"):
@@ -280,6 +309,8 @@ async def send_review_email(db: Session, cremation_id: int, user_id: int | None 
         rows = _notices(db, [cremation.id]).get(cremation.id, [])
         if _sent(db, cremation.id, rows):
             return {"sent": False, "reason": "already_sent"}
+        if _cancelled(rows):
+            return {"sent": False, "reason": CANCELLED}
         if len(_failed(rows)) >= MAX_ATTEMPTS:
             return {"sent": False, "reason": "max_attempts"}
 
@@ -446,7 +477,7 @@ def due_orders(db: Session, now: datetime | None = None) -> list[int]:
         if not (due and due <= now and (now - due) <= timedelta(days=MAX_AGE_DAYS)):
             continue
         rows = _notices(db, [c.id]).get(c.id, [])
-        if not _sent(db, c.id, rows) and len(_failed(rows)) < MAX_ATTEMPTS:
+        if not _sent(db, c.id, rows) and not _cancelled(rows) and len(_failed(rows)) < MAX_ATTEMPTS:
             out.append(c.id)
     return out
 

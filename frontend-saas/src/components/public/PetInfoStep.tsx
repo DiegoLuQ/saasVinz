@@ -123,6 +123,7 @@ export default function PetInfoStep({ data, updateData, errors, formConfig = DEF
                             type="text"
                             value={data.name}
                             onChange={(e) => updateData({ name: formatTitleCaseName(e.target.value).slice(0, 50) })}
+                            onBlur={(e) => updateData({ name: formatTitleCaseName(e.target.value.trim()).slice(0, 50) })}
                             className={`input-emotional ${errClass(errors.name)}`}
                             placeholder="Ej: Max"
                             maxLength={50}
@@ -135,7 +136,8 @@ export default function PetInfoStep({ data, updateData, errors, formConfig = DEF
                             <input
                                 type="text"
                                 value={data.nickname || ''}
-                                onChange={(e) => updateData({ nickname: e.target.value.slice(0, 30) })}
+                                onChange={(e) => updateData({ nickname: formatTitleCaseName(e.target.value).slice(0, 30) })}
+                                onBlur={(e) => updateData({ nickname: formatTitleCaseName(e.target.value.trim()).slice(0, 30) })}
                                 className={`input-emotional ${errClass(errors.nickname)}`}
                                 placeholder="Ej: Maxi"
                                 maxLength={30}

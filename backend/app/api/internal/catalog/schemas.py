@@ -254,7 +254,7 @@ class WeightPricingInDB(WeightPricingBase):
 
 # Tokens de Compartir Catálogo Online
 CatalogType = Literal["products", "plans"]
-CATALOG_MESSAGE_MAX = 300  # mensaje del catálogo de planes
+CATALOG_MESSAGE_MAX = 500  # mensaje del catálogo de planes
 
 class CatalogShareTokenCreate(BaseModel):
     name: Optional[str] = None

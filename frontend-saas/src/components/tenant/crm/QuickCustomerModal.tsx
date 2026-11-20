@@ -6,7 +6,7 @@ import Modal from '@/components/tenant/Modal';
 import { useSaveCustomer, Customer } from '@/hooks/useCustomers';
 import { regions } from '@/lib/tenant/chile-data';
 import SearchableSelect from '@/components/tenant/SearchableSelect';
-import { sanitizeEmailInput, autoFixEmailDomain } from '@/lib/formatters';
+import { sanitizeEmailInput, autoFixEmailDomain, formatTitleCaseName } from '@/lib/formatters';
 
 const COUNTRY_CODES = [
     { code: '+56', country: 'Chile', flag: '🇨🇱' },
@@ -75,7 +75,10 @@ export default function QuickCustomerModal({
         setIsSaving(true);
         try {
             const res = await saveCustomerMutation.mutateAsync({
-                customer: formData,
+                customer: {
+                    ...formData,
+                    name: formatTitleCaseName(formData.name || '').trim(),
+                },
                 isEdit: false,
             });
             setIsSaving(false);
@@ -139,7 +142,7 @@ export default function QuickCustomerModal({
                             required
                             placeholder="Ej: María González"
                             value={formData.name || ''}
-                            onChange={e => setFormData({ ...formData, name: e.target.value })}
+                            onChange={e => setFormData({ ...formData, name: formatTitleCaseName(e.target.value) })}
                             className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition text-sm"
                         />
                     </div>

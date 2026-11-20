@@ -65,7 +65,7 @@ def list_family_notices(
             "id": r.id, "kind": r.kind, "channel": r.channel, "sent_to": r.sent_to,
             "status": r.status or "sent", "error": r.error,
             "step_id": r.step_id, "step_name": steps.get(r.step_id), "created_at": r.created_at,
-        } for r in rows],
+        } for r in rows if r.status != gr.CANCELLED],
     }
 
 
@@ -240,6 +240,27 @@ async def send_review_now(
     return result
 
 
+class ReviewAuto(BaseModel):
+    enabled: bool
+
+
+@router.put("/ops/orders/{cremation_id}/family-notices/review-auto")
+def set_review_auto(
+    cremation_id: int,
+    data: ReviewAuto,
+    db: Session = Depends(get_db),
+    tenant_id: int = Depends(get_tenant_id),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Check de la orden / «Cancelar envío»: activa o cancela la invitación automática
+    a reseña de Google de esta orden. El aviso de fase final se envía igual."""
+    c = _order(db, cremation_id, tenant_id)
+    if not gr.feature_on(c.tenant):
+        raise HTTPException(status_code=403, detail="Las reseñas en Google no están incluidas en tu plan")
+    gr.set_auto(db, c, data.enabled, current_user.id)
+    return gr.order_status(db, c)
+
+
 @router.get("/review-emails")
 def list_review_emails(
     state: Optional[str] = None,
@@ -250,7 +271,7 @@ def list_review_emails(
 ):
     """Invitaciones a reseña de las órdenes entregadas en los últimos `days` días:
     programadas, enviadas ✓ (el servidor de correo las aceptó), con error o que no saldrán."""
-    if state not in (None, "", "sent", "scheduled", "failed", "skipped"):
+    if state not in (None, "", "sent", "scheduled", "failed", "skipped", gr.CANCELLED):
         raise HTTPException(status_code=400, detail="Estado inválido")
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     if not gr.feature_on(tenant):

@@ -273,6 +273,7 @@ export default function OwnerInfoStep({ data, updateData, errors, tenantSlug, hi
                         type="text"
                         value={data.fullName}
                         onChange={(e) => updateData({ fullName: formatTitleCaseName(e.target.value).slice(0, 50) })}
+                        onBlur={(e) => updateData({ fullName: formatTitleCaseName(e.target.value.trim()).slice(0, 50) })}
                         className={`input-emotional ${errors.fullName ? 'border-red-500/50 focus:ring-red-500/10' : ''}`}
                         placeholder="Ingresa tu nombre"
                         maxLength={50}

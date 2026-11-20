@@ -289,6 +289,11 @@ class Certificate(Base):
     number = Column(String)  # único por crematorio (ver __table_args__)
     issue_date = Column(DateTime(timezone=True), default=tz.get_now)
     html_content = Column(String)
+    # Datos con que se emitió (diseño, mascota, dueño, campos impresos y origen de
+    # cada texto con código). «Ver datos» del Repositorio. NULL = emitido antes.
+    data = Column(JSON, nullable=True)
+    # Folio impreso (campo «Folio» del diseño, services/cert_folio.py); se reutiliza al reemitir
+    folio = Column(String(40), nullable=True)
     # sku = Column(String, nullable=True) # Removed: not in DB
     # pdf_url = Column(String, nullable=True) # Removed: not in DB
     created_at = Column(DateTime(timezone=True), default=tz.get_now)

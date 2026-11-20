@@ -42,6 +42,9 @@ from app.services.landing_features import get_landing_features, plan_offers
 
 class PublicPlan(BaseModel):
     name: str
+    # Precio tachado (temporada de referencia, services/price_seasons.py); None = sin tachado
+    compare_price: Optional[float] = None
+    compare_annual_price: Optional[float] = None
     # Código fijo (FREE, TRACK, NORMAL, PRO, ULTRA…): la web decide botones y textos
     # por el código, no por el nombre (que el SuperAdmin puede cambiar).
     code: str = ""
@@ -97,7 +100,8 @@ def _features(plan: SubscriptionPlan) -> dict[str, bool]:
     return out
 
 
-def _serialize(plan: SubscriptionPlan, highlight_keys: List[str] | None = None, ai: dict | None = None) -> PublicPlan:
+def _serialize(plan: SubscriptionPlan, highlight_keys: List[str] | None = None, ai: dict | None = None,
+               compare: dict | None = None) -> PublicPlan:
     modules = set(plan.allowed_modules or [])
 
     annual = plan.annual_price
@@ -108,8 +112,11 @@ def _serialize(plan: SubscriptionPlan, highlight_keys: List[str] | None = None, 
         raw = (plan.price * 12) - annual
         savings = raw if raw > 0 else None
 
+    cmp = (compare or {}).get(plan.id) or {}
     return PublicPlan(
         name=plan.name,
+        compare_price=cmp.get("monthly"),
+        compare_annual_price=cmp.get("annual"),
         description=plan.description,
         code=plan_code(plan),
         display_order=plan.display_order or 0,
@@ -178,7 +185,9 @@ def list_public_plans(request: Request, response: Response, db: Session = Depend
     response.headers["Cache-Control"] = "public, max-age=60"
     keys = [f["key"] for f in get_landing_features(db)]
     ai = _ai_context(db)
-    return [_serialize(p, keys, ai) for p in plans]
+    from app.services.price_seasons import compare_prices
+    compare = compare_prices(db)
+    return [_serialize(p, keys, ai, compare) for p in plans]
 
 
 @router.get("/plans/annual-discount")
@@ -189,7 +198,9 @@ def public_annual_discount(request: Request, response: Response, db: Session = D
     from app.services.plan_pricing import get_annual_discount
 
     response.headers["Cache-Control"] = "public, max-age=60"
-    return get_annual_discount(db)
+    from app.services.price_seasons import public_info
+    # + temporada vigente y la de referencia (etiqueta del precio tachado)
+    return {**get_annual_discount(db), **public_info(db)}
 
 
 @router.get("/tour")

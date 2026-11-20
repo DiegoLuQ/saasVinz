@@ -79,6 +79,7 @@ type FieldType =
     | 'direccion_dueno'
     | 'codigo_verificacion'
     | 'numero_certificado'
+    | 'folio'
     | 'texto_fijo';
 
 interface DesignField extends TextBg {
@@ -92,12 +93,18 @@ interface DesignField extends TextBg {
     color?: string;
     align?: 'left' | 'center' | 'right';
     bold?: boolean;
-    format?: 'short' | 'long' | 'year' | 'month_year';
+    // part_* = una sola parte de la fecha (elementos Día / Mes / Año): el tenant no la cambia
+    format?: 'short' | 'long' | 'year' | 'month_year' | 'part_day' | 'part_month' | 'part_month_name' | 'part_year';
     value?: string; // solo texto_fijo: el texto escrito por el admin
     // solo texto_fijo: clave (MAYÚSCULAS_Y_GUIONES). Con código, el tenant puede
     // guardar su propio texto (sys_tenants.cert_text_values) y `value` queda
     // como valor por defecto.
     code?: string;
+    // solo folio (backend services/cert_folio.py): correlativo del crematorio o aleatorio
+    folio_mode?: 'sequence' | 'random';
+    folio_format?: string; // {n} = número, {año} = año de emisión
+    folio_digits?: number; // rellena con ceros (0 = no)
+    folio_length?: number; // aleatorio: 6–8
     // imagen
     slot?: number;
     w?: number; // % ancho
@@ -163,6 +170,7 @@ const FIELD_META: Record<FieldType, { label: string; icon: any; isImage?: boolea
     direccion_dueno: { label: 'Dirección Dueño', icon: MapPin },
     codigo_verificacion: { label: 'Código Verificación', icon: ShieldCheck },
     numero_certificado: { label: 'N° Certificado', icon: Hash },
+    folio: { label: 'Folio', icon: Hash },
     texto_fijo: { label: 'Texto Libre', icon: Type },
 };
 
@@ -177,6 +185,10 @@ function formatDemoDate(d: Date, fmt?: string): string {
     if (fmt === 'long') return `${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
     if (fmt === 'year') return `${d.getFullYear()}`;
     if (fmt === 'month_year') return `${MESES[d.getMonth()]} de ${d.getFullYear()}`;
+    if (fmt === 'part_day') return dd;
+    if (fmt === 'part_month') return mm;
+    if (fmt === 'part_month_name') return MESES[d.getMonth()];
+    if (fmt === 'part_year') return `${d.getFullYear()}`;
     return `${dd}/${mm}/${d.getFullYear()}`;
 }
 
@@ -205,6 +217,11 @@ function fieldDemoValue(f: DesignField): string {
     if (f.type === 'direccion_dueno') return 'Los Aromos 123, Providencia';
     if (f.type === 'codigo_verificacion') return 'YZAEAQ7TMV';
     if (f.type === 'numero_certificado') return 'CREM-2026-0001';
+    if (f.type === 'folio') {
+        if (f.folio_mode === 'random') return 'K7P2QM9H'.slice(0, Math.min(8, Math.max(6, f.folio_length || 8)));
+        const fmt = (f.folio_format || '{n}').includes('{n}') ? (f.folio_format || '{n}') : `${f.folio_format}{n}`;
+        return fmt.replace('{n}', String(250).padStart(f.folio_digits || 0, '0')).replace('{año}', String(new Date().getFullYear()));
+    }
     if (f.type === 'texto_fijo') return f.value || 'Texto libre';
     return '';
 }
@@ -527,6 +544,16 @@ function EditorImagenContent() {
     };
 
     // --- Gestión de campos ------------------------------------------------
+    // Día / Mes / Año de la fecha de emisión como elementos sueltos (ej. «250/» + año)
+    const addDatePart = (format: 'part_day' | 'part_month_name' | 'part_year') => {
+        const nf: DesignField = {
+            id: uid(), type: 'fecha_actual', x: 50, y: 50, fontSize: 20,
+            fontFamily: 'Georgia, serif', color: '#1a1a1a', align: 'center', bold: false, format,
+        };
+        setFields((prev) => [...prev, nf]);
+        setSelectedId(nf.id);
+    };
+
     const addField = (type: FieldType) => {
         if (type === 'imagen_mascota') {
             const imgCount = fields.filter((f) => f.type === 'imagen_mascota').length;
@@ -574,6 +601,7 @@ function EditorImagenContent() {
             bold: false,
             ...(meta.isDate ? { format: 'short' as const } : {}),
             ...(type === 'texto_fijo' ? { value: 'Texto libre', w: 80 } : {}),
+            ...(type === 'folio' ? { folio_mode: 'sequence' as const, folio_format: '{n}', fontSize: 18 } : {}),
         };
         setFields((prev) => [...prev, nf]);
         setSelectedId(nf.id);
@@ -755,6 +783,18 @@ function EditorImagenContent() {
                                 </button>
                             );
                         })}
+                        {([['part_day', 'Día'], ['part_month_name', 'Mes'], ['part_year', 'Año']] as const).map(([fmt, label]) => (
+                            <button
+                                key={fmt}
+                                onClick={() => addDatePart(fmt)}
+                                title={`${label} de la fecha de emisión, como elemento suelto`}
+                                className="flex items-center gap-2 bg-white/5 hover:bg-primary/20 hover:text-primary text-white/70 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider border border-white/5 transition-all"
+                            >
+                                <Plus size={14} />
+                                <Calendar size={14} />
+                                {label}
+                            </button>
+                        ))}
                         <button
                             onClick={openElementPicker}
                             className="flex items-center gap-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider border border-purple-500/20 transition-all"
@@ -1253,6 +1293,56 @@ function EditorImagenContent() {
                                     </>
                                 ) : (
                                     <>
+                                        {selectedField.type === 'folio' && (
+                                            <div className="space-y-3">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[9px] font-black uppercase text-white/30">Tipo de folio</label>
+                                                    <div className="grid grid-cols-2 gap-1.5">
+                                                        {([['sequence', 'Correlativo'], ['random', 'Aleatorio']] as const).map(([m, label]) => (
+                                                            <button key={m} type="button"
+                                                                onClick={() => updateField(selectedField.id, { folio_mode: m })}
+                                                                className={`py-2 rounded-xl text-[11px] font-bold border ${(selectedField.folio_mode || 'sequence') === m ? 'bg-primary/20 border-primary/50 text-white' : 'bg-black/30 border-white/5 text-white/50 hover:text-white'}`}>
+                                                                {label}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                {(selectedField.folio_mode || 'sequence') === 'sequence' ? (
+                                                    <>
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-[9px] font-black uppercase text-white/30">Formato</label>
+                                                            <input value={selectedField.folio_format ?? '{n}'} maxLength={40}
+                                                                onChange={(e) => updateField(selectedField.id, { folio_format: e.target.value })}
+                                                                placeholder="{n}/{año}"
+                                                                className="w-full bg-black/40 border border-white/5 rounded-xl py-2 px-3 text-xs font-mono font-bold text-white outline-none focus:border-primary/50" />
+                                                            <p className="text-[10px] text-white/20 font-medium">{'{n}'} = número del folio, {'{año}'} = año de emisión. Ej: {'{n}/{año}'} → 250/{new Date().getFullYear()}, {'CERT-{n}'} → CERT-250.</p>
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-[9px] font-black uppercase text-white/30">Mínimo de dígitos (rellena con ceros)</label>
+                                                            <input type="number" min={0} max={8} value={selectedField.folio_digits ?? 0}
+                                                                onChange={(e) => updateField(selectedField.id, { folio_digits: Math.max(0, Math.min(8, Number(e.target.value) || 0)) })}
+                                                                className="w-24 bg-black/40 border border-white/5 rounded-xl py-2 px-3 text-xs font-bold text-white outline-none focus:border-primary/50" />
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[9px] font-black uppercase text-white/30">Largo (caracteres)</label>
+                                                        <div className="grid grid-cols-3 gap-1.5">
+                                                            {[6, 7, 8].map((n) => (
+                                                                <button key={n} type="button" onClick={() => updateField(selectedField.id, { folio_length: n })}
+                                                                    className={`py-2 rounded-xl text-[11px] font-bold border ${(selectedField.folio_length || 8) === n ? 'bg-primary/20 border-primary/50 text-white' : 'bg-black/30 border-white/5 text-white/50 hover:text-white'}`}>
+                                                                    {n}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                        <p className="text-[10px] text-white/20 font-medium">Letras y números sin los que se confunden (0/O, 1/I). No se repite dentro del crematorio.</p>
+                                                    </div>
+                                                )}
+                                                <p className="text-[10px] text-white/30 font-medium leading-relaxed">
+                                                    Uno por crematorio: cada uno fija su número de partida en Configuración → Certificados y nunca se reinicia. Volver a emitir el certificado de una orden mantiene su folio; el crematorio puede corregirlo al emitir.
+                                                </p>
+                                            </div>
+                                        )}
                                         {selectedField.type === 'texto_fijo' && (
                                             <>
                                                 <div className="space-y-1.5">
@@ -1332,12 +1422,24 @@ function EditorImagenContent() {
                                             <div className="space-y-1.5">
                                                 <label className="text-[9px] font-black uppercase text-white/30">Formato de fecha (por defecto)</label>
                                                 <select value={selectedField.format} onChange={(e) => updateField(selectedField.id, { format: e.target.value as any })} className="w-full bg-black/40 border border-white/5 rounded-xl py-2 px-3 text-xs font-bold text-white outline-none focus:border-primary/50">
-                                                    <option value="short">12/06/2026</option>
-                                                    <option value="long">12 de junio de 2026</option>
-                                                    <option value="month_year">junio de 2026</option>
-                                                    <option value="year">2026</option>
+                                                    <optgroup label="Fecha completa">
+                                                        <option value="short">12/06/2026</option>
+                                                        <option value="long">12 de junio de 2026</option>
+                                                        <option value="month_year">junio de 2026</option>
+                                                        <option value="year">2026</option>
+                                                    </optgroup>
+                                                    <optgroup label="Una sola parte (elemento suelto)">
+                                                        <option value="part_day">Día · 12</option>
+                                                        <option value="part_month">Mes en número · 06</option>
+                                                        <option value="part_month_name">Mes en palabras · junio</option>
+                                                        <option value="part_year">Año · 2026</option>
+                                                    </optgroup>
                                                 </select>
-                                                <p className="text-[10px] text-white/20 font-medium">El tenant podrá cambiar este formato al emitir.</p>
+                                                <p className="text-[10px] text-white/20 font-medium">
+                                                    {selectedField.format?.startsWith('part_')
+                                                        ? 'Parte suelta: se imprime siempre así (el crematorio no la cambia). Si la ficha no sabe ese dato, queda vacía.'
+                                                        : 'El tenant podrá cambiar este formato al emitir.'}
+                                                </p>
                                             </div>
                                         )}
 

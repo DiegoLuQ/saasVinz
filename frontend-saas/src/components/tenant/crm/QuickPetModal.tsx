@@ -7,6 +7,7 @@ import Modal from '@/components/tenant/Modal';
 import { useSavePet, Pet } from '@/hooks/usePets';
 import { useCustomers } from '@/hooks/useCustomers';
 import SearchableSelect from '@/components/tenant/SearchableSelect';
+import { formatTitleCaseName } from '@/lib/formatters';
 
 interface QuickPetModalProps {
     isOpen: boolean;
@@ -49,7 +50,10 @@ export default function QuickPetModal({
         setIsSaving(true);
         try {
             const res = await savePetMutation.mutateAsync({
-                pet: formData,
+                pet: {
+                    ...formData,
+                    name: formatTitleCaseName(formData.name || '').trim(),
+                },
                 isEdit: false,
             });
             setIsSaving(false);
@@ -116,7 +120,7 @@ export default function QuickPetModal({
                             required
                             placeholder="Ej: Firulais"
                             value={formData.name || ''}
-                            onChange={e => setFormData({ ...formData, name: e.target.value })}
+                            onChange={e => setFormData({ ...formData, name: formatTitleCaseName(e.target.value) })}
                             className="w-full px-4 py-2.5 bg-background border border-white/10 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none transition text-sm"
                         />
                     </div>

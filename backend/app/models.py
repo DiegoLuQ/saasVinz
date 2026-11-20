@@ -8,7 +8,7 @@ from app.api.internal.auth.models import (
 )
 from app.api.internal.admin.models import (
     Tenant, TenantStatus, TenantBillingInfo, SubscriptionPlan, AuditLog, TemporaryFormToken, TableConfiguration, SaaSConfig,
-    TenantEvent, ModuleClickDaily, TrackingCustomTemplate, PlanChangeEvent,
+    TenantEvent, ModuleClickDaily, TrackingCustomTemplate, PlanChangeEvent, PriceSeason,
 )
 from app.api.internal.admin.image_templates.models import ImageTemplate, AiGeneration, TemplateExport
 from app.api.internal.creator.ai_providers.models import AiProvider

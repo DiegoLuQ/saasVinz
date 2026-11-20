@@ -1,5 +1,5 @@
 """Correo del formulario: «ñ», tildes y símbolos se limpian en vez de impedir el envío."""
-from app.utils.sanitize import sanitize_email, validate_email_strict
+from app.utils.sanitize import sanitize_email, validate_email_strict, format_title_case_name
 
 
 def test_ene_y_tildes_se_limpian():
@@ -12,3 +12,21 @@ def test_ene_y_tildes_se_limpian():
         email = sanitize_email(raw)
         assert email == expected
         assert validate_email_strict(email) is None
+
+
+def test_format_title_case_name():
+    for raw, expected in [
+        ("DANIELA BLANCO", "Daniela Blanco"),
+        ("daniela blanco", "Daniela Blanco"),
+        ("  DANIELA   BLANCO  ", "Daniela Blanco"),
+        ("LEÓN", "León"),
+        ("ÁNGEL GÓMEZ", "Ángel Gómez"),
+        ("MARÍA JOSÉ", "María José"),
+        ("Jean-Pierre", "Jean-Pierre"),
+        ("JEAN-PIERRE", "Jean-Pierre"),
+        ("pelusa", "Pelusa"),
+        (None, ""),
+        ("", ""),
+    ]:
+        assert format_title_case_name(raw) == expected
+

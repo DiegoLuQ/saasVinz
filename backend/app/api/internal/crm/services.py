@@ -41,8 +41,13 @@ class CustomerService:
                     detail=f"Ya existe un cliente registrado con el RUT {customer_in.rut}."
                 )
 
+        data = customer_in.model_dump()
+        if data.get("name"):
+            from app.utils.sanitize import format_title_case_name
+            data["name"] = format_title_case_name(data["name"])
+
         db_customer = models.Customer(
-            **customer_in.model_dump(),
+            **data,
             tenant_id=tenant_id
         )
         self.db.add(db_customer)
@@ -55,6 +60,9 @@ class CustomerService:
         db_customer = self.get_by_id(tenant_id, customer_id)
         
         update_data = customer_update.model_dump(exclude_unset=True)
+        if "name" in update_data and update_data["name"]:
+            from app.utils.sanitize import format_title_case_name
+            update_data["name"] = format_title_case_name(update_data["name"])
         
         # Validar duplicado si se cambia el RUT
         if "rut" in update_data and update_data["rut"] != db_customer.rut:

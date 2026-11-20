@@ -51,6 +51,9 @@ def set_annual_discount(db: Session, pct: int, launch: bool) -> dict:
         db.add(cfg)
     cfg.annual_discount_pct = pct
     cfg.annual_discount_launch = launch
+    # Queda también en la temporada de precios vigente (services/price_seasons.py)
+    from app.services.price_seasons import sync_discount
+    sync_discount(db, pct, launch)
     for plan in db.query(models.SubscriptionPlan).all():
         if plan.price and plan.price > 0:
             plan.annual_price = annual_price_for(plan.price, pct)
@@ -72,5 +75,11 @@ def lock_contracted_price(tenant, amount: float | None, cycle: str | None) -> No
     if not amount or amount <= 0:
         return
     tenant.contracted_price = float(amount)
+    # Temporada con la que contrató (su precio es para siempre); services/price_seasons.py
+    from sqlalchemy.orm import object_session
+    db = object_session(tenant)
+    if db is not None:
+        from app.services.price_seasons import current_name
+        tenant.contracted_season = current_name(db)
     if tenant.billing_info is not None:
         tenant.billing_info.monthly_price = float(amount) / CYCLE_MONTHS.get(cycle or "monthly", 1)

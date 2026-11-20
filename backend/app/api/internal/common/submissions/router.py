@@ -14,7 +14,7 @@ import shutil
 from pathlib import Path
 from pathlib import Path
 from app.utils.generators import generate_unique_code
-from app.utils.sanitize import sanitize_email
+from app.utils.sanitize import sanitize_email, format_title_case_name
 from app.api.internal.common.media_service import MediaService
 
 from app.api.internal.admin.rbac.router import check_permission
@@ -415,7 +415,7 @@ def create_customer_from_submission(
     
     db_customer = models.Customer(
         tenant_id=tenant_id,
-        name=owner.get("fullName"),
+        name=format_title_case_name(owner.get("fullName")),
         rut=rut,
         email=sanitize_email(owner.get("email")),
         phone=owner.get("phone"),
@@ -501,7 +501,7 @@ def create_pet_from_submission(
         db_pet = models.Pet(
             tenant_id=tenant_id,
             customer_id=customer_id,
-            name=pet_data.get("name", "Mascota S/N"),
+            name=format_title_case_name(pet_data.get("name")) or "Mascota S/N",
             species=species,
             breed=pet_data.get("breed", "N/A"),
             size=pet_data.get("size"), # pequeño, mediano, normal, grande, muy grande

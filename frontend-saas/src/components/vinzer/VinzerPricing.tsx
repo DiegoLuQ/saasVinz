@@ -66,7 +66,7 @@ export function VinzerPricing({ theme = 'dark', initialPlans = null, initialHigh
     }, [initialHighlights]);
 
     // Descuento anual y aviso de lanzamiento (Configuración de Planes del SuperAdmin).
-    const [discount, setDiscount] = useState<{ pct: number; launch: boolean } | null>(null);
+    const [discount, setDiscount] = useState<{ pct: number; launch: boolean; season?: string | null; compare_season?: string | null } | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -206,7 +206,8 @@ export function VinzerPricing({ theme = 'dark', initialPlans = null, initialHigh
                         {paidPlans.map((plan, i) => (
                             <PlanCard key={plan.name} plan={plan} prev={i === 0 ? freePlan : paidPlans[i - 1]}
                                 highlights={highlights.filter((h) => !commonKeys.has(h.key))}
-                                isAnnual={isAnnual} isLight={isLight} pct={pct} />
+                                isAnnual={isAnnual} isLight={isLight} pct={pct}
+                                compareLabel={discount?.compare_season || null} />
                         ))}
                     </div>
                 ) : (
@@ -259,8 +260,9 @@ export function VinzerPricing({ theme = 'dark', initialPlans = null, initialHigh
 }
 
 
-function PlanCard({ plan, prev, highlights, isAnnual, isLight, pct }: {
+function PlanCard({ plan, prev, highlights, isAnnual, isLight, pct, compareLabel }: {
     plan: PublicPlan; prev: PublicPlan | null; highlights: PlanHighlight[]; isAnnual: boolean; isLight: boolean; pct: number;
+    compareLabel: string | null;
 }) {
     const copy = PLAN_COPY[planCode(plan)] ?? {
         category: 'Plan',
@@ -275,6 +277,8 @@ function PlanCard({ plan, prev, highlights, isAnnual, isLight, pct }: {
     // esa tarjeta se queda en mensual en vez de inventar un precio.
     const hasAnnual = plan.annual_price != null && plan.annual_price > 0;
     const showAnnual = isAnnual && hasAnnual;
+    // Precio tachado de la temporada de referencia (ej. ~~$292.000~~ $119.000 en el Lanzamiento)
+    const struck = showAnnual ? plan.compare_annual_price : plan.compare_price;
 
     const border = isRecommended
         ? (isLight ? 'border-[#0284C7] ring-1 ring-[#0284C7]/30' : 'border-[#19B5FE] ring-1 ring-[#19B5FE]/30')
@@ -323,6 +327,12 @@ function PlanCard({ plan, prev, highlights, isAnnual, isLight, pct }: {
                 </p>
 
                 <div className="pt-2">
+                    {struck ? (
+                        <div className="text-[11px] text-slate-500 tabular-nums">
+                            <span className="line-through">${formatCLP(struck)}</span>
+                            {compareLabel && <span className="ml-1 font-semibold">· precio {compareLabel}</span>}
+                        </div>
+                    ) : null}
                     <div className={`text-2xl lg:text-3xl font-black tabular-nums ${isLight ? 'text-slate-900' : 'text-white'}`}>
                         ${formatCLP(showAnnual ? plan.annual_price! : plan.price)}
                         <span className="text-[10px] font-medium text-slate-500"> CLP {showAnnual ? '/ año' : '/ mes'}</span>

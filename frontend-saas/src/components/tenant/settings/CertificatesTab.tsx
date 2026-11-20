@@ -5,6 +5,7 @@ import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { apiRequest } from '@/lib/tenant/api';
 import { FormInput } from './FormField';
 import { CertificatePreview } from './CertificatePreview';
+import { CertificateFolioCard } from './CertificateFolioCard';
 
 interface CertificatesTabProps {
     bootstrapTenant: any;
@@ -201,6 +202,11 @@ export function CertificatesTab({ bootstrapTenant }: CertificatesTabProps) {
                         )}
                     </div>
                 </div>
+            </div>
+
+            {/* Folio correlativo (campo «Folio» de los diseños); se guarda aparte */}
+            <div className="pt-10 border-t border-white/5 max-w-3xl">
+                <CertificateFolioCard />
             </div>
 
             {/* Vista previa real (misma plantilla que se usa al emitir) */}

@@ -17,6 +17,9 @@ export interface PublicPlan {
     price: number;
     annual_price: number | null;
     annual_savings: number | null;
+    /** Precio tachado: el de la temporada de referencia (Admin → Planes → Temporadas). null = sin tachado. */
+    compare_price?: number | null;
+    compare_annual_price?: number | null;
 
     /** Topes mensuales: se cuentan por mes calendario. */
     max_pets: number;

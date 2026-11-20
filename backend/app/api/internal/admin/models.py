@@ -120,6 +120,8 @@ class Tenant(Base):
     # Textos con código de los certificados con imagen: {código: texto} que el
     # crematorio guardó (NULL / clave ausente = texto por defecto del diseño).
     cert_text_values = Column(JSON, nullable=True)
+    # Próximo folio correlativo del certificado (services/cert_folio.py); NULL = 1
+    cert_folio_next = Column(Integer, nullable=True)
     # Tarjeta de homenaje del formulario público (NULL = global predeterminada)
     form_farewell_template_id = Column(Integer, ForeignKey("ops_farewell_templates.id", ondelete="SET NULL"), nullable=True)
     # "Generar todo" del registro: documentos y plantillas a usar (ver common/auto_documents).
@@ -137,6 +139,8 @@ class Tenant(Base):
     # Monto por ciclo congelado al contratar (no cambia si después cambia el precio
     # o el descuento anual de los planes). NULL = se usa el precio de lista.
     contracted_price = Column(Float, nullable=True)
+    # Temporada de precios con la que contrató (services/price_seasons.py); su precio es para siempre
+    contracted_season = Column(String(60), nullable=True)
 
     # --- Registro autoservicio (vinzer.cl/crear-cuenta) y primeros pasos ---
     signup_source = Column(String(20), nullable=True)  # 'self' | NULL = creado por el admin
@@ -342,6 +346,22 @@ class SaaSConfig(Base):
     diagnostic_config = Column(JSON, nullable=True)
 
     updated_at = Column(DateTime(timezone=True), default=tz.get_now, onupdate=tz.get_now)
+
+
+class PriceSeason(Base):
+    """Temporada de precios de los planes SaaS (services/price_seasons.py). Global, sin RLS."""
+    __tablename__ = "sys_price_seasons"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(60), nullable=False)
+    prices = Column(JSON, nullable=False, default=dict)  # {"<plan id>": precio mensual}
+    annual_discount_pct = Column(Integer, nullable=False, default=0)
+    launch = Column(Boolean, nullable=False, default=False)  # aviso «precio de lanzamiento»
+    compare_season_id = Column(Integer, ForeignKey("sys_price_seasons.id", ondelete="SET NULL"), nullable=True)
+    is_current = Column(Boolean, nullable=False, default=False)
+    activated_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=tz.get_now)
+    updated_at = Column(DateTime(timezone=True), nullable=True, onupdate=tz.get_now)
 
 
 class ModuleClickDaily(Base):

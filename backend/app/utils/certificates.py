@@ -1005,12 +1005,35 @@ def _img_format_date(dt, fmt):
         return str(dt.year)
     if fmt == "month_year":
         return f"{_IMG_MESES[dt.month - 1]} de {dt.year}"
+    # Partes sueltas (elementos Día / Mes / Año del editor): «12», «06», «junio»
+    if fmt == "part_day":
+        return f"{dt.day:02d}"
+    if fmt == "part_month":
+        return f"{dt.month:02d}"
+    if fmt == "part_month_name":
+        return _IMG_MESES[dt.month - 1]
+    if fmt == "part_year":
+        return str(dt.year)
     # short por defecto
     return dt.strftime("%d/%m/%Y")
 
 
 # Precisión de la fecha de la ficha → formato de _img_format_date
 PRECISION_FORMAT = {"year": "year", "month": "month_year"}
+
+# Formatos de una sola parte de la fecha: el diseño los fija (el tenant no los cambia).
+# Con una fecha de la ficha menos precisa, la parte que no se sabe queda vacía.
+PART_FORMATS = {"part_day", "part_month", "part_month_name", "part_year"}
+_PART_NEEDS = {"part_day": {"day"}, "part_month": {"day", "month"}, "part_month_name": {"day", "month"},
+               "part_year": {"day", "month", "year"}}
+
+
+def _part_or_full(field: dict, ov: dict, precision: str | None):
+    """(formato, mostrar) para un campo de fecha de la mascota."""
+    design = field.get("format")
+    if design in PART_FORMATS:
+        return design, (precision or "day") in _PART_NEEDS[design]
+    return None, True
 
 
 def pet_date_text(value, precision: str = "day") -> str:
@@ -1085,6 +1108,7 @@ def generate_image_certificate_html(
     verification_code: str = "",
     text_values: dict = None,
     owner: dict = None,
+    folio: str = None,
     **kwargs,
 ) -> dict:
     """Genera el HTML de un certificado basado en imagen con campos posicionados.
@@ -1109,6 +1133,8 @@ def generate_image_certificate_html(
     elements = elements or []
     overrides = overrides or {}
     pet_images = pet_images or []
+    # Lo que se imprimió en cada campo de texto (se guarda con el certificado: «Ver datos»)
+    printed: list = []
 
     # z-index: el fondo SIEMPRE es la capa base (0). Los campos de texto/imagen
     # se dibujan en un nivel por defecto (FIELD_Z); los elementos decorativos
@@ -1264,27 +1290,35 @@ def generate_image_certificate_html(
         # Campos de texto
         if ftype == "nombre_mascota":
             value = pet_name or ""
-        elif ftype == "fecha_nacimiento":
-            # Ficha con «solo año» → el año, aunque el diseño pida la fecha completa
-            # Ficha con «solo año» / «mes y año» → solo eso, aunque el diseño pida la fecha completa
-            prec_fmt = None if _ov_date(ov) else PRECISION_FORMAT.get(birth_precision)
-            value = _img_format_date(_ov_date(ov) or birth_date, ov.get("format") or prec_fmt or field.get("format"))
-        elif ftype == "fecha_fallecimiento":
-            prec_fmt = None if _ov_date(ov) else PRECISION_FORMAT.get(death_precision)
-            value = _img_format_date(_ov_date(ov) or death_date, ov.get("format") or prec_fmt or field.get("format"))
+        elif ftype in ("fecha_nacimiento", "fecha_fallecimiento"):
+            is_birth = ftype == "fecha_nacimiento"
+            date_value = _ov_date(ov) or (birth_date if is_birth else death_date)
+            prec = None if _ov_date(ov) else (birth_precision if is_birth else death_precision)
+            part, show = _part_or_full(field, ov, prec)
+            if part:
+                # Día / Mes / Año sueltos: formato fijo del diseño; vacío si la ficha no lo sabe
+                value = _img_format_date(date_value, part) if show else ""
+            else:
+                # Ficha con «solo año» / «mes y año» → solo eso, aunque el diseño pida la fecha completa
+                prec_fmt = PRECISION_FORMAT.get(prec) if prec else None
+                value = _img_format_date(date_value, ov.get("format") or prec_fmt or field.get("format"))
         elif ftype == "fecha_actual":
-            value = _img_format_date(current_date, ov.get("format") or field.get("format"))
+            part = field.get("format") if field.get("format") in PART_FORMATS else None
+            value = _img_format_date(current_date, part or ov.get("format") or field.get("format"))
         elif ftype == "texto_fijo":
             # Prioridad: lo escrito al emitir > lo guardado por el tenant para el
             # codigo del campo > el texto que definio el admin en el diseno.
             ov_value = ov.get("value")
             saved = text_values.get(field.get("code")) if field.get("code") else None
             if ov_value is not None:
-                value = ov_value
+                value, source = ov_value, "emision"
             elif saved is not None:
-                value = saved
+                value, source = saved, "guardado"
             else:
-                value = field.get("value", "")
+                value, source = field.get("value", ""), "diseno"
+            if str(value).strip():
+                printed.append({"type": ftype, "code": field.get("code") or None,
+                                "value": str(value)[:1000], "source": source})
         elif ftype == "nombre_empresa":
             value = tenant_name or ""
         elif ftype == "rut_tenant":
@@ -1304,6 +1338,9 @@ def generate_image_certificate_html(
             value = verification_code or ""
         elif ftype == "numero_certificado":
             value = cert_number or ""
+        elif ftype == "folio":
+            # Folio automático (services/cert_folio.py); ya viene resuelto (o corregido al emitir)
+            value = folio or ""
         else:
             continue
 
@@ -1312,6 +1349,8 @@ def generate_image_certificate_html(
         # canvas del cliente, que tambien omite los valores vacios.
         if not str(value).strip():
             continue
+        if ftype != "texto_fijo":
+            printed.append({"type": ftype, "value": str(value)[:300]})
 
         font_size = field.get("fontSize", 24)
         font_family = field.get("fontFamily", "Georgia, serif")
@@ -1415,6 +1454,8 @@ def generate_image_certificate_html(
             "pdf_url": "",
             "paper_format": paper_format,
             "aspect_ratio": aspect_ratio,
+            "folio": folio or None,
         },
         "html_content": full_html,
+        "printed": printed,
     }

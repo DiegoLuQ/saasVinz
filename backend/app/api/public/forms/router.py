@@ -18,7 +18,7 @@ from app.services.recaptcha import verify_recaptcha
 from app.services.public_form_config import apply_form_config_to_submission, normalize_form_config
 from app.core.tenant_context import apply_tenant_rls, apply_bypass_rls
 from app.utils.upload_validation import read_and_validate_image, enforce_max_files, MAX_PUBLIC_FORM_PHOTOS
-from app.utils.sanitize import sanitize_email, validate_email_strict
+from app.utils.sanitize import sanitize_email, validate_email_strict, format_title_case_name
 from app.api.internal.integrations.models import TenantApiKey
 from app.api.internal.integrations.services import tenant_can_use_form_embed
 
@@ -254,8 +254,9 @@ async def submit_public_form(
         pet_dict = json.loads(pet_data)
         services_list_ids = json.loads(selected_services)
 
-        # Security Validations for owner_data
-        full_name = str(owner_dict.get("fullName") or "")
+        # Security Validations and Normalization for owner_data
+        full_name = format_title_case_name(owner_dict.get("fullName"))
+        owner_dict["fullName"] = full_name
         raw_email = str(owner_dict.get("email") or "")
         address = str(owner_dict.get("address") or "")
         rut = str(owner_dict.get("rut") or "")
@@ -288,8 +289,9 @@ async def submit_public_form(
         if len(rut) > 13:
             raise HTTPException(status_code=400, detail="RUT no puede exceder 13 caracteres")
 
-        # Security Validations for pet_dict
-        pet_name = str(pet_dict.get("name") or "")
+        # Security Validations and Normalization for pet_dict
+        pet_name = format_title_case_name(pet_dict.get("name"))
+        pet_dict["name"] = pet_name
         pet_breed = str(pet_dict.get("breed") or "")
         pet_age = str(pet_dict.get("age") or "")
         pet_type = str(pet_dict.get("type") or "")

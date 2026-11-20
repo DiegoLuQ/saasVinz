@@ -6,11 +6,11 @@ from app.services.plan_features import show_vinzer_brand
 from app.database import get_db
 from app import models
 from app import schemas
-from app.api.deps import get_tenant_id
+from app.api.deps import get_current_user, get_tenant_id
 from app.api.internal.admin.rbac.router import check_permission
 from app.api.deps_features import check_feature
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import shutil
 import os
 import re
@@ -87,7 +87,8 @@ def _order_cert_number(cremation, now) -> str:
     return f"CREM-{now.year}-{(cremation.oc_number or cremation.id):04d}"
 
 
-def _upsert_certificate(db: Session, tenant_id: int, cremation_id: Optional[int], cert_type: str, number: str, html: str, now) -> None:
+def _upsert_certificate(db: Session, tenant_id: int, cremation_id: Optional[int], cert_type: str, number: str, html: str, now,
+                        data: Optional[dict] = None, folio: Optional[str] = None) -> None:
     """Guarda el certificado. Una orden tiene un solo certificado por tipo: al
     volver a emitir se reemplaza (y toma el número actual) en vez de duplicarse."""
     q = db.query(models.Certificate).filter(models.Certificate.tenant_id == tenant_id)
@@ -100,6 +101,8 @@ def _upsert_certificate(db: Session, tenant_id: int, cremation_id: Optional[int]
         existing.number = number
         existing.html_content = html
         existing.issue_date = now
+        existing.data = data
+        existing.folio = folio or existing.folio
     else:
         db.add(models.Certificate(
             tenant_id=tenant_id,
@@ -108,6 +111,8 @@ def _upsert_certificate(db: Session, tenant_id: int, cremation_id: Optional[int]
             number=number,
             html_content=html,
             issue_date=now,
+            data=data,
+            folio=folio,
         ))
     db.commit()
 
@@ -278,6 +283,87 @@ def eliminar_certificado(cert_id: int, db: Session = Depends(get_db), tenant_id:
     db.commit()
     return {"message": "Certificado eliminado"}
 
+def _norm(text: str) -> str:
+    """Minúsculas y sin tildes, para buscar «cremacion» = «cremación»."""
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", text.lower()) if unicodedata.category(c) != "Mn")
+
+
+@router.get("/certificates/search")
+def buscar_en_certificados(q: str, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id),
+                           _perm: bool = Depends(check_permission("certificados", "view"))):
+    """Buscador del Repositorio: certificados cuyo texto impreso (textos libres, nombres,
+    fechas…) contiene `q`. Lee la copia de datos o, en los antiguos, los textos del HTML.
+    Devuelve {matches: {id: fragmento}}."""
+    term = _norm((q or "").strip())[:100]
+    if len(term) < 2:
+        return {"matches": {}}
+    rows = db.query(models.Certificate.id, models.Certificate.data, models.Certificate.html_content).filter(
+        models.Certificate.tenant_id == tenant_id).all()
+    matches: dict[int, str] = {}
+    for cid, data, html in rows:
+        info = data or _legacy_certificate_data(html, None) or {}
+        texts = [str(f.get("value") or "") for f in info.get("fields") or [] if isinstance(f, dict)]
+        for t in texts:
+            n = _norm(t)
+            i = n.find(term)
+            if i >= 0:
+                start = max(0, i - 30)
+                snippet = " ".join(t[start:i + len(term) + 40].split())
+                matches[cid] = ("…" if start else "") + snippet + ("…" if i + len(term) + 40 < len(t) else "")
+                break
+    return {"matches": matches}
+
+
+@router.get("/certificates/{cert_id}/data")
+def obtener_datos_certificado(cert_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id),
+                              _perm: bool = Depends(check_permission("certificados", "view"))):
+    """«Ver datos» del Repositorio: con qué se emitió el certificado. Sin copia
+    (emitidos antes de guardarla) = solo número, fecha y la orden con sus datos actuales."""
+    cert = db.query(models.Certificate).filter(models.Certificate.id == cert_id,
+                                               models.Certificate.tenant_id == tenant_id).first()
+    if not cert:
+        raise HTTPException(status_code=404, detail="Certificado no encontrado")
+    order = None
+    if cert.cremation_id:
+        c = db.query(models.Cremation).filter(models.Cremation.id == cert.cremation_id,
+                                              models.Cremation.tenant_id == tenant_id).first()
+        if c:
+            pet = c.pet
+            cust = pet.customer if pet else None
+            order = {"id": c.id, "verification_code": c.verification_code, "status": c.status,
+                     "pet_name": pet.name if pet else None, "owner_name": cust.name if cust else None}
+    data = cert.data or _legacy_certificate_data(cert.html_content, order)
+    return {"id": cert.id, "number": cert.number, "type": cert.type, "issue_date": cert.issue_date,
+            "folio": cert.folio, "order": order, "data": data}
+
+
+def _legacy_certificate_data(html: Optional[str], order: Optional[dict]) -> Optional[dict]:
+    """Certificados emitidos antes de guardar sus datos: los textos impresos salen de la
+    lista que el certificado con imagen trae en su HTML (<script id="cert-render-spec">).
+    No se sabe el código ni el origen de cada texto (`legacy`)."""
+    import json as _json
+    m = re.search(r'<script type="application/json" id="cert-render-spec">(.*?)</script>', html or "", re.S)
+    if not m:
+        return None
+    try:
+        spec = _json.loads(m.group(1))
+    except ValueError:
+        return None
+    items = spec.get("items") if isinstance(spec, dict) else spec
+    fields = []
+    for it in items or []:
+        if isinstance(it, dict) and it.get("kind") == "text" and str(it.get("value") or "").strip():
+            fields.append({"type": "texto_fijo" if it.get("is_free_text") else "dato",
+                           "value": str(it["value"])[:1000]})
+    if not fields:
+        return None
+    return {"legacy": True, "template": None,
+            "pet": {"name": order.get("pet_name")} if order else None,
+            "owner": {"name": order.get("owner_name")} if order and order.get("owner_name") else None,
+            "fields": fields}
+
+
 @router.get("/certificates/{cert_id}/content")
 def obtener_contenido_certificado(cert_id: int, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id), _perm: bool = Depends(check_permission("certificados", "view"))):
     cert = db.query(models.Certificate.html_content).filter(
@@ -371,6 +457,13 @@ def generar_certificado(
                     cert_number = f"CERT-{now.strftime('%Y%m%d%H%M%S')}"
 
             base_url = str(request.base_url).rstrip('/')
+            # Folio automático (campo «Folio» del diseño): uno por crematorio, se reutiliza
+            # al volver a emitir la orden; la vista previa no consume número.
+            from app.services import cert_folio
+            folio_def = cert_folio.folio_field(fields)
+            folio_ov = ((req.image_overrides or {}).get(folio_def.get("id")) or {}).get("value") if folio_def else None
+            folio = cert_folio.resolve(db, tenant, folio_def, cremation.id if cremation else None,
+                                       req.certificate_type, now.year, folio_ov, persist=bool(req.persist))
             result = generate_image_certificate_html(
                 background_url=template.background_logo_url,
                 aspect_ratio=aspect_ratio,
@@ -397,6 +490,7 @@ def generar_certificado(
                 base_url=base_url,
                 verification_code=(cremation.verification_code if cremation else "") or "",
                 text_values=(tenant.cert_text_values if tenant else None),
+                folio=folio,
                 owner=certificate_owner(
                     db.query(models.Customer).filter(
                         models.Customer.id == pet.customer_id, models.Customer.tenant_id == tenant_id,
@@ -408,7 +502,21 @@ def generar_certificado(
             # crear certificados). Emitir requiere persist=True.
             if not req.persist:
                 return result
-            _upsert_certificate(db, tenant_id, req.cremation_id if cremation else None, req.certificate_type, cert_number, result["html_content"], now)
+            customer = db.query(models.Customer).filter(
+                models.Customer.id == pet.customer_id, models.Customer.tenant_id == tenant_id,
+            ).first() if pet and pet.customer_id else None
+            snapshot = {
+                "template": {"id": template.id, "name": template.name},
+                "pet": {"name": req.pet_name or (pet.name if pet else None),
+                        "species": pet.species if pet else None, "breed": pet.breed if pet else None},
+                "owner": {"name": customer.name, "rut": customer.rut, "email": customer.email,
+                          "phone": customer.phone} if customer else None,
+                "fields": result.pop("printed", []),
+            }
+            if folio:
+                snapshot["folio"] = folio
+            _upsert_certificate(db, tenant_id, req.cremation_id if cremation else None, req.certificate_type, cert_number,
+                                result["html_content"], now, snapshot, folio)
             return result
 
         # 3. Inicializar variables con prioridad: Request > Template > Code Defaults
@@ -475,7 +583,17 @@ def generar_certificado(
         # 6. Guardar en DB para historial (persist=False -> solo vista previa)
         if not req.persist:
             return result
-        _upsert_certificate(db, tenant_id, req.cremation_id, data["certificate_type"], data["cert_number"], result["html_content"], now)
+        texts = [("declaracion", data["auth_declaration"]), ("proceso", data["process_details"]),
+                 ("firma", data["signature_text"]), ("mensaje", data["memorial_message"]),
+                 ("despedida", data["farewell_text"])]
+        snapshot = {
+            "template": {"id": template.id, "name": template.name} if template else None,
+            "pet": {"name": data["pet_name"], "description": data["pet_desc"]},
+            "owner": {"name": data["owner_name"], "contact": data["owner_contact"]},
+            "fields": [{"type": k, "value": str(v)[:1000]} for k, v in texts if v and str(v).strip() and v != "N/A"],
+        }
+        _upsert_certificate(db, tenant_id, req.cremation_id, data["certificate_type"], data["cert_number"],
+                            result["html_content"], now, snapshot)
         return result
     except Exception as e:
         import traceback
@@ -485,6 +603,36 @@ def generar_certificado(
 
 CERT_TEXT_CODE_RE = re.compile(r"^[A-Z0-9_]{1,40}$")
 CERT_TEXT_MAX_LEN = 1000
+
+
+class FolioConfig(BaseModel):
+    next: int = Field(..., ge=1, le=99_999_999)
+
+
+@router.get("/folio")
+def obtener_folio(db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id),
+                  _perm: bool = Depends(check_permission("certificados", "view"))):
+    """Próximo folio correlativo del crematorio (campo «Folio» de los diseños)."""
+    from app.services import cert_folio
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    last = db.query(models.Certificate.folio, models.Certificate.issue_date).filter(
+        models.Certificate.tenant_id == tenant_id, models.Certificate.folio.isnot(None)
+    ).order_by(models.Certificate.issue_date.desc()).first()
+    return {"next": cert_folio.next_number(tenant), "last": last[0] if last else None,
+            "last_at": last[1] if last else None}
+
+
+@router.put("/folio")
+def guardar_folio(payload: FolioConfig, db: Session = Depends(get_db), tenant_id: int = Depends(get_tenant_id),
+                  current_user: models.User = Depends(get_current_user),
+                  _perm: bool = Depends(check_permission("certificados", "edit"))):
+    """Número de partida / próximo folio. Solo el administrador del crematorio."""
+    if current_user.role not in (models.UserRole.admin, models.UserRole.creator):
+        raise HTTPException(status_code=403, detail="Solo el administrador puede cambiar el folio")
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).with_for_update().first()
+    tenant.cert_folio_next = payload.next
+    db.commit()
+    return {"next": payload.next}
 
 
 @router.get("/text-values")

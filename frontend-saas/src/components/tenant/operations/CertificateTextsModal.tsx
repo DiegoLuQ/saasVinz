@@ -133,6 +133,11 @@ export default function CertificateTextsModal({ isOpen, onClose, cremationId, pe
     const template = data?.template || null;
     const savedTexts = data?.savedTexts || {};
     const textFields = issueTextFields(data);
+    // Folio automático del diseño: el backend lo propone en la vista previa; aquí se puede corregir
+    const folioField = template?.category === 'certificadoImg'
+        ? (template.sections_config?.fields || []).find((f) => f.type === 'folio') || null : null;
+    const [folio, setFolio] = useState('');
+    const [previewFolio, setPreviewFolio] = useState<string | null>(null);
     const dateKinds = [...new Set(issueDateFields(data).map((f) => f.type))];
     const { data: petDates } = usePetDates(petId, isOpen && dateKinds.length > 0);
     const [dates, setDates] = useState<Record<DateKind, string>>({ fecha_nacimiento: '', fecha_fallecimiento: '' });
@@ -150,6 +155,7 @@ export default function CertificateTextsModal({ isOpen, onClose, cremationId, pe
         });
         setTexts(initTexts);
         setSaveToggles(initSave);
+        setFolio('');
         // Solo al abrir o cambiar de plantilla; no pisar lo que se está escribiendo.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen, template?.id]);
@@ -167,6 +173,7 @@ export default function CertificateTextsModal({ isOpen, onClose, cremationId, pe
             const v = texts[f.id];
             if (v !== undefined) overrides[f.id] = { value: v };
         });
+        if (folioField && folio.trim()) overrides[folioField.id] = { value: folio.trim() };
         issueDateFields(data).forEach((f) => {
             const d = dates[f.type];
             const fmt = PRECISION_FORMAT[precision[f.type]];
@@ -217,7 +224,10 @@ export default function CertificateTextsModal({ isOpen, onClose, cremationId, pe
                         persist: false,
                     },
                 });
-                if (reqId === previewReqRef.current) setPreviewHtml(res.html_content);
+                if (reqId === previewReqRef.current) {
+                    setPreviewHtml(res.html_content);
+                    setPreviewFolio(res.metadata?.folio || null);
+                }
             } catch {
                 if (reqId === previewReqRef.current) setPreviewHtml(null);
             } finally {
@@ -227,7 +237,7 @@ export default function CertificateTextsModal({ isOpen, onClose, cremationId, pe
         return () => clearTimeout(timer);
         // buildOverrides se deriva de texts y dates
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen, template?.id, cremationId, texts, dates, precision]);
+    }, [isOpen, template?.id, cremationId, texts, dates, precision, folio]);
 
     // Guarda los textos con código marcados "para próximos certificados".
     // Volver al texto del diseño borra lo guardado (null).
@@ -316,6 +326,18 @@ export default function CertificateTextsModal({ isOpen, onClose, cremationId, pe
                                         <p className="text-[10px] text-white/20 font-medium">Al emitir se guardan en la ficha de la mascota y quedan para sus otros documentos.</p>
                                     </>
                                 )}
+                            </div>
+                        )}
+
+                        {folioField && (
+                            <div className="space-y-1.5">
+                                <label htmlFor="cert-folio-modal" className="text-[10px] font-black uppercase tracking-widest text-white/40 flex items-center gap-2"><Type size={12} /> Folio</label>
+                                <input id="cert-folio-modal" value={folio} maxLength={40} onChange={(e) => setFolio(e.target.value)}
+                                    placeholder={previewFolio ? `Automático: ${previewFolio}` : 'Automático'}
+                                    className="w-full bg-black/40 border border-white/5 rounded-xl py-2 px-3 text-xs font-mono font-bold text-white outline-none focus:border-primary/50" />
+                                <p className="text-[10px] text-white/30 font-medium">
+                                    {folio.trim() ? 'Se imprimirá este folio en lugar del automático.' : 'Se asigna solo al emitir y se mantiene si vuelves a emitir. Escribe solo para corregirlo.'}
+                                </p>
                             </div>
                         )}
 

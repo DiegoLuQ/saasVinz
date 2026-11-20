@@ -35,8 +35,9 @@ def photos_world(client, auth, monkeypatch):
 def test_lista_paginada_y_busqueda(client, photos_world):
     h, tag = photos_world["h"], photos_world["tag"]
     r = client.get(f"/api/internal/pets/photos?q={tag}", headers=h).json()
-    assert r["total"] == 13 and r["pets"] == 7 and len(r["items"]) == 10
-    assert len(client.get(f"/api/internal/pets/photos?q={tag}&page=2", headers=h).json()["items"]) == 3
+    # 5 por página (por defecto)
+    assert r["total"] == 13 and r["pets"] == 7 and len(r["items"]) == 5
+    assert len(client.get(f"/api/internal/pets/photos?q={tag}&page=3", headers=h).json()["items"]) == 3
     # Por dueño
     assert client.get(f"/api/internal/pets/photos?q=Rocío {tag}", headers=h).json()["total"] == 13
     # Por mascota

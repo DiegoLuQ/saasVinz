@@ -1011,6 +1011,7 @@ export default function PetsPage() {
                                     required
                                     value={currentPet?.name || ''}
                                     onChange={(e) => setCurrentPet({ ...currentPet, name: formatTitleCaseName(e.target.value) })}
+                                    onBlur={(e) => setCurrentPet({ ...currentPet, name: formatTitleCaseName(e.target.value.trim()) })}
                                     placeholder="Ej: Mía, Rocky..."
                                     className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-white/15 rounded-xl py-2.5 px-3.5 text-sm text-slate-900 dark:text-white outline-none focus:border-amber-500 transition-colors"
                                 />

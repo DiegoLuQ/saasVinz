@@ -533,6 +533,8 @@ class CertificateGenerateMetadata(BaseModel):
     fecha_emision: str
     pdf_url: str
     paper_format: str
+    # Folio automático del diseño (campo «Folio»); en la vista previa = el próximo, sin consumirlo
+    folio: Optional[str] = None
 
 class CertificateGenerateResponse(BaseModel):
     metadata: CertificateGenerateMetadata

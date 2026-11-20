@@ -28,7 +28,7 @@ import { TableSkeleton } from '@/components/tenant/ui/Skeleton';
 import { usePermissions } from '@/app/(tenant)/tenant/context/PermissionContext';
 import { regions } from '@/lib/tenant/chile-data';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
-import { sanitizeEmailInput, autoFixEmailDomain } from '@/lib/formatters';
+import { sanitizeEmailInput, autoFixEmailDomain, formatTitleCaseName } from '@/lib/formatters';
 import Modal from '@/components/tenant/Modal';
 import DeleteConfirmationModal from '@/components/tenant/DeleteConfirmationModal';
 import { useTenant } from '@/app/(tenant)/tenant/context/TenantContext';
@@ -185,7 +185,10 @@ export default function CustomersPage() {
 
             const saved = await saveCustomerMutation.mutateAsync({
                 isEdit,
-                customer: currentCustomer
+                customer: {
+                    ...currentCustomer,
+                    name: formatTitleCaseName(currentCustomer.name || '').trim(),
+                }
             });
 
             setIsModalOpen(false);
@@ -292,7 +295,7 @@ export default function CustomersPage() {
                             <input
                                 required
                                 value={currentCustomer?.name || ''}
-                                onChange={(e) => setCurrentCustomer({ ...currentCustomer, name: e.target.value })}
+                                onChange={(e) => setCurrentCustomer({ ...currentCustomer, name: formatTitleCaseName(e.target.value) })}
                                 placeholder="Ej: Juan Pérez"
                                 className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-primary/50 text-sm"
                             />
@@ -679,7 +682,7 @@ export default function CustomersPage() {
                             <input
                                 required
                                 value={currentCustomer?.name || ''}
-                                onChange={(e) => setCurrentCustomer({ ...currentCustomer, name: e.target.value })}
+                                onChange={(e) => setCurrentCustomer({ ...currentCustomer, name: formatTitleCaseName(e.target.value) })}
                                 className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 outline-none focus:border-primary/50"
                             />
                         </div>

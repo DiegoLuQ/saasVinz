@@ -426,6 +426,19 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                 </div>
             </section>
 
+            {/* Mensaje del crematorio para este enlace (≤ 500): franja a todo el ancho de la
+                pantalla, en la serif del catálogo; el texto se limita a ~75 caracteres por línea
+                para que siga siendo cómodo de leer. */}
+            {message?.trim() && (
+                <section aria-label="Mensaje del crematorio"
+                    className="w-full mb-10 border-y border-[var(--cat-gold)]/25 bg-[var(--cat-gold)]/[0.06] px-4 sm:px-8 py-8 sm:py-10">
+                    <Feather className="mx-auto mb-3 text-[var(--cat-gold)]/70" size={22} aria-hidden="true" />
+                    <p className="mx-auto max-w-[68ch] text-center [font-family:var(--cat-serif)] text-[1.3rem] sm:text-[1.6rem] font-medium italic leading-[1.55] text-[var(--cat-ink)] whitespace-pre-line break-words">
+                        {message.trim()}
+                    </p>
+                </section>
+            )}
+
             {/* Contenedor Inferior: Resultados / Planes */}
             <main className="flex-1 w-full max-w-[1440px] mx-auto px-4 sm:px-8 lg:px-12 pb-16">
                 {plans.length > SEARCH_THRESHOLD && (
@@ -443,15 +456,6 @@ export default function PublicPlansCatalog({ tenant, plans, getImageUrl, onShare
                                 <X size={16} />
                             </button>
                         )}
-                    </div>
-                )}
-
-                {/* Mensaje del crematorio para este enlace: al ancho del contenedor */}
-                {message?.trim() && (
-                    <div className="mb-8 w-full rounded-2xl border border-[var(--cat-gold)]/30 bg-[var(--cat-gold)]/[0.06] px-5 py-4 sm:px-7 text-center">
-                        <p className="text-[15px] sm:text-base font-bold leading-relaxed text-[var(--cat-ink)] whitespace-pre-line">
-                            {message.trim()}
-                        </p>
                     </div>
                 )}
 

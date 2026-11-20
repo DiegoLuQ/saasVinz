@@ -18,3 +18,22 @@ def test_campos_del_dueno():
     # Sin dueño: los campos no se dibujan
     empty = str(generate_image_certificate_html(background_url="", aspect_ratio="16:9", fields=fields))
     assert "Ana Rojas" not in empty and certificate_owner(None) == {}
+
+
+def test_dia_mes_y_anio_sueltos():
+    """Elementos Día / Mes / Año del editor: partes de la fecha con formato fijo del diseño;
+    con una fecha de la ficha menos precisa, la parte que no se sabe queda vacía."""
+    from datetime import datetime
+    fields = [
+        {"id": "d", "type": "fecha_actual", "format": "part_day", "x": 10, "y": 10},
+        {"id": "m", "type": "fecha_actual", "format": "part_month_name", "x": 20, "y": 10},
+        {"id": "y", "type": "fecha_actual", "format": "part_year", "x": 30, "y": 10},
+        {"id": "bd", "type": "fecha_nacimiento", "format": "part_day", "x": 40, "y": 10},
+        {"id": "by", "type": "fecha_nacimiento", "format": "part_year", "x": 50, "y": 10},
+    ]
+    out = generate_image_certificate_html(
+        background_url="", aspect_ratio="16:9", fields=fields, current_date=datetime(2026, 3, 5),
+        birth_date=datetime(2015, 1, 1), birth_precision="year",
+        overrides={"y": {"format": "long"}})  # el tenant no cambia una parte suelta
+    texts = [f["value"] for f in out["printed"]]
+    assert texts == ["05", "marzo", "2026", "2015"]  # día de nacimiento desconocido = vacío

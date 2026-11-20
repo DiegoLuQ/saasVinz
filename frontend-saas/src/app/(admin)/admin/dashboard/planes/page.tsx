@@ -9,6 +9,7 @@ import DeleteConfirmationModal from '@/components/admin/DeleteConfirmationModal'
 import PlanCard, { type PlanData } from '@/components/admin/plans/PlanCard';
 import CreatePlanModal from '@/components/admin/plans/CreatePlanModal';
 import AnnualDiscountCard from '@/components/admin/plans/AnnualDiscountCard';
+import PriceSeasonsCard from '@/components/admin/plans/PriceSeasonsCard';
 import LandingFeaturesCard from '@/components/admin/plans/LandingFeaturesCard';
 import PlansMatrixView from '@/components/admin/plans/PlansMatrixView';
 import type { PlanModuleDef } from '@/components/admin/plans/PlanModuleToggle';
@@ -233,6 +234,7 @@ export default function PlansPage() {
 
             {viewMode === 'cards' && (
                 <>
+                    <PriceSeasonsCard onSaved={afterChange} onToast={showToast} />
                     <AnnualDiscountCard plans={plans} onSaved={afterChange} onToast={showToast} />
                     <LandingFeaturesCard plans={plans} onSaved={afterChange} onToast={showToast} />
                 </>

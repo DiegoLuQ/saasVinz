@@ -310,6 +310,12 @@ async def submit_partner_admission(
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Datos de formulario con formato inválido.")
 
+    from app.utils.sanitize import format_title_case_name
+    if owner_dict.get("fullName"):
+        owner_dict["fullName"] = format_title_case_name(owner_dict["fullName"])
+    if pet_dict.get("name"):
+        pet_dict["name"] = format_title_case_name(pet_dict["name"])
+
     # Inyectar el partner_id en el payload del dueño para la trazabilidad
     owner_dict["partner_id"] = link.id
     owner_dict["referral_partner_name"] = link.veterinary.name if link.veterinary else "Clínica Asociada"

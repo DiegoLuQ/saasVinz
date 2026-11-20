@@ -10,7 +10,7 @@ import { changedFields, formSessionId, resetFormSession, sendFormEvent, type For
 import { MAX_MEMORIAL_PHOTOS } from '@/components/public/ImageUploadStep';
 import { isFuturePartialDate, isValidPartialDate } from '@/lib/petDates';
 import { cleanPhaseOrder, mergeWelcomeModal, phaseName, phrasePhase, planFitsWeight, planPriceForTier, PHASE_DEFAULTS, resolveFormConfig, tierForWeight, type PhaseKey, type PublicFormConfig, type WeightTier } from '@/lib/publicFormConfig';
-import { validateEmailStrict, validatePhoneStrict, autoFixEmailDomain } from '@/lib/formatters';
+import { validateEmailStrict, validatePhoneStrict, autoFixEmailDomain, formatTitleCaseName } from '@/lib/formatters';
 
 export interface Tenant {
     id: number;
@@ -724,7 +724,10 @@ export function useTenantForm(
             // Los campos que el crematorio oculta no se envían (un borrador
             // antiguo podría traerlos con datos).
             const f = formConfig.fields;
-            const owner = { ...ownerData };
+            const owner = {
+                ...ownerData,
+                fullName: formatTitleCaseName(ownerData.fullName).trim(),
+            };
             if (!f.rut.visible) owner.rut = '';
             if (!f.email.visible) owner.email = '';
             else if (owner.email) owner.email = autoFixEmailDomain(owner.email);
@@ -732,7 +735,10 @@ export function useTenantForm(
             if (!f.comments.visible) owner.comments = '';
             if (!f.pickup.visible) { owner.veterinary = ''; owner.pickupRegion = ''; owner.pickupCommune = ''; }
             if (!f.address.visible) { owner.address = ''; owner.commune = ''; }
-            const pet = { ...petData };
+            const pet = {
+                ...petData,
+                name: formatTitleCaseName(petData.name).trim(),
+            };
             if (!f.nickname.visible) pet.nickname = '';
             if (!f.breed.visible) pet.breed = '';
             if (!f.age.visible) { pet.age = ''; pet.ageUnit = undefined; pet.ageAuto = undefined; }

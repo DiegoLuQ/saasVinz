@@ -134,7 +134,7 @@ const EXPIRATION_OPTIONS: Record<CatalogType, ExpirationOption[]> = {
 };
 
 // Mensaje del crematorio en el catálogo de planes (backend: CATALOG_MESSAGE_MAX)
-const MESSAGE_MAX = 300;
+const MESSAGE_MAX = 500;
 
 /** Edición de un enlace existente (PATCH /api/internal/catalog/links/{id}); la URL no cambia. */
 interface LinkEdit {
@@ -646,7 +646,7 @@ export default function ShareCatalogModal({
                                                                 Mensaje para la familia
                                                                 <span className="font-mono font-normal text-slate-500">{editing.message.length}/{MESSAGE_MAX}</span>
                                                             </span>
-                                                            <textarea rows={2} value={editing.message} maxLength={MESSAGE_MAX}
+                                                            <textarea rows={4} value={editing.message} maxLength={MESSAGE_MAX}
                                                                 onChange={e => setEditing({ ...editing, message: e.target.value.slice(0, MESSAGE_MAX) })}
                                                                 className={`${editInputCls} resize-none`} />
                                                         </label>

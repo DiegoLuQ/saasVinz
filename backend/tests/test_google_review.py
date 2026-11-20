@@ -216,3 +216,38 @@ def test_clic_en_google_se_registra_y_redirige_al_enlace_del_crematorio(client, 
     assert any(x["cremation_id"] == oid for x in det["reviews"]["recent_clicked"])
     assert all(x["clicked_at"] is None for x in det["reviews"]["recent_unclicked"])
     assert all(len(det["reviews"][k]) <= 10 for k in ("recent", "recent_clicked", "recent_unclicked"))
+
+
+def test_cancelar_invitacion_automatica_de_una_orden(client, db, setup, sent_emails):
+    """Check de la orden / «Cancelar envío»: esa orden no recibe la invitación automática;
+    el aviso de fase final sale igual y «Reactivar» la vuelve a programar."""
+    h, oid = setup["h"], setup["oid"]
+    base = f"/api/internal/operations/ops/orders/{oid}/family-notices"
+    client.put("/api/internal/operations/review-config", headers=h, json={"enabled": True, "delay_days": 1})
+
+    # Se puede cancelar antes de entregar (orden en proceso)
+    r = client.put(f"{base}/review-auto", headers=h, json={"enabled": False})
+    assert r.status_code == 200 and r.json()["auto"] is False and r.json()["state"] == "cancelled"
+    assert client.put(f"{base}/review-auto", headers=h, json={"enabled": False}).status_code == 200  # idempotente
+
+    n = len(sent_emails)
+    _deliver(client, h, db, oid, tz.get_now() + timedelta(minutes=1))
+    assert len(sent_emails) == n + 1  # el aviso de fase final se envía igual
+    db.expire_all()
+    due = datetime.fromisoformat(client.get(base, headers=h).json()["review"]["cancelled_at"])
+    later = tz.get_now() + timedelta(days=2)
+    assert oid not in gr.due_orders(db, now=later)
+    import asyncio
+    assert asyncio.run(gr.send_review_email(db, oid))["reason"] == "cancelled"
+
+    info = client.get(base, headers=h).json()
+    assert info["review"]["auto"] is False and due
+    assert all(x["status"] != "cancelled" for x in info["notices"])  # no aparece en el historial
+    lst = client.get("/api/internal/operations/review-emails?state=cancelled", headers=h).json()
+    assert any(i["cremation_id"] == oid for i in lst["items"]) and lst["counts"]["cancelled"] >= 1
+
+    # Reactivar: vuelve a programarse
+    r = client.put(f"{base}/review-auto", headers=h, json={"enabled": True})
+    assert r.json()["auto"] is True and r.json()["state"] in ("scheduled", "pending")
+    db.expire_all()
+    assert oid in gr.due_orders(db, now=later)

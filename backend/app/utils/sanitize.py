@@ -124,3 +124,24 @@ def validate_email_strict(email: str | None) -> str | None:
         return "Dominio inválido: revisa si quisiste escribir .com"
     return None
 
+
+def format_title_case_name(name: str | None) -> str:
+    """
+    Convierte nombres propios o de mascotas a formato Title Case
+    (ej: DANIELA BLANCO -> Daniela Blanco, LEÓN -> León).
+    Evita mayúsculas sostenidas, normaliza espacios y respeta tildes y guiones.
+    """
+    if not name or not isinstance(name, str):
+        return ""
+    cleaned = sanitize_text(name, max_length=100)
+    words = cleaned.split()
+    formatted = []
+    for w in words:
+        if "-" in w:
+            parts = [p.capitalize() for p in w.split("-")]
+            formatted.append("-".join(parts))
+        else:
+            formatted.append(w.capitalize())
+    return " ".join(formatted)
+
+

@@ -6,18 +6,19 @@
  * «Enviada ✓» = el servidor de correo la aceptó (equivale al «200»); «Con error» =
  * la rechazó (se reintenta hasta 3 veces, el motivo queda visible).
  * Filas en 3 columnas (familia · estado · acción), sin scroll horizontal; en celular se apilan.
+ * «Cancelar envío» / «Reactivar» = PUT .../family-notices/review-auto (mismo dato que el check de la orden).
  * API GET /api/internal/operations/review-emails?state=; lógica google_review.tenant_list().
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CalendarClock, CheckCircle2, Clock, Info, Loader2, Mail, MinusCircle, MousePointerClick, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Ban, CalendarClock, CheckCircle2, Clock, Info, Loader2, Mail, MinusCircle, MousePointerClick, RefreshCw, RotateCcw } from 'lucide-react';
 import { apiRequest } from '@/lib/tenant/api';
 import { formatChileDate, formatChileTime } from '@/lib/dates';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 
-type State = 'sent' | 'scheduled' | 'pending' | 'retrying' | 'failed' | 'skipped';
-type Filter = '' | 'scheduled' | 'sent' | 'failed' | 'skipped';
+type State = 'sent' | 'scheduled' | 'pending' | 'retrying' | 'failed' | 'skipped' | 'cancelled';
+type Filter = '' | 'scheduled' | 'sent' | 'failed' | 'skipped' | 'cancelled';
 
 interface Row {
     cremation_id: number;
@@ -37,8 +38,9 @@ interface Row {
     last_error?: string | null;
     last_attempt_at?: string | null;
     can_send: boolean;
+    cancelled_at?: string | null;
 }
-interface ListData { items: Row[]; counts: Record<'sent' | 'scheduled' | 'failed' | 'skipped', number>; days: number; max_attempts: number }
+interface ListData { items: Row[]; counts: Record<'sent' | 'scheduled' | 'failed' | 'skipped' | 'cancelled', number>; days: number; max_attempts: number }
 
 const FILTERS: { id: Filter; label: string }[] = [
     { id: '', label: 'Todas' },
@@ -46,6 +48,7 @@ const FILTERS: { id: Filter; label: string }[] = [
     { id: 'sent', label: 'Enviadas' },
     { id: 'failed', label: 'Con error' },
     { id: 'skipped', label: 'No saldrán' },
+    { id: 'cancelled', label: 'Canceladas' },
 ];
 
 const REASON: Record<string, string> = {
@@ -68,6 +71,7 @@ const STATE_UI: Record<State, { label: string; icon: React.ElementType; cls: str
     retrying: { label: 'Reintentando', icon: RefreshCw, cls: 'text-amber-700 dark:text-amber-300' },
     failed: { label: 'Error', icon: AlertTriangle, cls: 'text-red-700 dark:text-red-300' },
     skipped: { label: 'No saldrá', icon: MinusCircle, cls: 'text-slate-500 dark:text-slate-400' },
+    cancelled: { label: 'Cancelada', icon: Ban, cls: 'text-slate-500 dark:text-slate-400' },
 };
 
 /** Texto bajo el estado; `hideReason` = el motivo ya se explica en el aviso de arriba. */
@@ -78,6 +82,7 @@ function detail(row: Row, maxAttempts: number, hideReason: boolean): string {
         case 'pending': return 'Sale en los próximos minutos';
         case 'retrying': return `Rechazada (${row.attempts}/${maxAttempts}), se reintentará`;
         case 'failed': return `Rechazada ${row.attempts} veces`;
+        case 'cancelled': return `Cancelada el ${when(row.cancelled_at)}`;
         default: return hideReason ? '' : (REASON[row.reason || ''] || '');
     }
 }
@@ -129,9 +134,26 @@ export function ReviewEmailsList() {
         }
     };
 
+    // Cancelar o reactivar la invitación automática de esa orden
+    const setAuto = async (row: Row, enabled: boolean) => {
+        setBusy(row.cremation_id);
+        try {
+            await apiRequest(`/api/internal/operations/ops/orders/${row.cremation_id}/family-notices/review-auto`, {
+                method: 'PUT', body: { enabled },
+            });
+            showToast(enabled ? 'Invitación reactivada: vuelve a estar programada' : 'Envío cancelado: esta familia no recibirá la invitación', 'success');
+        } catch (e) {
+            showToast(e instanceof Error && e.message ? e.message : 'No se pudo guardar', 'error');
+        } finally {
+            setBusy(null);
+            qc.invalidateQueries({ queryKey: ['review-emails'] });
+            qc.invalidateQueries({ queryKey: ['family-notices', row.cremation_id] });
+        }
+    };
+
     const counts = data?.counts;
-    const total = counts ? counts.sent + counts.scheduled + counts.failed + counts.skipped : 0;
-    const countOf = (f: Filter) => (!counts ? 0 : f === '' ? total : counts[f]);
+    const total = counts ? counts.sent + counts.scheduled + counts.failed + counts.skipped + (counts.cancelled || 0) : 0;
+    const countOf = (f: Filter) => (!counts ? 0 : f === '' ? total : counts[f] || 0);
 
     return (
         <div className="rounded-3xl border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-white/[0.03] p-5 space-y-4">
@@ -193,7 +215,7 @@ export function ReviewEmailsList() {
                         {rows.slice(0, shown).map(row => {
                             const ui = STATE_UI[row.state];
                             const Icon = ui.icon;
-                            const muted = row.state === 'skipped';
+                            const muted = row.state === 'skipped' || row.state === 'cancelled';
                             const mail = row.sent_to || row.email;
                             const sub = detail(row, data!.max_attempts, !!commonReason && row.reason === commonReason.reason);
                             return (
@@ -228,14 +250,25 @@ export function ReviewEmailsList() {
                                     </div>
 
                                     {/* Acción */}
-                                    <div className="md:w-[132px] md:text-right">
-                                        {row.state !== 'sent' && row.can_send && (
+                                    <div className="md:w-[132px] md:text-right flex flex-col md:items-end gap-1.5">
+                                        {row.state === 'cancelled' ? (
+                                            <button type="button" onClick={() => setAuto(row, true)} disabled={busy !== null}
+                                                className="inline-flex items-center justify-center gap-1.5 w-full md:w-auto rounded-xl border border-slate-200 dark:border-white/10 px-3.5 py-2 text-xs font-bold hover:bg-slate-50 dark:hover:bg-white/5 disabled:opacity-50 cursor-pointer whitespace-nowrap">
+                                                {busy === row.cremation_id ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />} Reactivar
+                                            </button>
+                                        ) : row.state !== 'sent' && row.can_send && (
                                             <button type="button" onClick={() => sendNow(row)} disabled={busy !== null}
                                                 className={`inline-flex items-center justify-center gap-1.5 w-full md:w-auto rounded-xl px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors disabled:opacity-50 cursor-pointer whitespace-nowrap ${row.state === 'failed' || row.state === 'retrying'
                                                     ? 'bg-red-600 hover:bg-red-700'
                                                     : 'bg-sky-600 hover:bg-sky-700'}`}>
                                                 {busy === row.cremation_id ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />}
                                                 {row.state === 'failed' || row.state === 'retrying' ? 'Reintentar' : 'Enviar ahora'}
+                                            </button>
+                                        )}
+                                        {['scheduled', 'pending', 'retrying'].includes(row.state) && (
+                                            <button type="button" onClick={() => setAuto(row, false)} disabled={busy !== null}
+                                                className="inline-flex items-center justify-center gap-1 w-full md:w-auto px-2 py-1 text-[11px] font-bold text-muted-foreground hover:text-red-600 disabled:opacity-50 cursor-pointer whitespace-nowrap">
+                                                <Ban size={12} /> Cancelar envío
                                             </button>
                                         )}
                                     </div>

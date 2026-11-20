@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/tenant/api';
 import {
     FileText,
     Search,
@@ -11,6 +13,7 @@ import {
     FileCheck,
     FileBadge,
     AlertCircle,
+    Eye,
     X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -18,6 +21,7 @@ import Modal from '@/components/tenant/Modal';
 import { useDocuments, useDeleteDocument, fetchDocumentContent, DocumentItem } from '@/hooks/useDocuments';
 import { useToast } from '@/app/(tenant)/tenant/context/ToastContext';
 import { downloadHtmlAsPdf, pdfFileName } from '@/lib/certPdf';
+import CertificateDataModal from '@/components/tenant/documents/CertificateDataModal';
 
 type FilterKey = 'certificados' | 'recibos' | 'autorizaciones' | 'otros';
 type Tone = 'blue' | 'emerald' | 'purple' | 'orange';
@@ -71,6 +75,8 @@ export default function DocumentsPage() {
     const deleteMutation = useDeleteDocument();
     const { showToast } = useToast();
     const [downloadingId, setDownloadingId] = useState<number | null>(null);
+    // «Ver datos» de un certificado emitido por el sistema
+    const [dataCertId, setDataCertId] = useState<number | null>(null);
 
     const documents = data?.documents || [];
     const stats = data?.stats || { certificados: 0, recibos: 0, autorizaciones: 0, otros: 0 };
@@ -78,6 +84,22 @@ export default function DocumentsPage() {
     // States
     const [searchTerm, setSearchTerm] = useState('');
     const [activeFilter, setActiveFilter] = useState<FilterKey | null>(null);
+
+    // Búsqueda en el texto impreso de los certificados (textos libres, nombres, fechas…):
+    // la hace el backend (también en certificados antiguos); espera 300 ms tras escribir.
+    const [debounced, setDebounced] = useState('');
+    useEffect(() => {
+        const t = setTimeout(() => setDebounced(searchTerm.trim()), 300);
+        return () => clearTimeout(t);
+    }, [searchTerm]);
+    const { data: textSearch, isFetching: searchingTexts } = useQuery<{ matches: Record<string, string> }>({
+        queryKey: ['certificate-text-search', debounced],
+        queryFn: () => apiRequest(`/api/internal/ops-records/certificates/search?q=${encodeURIComponent(debounced)}`),
+        enabled: debounced.length >= 2,
+        staleTime: 30_000,
+    });
+    const textMatches = useMemo<Record<string, string>>(
+        () => (debounced.length >= 2 ? textSearch?.matches || {} : {}), [debounced, textSearch]);
     
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [docToDelete, setDocToDelete] = useState<{ id: number; isGenerated: boolean } | null>(null);
@@ -101,15 +123,16 @@ export default function DocumentsPage() {
         // 2. Filter by search term
         if (searchTerm) {
             const lowerSearch = searchTerm.toLowerCase();
-            filtered = filtered.filter(doc => 
+            filtered = filtered.filter(doc =>
                 doc.pet_name?.toLowerCase().includes(lowerSearch) ||
                 doc.number?.toLowerCase().includes(lowerSearch) ||
-                doc.cremation_id?.toString().includes(lowerSearch)
+                doc.cremation_id?.toString().includes(lowerSearch) ||
+                (doc.is_generated && String(doc.id) in textMatches)
             );
         }
 
         return filtered;
-    }, [documents, activeFilter, searchTerm]);
+    }, [documents, activeFilter, searchTerm, textMatches]);
 
     // Handlers
     const toggleFilter = (filter: FilterKey) => {
@@ -222,9 +245,10 @@ export default function DocumentsPage() {
                     </div>
                     <div className="relative flex-1 max-w-sm">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        {searchingTexts && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-slate-400" size={16} />}
                         <input
                             type="text"
-                            placeholder="Buscar mascota, ID o folio..."
+                            placeholder="Buscar mascota, folio, orden o texto del certificado..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 rounded-2xl py-3 pl-12 pr-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all font-medium dark:bg-black/30 dark:border-white/10 dark:text-white dark:placeholder:text-slate-500"
@@ -258,6 +282,16 @@ export default function DocumentsPage() {
                                                         {doc.type}
                                                     </span>
                                                     <div className="flex gap-1.5 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
+                                                        {doc.is_generated && (
+                                                            <button
+                                                                onClick={() => setDataCertId(doc.id)}
+                                                                className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-primary/10 hover:text-primary transition-colors dark:bg-white/5 dark:text-slate-300"
+                                                                title="Ver datos del certificado"
+                                                                aria-label="Ver datos del certificado"
+                                                            >
+                                                                <Eye size={16} />
+                                                            </button>
+                                                        )}
                                                         <button
                                                             onClick={() => handleDownloadPdf(doc)}
                                                             disabled={downloadingId === doc.id}
@@ -284,6 +318,12 @@ export default function DocumentsPage() {
                                                     {doc.number && <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-white/20" />}
                                                     <span className="font-mono">{doc.number}</span>
                                                 </p>
+                                                {searchTerm.trim() && doc.is_generated && textMatches[String(doc.id)] && (
+                                                    <p className="mt-2 text-xs text-slate-600 dark:text-slate-300 line-clamp-2 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200/70 dark:border-amber-500/20 px-2.5 py-1.5"
+                                                        title={textMatches[String(doc.id)]}>
+                                                        <span className="font-bold text-amber-700 dark:text-amber-300">Texto: </span>{textMatches[String(doc.id)]}
+                                                    </p>
+                                                )}
                                             </div>
 
                                             <div className="mt-5 pt-4 border-t border-slate-100 dark:border-white/[0.06] flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-semibold">
@@ -325,6 +365,8 @@ export default function DocumentsPage() {
                     </AnimatePresence>
                 )}
             </div>
+
+            <CertificateDataModal certId={dataCertId} onClose={() => setDataCertId(null)} />
 
             {/* Delete Modal */}
             <Modal

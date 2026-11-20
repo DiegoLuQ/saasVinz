@@ -13,8 +13,10 @@ interface ReviewStatus {
     sent_at?: string | null;
     clicked_at?: string | null;
     scheduled_for?: string | null;
-    state?: 'sent' | 'scheduled' | 'pending' | 'retrying' | 'failed' | 'skipped';
-    reason?: 'no_link' | 'no_email' | 'off' | 'not_delivered' | 'before_enabled' | 'expired' | 'max_attempts' | null;
+    state?: 'sent' | 'scheduled' | 'pending' | 'retrying' | 'failed' | 'skipped' | 'cancelled';
+    reason?: 'no_link' | 'no_email' | 'off' | 'not_delivered' | 'before_enabled' | 'expired' | 'max_attempts' | 'cancelled' | null;
+    /** Check «Enviar invitación automática»: false = cancelada para esta orden. */
+    auto?: boolean;
     attempts?: number;
     last_error?: string | null;
     can_send?: boolean;
@@ -29,6 +31,7 @@ const REVIEW_REASON: Record<string, string> = {
     before_enabled: 'Entregada antes de activar las reseñas',
     expired: 'Pasó la fecha y no se envió',
     max_attempts: 'El servidor de correo la rechazó 3 veces',
+    cancelled: 'Envío automático cancelado',
 };
 
 const NOTICE_LABEL = (n: Notice) =>
@@ -62,7 +65,7 @@ export default function FamilyNoticesBox({ orderId, stepId, finished, compact = 
     const qc = useQueryClient();
     const key = ['family-notices', orderId];
     const { data } = useQuery<NoticesData>({ queryKey: key, queryFn: () => apiRequest(`/api/internal/operations/ops/orders/${orderId}/family-notices`) });
-    const [busy, setBusy] = useState<'whatsapp' | 'email' | 'review' | null>(null);
+    const [busy, setBusy] = useState<'whatsapp' | 'email' | 'review' | 'auto' | null>(null);
     const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
     if (!data?.enabled) return null;
@@ -103,6 +106,18 @@ export default function FamilyNoticesBox({ orderId, stepId, finished, compact = 
             setMsg({ ok: false, text: e instanceof Error ? e.message : 'No se pudo enviar la invitación' });
         } finally { setBusy(null); }
     };
+    // Check de la orden: solo la invitación a reseña de Google (el aviso de fase final sale igual)
+    const setAuto = async (enabled: boolean) => {
+        setBusy('auto'); setMsg(null);
+        try {
+            await apiRequest(`/api/internal/operations/ops/orders/${orderId}/family-notices/review-auto`, { method: 'PUT', body: { enabled } });
+            setMsg({ ok: true, text: enabled ? 'Se enviará la invitación a reseña automáticamente' : 'Esta familia no recibirá la invitación a reseña' });
+            qc.invalidateQueries({ queryKey: key });
+            qc.invalidateQueries({ queryKey: ['review-emails'] });
+        } catch (e: unknown) {
+            setMsg({ ok: false, text: e instanceof Error ? e.message : 'No se pudo guardar' });
+        } finally { setBusy(null); }
+    };
     const review = data.review;
 
     const btn = 'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-colors disabled:opacity-40';
@@ -123,10 +138,13 @@ export default function FamilyNoticesBox({ orderId, stepId, finished, compact = 
                 </button>
             </div>
             {review?.available && (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/60 dark:bg-white/[0.03] px-3 py-2">
+                <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white/60 dark:bg-white/[0.03] px-3 py-2 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="min-w-0 text-[11px] text-muted-foreground">
                         <span className="font-bold text-foreground">Reseña en Google</span>
-                        {review.sent_at ? null : review.last_error ? (
+                        {review.sent_at ? null : review.state === 'cancelled' ? (
+                            <span className="ml-1.5">· {REVIEW_REASON.cancelled}</span>
+                        ) : review.last_error ? (
                             <span className="ml-1.5 inline-flex items-center gap-1 text-red-600 dark:text-red-400" title={review.last_error}>
                                 <AlertTriangle size={12} /> {review.state === 'failed' ? 'No se pudo enviar' : `Falló (intento ${review.attempts}), se reintentará`}</span>
                         ) : review.scheduled_for && review.reason !== 'expired' ? (
@@ -140,6 +158,23 @@ export default function FamilyNoticesBox({ orderId, stepId, finished, compact = 
                             {busy === 'review' ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />} Enviar ahora
                         </button>
                     )}
+                </div>
+                {!review.sent_at && (
+                    <label className="flex items-start gap-2 cursor-pointer select-none text-[11px]">
+                        <input type="checkbox" checked={review.auto !== false} disabled={!!busy}
+                            onChange={(e) => setAuto(e.target.checked)}
+                            className="mt-0.5 h-3.5 w-3.5 accent-sky-600" />
+                        <span>
+                            <span className="font-bold text-foreground">Enviar correo automático de reseña</span>
+                            <span className="block text-muted-foreground">
+                                {review.auto !== false
+                                    ? 'Se envía solo, después de la entrega. Desmárcalo si esta familia no debe recibirlo.'
+                                    : 'No se enviará. El aviso de fase final se envía igual.'}
+                            </span>
+                        </span>
+                        {busy === 'auto' && <Loader2 size={12} className="animate-spin mt-0.5" />}
+                    </label>
+                )}
                 </div>
             )}
             {msg && <p className={`text-xs ${msg.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>{msg.text}</p>}

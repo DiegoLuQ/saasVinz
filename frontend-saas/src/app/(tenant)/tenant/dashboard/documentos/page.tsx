@@ -25,7 +25,7 @@ import { extractCertSpec, renderCertSpecToCanvas } from '@/lib/certImageDraw';
 // --- Tipos compartidos con el editor admin --------------------------------
 interface DesignField extends TextBg {
     id: string;
-    type: 'nombre_mascota' | 'fecha_nacimiento' | 'fecha_fallecimiento' | 'fecha_actual' | 'imagen_mascota' | 'logo_tenant' | 'nombre_empresa' | 'rut_tenant' | 'encargado_tenant' | 'rut_encargado' | 'celular_tenant' | 'direccion_tenant' | 'nombre_dueno' | 'rut_dueno' | 'correo_dueno' | 'telefono_dueno' | 'direccion_dueno' | 'codigo_verificacion' | 'numero_certificado' | 'texto_fijo';
+    type: 'nombre_mascota' | 'fecha_nacimiento' | 'fecha_fallecimiento' | 'fecha_actual' | 'imagen_mascota' | 'logo_tenant' | 'nombre_empresa' | 'rut_tenant' | 'encargado_tenant' | 'rut_encargado' | 'celular_tenant' | 'direccion_tenant' | 'nombre_dueno' | 'rut_dueno' | 'correo_dueno' | 'telefono_dueno' | 'direccion_dueno' | 'codigo_verificacion' | 'numero_certificado' | 'folio' | 'texto_fijo';
     x: number;
     y: number;
     fontSize?: number;
@@ -33,7 +33,7 @@ interface DesignField extends TextBg {
     color?: string;
     align?: 'left' | 'center' | 'right';
     bold?: boolean;
-    format?: 'short' | 'long' | 'year' | 'month_year';
+    format?: 'short' | 'long' | 'year' | 'month_year' | 'part_day' | 'part_month' | 'part_month_name' | 'part_year';
     value?: string; // solo texto_fijo: texto por defecto del diseño
     code?: string; // solo texto_fijo: con código, el crematorio puede guardar su texto
     slot?: number;
@@ -86,11 +86,15 @@ const FIELD_LABELS: Record<DesignField['type'], string> = {
     direccion_dueno: 'Dirección dueño',
     codigo_verificacion: 'Código verificación',
     numero_certificado: 'N° certificado',
+    folio: 'Folio',
     texto_fijo: 'Texto libre',
 };
 
+const PART_LABELS: Record<string, string> = { part_day: 'Día', part_month: 'Mes', part_month_name: 'Mes', part_year: 'Año' };
+
 const fieldLabel = (f: DesignField, effectiveText?: string): string => {
     if (f.type === 'imagen_mascota') return `Foto #${(f.slot ?? 0) + 1}`;
+    if (f.format && PART_LABELS[f.format]) return `${PART_LABELS[f.format]} (${FIELD_LABELS[f.type] || 'fecha'})`;
     if (f.type === 'texto_fijo') {
         const t = (effectiveText ?? f.value ?? '').trim();
         return t ? `Texto: ${t.length > 24 ? t.slice(0, 24) + '…' : t}` : 'Texto libre';
@@ -131,6 +135,10 @@ export default function EmitirDocumentosPage() {
     // Texto libre editable por el tenant al emitir. El diseño trae el texto por
     // defecto; aquí se guarda el cambio, sin tocar la plantilla del admin.
     const [textOverrides, setTextOverrides] = useState<Record<string, string>>({});
+    // Folio automático (campo «Folio» del diseño): el que propone el backend en la vista
+    // previa (no se consume) y la corrección opcional del crematorio al emitir.
+    const [previewFolio, setPreviewFolio] = useState<string | null>(null);
+    const [folioOverride, setFolioOverride] = useState('');
     // Textos guardados por el crematorio para los campos con código: { código: texto }
     const [savedTexts, setSavedTexts] = useState<Record<string, string>>({});
     // ¿Guardar el texto de este campo (con código) para próximos certificados? { fieldId: bool }
@@ -203,6 +211,8 @@ export default function EmitirDocumentosPage() {
     const openEmit = async (tpl: ImgTemplate) => {
         setActive(tpl);
         setSelectedCremId(null);
+        setFolioOverride('');
+        setPreviewFolio(null);
         setDateOverrides({});
         setPhotoOverrides({});
         // Se precarga con el texto guardado por el crematorio (si el campo tiene
@@ -270,9 +280,11 @@ export default function EmitirDocumentosPage() {
     const fields = active?.sections_config?.fields || [];
     const elements = active?.sections_config?.elements || [];
     const aspect = active?.sections_config?.aspect_ratio || '16:9';
-    const dateFields = fields.filter((f) => f.type.startsWith('fecha'));
+    // Las partes sueltas (Día / Mes / Año) tienen formato fijo del diseño: no se ofrecen aquí
+    const dateFields = fields.filter((f) => f.type.startsWith('fecha') && !f.format?.startsWith('part_'));
     const imageFields = fields.filter((f) => f.type === 'imagen_mascota');
     const textFields = fields.filter((f) => f.type === 'texto_fijo');
+    const folioField = fields.find((f) => f.type === 'folio') || null;
 
     // ¿Se muestra el elemento? Según el toggle del tenant; por defecto, los
     // opcionales según su visibilidad por defecto y los fijos siempre.
@@ -317,6 +329,9 @@ export default function EmitirDocumentosPage() {
             const v = textOverrides[f.id];
             if (v !== undefined) overrides[f.id] = { ...(overrides[f.id] || {}), value: v };
         });
+        if (folioField && folioOverride.trim()) {
+            overrides[folioField.id] = { ...(overrides[folioField.id] || {}), value: folioOverride.trim() };
+        }
         imageFields.forEach((f) => {
             const entry: any = {};
             const url = photoForField(f);
@@ -356,7 +371,10 @@ export default function EmitirDocumentosPage() {
                         persist: false,
                     },
                 });
-                if (reqId === previewReqRef.current) setPreviewHtml(res.html_content);
+                if (reqId === previewReqRef.current) {
+                    setPreviewHtml(res.html_content);
+                    setPreviewFolio(res.metadata?.folio || null);
+                }
             } catch {
                 if (reqId === previewReqRef.current) setPreviewHtml(null);
             } finally {
@@ -366,7 +384,7 @@ export default function EmitirDocumentosPage() {
         return () => clearTimeout(timer);
         // buildOverrides se deriva de estos estados
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [active?.id, selectedCremId, dateOverrides, photoOverrides, textOverrides, elementToggles, fieldToggles, frameOverrides]);
+    }, [active?.id, selectedCremId, dateOverrides, photoOverrides, textOverrides, elementToggles, fieldToggles, frameOverrides, folioOverride]);
 
     const handleGenerate = async () => {
         if (!active || !selectedCremId) {
@@ -387,6 +405,8 @@ export default function EmitirDocumentosPage() {
             });
             setResultHtml(res.html_content);
             setPreviewHtml(res.html_content);
+            setPreviewFolio(res.metadata?.folio || null);
+            setFolioOverride('');
             showToast('Certificado generado correctamente', 'success');
             await saveCodedTexts();
         } catch (err: any) {
@@ -566,7 +586,7 @@ export default function EmitirDocumentosPage() {
                                                 filteredCremations.map((c) => (
                                                 <button
                                                     key={c.id}
-                                                    onClick={() => { setSelectedCremId(c.id); setPhotoOverrides({}); }}
+                                                    onClick={() => { setSelectedCremId(c.id); setPhotoOverrides({}); setFolioOverride(''); }}
                                                     className={`w-full flex items-center gap-3 p-2.5 rounded-xl border text-left transition-all ${selectedCremId === c.id ? 'bg-emerald-50 border-emerald-300 dark:bg-primary/15 dark:border-primary/40' : 'bg-white border-slate-200 hover:bg-slate-50 dark:bg-white/[0.02] dark:border-white/5 dark:hover:bg-white/5'}`}
                                                 >
                                                     <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-black/40 overflow-hidden shrink-0">
@@ -602,6 +622,24 @@ export default function EmitirDocumentosPage() {
                                                 </div>
                                             );
                                         })}
+                                    </div>
+                                )}
+
+                                {/* Folio automático: se puede corregir al emitir */}
+                                {selectedCrem && folioField && (
+                                    <div className="space-y-1.5">
+                                        <label htmlFor="cert-folio" className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-white/40 flex items-center gap-2">
+                                            <Type size={12} /> Folio
+                                        </label>
+                                        <input id="cert-folio" value={folioOverride} maxLength={40}
+                                            onChange={(e) => setFolioOverride(e.target.value)}
+                                            placeholder={previewFolio ? `Automático: ${previewFolio}` : 'Automático'}
+                                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-mono font-bold text-slate-900 outline-none focus:border-primary dark:bg-black/30 dark:border-white/10 dark:text-white" />
+                                        <p className="text-[11px] text-slate-500 dark:text-white/40">
+                                            {folioOverride.trim()
+                                                ? 'Se imprimirá este folio en lugar del automático (no usa número).'
+                                                : 'Se asigna solo al emitir y se mantiene si vuelves a emitir esta orden. Escribe aquí solo para corregirlo.'}
+                                        </p>
                                     </div>
                                 )}
 

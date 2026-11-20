@@ -1429,6 +1429,45 @@ def update_annual_discount(
     return set_annual_discount(db, payload.pct, payload.launch)
 
 
+# ===== Temporadas de precios (services/price_seasons.py) =====
+
+@router.get("/pricing/seasons")
+def list_price_seasons(current_creator: User = Depends(get_current_creator), db: Session = Depends(get_db)):
+    from app.services import price_seasons
+    return {"seasons": price_seasons.list_seasons(db), "max": price_seasons.MAX_SEASONS,
+            "max_discount": MAX_ANNUAL_DISCOUNT}
+
+
+@router.post("/pricing/seasons")
+def create_price_season(payload: dict, current_creator: User = Depends(get_current_creator), db: Session = Depends(get_db)):
+    """Nueva temporada (sin precios = copia de la vigente). No se activa sola."""
+    from app.services import price_seasons
+    return price_seasons.create(db, payload)
+
+
+@router.put("/pricing/seasons/{season_id}")
+def update_price_season(season_id: int, payload: dict, current_creator: User = Depends(get_current_creator),
+                        db: Session = Depends(get_db)):
+    """Edita la temporada; si es la vigente, sus precios pasan a los planes al instante."""
+    from app.services import price_seasons
+    return price_seasons.update(db, season_id, payload)
+
+
+@router.delete("/pricing/seasons/{season_id}")
+def delete_price_season(season_id: int, current_creator: User = Depends(get_current_creator), db: Session = Depends(get_db)):
+    from app.services import price_seasons
+    price_seasons.delete(db, season_id)
+    return {"ok": True}
+
+
+@router.post("/pricing/seasons/{season_id}/activate")
+def activate_price_season(season_id: int, current_creator: User = Depends(get_current_creator), db: Session = Depends(get_db)):
+    """Deja vigente la temporada (precios y % anual a todos los planes). Los crematorios
+    que ya contrataron mantienen su precio congelado."""
+    from app.services import price_seasons
+    return price_seasons.activate(db, season_id)
+
+
 class LandingFeatureIn(BaseModel):
     key: str = Field(..., min_length=1, max_length=80)
     label: str = Field(..., min_length=1, max_length=70)
@@ -1476,6 +1515,10 @@ async def create_plan(
     new_plan = models.SubscriptionPlan(**data, code=make_plan_code(data["name"], taken))
     apply_annual_price(db, new_plan)
     db.add(new_plan)
+    db.flush()
+    # El plan nuevo entra a la temporada de precios vigente con su precio (services/price_seasons.py)
+    from app.services.price_seasons import sync_plan_price
+    sync_plan_price(db, new_plan)
     db.commit()
     db.refresh(new_plan)
     return new_plan
@@ -1523,6 +1566,9 @@ async def update_plan(
 
     # El anual sigue al mensual con el descuento global (no cambia lo ya contratado).
     apply_annual_price(db, plan)
+    # El precio mensual queda también en la temporada de precios vigente
+    from app.services.price_seasons import sync_plan_price
+    sync_plan_price(db, plan)
 
     if renamed:
         # Copia antigua del nombre en sys_tenants.plan (pantallas/reportes que la leen).

@@ -184,6 +184,9 @@ export default async function CompararPlanesPage() {
                                                         <p className={`text-[10px] font-bold ${hl ? 'text-[#19B5FE]' : 'text-slate-300'}`}>
                                                             {p.price > 0 ? `$${formatCLP(p.price)} CLP / mes` : '$0 CLP / mes'}
                                                         </p>
+                                                        {p.compare_price ? (
+                                                            <p className="text-[10px] text-slate-500 line-through tabular-nums">${formatCLP(p.compare_price)}</p>
+                                                        ) : null}
                                                         {(() => {
                                                             const cta = planCta(p.name, p.price, p.code);
                                                             return (

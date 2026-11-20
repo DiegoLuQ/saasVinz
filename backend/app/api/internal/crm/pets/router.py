@@ -138,20 +138,25 @@ def create_pet(
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found for this tenant")
 
+    pet_data = pet_in.dict()
+    if pet_data.get("name"):
+        from app.utils.sanitize import format_title_case_name
+        pet_data["name"] = format_title_case_name(pet_data["name"])
+
     # Validar duplicado por nombre para el mismo dueño y tenant
     existing_pet = db.query(models.Pet).filter(
         models.Pet.tenant_id == tenant_id,
         models.Pet.customer_id == pet_in.customer_id,
-        models.Pet.name == pet_in.name
+        models.Pet.name == pet_data.get("name")
     ).first()
     if existing_pet:
         raise HTTPException(
             status_code=400,
-            detail=f"El cliente ya tiene una mascota registrada con el nombre '{pet_in.name}'."
+            detail=f"El cliente ya tiene una mascota registrada con el nombre '{pet_data.get('name')}'."
         )
 
     db_pet = models.Pet(
-        **pet_in.dict(),
+        **pet_data,
         tenant_id=tenant_id
     )
     db.add(db_pet)
@@ -206,6 +211,9 @@ def actualizar_mascota(
         raise HTTPException(status_code=404, detail="Mascota no encontrada")
 
     update_data = pet_update.dict(exclude_unset=True)
+    if "name" in update_data and update_data["name"]:
+        from app.utils.sanitize import format_title_case_name
+        update_data["name"] = format_title_case_name(update_data["name"])
 
     # Validar duplicados si se cambia el nombre para el mismo dueño y tenant
     if "name" in update_data and update_data["name"] != db_pet.name:

@@ -35,6 +35,10 @@ def create_subscription_plan(
     db_plan = models.SubscriptionPlan(**plan.dict())
     apply_annual_price(db, db_plan)
     db.add(db_plan)
+    db.flush()
+    # El plan nuevo entra a la temporada de precios vigente con su precio
+    from app.services.price_seasons import sync_plan_price
+    sync_plan_price(db, db_plan)
     db.commit()
     db.refresh(db_plan)
     return db_plan
@@ -78,6 +82,10 @@ def update_subscription_plan(
         setattr(plan, field, value)
     # El anual sigue al mensual con el descuento global (services/plan_pricing.py).
     apply_annual_price(db, plan)
+    if "price" in update_data:
+        # El precio queda también en la temporada vigente (services/price_seasons.py)
+        from app.services.price_seasons import sync_plan_price
+        sync_plan_price(db, plan)
 
     db.commit()
     db.refresh(plan)
