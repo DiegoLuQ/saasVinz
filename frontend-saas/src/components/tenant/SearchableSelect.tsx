@@ -19,6 +19,7 @@ interface SearchableSelectProps {
     required?: boolean;
     isMulti?: boolean;
     icon?: React.ReactNode;
+    size?: 'sm' | 'md' | 'lg';
     triggerClassName?: string;
     renderTrigger?: (selectedOption: Option | undefined, isOpen: boolean) => React.ReactNode;
     renderOption?: (option: Option, isSelected: boolean) => React.ReactNode;
@@ -33,6 +34,7 @@ export default function SearchableSelect({
     required = false,
     isMulti = false,
     icon,
+    size = 'md',
     triggerClassName = '',
     renderTrigger,
     renderOption
@@ -131,6 +133,8 @@ export default function SearchableSelect({
         setIsOpen(newState);
     };
 
+    const isSm = size === 'sm';
+
     return (
         <div className={`relative ${className}`} ref={containerRef}>
             {renderTrigger ? (
@@ -140,17 +144,27 @@ export default function SearchableSelect({
             ) : (
                 <div
                     onClick={handleToggle}
-                    className={`w-full h-[52px] backdrop-blur-md border rounded-2xl px-5 flex items-center justify-between cursor-pointer transition-all duration-300 group shadow-lg shadow-black/5 ${
-                        isOpen ? 'border-primary/50 ring-4 ring-primary/10 bg-black/20' : 'border-white/10 bg-card/40 hover:bg-card/60'
+                    className={`w-full backdrop-blur-md border flex items-center justify-between cursor-pointer transition-all duration-200 group ${
+                        isSm
+                            ? `h-10 rounded-xl px-3 text-sm shadow-xs ${
+                                isOpen
+                                    ? 'border-amber-500 ring-2 ring-amber-500/15 bg-white dark:bg-slate-950'
+                                    : 'border-slate-300 dark:border-white/15 bg-white dark:bg-slate-950 hover:border-slate-400 dark:hover:border-white/30'
+                            }`
+                            : `h-[52px] rounded-2xl px-5 shadow-lg shadow-black/5 ${
+                                isOpen
+                                    ? 'border-primary/50 ring-4 ring-primary/10 bg-black/20'
+                                    : 'border-white/10 bg-card/40 hover:bg-card/60'
+                            }`
                     } ${triggerClassName}`}
                 >
                     <div className="flex items-center min-w-0 flex-1">
-                        {icon && <div className={`mr-3 transition-colors ${isOpen ? 'text-primary' : 'text-muted-foreground'}`}>{icon}</div>}
-                        <span className={`block truncate text-sm font-bold tracking-tight ${(!value || (Array.isArray(value) && value.length === 0)) ? 'text-muted-foreground/40' : 'text-foreground'}`}>
+                        {icon && <div className={`${isSm ? 'mr-2 shrink-0' : 'mr-3'} transition-colors ${isOpen ? 'text-amber-500' : 'text-muted-foreground'}`}>{icon}</div>}
+                        <span className={`block truncate ${isSm ? 'text-sm font-medium' : 'text-sm font-bold tracking-tight'} ${(!value || (Array.isArray(value) && value.length === 0)) ? 'text-muted-foreground/40' : 'text-slate-900 dark:text-white'}`}>
                             {getDisplayValue()}
                         </span>
                     </div>
-                    <ChevronDown size={18} className={`text-muted-foreground transition-transform duration-300 ${isOpen ? 'rotate-180 text-primary' : ''}`} />
+                    <ChevronDown size={isSm ? 16 : 18} className={`text-muted-foreground shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180 text-amber-500' : ''}`} />
                 </div>
             )}
 

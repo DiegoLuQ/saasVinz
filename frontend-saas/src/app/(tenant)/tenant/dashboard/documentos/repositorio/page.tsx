@@ -84,6 +84,8 @@ export default function DocumentsPage() {
     // States
     const [searchTerm, setSearchTerm] = useState('');
     const [activeFilter, setActiveFilter] = useState<FilterKey | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     // Búsqueda en el texto impreso de los certificados (textos libres, nombres, fechas…):
     // la hace el backend (también en certificados antiguos); espera 300 ms tras escribir.
@@ -104,9 +106,9 @@ export default function DocumentsPage() {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [docToDelete, setDocToDelete] = useState<{ id: number; isGenerated: boolean } | null>(null);
 
-    // Filter logic
+    // Filter & Sort logic
     const filteredDocuments = useMemo(() => {
-        let filtered = documents;
+        let filtered = [...documents];
 
         // 1. Filter by category
         if (activeFilter) {
@@ -131,8 +133,34 @@ export default function DocumentsPage() {
             );
         }
 
+        // 3. Sort latest first (most recent issue_date or created_at)
+        filtered.sort((a, b) => {
+            const dateA = new Date(a.issue_date || a.created_at || 0).getTime();
+            const dateB = new Date(b.issue_date || b.created_at || 0).getTime();
+            if (dateB !== dateA) return dateB - dateA;
+            return b.id - a.id;
+        });
+
         return filtered;
     }, [documents, activeFilter, searchTerm, textMatches]);
+
+    const totalPages = Math.ceil(filteredDocuments.length / itemsPerPage) || 1;
+
+    // Reset pagination to first page when search or category filter changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, activeFilter, itemsPerPage]);
+
+    useEffect(() => {
+        if (currentPage > totalPages) {
+            setCurrentPage(totalPages);
+        }
+    }, [currentPage, totalPages]);
+
+    const paginatedDocuments = useMemo(() => {
+        const start = (currentPage - 1) * itemsPerPage;
+        return filteredDocuments.slice(start, start + itemsPerPage);
+    }, [filteredDocuments, currentPage, itemsPerPage]);
 
     // Handlers
     const toggleFilter = (filter: FilterKey) => {
@@ -264,79 +292,146 @@ export default function DocumentsPage() {
                 ) : (
                     <AnimatePresence mode="popLayout">
                         {filteredDocuments.length > 0 ? (
-                            <motion.div layout className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                {filteredDocuments.map((doc) => {
-                                    const badge = getBadgeStyle(doc.type, doc.is_generated);
-                                    return (
-                                        <motion.div
-                                            layout
-                                            initial={{ opacity: 0, scale: 0.97 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            exit={{ opacity: 0, scale: 0.97 }}
-                                            key={doc.id}
-                                            className="group p-5 bg-white rounded-3xl border border-slate-200 shadow-sm hover:border-primary/40 hover:shadow-md transition-all flex flex-col justify-between h-full dark:bg-slate-900/50 dark:border-white/10 dark:shadow-none"
-                                        >
-                                            <div>
-                                                <div className="flex items-start justify-between gap-2 mb-4">
-                                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] uppercase font-black tracking-wider border ${badge}`}>
-                                                        {doc.type}
-                                                    </span>
-                                                    <div className="flex gap-1.5 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
-                                                        {doc.is_generated && (
+                            <>
+                                <motion.div layout className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                    {paginatedDocuments.map((doc) => {
+                                        const badge = getBadgeStyle(doc.type, doc.is_generated);
+                                        return (
+                                            <motion.div
+                                                layout
+                                                initial={{ opacity: 0, scale: 0.97 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                exit={{ opacity: 0, scale: 0.97 }}
+                                                key={doc.id}
+                                                className="group p-5 bg-white rounded-3xl border border-slate-200 shadow-sm hover:border-primary/40 hover:shadow-md transition-all flex flex-col justify-between h-full dark:bg-slate-900/50 dark:border-white/10 dark:shadow-none"
+                                            >
+                                                <div>
+                                                    <div className="flex items-start justify-between gap-2 mb-4">
+                                                        <span className={`px-2.5 py-1 rounded-lg text-[10px] uppercase font-black tracking-wider border ${badge}`}>
+                                                            {doc.type}
+                                                        </span>
+                                                        <div className="flex gap-1.5 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
+                                                            {doc.is_generated && (
+                                                                <button
+                                                                    onClick={() => setDataCertId(doc.id)}
+                                                                    className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-primary/10 hover:text-primary transition-colors dark:bg-white/5 dark:text-slate-300"
+                                                                    title="Ver datos del certificado"
+                                                                    aria-label="Ver datos del certificado"
+                                                                >
+                                                                    <Eye size={16} />
+                                                                </button>
+                                                            )}
                                                             <button
-                                                                onClick={() => setDataCertId(doc.id)}
-                                                                className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-primary/10 hover:text-primary transition-colors dark:bg-white/5 dark:text-slate-300"
-                                                                title="Ver datos del certificado"
-                                                                aria-label="Ver datos del certificado"
+                                                                onClick={() => handleDownloadPdf(doc)}
+                                                                disabled={downloadingId === doc.id}
+                                                                className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-primary/10 hover:text-primary transition-colors disabled:opacity-50 dark:bg-white/5 dark:text-slate-300"
+                                                                title="Descargar PDF"
+                                                                aria-label="Descargar PDF"
                                                             >
-                                                                <Eye size={16} />
+                                                                {downloadingId === doc.id ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
                                                             </button>
-                                                        )}
-                                                        <button
-                                                            onClick={() => handleDownloadPdf(doc)}
-                                                            disabled={downloadingId === doc.id}
-                                                            className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-primary/10 hover:text-primary transition-colors disabled:opacity-50 dark:bg-white/5 dark:text-slate-300"
-                                                            title="Descargar PDF"
-                                                            aria-label="Descargar PDF"
-                                                        >
-                                                            {downloadingId === doc.id ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeleteClick(doc.id, doc.is_generated)}
-                                                            className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors dark:bg-white/5 dark:text-slate-300 dark:hover:bg-red-500/15 dark:hover:text-red-400"
-                                                            title="Eliminar del repositorio"
-                                                            aria-label="Eliminar del repositorio"
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
+                                                            <button
+                                                                onClick={() => handleDeleteClick(doc.id, doc.is_generated)}
+                                                                className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors dark:bg-white/5 dark:text-slate-300 dark:hover:bg-red-500/15 dark:hover:text-red-400"
+                                                                title="Eliminar del repositorio"
+                                                                aria-label="Eliminar del repositorio"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
                                                     </div>
+
+                                                    <h4 className="font-bold text-slate-900 dark:text-white text-lg tracking-tight mb-1 truncate">{doc.pet_name}</h4>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold flex items-center gap-1.5 flex-wrap">
+                                                        {doc.service_type}
+                                                        {doc.number && <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-white/20" />}
+                                                        <span className="font-mono">{doc.number}</span>
+                                                    </p>
+                                                    {searchTerm.trim() && doc.is_generated && textMatches[String(doc.id)] && (
+                                                        <p className="mt-2 text-xs text-slate-600 dark:text-slate-300 line-clamp-2 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200/70 dark:border-amber-500/20 px-2.5 py-1.5"
+                                                            title={textMatches[String(doc.id)]}>
+                                                            <span className="font-bold text-amber-700 dark:text-amber-300">Texto: </span>{textMatches[String(doc.id)]}
+                                                        </p>
+                                                    )}
                                                 </div>
 
-                                                <h4 className="font-bold text-slate-900 dark:text-white text-lg tracking-tight mb-1 truncate">{doc.pet_name}</h4>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold flex items-center gap-1.5 flex-wrap">
-                                                    {doc.service_type}
-                                                    {doc.number && <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-white/20" />}
-                                                    <span className="font-mono">{doc.number}</span>
-                                                </p>
-                                                {searchTerm.trim() && doc.is_generated && textMatches[String(doc.id)] && (
-                                                    <p className="mt-2 text-xs text-slate-600 dark:text-slate-300 line-clamp-2 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200/70 dark:border-amber-500/20 px-2.5 py-1.5"
-                                                        title={textMatches[String(doc.id)]}>
-                                                        <span className="font-bold text-amber-700 dark:text-amber-300">Texto: </span>{textMatches[String(doc.id)]}
-                                                    </p>
-                                                )}
-                                            </div>
+                                                <div className="mt-5 pt-4 border-t border-slate-100 dark:border-white/[0.06] flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                                                    <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 rounded-lg dark:bg-white/5">
+                                                        <FileBadge size={12} className="text-primary" />
+                                                        Orden #{doc.cremation_id}
+                                                    </span>
+                                                    <span>{new Date(doc.issue_date || doc.created_at).toLocaleDateString('es-CL')}</span>
+                                                </div>
+                                            </motion.div>
+                                        );
+                                    })}
+                                </motion.div>
 
-                                            <div className="mt-5 pt-4 border-t border-slate-100 dark:border-white/[0.06] flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-semibold">
-                                                <span className="flex items-center gap-1.5 px-2 py-1 bg-slate-100 rounded-lg dark:bg-white/5">
-                                                    <FileBadge size={12} className="text-primary" />
-                                                    Orden #{doc.cremation_id}
-                                                </span>
-                                                <span>{new Date(doc.issue_date || doc.created_at).toLocaleDateString('es-CL')}</span>
+                                {/* Pagination Controls */}
+                                <div className="mt-8 pt-6 border-t border-slate-200/80 dark:border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Mostrar:</span>
+                                        <select
+                                            value={itemsPerPage}
+                                            onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-primary transition-all cursor-pointer shadow-xs"
+                                        >
+                                            <option value={10}>10</option>
+                                            <option value={20}>20</option>
+                                            <option value={50}>50</option>
+                                        </select>
+                                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                            Mostrando {(currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, filteredDocuments.length)} de {filteredDocuments.length} documentos
+                                        </span>
+                                    </div>
+
+                                    {totalPages > 1 && (
+                                        <div className="flex items-center gap-1.5">
+                                            <button
+                                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                                disabled={currentPage === 1}
+                                                className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-xs"
+                                            >
+                                                Anterior
+                                            </button>
+                                            <div className="flex items-center gap-1">
+                                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                                    let pageNum: number;
+                                                    if (totalPages <= 5) {
+                                                        pageNum = i + 1;
+                                                    } else if (currentPage <= 3) {
+                                                        pageNum = i + 1;
+                                                    } else if (currentPage >= totalPages - 2) {
+                                                        pageNum = totalPages - 4 + i;
+                                                    } else {
+                                                        pageNum = currentPage - 2 + i;
+                                                    }
+                                                    return (
+                                                        <button
+                                                            key={pageNum}
+                                                            onClick={() => setCurrentPage(pageNum)}
+                                                            className={`w-8 h-8 rounded-xl text-xs font-bold transition-all ${
+                                                                currentPage === pageNum
+                                                                    ? 'bg-primary text-white shadow-sm'
+                                                                    : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                                            }`}
+                                                        >
+                                                            {pageNum}
+                                                        </button>
+                                                    );
+                                                })}
                                             </div>
-                                        </motion.div>
-                                    );
-                                })}
-                            </motion.div>
+                                            <button
+                                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                                disabled={currentPage === totalPages}
+                                                className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-xs"
+                                            >
+                                                Siguiente
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </>
                         ) : (
                             <motion.div
                                 initial={{ opacity: 0 }}

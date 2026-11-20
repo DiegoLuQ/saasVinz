@@ -727,29 +727,34 @@ export default function TrackingPage() {
 
             {/* Header / Brand */}
             {isVisualTemplate ? (
-                <div className="fixed top-2 sm:top-3 left-0 right-0 z-20 px-4 pointer-events-none">
-                    <div className={`max-w-md mx-auto px-5 py-2.5 sm:py-3 flex items-center justify-between rounded-2xl backdrop-blur-md shadow-xs pointer-events-auto transition-colors duration-300 ${
-                        isDarkMode
-                            ? 'bg-[#1a1410]/85 border border-amber-500/30 shadow-[0_4px_20px_rgba(0,0,0,0.5)]'
-                            : 'bg-white/20 border border-white/40 shadow-xs'
-                    }`}>
-                        <div className="w-8" />
-                        <span className={`font-cinzel font-bold text-xs sm:text-sm tracking-[0.25em] uppercase transition-colors duration-300 ${
-                            isDarkMode ? 'text-amber-200' : 'text-amber-950'
-                        }`}>
+                <header className="fixed top-0 left-0 right-0 z-20 px-4 sm:px-6 py-3 sm:py-4 pointer-events-none">
+                    <div className="max-w-4xl mx-auto flex items-center justify-between pointer-events-auto">
+                        <div className="w-9 sm:w-10" />
+                        <span
+                            className={`font-cinzel font-bold text-xs sm:text-sm md:text-base tracking-[0.28em] uppercase transition-colors duration-300 text-center select-none ${
+                                isDarkMode ? 'text-amber-200' : 'text-amber-950'
+                            }`}
+                            style={{
+                                textShadow: isDarkMode
+                                    ? '0 1px 8px rgba(0,0,0,0.9), 0 0 20px rgba(251,191,36,0.2)'
+                                    : '0 1px 6px rgba(255,255,255,0.9), 0 1px 2px rgba(120,53,15,0.15)',
+                            }}
+                        >
                             {data.tenant_name}
                         </span>
                         <button
                             onClick={() => setIsDarkMode(!isDarkMode)}
-                            className={`p-1.5 rounded-full transition-colors shrink-0 ${
-                                isDarkMode ? 'hover:bg-amber-400/20 text-amber-300' : 'hover:bg-amber-500/15 text-amber-900'
+                            className={`p-2 sm:p-2.5 rounded-full transition-all shrink-0 backdrop-blur-md cursor-pointer ${
+                                isDarkMode
+                                    ? 'bg-[#1a1410]/70 hover:bg-amber-400/20 text-amber-300 border border-amber-500/25 shadow-[0_2px_12px_rgba(0,0,0,0.5)]'
+                                    : 'bg-white/40 hover:bg-white/70 text-amber-900 border border-white/60 shadow-xs hover:shadow-sm'
                             }`}
                             aria-label="Cambiar tema día/noche"
                         >
                             {isDarkMode ? <Sun size={17} /> : <Moon size={17} />}
                         </button>
                     </div>
-                </div>
+                </header>
             ) : (
                 <div className={`fixed top-0 w-full z-20 backdrop-blur-xl border-b transition-colors duration-500 ${theme.headerBg}`}>
                     <div className="max-w-md mx-auto px-6 py-4 flex items-center justify-center relative">
@@ -785,7 +790,7 @@ export default function TrackingPage() {
             )}
 
             <div className={`max-w-5xl mx-auto pb-20 px-4 sm:px-6 relative z-10 ${
-                isVisualTemplate ? 'pt-24 sm:pt-28' : 'pt-24'
+                isVisualTemplate ? 'pt-28 sm:pt-36 md:pt-40' : 'pt-24'
             }`}>
 
                 {/* Main Hero */}
@@ -795,7 +800,7 @@ export default function TrackingPage() {
                         animate={{ opacity: 1, y: 0 }}
                         className="mb-8 text-center"
                     >
-                        <div className="relative inline-block mb-4 mt-4">
+                        <div className="relative inline-block mb-4 mt-6 sm:mt-8">
                             {/* Ambient golden aura - muy suave, difuso y con alto blur */}
                             <div
                                 aria-hidden="true"
@@ -922,7 +927,7 @@ export default function TrackingPage() {
                                 <span style={{ color: visualColors.accent }}>♥</span>
                             </p>
                             <h1
-                                className="font-dancing sm:font-alex text-5xl sm:text-6xl font-bold tracking-wide my-0.5 transition-colors duration-300"
+                                className="font-dancing sm:font-alex text-5xl sm:text-6xl font-bold tracking-wide my-0.5 transition-colors duration-300 capitalize"
                                 style={{
                                     color: visualColors.title,
                                     textShadow: isDarkMode ? '0 2px 12px rgba(251,191,36,0.28)' : undefined,
@@ -937,11 +942,16 @@ export default function TrackingPage() {
                                     textShadow: isDarkMode ? '0 1px 4px rgba(0,0,0,0.8)' : undefined,
                                 }}
                             >
-                                <span>{data.pet_species === 'Felino' || data.pet_species === 'Gato' ? '♀ Felino' : '🐾 ' + (data.pet_species || 'Mascota')}</span>
+                                <span className="inline-flex items-center gap-1 capitalize">
+                                    {data.pet_species === 'Felino' || data.pet_species === 'Gato' ? '♀ Felino' : '🐾 ' + (data.pet_species || 'Mascota')}
+                                </span>
                                 {data.customer_name && (
                                     <>
-                                        <span>·</span>
-                                        <span>🐾 {data.customer_name}</span>
+                                        <span className="opacity-50">·</span>
+                                        <span className="inline-flex items-center gap-1.5 capitalize">
+                                            <Heart size={13} className="shrink-0 fill-current opacity-80" />
+                                            {data.customer_name}
+                                        </span>
                                     </>
                                 )}
                             </div>
